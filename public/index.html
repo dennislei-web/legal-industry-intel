@@ -425,23 +425,18 @@
           <option value="僅全聯會">僅全聯會</option>
           <option value="僅Lawsnote">僅Lawsnote</option>
         </select>
-        <select id="lawyerSortFilter" onchange="searchLawyers()">
-          <option value="name_asc">姓名 A→Z</option>
-          <option value="cases_desc">案件數多→少</option>
-          <option value="cases_asc">案件數少→多</option>
-        </select>
       </div>
       <div class="card">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>姓名</th>
-                <th>事務所</th>
-                <th>公會</th>
-                <th>執業起始</th>
-                <th>案件數(5年)</th>
-                <th>來源</th>
+                <th style="cursor:pointer" onclick="sortLawyers('name')">姓名 <span id="sortIcon_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('firm_name')">事務所 <span id="sortIcon_firm_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('region')">公會 <span id="sortIcon_region">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('practice_start_date')">執業起始 <span id="sortIcon_practice_start_date">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('case_count_5yr')">案件數(5年) <span id="sortIcon_case_count_5yr">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('data_source')">來源 <span id="sortIcon_data_source">↕</span></th>
               </tr>
             </thead>
             <tbody id="lawyerTableBody">
@@ -797,6 +792,23 @@ const PAGE_SIZE = 50;
 
 // Pagination state
 let lawyerPage = 0, lawyerTotal = 0;
+let lawyerSortCol = 'name', lawyerSortAsc = true;
+
+function sortLawyers(col) {
+  if (lawyerSortCol === col) {
+    lawyerSortAsc = !lawyerSortAsc;
+  } else {
+    lawyerSortCol = col;
+    lawyerSortAsc = (col === 'case_count_5yr') ? false : true; // 案件數預設降序
+  }
+  // 更新排序圖示
+  ['name','firm_name','region','practice_start_date','case_count_5yr','data_source'].forEach(c => {
+    const icon = document.getElementById('sortIcon_' + c);
+    if (icon) icon.textContent = c === col ? (lawyerSortAsc ? '↑' : '↓') : '↕';
+  });
+  lawyerPage = 0;
+  loadLawyers();
+}
 
 let newsPage = 0, newsTotal = 0;
 
@@ -1056,16 +1068,13 @@ async function loadLawyers() {
   const search = document.getElementById('lawyerSearch').value.trim();
   const region = document.getElementById('lawyerRegionFilter').value;
   const source = document.getElementById('lawyerSourceFilter').value;
-  const sort = document.getElementById('lawyerSortFilter').value;
-
   let query = db.from('lawyers_combined').select('*', { count: 'exact' });
   if (search) query = query.or(`name.ilike.%${search}%,firm_name.ilike.%${search}%`);
   if (region) query = query.eq('region', region);
   if (source) query = query.eq('data_source', source);
 
-  if (sort === 'cases_desc') query = query.order('case_count_5yr', { ascending: false, nullsFirst: false });
-  else if (sort === 'cases_asc') query = query.order('case_count_5yr', { ascending: true, nullsFirst: false });
-  else query = query.order('name', { ascending: true });
+  const nullsFirst = lawyerSortAsc;
+  query = query.order(lawyerSortCol, { ascending: lawyerSortAsc, nullsFirst: false });
 
   query = query.range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
