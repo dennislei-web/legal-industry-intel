@@ -1092,10 +1092,9 @@ async function loadLawyers() {
 
   tbody.innerHTML = data.map(l => {
     const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
-    const firm = l.firm_name ? l.firm_name.replace('律師事務所', '').replace('法律事務所', '(法律)').trim() : '-';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
-      <td style="font-size:0.8rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.firm_name || '')}">${escHtml(firm)}</td>
+      <td style="font-size:0.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.firm_name || '')}">${escHtml(l.firm_name || '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
