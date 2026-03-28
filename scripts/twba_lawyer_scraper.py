@@ -30,6 +30,13 @@ SURNAMES = [
     '紀', '姚', '連', '馮', '歐', '程', '湯', '田', '康', '姜',
     '白', '汪', '鄒', '尤', '巫', '鑰', '鐘', '黎', '涂', '龔',
     '嚴', '韓', '袁', '金', '童', '陸', '夏', '柳', '凃', '邵',
+    # 第二批：從 Lawsnote 比對發現缺少的姓氏
+    '溫', '鄺', '歐陽', '穆', '段', '孔', '任', '秦', '闕', '賀',
+    '雷', '喬', '裴', '甘', '萬', '崔', '談', '賈', '文', '殷',
+    '倪', '左', '辛', '錢', '伍', '章', '管', '樊', '郝', '祝',
+    '鞏', '成', '包', '屈', '凌', '費', '單', '齊', '梅', '龍',
+    '關', '華', '申', '岳', '鄧', '毛', '鮑', '易', '安', '危',
+    '全', '覃', '向', '俞', '耿', '植', '聶', '景', '池', '畢',
 ]
 
 
@@ -50,32 +57,16 @@ def get_viewstate(session):
     return fields
 
 
-def search_by_name(session, viewstate, name):
-    """以姓名查詢，回傳律師列表"""
-    data = dict(viewstate)
-    data['tb_CName'] = name
-    data['Button1'] = '查詢'
-
-    resp = session.post(URL, data=data, headers=HEADERS, timeout=60)
-    resp.raise_for_status()
-    resp.encoding = 'utf-8'
-
-    soup = BeautifulSoup(resp.text, 'html.parser')
-
-    # 更新 viewstate for next request
-    for field_name in ['__VIEWSTATE', '__VIEWSTATEGENERATOR', '__EVENTVALIDATION',
-                        '__VIEWSTATEENCRYPTED']:
-        tag = soup.find('input', {'name': field_name})
-        if tag:
-            viewstate[field_name] = tag.get('value', '')
-
-    # 解析表格 (ASP.NET GridView, id=GView_PIO)
+def parse_table_page(soup):
+    """解析單頁表格結果"""
     table = soup.find('table', {'id': 'GView_PIO'})
     if not table:
-        return []
+        return [], False
 
     rows = table.find_all('tr')
     results = []
+    has_next_page = False
+
     for row in rows[1:]:  # 跳過表頭
         cells = row.find_all('td')
         if len(cells) >= 4:
@@ -92,7 +83,71 @@ def search_by_name(session, viewstate, name):
                     'practice_end': practice_end,
                 })
 
-    return results
+        # 檢查是否有分頁列（包含 '...' 或數字連結）
+        pager_links = row.find_all('a', href=True)
+        for link in pager_links:
+            href = link.get('href', '')
+            if "Page$" in href or "Page$Next" in href:
+                has_next_page = True
+
+    return results, has_next_page
+
+
+def update_viewstate(soup, viewstate):
+    """從回傳頁面更新 ViewState"""
+    for field_name in ['__VIEWSTATE', '__VIEWSTATEGENERATOR', '__EVENTVALIDATION',
+                        '__VIEWSTATEENCRYPTED']:
+        tag = soup.find('input', {'name': field_name})
+        if tag:
+            viewstate[field_name] = tag.get('value', '')
+
+
+def search_by_name(session, viewstate, name):
+    """以姓名查詢，支援分頁，回傳所有頁面的律師列表"""
+    # 第一頁：送出查詢
+    data = dict(viewstate)
+    data['tb_CName'] = name
+    data['Button1'] = '查詢'
+
+    resp = session.post(URL, data=data, headers=HEADERS, timeout=60)
+    resp.raise_for_status()
+    resp.encoding = 'utf-8'
+
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    update_viewstate(soup, viewstate)
+
+    results, has_next = parse_table_page(soup)
+    all_results = list(results)
+
+    # 分頁處理：如果有下一頁，繼續抓取
+    page = 2
+    max_pages = 20  # 安全上限
+    while has_next and page <= max_pages:
+        polite_delay(1.0)
+        log(f'    → 翻頁 {page}...')
+
+        data = dict(viewstate)
+        data['__EVENTTARGET'] = 'GView_PIO'
+        data['__EVENTARGUMENT'] = f'Page${page}'
+        data['tb_CName'] = name
+
+        try:
+            resp = session.post(URL, data=data, headers=HEADERS, timeout=60)
+            resp.raise_for_status()
+            resp.encoding = 'utf-8'
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            update_viewstate(soup, viewstate)
+
+            results, has_next = parse_table_page(soup)
+            if not results:
+                break
+            all_results.extend(results)
+            page += 1
+        except Exception as e:
+            log(f'    → 分頁 {page} 失敗: {e}')
+            break
+
+    return all_results
 
 
 def normalize_bar_association(raw):
