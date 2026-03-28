@@ -1142,13 +1142,24 @@ async function loadLawyers() {
 
   tbody.innerHTML = data.map(l => {
     const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
+    const lawsnoteLink = l.lawsnote_id ? `https://page.lawsnote.com/page/${l.lawsnote_id}` : null;
+    const twbaLink = 'https://nab.twba.org.tw/';
+    let srcHtml = '';
+    if (l.data_source === '兩者皆有') {
+      srcHtml = `<a href="${twbaLink}" target="_blank" class="badge badge-blue" style="text-decoration:none;margin:1px;">全聯會</a>` +
+                (lawsnoteLink ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;margin:1px;">Lawsnote</a>` : '');
+    } else if (l.data_source === '僅全聯會') {
+      srcHtml = `<a href="${twbaLink}" target="_blank" class="badge badge-blue" style="text-decoration:none;">全聯會</a>`;
+    } else {
+      srcHtml = lawsnoteLink ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;">Lawsnote</a>` : `<span class="badge badge-orange">Lawsnote</span>`;
+    }
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
       <td style="font-size:0.8rem;" title="${escHtml(l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
-      <td><span class="badge ${srcCls}">${escHtml(l.data_source)}</span></td>
+      <td>${srcHtml}</td>
     </tr>`;
   }).join('');
 
