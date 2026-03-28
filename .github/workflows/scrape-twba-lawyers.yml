@@ -1,0 +1,28 @@
+name: 爬取全聯會律師名單
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'  # 每週日 UTC 19:00 = 台灣週一凌晨 3:00
+  workflow_dispatch: {}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run TWBA lawyer scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: python twba_lawyer_scraper.py
