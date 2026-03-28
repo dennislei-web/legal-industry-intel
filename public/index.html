@@ -736,14 +736,11 @@ async function loadOverview() {
   document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
   document.getElementById('kpiSourcesSub').textContent = '資料來源';
 
-  // Region distribution chart - from lawyer_members
-  const { data: regionRaw } = await db.from('lawyer_members').select('region');
-  const regionMap = {};
-  (regionRaw || []).forEach(r => { if (r.region) regionMap[r.region] = (regionMap[r.region] || 0) + 1; });
-  const regionData = Object.entries(regionMap)
-    .map(([region, count]) => ({ region, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  // Region distribution chart - from industry_stats (guild_lawyer_count)
+  const { data: regionStats } = await db.from('industry_stats').select('region,value')
+    .eq('stat_type', 'guild_lawyer_count').not('region', 'is', null)
+    .order('value', { ascending: false }).limit(10);
+  const regionData = (regionStats || []).map(r => ({ region: r.region, count: Number(r.value) }));
   renderRegionChart(regionData);
 
   // Yearly new lawyers chart
