@@ -621,6 +621,11 @@
       </div>
 
       <div class="card">
+        <div class="card-title">📂 已上傳的檔案</div>
+        <div id="uploadsList"><div class="loading">載入中</div></div>
+      </div>
+
+      <div class="card">
         <div class="card-title">&#128203; 我的筆記</div>
         <div id="notesList"><div class="loading">載入中</div></div>
       </div>
@@ -761,7 +766,7 @@ function showTab(tab) {
   if (tab === 'firms') loadFirms();
   if (tab === 'trends') loadTrends();
   if (tab === 'news') { loadNews(); loadInsights(); }
-  if (tab === 'input') loadNotes();
+  if (tab === 'input') { loadNotes(); loadUploads(); }
   if (tab === 'sources') loadSources();
 }
 
@@ -1431,8 +1436,33 @@ async function uploadData() {
   } else {
     statusEl.style.color = 'var(--green)';
     statusEl.textContent = `✅ 成功匯入 ${uploadedData.length} 筆`;
+    loadUploads(); // refresh the uploads list
     setTimeout(() => { clearUpload(); statusEl.style.display = 'none'; }, 3000);
   }
+}
+
+async function loadUploads() {
+  const el = document.getElementById('uploadsList');
+  const { data, error } = await db.from('user_uploads')
+    .select('id,file_name,data_type,description,row_count,created_at')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error || !data || !data.length) {
+    el.innerHTML = '<div class="empty-state"><div class="msg">尚無上傳檔案</div></div>';
+    return;
+  }
+
+  const typeLabels = { lawyers: '律師資料', law_firms: '事務所資料', industry_stats: '產業統計', custom: '自訂資料' };
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>檔案名稱</th><th>資料類型</th><th>說明</th><th>筆數</th><th>上傳時間</th></tr></thead><tbody>' +
+    data.map(u => `<tr>
+      <td style="color:var(--blue);">📄 ${u.file_name}</td>
+      <td><span class="badge" style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:0.8rem;">${typeLabels[u.data_type] || u.data_type}</span></td>
+      <td>${u.description || '-'}</td>
+      <td>${u.row_count || '-'}</td>
+      <td style="color:var(--text-muted);font-size:0.85rem;">${new Date(u.created_at).toLocaleString('zh-TW')}</td>
+    </tr>`).join('') +
+    '</tbody></table></div>';
 }
 
 async function saveNote() {
