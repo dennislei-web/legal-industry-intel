@@ -259,6 +259,36 @@ CREATE POLICY "notes_update" ON manual_notes FOR UPDATE USING (user_id = auth.ui
 CREATE POLICY "notes_delete" ON manual_notes FOR DELETE USING (user_id = auth.uid());
 
 -- ============================================================
+-- 4b. Lawsnote 律師專長資料
+-- ============================================================
+
+CREATE TABLE lawsnote_lawyers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  lawsnote_id TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  case_count_5yr INTEGER,
+  expertise_areas TEXT[],
+  regions TEXT[],
+  cert_number TEXT,
+  service_regions TEXT[],
+  is_active BOOLEAN DEFAULT true,
+  source_url TEXT,
+  raw_data JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_lawsnote_name ON lawsnote_lawyers(name);
+CREATE INDEX idx_lawsnote_case_count ON lawsnote_lawyers(case_count_5yr DESC);
+CREATE INDEX idx_lawsnote_expertise ON lawsnote_lawyers USING GIN(expertise_areas);
+CREATE INDEX idx_lawsnote_regions ON lawsnote_lawyers USING GIN(regions);
+
+ALTER TABLE lawsnote_lawyers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_read" ON lawsnote_lawyers FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE TRIGGER lawsnote_lawyers_updated_at BEFORE UPDATE ON lawsnote_lawyers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
 -- 5. 種子資料 - 資料來源
 -- ============================================================
 
@@ -267,5 +297,6 @@ INSERT INTO data_sources (name, url, description, data_type, scraper_name, updat
   ('經濟部商工登記', 'https://findbiz.nat.gov.tw/', '經濟部商業司商工登記公示資料', 'firms', 'moea_firms', 'weekly'),
   ('司法院統計', 'https://www.judicial.gov.tw/', '司法院司法統計年報', 'stats', 'judicial_stats', 'monthly'),
   ('法律新聞聚合', NULL, 'Google News + 法律媒體新聞', 'news', 'news', 'daily'),
-  ('AI 市場分析', NULL, 'Claude API 產出的市場洞察報告', 'insights', 'ai_insights', 'weekly')
+  ('AI 市場分析', NULL, 'Claude API 產出的市場洞察報告', 'insights', 'ai_insights', 'weekly'),
+  ('Lawsnote 律師專長', 'https://page.lawsnote.com/', 'Lawsnote 律師頁面 - 案件數與專長分布', 'lawyers', 'lawsnote_lawyers', 'weekly')
 ON CONFLICT (name) DO NOTHING;
