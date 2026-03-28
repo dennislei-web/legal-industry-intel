@@ -397,15 +397,9 @@
     <!-- ==================== TAB: LAWYERS ==================== -->
     <div id="tab-lawyers" class="tab-content">
       <div class="search-bar">
-        <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名、證號、事務所..." oninput="searchLawyers()">
+        <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名..." oninput="searchLawyers()">
         <select id="lawyerRegionFilter" onchange="searchLawyers()">
           <option value="">所有地區</option>
-        </select>
-        <select id="lawyerStatusFilter" onchange="searchLawyers()">
-          <option value="">所有狀態</option>
-          <option value="active">執業中</option>
-          <option value="inactive">停業</option>
-          <option value="retired">退休</option>
         </select>
       </div>
       <div class="card">
@@ -414,16 +408,15 @@
             <thead>
               <tr>
                 <th>姓名</th>
-                <th>證號</th>
                 <th>所屬公會</th>
-                <th>事務所</th>
                 <th>地區</th>
-                <th>資格日期</th>
+                <th>執業起始</th>
+                <th>執業結束</th>
                 <th>狀態</th>
               </tr>
             </thead>
             <tbody id="lawyerTableBody">
-              <tr><td colspan="7" class="loading">載入中</td></tr>
+              <tr><td colspan="6" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -722,31 +715,36 @@ function toggleTheme() {
 // ============================================================
 async function loadOverview() {
   // Lawyer count
-  const { count: lawyerCount } = await db.from('industry_lawyers').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  const { count: lawyerCount } = await db.from('lawyer_members').select('*', { count: 'exact', head: true }).eq('is_active', true);
   document.getElementById('kpiLawyerCount').textContent = lawyerCount != null ? lawyerCount.toLocaleString() : '0';
-  document.getElementById('kpiLawyerSub').textContent = '執業中';
+  document.getElementById('kpiLawyerSub').textContent = '執業中 (全聯會)';
 
   // Firm count
   const { count: firmCount } = await db.from('law_firms').select('*', { count: 'exact', head: true }).eq('status', 'active');
   document.getElementById('kpiFirmCount').textContent = firmCount != null ? firmCount.toLocaleString() : '0';
-  document.getElementById('kpiFirmSub').textContent = '營業中';
+  document.getElementById('kpiFirmSub').textContent = '公會數';
 
-  // New lawyers this year
-  const currentYear = new Date().getFullYear();
-  const yearStart = `${currentYear}-01-01`;
-  const { count: newLawyers } = await db.from('industry_lawyers').select('*', { count: 'exact', head: true })
-    .gte('license_date', yearStart);
-  document.getElementById('kpiNewLawyers').textContent = newLawyers != null ? newLawyers.toLocaleString() : '0';
-  document.getElementById('kpiNewLawyersSub').textContent = `${currentYear} 年`;
+  // Guild total from industry_stats
+  const { data: guildStats } = await db.from('industry_stats').select('value')
+    .eq('stat_type', 'lawyer_count').is('region', null).order('year', { ascending: false }).limit(1);
+  const totalFromGuild = guildStats && guildStats[0] ? Number(guildStats[0].value) : 0;
+  document.getElementById('kpiNewLawyers').textContent = totalFromGuild.toLocaleString();
+  document.getElementById('kpiNewLawyersSub').textContent = '法務部統計總數';
 
   // Data sources
   const { count: srcCount } = await db.from('data_sources').select('*', { count: 'exact', head: true }).eq('is_active', true);
   document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
-  document.getElementById('kpiSourcesSub').textContent = '啟用中';
+  document.getElementById('kpiSourcesSub').textContent = '資料來源';
 
-  // Region distribution chart
-  const { data: regionData } = await db.from('ind_lawyer_region_distribution').select('*').limit(10);
-  renderRegionChart(regionData || []);
+  // Region distribution chart - from lawyer_members
+  const { data: regionRaw } = await db.from('lawyer_members').select('region');
+  const regionMap = {};
+  (regionRaw || []).forEach(r => { if (r.region) regionMap[r.region] = (regionMap[r.region] || 0) + 1; });
+  const regionData = Object.entries(regionMap)
+    .map(([region, count]) => ({ region, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  renderRegionChart(regionData);
 
   // Yearly new lawyers chart
   const { data: yearlyData } = await db.from('ind_yearly_new_lawyers').select('*');
@@ -842,14 +840,12 @@ function searchLawyers() {
 async function loadLawyers() {
   const search = document.getElementById('lawyerSearch').value.trim();
   const region = document.getElementById('lawyerRegionFilter').value;
-  const status = document.getElementById('lawyerStatusFilter').value;
 
-  let query = db.from('industry_lawyers').select('*', { count: 'exact' });
-  if (search) query = query.or(`name.ilike.%${search}%,license_number.ilike.%${search}%,affiliated_firm_name.ilike.%${search}%`);
+  let query = db.from('lawyer_members').select('*', { count: 'exact' });
+  if (search) query = query.ilike('name', `%${search}%`);
   if (region) query = query.eq('region', region);
-  if (status) query = query.eq('status', status);
 
-  query = query.order('license_date', { ascending: false, nullsFirst: false })
+  query = query.order('name', { ascending: true })
     .range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
   const { data, count, error } = await query;
@@ -859,21 +855,20 @@ async function loadLawyers() {
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
     return;
   }
 
-  const statusMap = { active: ['執業中', 'badge-green'], inactive: ['停業', 'badge-orange'], suspended: ['停權', 'badge-red'], retired: ['退休', 'badge-purple'] };
   tbody.innerHTML = data.map(l => {
-    const [label, cls] = statusMap[l.status] || [l.status, ''];
+    const cls = l.is_active ? 'badge-green' : 'badge-orange';
+    const label = l.is_active ? '執業中' : '已屆期';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
-      <td>${escHtml(l.license_number || '-')}</td>
       <td>${escHtml(l.bar_association || '-')}</td>
-      <td>${escHtml(l.affiliated_firm_name || '-')}</td>
       <td>${escHtml(l.region || '-')}</td>
-      <td>${l.license_date || '-'}</td>
+      <td>${l.practice_start_date || '-'}</td>
+      <td>${l.practice_end_date || '-'}</td>
       <td><span class="badge ${cls}">${label}</span></td>
     </tr>`;
   }).join('');
@@ -882,11 +877,12 @@ async function loadLawyers() {
 
   // Populate region filter (once)
   if (document.getElementById('lawyerRegionFilter').options.length <= 1) {
-    const { data: regions } = await db.from('ind_lawyer_region_distribution').select('region');
+    const { data: regions } = await db.from('lawyer_members').select('region').neq('region', null);
     if (regions) {
-      regions.forEach(r => {
+      const unique = [...new Set(regions.map(r => r.region))].sort();
+      unique.forEach(r => {
         const opt = document.createElement('option');
-        opt.value = r.region; opt.textContent = r.region;
+        opt.value = r; opt.textContent = r;
         document.getElementById('lawyerRegionFilter').appendChild(opt);
       });
     }
