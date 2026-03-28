@@ -441,12 +441,11 @@
                 <th>公會</th>
                 <th>執業起始</th>
                 <th>案件數(5年)</th>
-                <th>擅長領域</th>
                 <th>來源</th>
               </tr>
             </thead>
             <tbody id="lawyerTableBody">
-              <tr><td colspan="7" class="loading">載入中</td></tr>
+              <tr><td colspan="6" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -1077,14 +1076,12 @@ async function loadLawyers() {
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
     return;
   }
 
   tbody.innerHTML = data.map(l => {
-    const areas = (l.expertise_areas || []).slice(0, 3).map(e => `<span class="badge badge-blue" style="margin:1px;font-size:0.7rem;">${escHtml(e)}</span>`).join('');
-    const more = (l.expertise_areas || []).length > 3 ? `<span style="color:var(--text-muted);font-size:0.7rem;">+${l.expertise_areas.length - 3}</span>` : '';
     const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
     const firm = l.firm_name ? l.firm_name.replace('律師事務所', '').replace('法律事務所', '(法律)').trim() : '-';
     return `<tr>
@@ -1093,7 +1090,6 @@ async function loadLawyers() {
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
-      <td>${areas}${more || '-'}</td>
       <td><span class="badge ${srcCls}">${escHtml(l.data_source)}</span></td>
     </tr>`;
   }).join('');
