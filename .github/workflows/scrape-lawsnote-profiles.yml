@@ -1,0 +1,34 @@
+name: 爬取 Lawsnote 律師個人資料
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: '每批處理筆數'
+        required: false
+        default: '600'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install supabase playwright
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run profile scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '600' }}
+        working-directory: scripts
+        run: python scrape_lawsnote_profiles.py
