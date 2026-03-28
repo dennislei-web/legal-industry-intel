@@ -437,7 +437,7 @@
             <thead>
               <tr>
                 <th>姓名</th>
-                <th>所屬公會</th>
+                <th>公會</th>
                 <th>地區</th>
                 <th>執業起始</th>
                 <th>案件數(5年)</th>
@@ -1088,7 +1088,7 @@ async function loadLawyers() {
     const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
-      <td>${escHtml(l.bar_association || '-')}</td>
+      <td>${escHtml((l.bar_association || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td>${escHtml(l.region || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
@@ -1099,14 +1099,13 @@ async function loadLawyers() {
 
   renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
 
-  // Populate region filter (once)
+  // Populate region filter (once) - use RPC for efficiency
   if (document.getElementById('lawyerRegionFilter').options.length <= 1) {
-    const { data: regions } = await db.from('lawyer_members').select('region').neq('region', null);
+    const { data: regions } = await db.rpc('region_distribution');
     if (regions) {
-      const unique = [...new Set(regions.map(r => r.region))].sort();
-      unique.forEach(r => {
+      regions.forEach(r => {
         const opt = document.createElement('option');
-        opt.value = r; opt.textContent = r;
+        opt.value = r.region; opt.textContent = `${r.region} (${r.count})`;
         document.getElementById('lawyerRegionFilter').appendChild(opt);
       });
     }
