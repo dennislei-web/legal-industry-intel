@@ -58,6 +58,7 @@ def search_by_name(session, viewstate, name):
 
     resp = session.post(URL, data=data, headers=HEADERS, timeout=60)
     resp.raise_for_status()
+    resp.encoding = 'utf-8'
 
     soup = BeautifulSoup(resp.text, 'html.parser')
 
@@ -68,8 +69,8 @@ def search_by_name(session, viewstate, name):
         if tag:
             viewstate[field_name] = tag.get('value', '')
 
-    # 解析表格
-    table = soup.find('table')
+    # 解析表格 (ASP.NET GridView, id=GView_PIO)
+    table = soup.find('table', {'id': 'GView_PIO'})
     if not table:
         return []
 
