@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台灣法律產業情報儀表板</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    /* ===================== CSS VARIABLES ===================== */
+    :root {
+      --bg-main:    #020b18;
+      --bg-card:    #0a1628;
+      --bg-row:     #111b2e;
+      --bg-hover:   #16253d;
+      --border:     #1e3050;
+      --border-light: #243a5e;
+      --gold:       #c9a84c;
+      --gold-light: #e8c97a;
+      --text:       #e0e0e0;
+      --text-muted: #8899aa;
+      --blue:       #4f8ef7;
+      --blue-dim:   rgba(79,142,247,0.15);
+      --green:      #4caf82;
+      --green-dim:  rgba(76,175,130,0.15);
+      --red:        #e05c5c;
+      --red-dim:    rgba(224,92,92,0.15);
+      --orange:     #e0954a;
+      --orange-dim: rgba(224,149,74,0.15);
+      --purple:     #9b7ed8;
+      --purple-dim: rgba(155,126,216,0.15);
+      --header-bg:  rgba(10,22,40,0.95);
+      --login-shadow: rgba(0,0,0,0.5);
+      --tab-active-bg: rgba(201,168,76,0.12);
+      --tab-active-border: rgba(201,168,76,0.2);
+      --tab-active-color: var(--gold-light);
+      --ghost-bg: rgba(255,255,255,0.07);
+      --ghost-hover-bg: rgba(255,255,255,0.12);
+    }
+
+    [data-theme="light"] {
+      --bg-main:    #f5f6fa;
+      --bg-card:    #ffffff;
+      --bg-row:     #f0f2f5;
+      --bg-hover:   #e8eaf0;
+      --border:     #d0d5dd;
+      --border-light: #e0e4eb;
+      --gold:       #a3842a;
+      --gold-light: #8b6f1e;
+      --text:       #1a1a2e;
+      --text-muted: #6b7280;
+      --blue:       #2563eb;
+      --blue-dim:   rgba(37,99,235,0.1);
+      --green:      #15803d;
+      --green-dim:  rgba(21,128,61,0.12);
+      --red:        #dc2626;
+      --red-dim:    rgba(220,38,38,0.1);
+      --orange:     #d97706;
+      --orange-dim: rgba(217,119,6,0.1);
+      --purple:     #7c3aed;
+      --purple-dim: rgba(124,58,237,0.1);
+      --header-bg:  rgba(255,255,255,0.95);
+      --login-shadow: rgba(0,0,0,0.12);
+      --tab-active-bg: rgba(37,99,235,0.1);
+      --tab-active-border: rgba(37,99,235,0.25);
+      --tab-active-color: #2563eb;
+      --ghost-bg: rgba(0,0,0,0.04);
+      --ghost-hover-bg: rgba(0,0,0,0.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+      background: var(--bg-main);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-main); }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+
+    /* ===================== LOGIN ===================== */
+    #loginPage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(79,142,247,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(201,168,76,0.06) 0%, transparent 50%),
+        var(--bg-main);
+    }
+
+    .login-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 44px 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 24px 64px var(--login-shadow);
+    }
+
+    .login-logo { text-align: center; margin-bottom: 28px; }
+    .login-logo .title { font-size: 1.5rem; font-weight: 700; color: var(--gold-light); letter-spacing: 2px; }
+    .login-logo .subtitle { margin-top: 6px; font-size: 0.85rem; color: var(--text-muted); letter-spacing: 1px; }
+    .login-divider { height: 1px; background: linear-gradient(to right, transparent, var(--border-light), transparent); margin-bottom: 28px; }
+
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; padding: 11px 14px; background: var(--bg-row); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; transition: border-color 0.2s; font-family: inherit;
+    }
+    .form-group input::placeholder, .form-group textarea::placeholder { color: var(--text-muted); }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(79,142,247,0.15); }
+    .form-group textarea { resize: vertical; min-height: 100px; }
+
+    .login-error { color: var(--red); font-size: 0.85rem; margin-bottom: 12px; display: none; }
+
+    .btn { display: inline-block; padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+    .btn-primary { background: linear-gradient(135deg, var(--gold), var(--gold-light)); color: #020b18; width: 100%; padding: 12px; font-size: 1rem; letter-spacing: 1px; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(201,168,76,0.35); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+    .btn-ghost { background: var(--ghost-bg); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--ghost-hover-bg); }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-blue:hover { opacity: 0.9; }
+    .btn-red { background: var(--red); color: #fff; }
+
+    /* ===================== HEADER ===================== */
+    #dashboard { display: none; }
+
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--header-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+
+    .header-inner { display: flex; align-items: center; justify-content: space-between; height: 56px; max-width: 1400px; margin: 0 auto; }
+    .header-brand { display: flex; align-items: center; gap: 10px; }
+    .header-brand .icon { font-size: 1.4rem; }
+    .header-brand .name { font-size: 1.1rem; font-weight: 700; color: var(--gold-light); letter-spacing: 1px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+
+    .theme-toggle {
+      background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text-muted);
+      width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: all 0.2s;
+    }
+    .theme-toggle:hover { background: var(--ghost-hover-bg); color: var(--text); }
+
+    .user-badge { font-size: 0.8rem; color: var(--text-muted); }
+    .btn-logout { padding: 6px 14px; font-size: 0.8rem; background: var(--ghost-bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .btn-logout:hover { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+
+    /* ===================== TABS ===================== */
+    .tabs-bar {
+      display: flex; gap: 2px; max-width: 1400px; margin: 0 auto; padding: 8px 24px 0;
+      border-bottom: 1px solid var(--border); overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 10px 18px; font-size: 0.85rem; font-weight: 500; color: var(--text-muted);
+      background: none; border: none; border-bottom: 2px solid transparent;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: inherit;
+    }
+    .tab-btn:hover { color: var(--text); background: var(--ghost-bg); }
+    .tab-btn.active { color: var(--tab-active-color); border-bottom-color: var(--tab-active-color); background: var(--tab-active-bg); }
+
+    /* ===================== CONTENT ===================== */
+    .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ===================== KPI CARDS ===================== */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+    .kpi-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .kpi-card:hover { border-color: var(--border-light); }
+    .kpi-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .kpi-value { font-size: 2rem; font-weight: 700; color: var(--text); }
+    .kpi-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+    .kpi-trend { font-size: 0.8rem; margin-top: 6px; }
+    .kpi-trend.up { color: var(--green); }
+    .kpi-trend.down { color: var(--red); }
+
+    /* ===================== CARDS & PANELS ===================== */
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px;
+    }
+    .card-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    /* ===================== TABLE ===================== */
+    .table-wrap { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 10px 12px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: var(--bg-row); }
+    td { padding: 10px 12px; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: var(--bg-hover); }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+    }
+    .badge-green { background: var(--green-dim); color: var(--green); }
+    .badge-red { background: var(--red-dim); color: var(--red); }
+    .badge-blue { background: var(--blue-dim); color: var(--blue); }
+    .badge-orange { background: var(--orange-dim); color: var(--orange); }
+    .badge-purple { background: var(--purple-dim); color: var(--purple); }
+
+    /* ===================== SEARCH/FILTER ===================== */
+    .search-bar {
+      display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .search-bar input, .search-bar select {
+      padding: 8px 14px; background: var(--bg-row); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.88rem; font-family: inherit;
+    }
+    .search-bar input { flex: 1; min-width: 200px; }
+    .search-bar input:focus, .search-bar select:focus { outline: none; border-color: var(--blue); }
+
+    /* ===================== NEWS CARD ===================== */
+    .news-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px;
+      transition: border-color 0.2s; cursor: default;
+    }
+    .news-card:hover { border-color: var(--border-light); }
+    .news-card .news-title { font-size: 0.95rem; font-weight: 600; color: var(--blue); margin-bottom: 6px; }
+    .news-card .news-title a { color: inherit; text-decoration: none; }
+    .news-card .news-title a:hover { text-decoration: underline; }
+    .news-card .news-meta { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px; }
+    .news-card .news-summary { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+    .news-card .news-tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .news-card .news-tags .tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: var(--blue-dim); color: var(--blue); }
+
+    .star-btn {
+      background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted); transition: color 0.2s;
+    }
+    .star-btn.starred { color: var(--gold); }
+
+    /* ===================== INSIGHT CARD ===================== */
+    .insight-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px;
+    }
+    .insight-card .insight-type { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--purple); margin-bottom: 6px; }
+    .insight-card .insight-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 10px; }
+    .insight-card .insight-content { font-size: 0.88rem; color: var(--text); line-height: 1.7; white-space: pre-wrap; }
+    .insight-card .insight-date { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; }
+
+    /* ===================== PAGINATION ===================== */
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; }
+    .pagination button { padding: 6px 12px; background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-family: inherit; }
+    .pagination button:hover { background: var(--ghost-hover-bg); }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination .page-info { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ===================== LOADING ===================== */
+    .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+    .loading::after { content: ''; display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state .msg { font-size: 0.95rem; }
+
+    /* ===================== CHART ===================== */
+    .chart-container { position: relative; height: 300px; margin-bottom: 16px; }
+
+    /* ===================== MOBILE ===================== */
+    @media (max-width: 768px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .header-inner { padding: 0 12px; }
+      .tabs-bar { padding: 8px 12px 0; }
+      .content { padding: 16px 12px; }
+      .kpi-value { font-size: 1.5rem; }
+    }
+
+    /* ===================== NOTE FORM ===================== */
+    .note-form { max-width: 700px; }
+    .note-form .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+    .note-form .form-row > * { flex: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ==================== LOGIN PAGE ==================== -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="title">法律產業情報</div>
+      <div class="subtitle">Taiwan Legal Industry Intelligence</div>
+    </div>
+    <div class="login-divider"></div>
+    <div class="form-group">
+      <label>電子郵件</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com">
+    </div>
+    <div class="form-group">
+      <label>密碼</label>
+      <input type="password" id="loginPassword" placeholder="請輸入密碼">
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">登入系統</button>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD ==================== -->
+<div id="dashboard">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <span class="icon">&#9878;</span>
+        <span class="name">法律產業情報</span>
+      </div>
+      <div class="header-actions">
+        <span class="user-badge" id="userBadge"></span>
+        <button class="theme-toggle" onclick="toggleTheme()" title="切換主題">&#9790;</button>
+        <button class="btn-logout" onclick="handleLogout()">登出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="showTab('overview')">總覽</button>
+    <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
+    <button class="tab-btn" onclick="showTab('firms')">事務所</button>
+    <button class="tab-btn" onclick="showTab('trends')">市場趨勢</button>
+    <button class="tab-btn" onclick="showTab('news')">新聞與洞察</button>
+    <button class="tab-btn" onclick="showTab('input')">手動輸入</button>
+    <button class="tab-btn" onclick="showTab('sources')">資料來源</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ==================== TAB: OVERVIEW ==================== -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="kpi-grid" id="overviewKpis">
+        <div class="kpi-card">
+          <div class="kpi-label">執業律師總數</div>
+          <div class="kpi-value" id="kpiLawyerCount">-</div>
+          <div class="kpi-sub" id="kpiLawyerSub">載入中...</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">事務所總數</div>
+          <div class="kpi-value" id="kpiFirmCount">-</div>
+          <div class="kpi-sub" id="kpiFirmSub">載入中...</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">今年新增律師</div>
+          <div class="kpi-value" id="kpiNewLawyers">-</div>
+          <div class="kpi-sub" id="kpiNewLawyersSub">載入中...</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">資料來源數</div>
+          <div class="kpi-value" id="kpiSources">-</div>
+          <div class="kpi-sub" id="kpiSourcesSub">載入中...</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128200; 律師地區分布</div>
+          <div class="chart-container"><canvas id="chartRegion"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128202; 每年新增律師</div>
+          <div class="chart-container"><canvas id="chartYearly"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128240; 最新產業新聞</div>
+          <div id="overviewNews"><div class="loading">載入中</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#129302; 最新 AI 洞察</div>
+          <div id="overviewInsight"><div class="loading">載入中</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: LAWYERS ==================== -->
+    <div id="tab-lawyers" class="tab-content">
+      <div class="search-bar">
+        <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名、證號、事務所..." oninput="searchLawyers()">
+        <select id="lawyerRegionFilter" onchange="searchLawyers()">
+          <option value="">所有地區</option>
+        </select>
+        <select id="lawyerStatusFilter" onchange="searchLawyers()">
+          <option value="">所有狀態</option>
+          <option value="active">執業中</option>
+          <option value="inactive">停業</option>
+          <option value="retired">退休</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>證號</th>
+                <th>所屬公會</th>
+                <th>事務所</th>
+                <th>地區</th>
+                <th>資格日期</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody id="lawyerTableBody">
+              <tr><td colspan="7" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="lawyerPagination"></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: FIRMS ==================== -->
+    <div id="tab-firms" class="tab-content">
+      <div class="search-bar">
+        <input type="text" id="firmSearch" placeholder="搜尋事務所名稱、統編..." oninput="searchFirms()">
+        <select id="firmCityFilter" onchange="searchFirms()">
+          <option value="">所有縣市</option>
+        </select>
+        <select id="firmStatusFilter" onchange="searchFirms()">
+          <option value="">所有狀態</option>
+          <option value="active">營業中</option>
+          <option value="closed">已歇業</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>名稱</th>
+                <th>統一編號</th>
+                <th>縣市</th>
+                <th>律師人數</th>
+                <th>組織型態</th>
+                <th>成立日期</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody id="firmTableBody">
+              <tr><td colspan="7" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="firmPagination"></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: TRENDS ==================== -->
+    <div id="tab-trends" class="tab-content">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">律師年複合成長率</div>
+          <div class="kpi-value" id="kpiLawyerGrowth">-</div>
+          <div class="kpi-sub">近 5 年</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">事務所密度</div>
+          <div class="kpi-value" id="kpiFirmDensity">-</div>
+          <div class="kpi-sub">每萬人口</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128200; 律師人數趨勢</div>
+          <div class="chart-container"><canvas id="chartLawyerTrend"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127970; 事務所數量趨勢</div>
+          <div class="chart-container"><canvas id="chartFirmTrend"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128202; 事務所規模分布</div>
+        <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: NEWS ==================== -->
+    <div id="tab-news" class="tab-content">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn btn-sm btn-ghost" onclick="showNewsSubTab('news')" id="newsSubBtn" style="border-bottom:2px solid var(--tab-active-color);">新聞</button>
+        <button class="btn btn-sm btn-ghost" onclick="showNewsSubTab('insights')" id="insightsSubBtn">AI 分析</button>
+      </div>
+
+      <div id="newsSubTab">
+        <div class="search-bar">
+          <input type="text" id="newsSearch" placeholder="搜尋新聞標題..." oninput="filterNews()">
+          <select id="newsSourceFilter" onchange="filterNews()">
+            <option value="">所有來源</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);cursor:pointer;">
+            <input type="checkbox" id="newsStarredFilter" onchange="filterNews()"> 僅顯示標星
+          </label>
+        </div>
+        <div id="newsList"><div class="loading">載入中</div></div>
+        <div class="pagination" id="newsPagination"></div>
+      </div>
+
+      <div id="insightsSubTab" style="display:none;">
+        <div id="insightsList"><div class="loading">載入中</div></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: INPUT ==================== -->
+    <div id="tab-input" class="tab-content">
+      <div class="card">
+        <div class="card-title">&#128221; 新增研究筆記</div>
+        <div class="note-form">
+          <div class="form-group">
+            <label>標題</label>
+            <input type="text" id="noteTitle" placeholder="筆記標題">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>分類</label>
+              <select id="noteCategory">
+                <option value="general">一般</option>
+                <option value="firm_research">事務所研究</option>
+                <option value="market_observation">市場觀察</option>
+                <option value="competitor">競爭分析</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>標籤 (逗號分隔)</label>
+              <input type="text" id="noteTags" placeholder="例：合併, 趨勢">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>內容</label>
+            <textarea id="noteContent" placeholder="支援 Markdown 格式..." rows="6"></textarea>
+          </div>
+          <button class="btn btn-blue" onclick="saveNote()">儲存筆記</button>
+          <span id="noteSaveStatus" style="margin-left:12px;font-size:0.85rem;color:var(--green);display:none;"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">&#128203; 我的筆記</div>
+        <div id="notesList"><div class="loading">載入中</div></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: SOURCES ==================== -->
+    <div id="tab-sources" class="tab-content">
+      <div class="card">
+        <div class="card-title">&#128279; 資料來源狀態</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>來源名稱</th>
+                <th>資料類型</th>
+                <th>更新頻率</th>
+                <th>最後爬取</th>
+                <th>狀態</th>
+              </tr>
+            </thead>
+            <tbody id="sourcesTableBody">
+              <tr><td colspan="5" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">&#128196; 爬蟲執行紀錄</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>爬蟲</th>
+                <th>開始時間</th>
+                <th>結束時間</th>
+                <th>狀態</th>
+                <th>找到</th>
+                <th>新增</th>
+                <th>更新</th>
+                <th>錯誤</th>
+              </tr>
+            </thead>
+            <tbody id="scrapeLogsBody">
+              <tr><td colspan="8" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- .content -->
+</div><!-- #dashboard -->
+
+<script>
+// ============================================================
+// CONFIG - 請替換為你的 Supabase 設定
+// ============================================================
+const SUPABASE_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwYmtleWh4eXlrYnZvd25ybmdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNjQyMjksImV4cCI6MjA1NDg0MDIyOX0.xMVwMm2JO7g3mcOPJn1XBqrit8FHCuePFMgCVSiSk5c';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let chartInstances = {};
+const PAGE_SIZE = 50;
+
+// Pagination state
+let lawyerPage = 0, lawyerTotal = 0;
+let firmPage = 0, firmTotal = 0;
+let newsPage = 0, newsTotal = 0;
+
+// ============================================================
+// AUTH
+// ============================================================
+async function handleLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+
+  if (!email || !password) { errEl.textContent = '請輸入信箱和密碼'; errEl.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = '登入中...';
+  errEl.style.display = 'none';
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = '登入失敗：' + error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = '登入系統';
+    return;
+  }
+  currentUser = data.user;
+  showDashboard();
+}
+
+async function handleLogout() {
+  await supabase.auth.signOut();
+  currentUser = null;
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    showDashboard();
+  }
+});
+
+// ============================================================
+// DASHBOARD INIT
+// ============================================================
+function showDashboard() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('userBadge').textContent = currentUser.email;
+  loadOverview();
+  loadSources();
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+
+  // Lazy load data
+  if (tab === 'lawyers') loadLawyers();
+  if (tab === 'firms') loadFirms();
+  if (tab === 'trends') loadTrends();
+  if (tab === 'news') { loadNews(); loadInsights(); }
+  if (tab === 'input') loadNotes();
+  if (tab === 'sources') loadSources();
+}
+
+// ============================================================
+// THEME
+// ============================================================
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'light' ? '' : 'light';
+  if (next) html.setAttribute('data-theme', 'light');
+  else html.removeAttribute('data-theme');
+  localStorage.setItem('theme', next || 'dark');
+}
+
+// Restore theme
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved === 'light') document.documentElement.setAttribute('data-theme', 'light');
+})();
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+async function loadOverview() {
+  // Lawyer count
+  const { count: lawyerCount } = await supabase.from('industry_lawyers').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  document.getElementById('kpiLawyerCount').textContent = lawyerCount != null ? lawyerCount.toLocaleString() : '0';
+  document.getElementById('kpiLawyerSub').textContent = '執業中';
+
+  // Firm count
+  const { count: firmCount } = await supabase.from('law_firms').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  document.getElementById('kpiFirmCount').textContent = firmCount != null ? firmCount.toLocaleString() : '0';
+  document.getElementById('kpiFirmSub').textContent = '營業中';
+
+  // New lawyers this year
+  const currentYear = new Date().getFullYear();
+  const yearStart = `${currentYear}-01-01`;
+  const { count: newLawyers } = await supabase.from('industry_lawyers').select('*', { count: 'exact', head: true })
+    .gte('license_date', yearStart);
+  document.getElementById('kpiNewLawyers').textContent = newLawyers != null ? newLawyers.toLocaleString() : '0';
+  document.getElementById('kpiNewLawyersSub').textContent = `${currentYear} 年`;
+
+  // Data sources
+  const { count: srcCount } = await supabase.from('data_sources').select('*', { count: 'exact', head: true }).eq('is_active', true);
+  document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
+  document.getElementById('kpiSourcesSub').textContent = '啟用中';
+
+  // Region distribution chart
+  const { data: regionData } = await supabase.from('ind_lawyer_region_distribution').select('*').limit(10);
+  renderRegionChart(regionData || []);
+
+  // Yearly new lawyers chart
+  const { data: yearlyData } = await supabase.from('ind_yearly_new_lawyers').select('*');
+  renderYearlyChart(yearlyData || []);
+
+  // Latest news
+  const { data: latestNews } = await supabase.from('news_articles').select('title, url, source_name, published_at').order('published_at', { ascending: false }).limit(5);
+  renderOverviewNews(latestNews || []);
+
+  // Latest AI insight
+  const { data: latestInsight } = await supabase.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(1);
+  renderOverviewInsight(latestInsight?.[0]);
+}
+
+function renderRegionChart(data) {
+  if (chartInstances.region) chartInstances.region.destroy();
+  const ctx = document.getElementById('chartRegion').getContext('2d');
+  chartInstances.region = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.map(r => r.region),
+      datasets: [{
+        data: data.map(r => r.count),
+        backgroundColor: ['#4f8ef7', '#c9a84c', '#4caf82', '#e05c5c', '#9b7ed8', '#e0954a', '#45b7d1', '#f093a0', '#6dd5ed', '#c9c9c9'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: getComputedStyle(document.body).getPropertyValue('--text').trim(), font: { size: 11 } } } }
+    }
+  });
+}
+
+function renderYearlyChart(data) {
+  if (chartInstances.yearly) chartInstances.yearly.destroy();
+  const ctx = document.getElementById('chartYearly').getContext('2d');
+  const last20 = data.slice(-20);
+  chartInstances.yearly = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: last20.map(r => r.year),
+      datasets: [{
+        label: '新增律師',
+        data: last20.map(r => r.new_lawyers),
+        backgroundColor: 'rgba(79,142,247,0.6)',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: '#8899aa' }, grid: { display: false } },
+        y: { ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function renderOverviewNews(news) {
+  const el = document.getElementById('overviewNews');
+  if (!news.length) { el.innerHTML = '<div class="empty-state"><div class="msg">尚無新聞資料</div></div>'; return; }
+  el.innerHTML = news.map(n => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+      <a href="${escHtml(n.url)}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:0.88rem;">${escHtml(n.title)}</a>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${n.source_name || ''} &middot; ${formatDate(n.published_at)}</div>
+    </div>
+  `).join('');
+}
+
+function renderOverviewInsight(insight) {
+  const el = document.getElementById('overviewInsight');
+  if (!insight) { el.innerHTML = '<div class="empty-state"><div class="msg">尚無 AI 分析</div></div>'; return; }
+  const typeMap = { weekly_summary: '週報', trend_analysis: '趨勢分析', market_forecast: '市場預測', firm_profile: '事務所分析' };
+  el.innerHTML = `
+    <div style="font-size:0.7rem;color:var(--purple);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${typeMap[insight.insight_type] || insight.insight_type}</div>
+    <div style="font-size:0.95rem;font-weight:600;margin-bottom:8px;">${escHtml(insight.title)}</div>
+    <div style="font-size:0.85rem;color:var(--text);line-height:1.6;max-height:200px;overflow:hidden;">${escHtml(insight.content).substring(0, 500)}...</div>
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">${formatDate(insight.created_at)}</div>
+  `;
+}
+
+// ============================================================
+// LAWYERS TAB
+// ============================================================
+let lawyerSearchTimer;
+function searchLawyers() {
+  clearTimeout(lawyerSearchTimer);
+  lawyerSearchTimer = setTimeout(() => { lawyerPage = 0; loadLawyers(); }, 300);
+}
+
+async function loadLawyers() {
+  const search = document.getElementById('lawyerSearch').value.trim();
+  const region = document.getElementById('lawyerRegionFilter').value;
+  const status = document.getElementById('lawyerStatusFilter').value;
+
+  let query = supabase.from('industry_lawyers').select('*', { count: 'exact' });
+  if (search) query = query.or(`name.ilike.%${search}%,license_number.ilike.%${search}%,affiliated_firm_name.ilike.%${search}%`);
+  if (region) query = query.eq('region', region);
+  if (status) query = query.eq('status', status);
+
+  query = query.order('license_date', { ascending: false, nullsFirst: false })
+    .range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
+
+  const { data, count, error } = await query;
+  lawyerTotal = count || 0;
+
+  if (error) { console.error(error); return; }
+
+  const tbody = document.getElementById('lawyerTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
+    return;
+  }
+
+  const statusMap = { active: ['執業中', 'badge-green'], inactive: ['停業', 'badge-orange'], suspended: ['停權', 'badge-red'], retired: ['退休', 'badge-purple'] };
+  tbody.innerHTML = data.map(l => {
+    const [label, cls] = statusMap[l.status] || [l.status, ''];
+    return `<tr>
+      <td><strong>${escHtml(l.name)}</strong></td>
+      <td>${escHtml(l.license_number || '-')}</td>
+      <td>${escHtml(l.bar_association || '-')}</td>
+      <td>${escHtml(l.affiliated_firm_name || '-')}</td>
+      <td>${escHtml(l.region || '-')}</td>
+      <td>${l.license_date || '-'}</td>
+      <td><span class="badge ${cls}">${label}</span></td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
+
+  // Populate region filter (once)
+  if (document.getElementById('lawyerRegionFilter').options.length <= 1) {
+    const { data: regions } = await supabase.from('ind_lawyer_region_distribution').select('region');
+    if (regions) {
+      regions.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.region; opt.textContent = r.region;
+        document.getElementById('lawyerRegionFilter').appendChild(opt);
+      });
+    }
+  }
+}
+
+// ============================================================
+// FIRMS TAB
+// ============================================================
+let firmSearchTimer;
+function searchFirms() {
+  clearTimeout(firmSearchTimer);
+  firmSearchTimer = setTimeout(() => { firmPage = 0; loadFirms(); }, 300);
+}
+
+async function loadFirms() {
+  const search = document.getElementById('firmSearch').value.trim();
+  const city = document.getElementById('firmCityFilter').value;
+  const status = document.getElementById('firmStatusFilter').value;
+
+  let query = supabase.from('law_firms').select('*', { count: 'exact' });
+  if (search) query = query.or(`name.ilike.%${search}%,tax_id.ilike.%${search}%`);
+  if (city) query = query.eq('city', city);
+  if (status) query = query.eq('status', status);
+
+  query = query.order('lawyer_count', { ascending: false, nullsFirst: true })
+    .range(firmPage * PAGE_SIZE, (firmPage + 1) * PAGE_SIZE - 1);
+
+  const { data, count, error } = await query;
+  firmTotal = count || 0;
+
+  if (error) { console.error(error); return; }
+
+  const tbody = document.getElementById('firmTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('firmPagination', firmPage, firmTotal, p => { firmPage = p; loadFirms(); });
+    return;
+  }
+
+  const statusMap = { active: ['營業中', 'badge-green'], closed: ['已歇業', 'badge-red'], suspended: ['停業', 'badge-orange'] };
+  tbody.innerHTML = data.map(f => {
+    const [label, cls] = statusMap[f.status] || [f.status, ''];
+    return `<tr>
+      <td><strong>${escHtml(f.name)}</strong></td>
+      <td>${escHtml(f.tax_id || '-')}</td>
+      <td>${escHtml(f.city || '-')}</td>
+      <td>${f.lawyer_count != null ? f.lawyer_count : '-'}</td>
+      <td>${escHtml(f.organization_type || '-')}</td>
+      <td>${f.founding_date || '-'}</td>
+      <td><span class="badge ${cls}">${label}</span></td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('firmPagination', firmPage, firmTotal, p => { firmPage = p; loadFirms(); });
+
+  // Populate city filter (once)
+  if (document.getElementById('firmCityFilter').options.length <= 1) {
+    const { data: cities } = await supabase.from('law_firms').select('city').not('city', 'is', null);
+    if (cities) {
+      const unique = [...new Set(cities.map(c => c.city))].sort();
+      unique.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        document.getElementById('firmCityFilter').appendChild(opt);
+      });
+    }
+  }
+}
+
+// ============================================================
+// TRENDS TAB
+// ============================================================
+async function loadTrends() {
+  // Lawyer count by year from industry_stats
+  const { data: lawyerTrend } = await supabase.from('industry_stats')
+    .select('*').eq('stat_type', 'lawyer_count').is('region', null).order('year');
+
+  if (lawyerTrend?.length) {
+    renderTrendChart('chartLawyerTrend', 'lawyerTrend', lawyerTrend.map(r => r.year), lawyerTrend.map(r => Number(r.value)), '律師總數', '#4f8ef7');
+    // CAGR
+    const first = Number(lawyerTrend[0].value), last = Number(lawyerTrend[lawyerTrend.length - 1].value);
+    const years = lawyerTrend[lawyerTrend.length - 1].year - lawyerTrend[0].year;
+    if (years > 0 && first > 0) {
+      const cagr = (Math.pow(last / first, 1 / years) - 1) * 100;
+      document.getElementById('kpiLawyerGrowth').textContent = cagr.toFixed(1) + '%';
+    }
+  }
+
+  // Firm count by year
+  const { data: firmTrend } = await supabase.from('industry_stats')
+    .select('*').eq('stat_type', 'firm_count').is('region', null).order('year');
+
+  if (firmTrend?.length) {
+    renderTrendChart('chartFirmTrend', 'firmTrend', firmTrend.map(r => r.year), firmTrend.map(r => Number(r.value)), '事務所數', '#c9a84c');
+  }
+
+  // Firm size distribution
+  const { data: sizeData } = await supabase.from('ind_firm_size_distribution').select('*');
+  if (sizeData?.length) {
+    renderFirmSizeChart(sizeData);
+  }
+}
+
+function renderTrendChart(canvasId, key, labels, values, label, color) {
+  if (chartInstances[key]) chartInstances[key].destroy();
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  chartInstances[key] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label,
+        data: values,
+        borderColor: color,
+        backgroundColor: color + '33',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: '#8899aa' }, grid: { display: false } },
+        y: { ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function renderFirmSizeChart(data) {
+  if (chartInstances.firmSize) chartInstances.firmSize.destroy();
+  const ctx = document.getElementById('chartFirmSize').getContext('2d');
+  chartInstances.firmSize = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(r => r.size_category),
+      datasets: [{
+        label: '事務所數',
+        data: data.map(r => r.firm_count),
+        backgroundColor: ['#4f8ef7', '#c9a84c', '#4caf82', '#e05c5c', '#9b7ed8', '#e0954a'],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: {
+        x: { ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#8899aa' }, grid: { display: false } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+// ============================================================
+// NEWS TAB
+// ============================================================
+function showNewsSubTab(tab) {
+  document.getElementById('newsSubTab').style.display = tab === 'news' ? 'block' : 'none';
+  document.getElementById('insightsSubTab').style.display = tab === 'insights' ? 'block' : 'none';
+  document.getElementById('newsSubBtn').style.borderBottom = tab === 'news' ? '2px solid var(--tab-active-color)' : 'none';
+  document.getElementById('insightsSubBtn').style.borderBottom = tab === 'insights' ? '2px solid var(--tab-active-color)' : 'none';
+}
+
+let newsSearchTimer;
+function filterNews() {
+  clearTimeout(newsSearchTimer);
+  newsSearchTimer = setTimeout(() => { newsPage = 0; loadNews(); }, 300);
+}
+
+async function loadNews() {
+  const search = document.getElementById('newsSearch').value.trim();
+  const source = document.getElementById('newsSourceFilter').value;
+  const starredOnly = document.getElementById('newsStarredFilter').checked;
+
+  let query = supabase.from('news_articles').select('*', { count: 'exact' });
+  if (search) query = query.ilike('title', `%${search}%`);
+  if (source) query = query.eq('source_name', source);
+  if (starredOnly) query = query.eq('is_starred', true);
+
+  query = query.order('published_at', { ascending: false })
+    .range(newsPage * PAGE_SIZE, (newsPage + 1) * PAGE_SIZE - 1);
+
+  const { data, count } = await query;
+  newsTotal = count || 0;
+
+  const el = document.getElementById('newsList');
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128240;</div><div class="msg">尚無新聞資料，等待爬蟲執行</div></div>';
+    return;
+  }
+
+  el.innerHTML = data.map(n => `
+    <div class="news-card">
+      <div style="display:flex;justify-content:space-between;align-items:start;">
+        <div class="news-title"><a href="${escHtml(n.url)}" target="_blank">${escHtml(n.title)}</a></div>
+        <button class="star-btn ${n.is_starred ? 'starred' : ''}" onclick="toggleStar('${n.id}', ${!n.is_starred})">&#9733;</button>
+      </div>
+      <div class="news-meta">${escHtml(n.source_name || '未知')} &middot; ${formatDate(n.published_at)}</div>
+      ${n.summary ? `<div class="news-summary">${escHtml(n.summary)}</div>` : ''}
+      ${n.tags?.length ? `<div class="news-tags">${n.tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
+    </div>
+  `).join('');
+
+  renderPagination('newsPagination', newsPage, newsTotal, p => { newsPage = p; loadNews(); });
+
+  // Populate source filter (once)
+  if (document.getElementById('newsSourceFilter').options.length <= 1) {
+    const { data: sources } = await supabase.from('news_articles').select('source_name').not('source_name', 'is', null);
+    if (sources) {
+      [...new Set(sources.map(s => s.source_name))].sort().forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s;
+        document.getElementById('newsSourceFilter').appendChild(opt);
+      });
+    }
+  }
+}
+
+async function toggleStar(id, starred) {
+  await supabase.from('news_articles').update({ is_starred: starred }).eq('id', id);
+  loadNews();
+}
+
+async function loadInsights() {
+  const { data } = await supabase.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(20);
+  const el = document.getElementById('insightsList');
+
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#129302;</div><div class="msg">尚無 AI 分析報告，等待每週分析排程</div></div>';
+    return;
+  }
+
+  const typeMap = { weekly_summary: '週報', trend_analysis: '趨勢分析', market_forecast: '市場預測', firm_profile: '事務所分析' };
+  el.innerHTML = data.map(i => `
+    <div class="insight-card">
+      <div class="insight-type">${typeMap[i.insight_type] || i.insight_type}</div>
+      <div class="insight-title">${escHtml(i.title)}</div>
+      <div class="insight-content">${escHtml(i.content)}</div>
+      <div class="insight-date">${formatDate(i.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// NOTES TAB
+// ============================================================
+async function saveNote() {
+  const title = document.getElementById('noteTitle').value.trim();
+  const content = document.getElementById('noteContent').value.trim();
+  const category = document.getElementById('noteCategory').value;
+  const tagsStr = document.getElementById('noteTags').value.trim();
+  const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+  if (!title) { alert('請輸入標題'); return; }
+
+  const { error } = await supabase.from('manual_notes').insert({
+    user_id: currentUser.id,
+    title, content, category, tags
+  });
+
+  if (error) { alert('儲存失敗：' + error.message); return; }
+
+  // Reset form
+  document.getElementById('noteTitle').value = '';
+  document.getElementById('noteContent').value = '';
+  document.getElementById('noteTags').value = '';
+  const status = document.getElementById('noteSaveStatus');
+  status.textContent = '已儲存!'; status.style.display = 'inline';
+  setTimeout(() => { status.style.display = 'none'; }, 2000);
+
+  loadNotes();
+}
+
+async function loadNotes() {
+  const { data } = await supabase.from('manual_notes').select('*').order('created_at', { ascending: false });
+  const el = document.getElementById('notesList');
+
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty-state"><div class="msg">尚無筆記，在上方新增你的第一筆研究筆記</div></div>';
+    return;
+  }
+
+  const catMap = { general: '一般', firm_research: '事務所研究', market_observation: '市場觀察', competitor: '競爭分析' };
+  el.innerHTML = data.map(n => `
+    <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong>${escHtml(n.title)}</strong>
+          <span class="badge badge-blue" style="margin-left:8px;">${catMap[n.category] || n.category}</span>
+          ${n.tags?.map(t => `<span class="badge badge-purple" style="margin-left:4px;">${escHtml(t)}</span>`).join('') || ''}
+        </div>
+        <button class="btn btn-sm btn-ghost" style="color:var(--red);" onclick="deleteNote('${n.id}')">刪除</button>
+      </div>
+      ${n.content ? `<div style="font-size:0.85rem;color:var(--text);margin-top:8px;white-space:pre-wrap;line-height:1.6;">${escHtml(n.content)}</div>` : ''}
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">${formatDate(n.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+async function deleteNote(id) {
+  if (!confirm('確定要刪除這筆筆記嗎？')) return;
+  await supabase.from('manual_notes').delete().eq('id', id);
+  loadNotes();
+}
+
+// ============================================================
+// SOURCES TAB
+// ============================================================
+async function loadSources() {
+  // Data sources
+  const { data: sources } = await supabase.from('data_sources').select('*').order('name');
+  const srcBody = document.getElementById('sourcesTableBody');
+  if (sources?.length) {
+    srcBody.innerHTML = sources.map(s => `
+      <tr>
+        <td><strong>${escHtml(s.name)}</strong>${s.url ? ` <a href="${escHtml(s.url)}" target="_blank" style="color:var(--blue);font-size:0.8rem;">&#8599;</a>` : ''}</td>
+        <td>${escHtml(s.data_type || '-')}</td>
+        <td>${escHtml(s.update_frequency || '-')}</td>
+        <td>${s.last_scraped_at ? formatDate(s.last_scraped_at) : '尚未執行'}</td>
+        <td><span class="badge ${s.is_active ? 'badge-green' : 'badge-red'}">${s.is_active ? '啟用' : '停用'}</span></td>
+      </tr>
+    `).join('');
+  } else {
+    srcBody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料來源</div></td></tr>';
+  }
+
+  // Scrape logs
+  const { data: logs } = await supabase.from('scrape_logs').select('*').order('started_at', { ascending: false }).limit(50);
+  const logBody = document.getElementById('scrapeLogsBody');
+  if (logs?.length) {
+    const statusMap = { running: ['執行中', 'badge-blue'], success: ['成功', 'badge-green'], error: ['失敗', 'badge-red'], partial: ['部分成功', 'badge-orange'] };
+    logBody.innerHTML = logs.map(l => {
+      const [label, cls] = statusMap[l.status] || [l.status, ''];
+      return `<tr>
+        <td>${escHtml(l.scraper_name)}</td>
+        <td>${formatDate(l.started_at)}</td>
+        <td>${l.finished_at ? formatDate(l.finished_at) : '-'}</td>
+        <td><span class="badge ${cls}">${label}</span></td>
+        <td>${l.records_found ?? '-'}</td>
+        <td>${l.records_inserted ?? '-'}</td>
+        <td>${l.records_updated ?? '-'}</td>
+        <td style="color:var(--red);font-size:0.8rem;">${l.error_message ? escHtml(l.error_message).substring(0, 50) : '-'}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    logBody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">尚無爬蟲紀錄</div></td></tr>';
+  }
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function escHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }) +
+    ' ' + d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderPagination(containerId, page, total, onPageChange) {
+  const el = document.getElementById(containerId);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (totalPages <= 1) { el.innerHTML = total > 0 ? `<span class="page-info">共 ${total} 筆</span>` : ''; return; }
+
+  el.innerHTML = `
+    <button ${page === 0 ? 'disabled' : ''} onclick="void(0)">上一頁</button>
+    <span class="page-info">第 ${page + 1} / ${totalPages} 頁 (共 ${total} 筆)</span>
+    <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="void(0)">下一頁</button>
+  `;
+  const btns = el.querySelectorAll('button');
+  btns[0].onclick = () => onPageChange(page - 1);
+  btns[1].onclick = () => onPageChange(page + 1);
+}
+
+// ============================================================
+// INIT - Check existing session
+// ============================================================
+(async function init() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    showDashboard();
+  }
+})();
+</script>
+
+</body>
+</html>
