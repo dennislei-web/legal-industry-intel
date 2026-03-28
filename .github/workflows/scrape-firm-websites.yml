@@ -1,0 +1,33 @@
+name: 搜尋事務所官網
+
+on:
+  schedule:
+    - cron: '40 20 * * *'  # 每日 UTC 20:40 = 台灣凌晨 4:40
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: '每批搜尋筆數'
+        required: false
+        default: '30'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Search firm websites
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '30' }}
+        working-directory: scripts
+        run: python scrape_firm_websites.py

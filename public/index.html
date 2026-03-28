@@ -340,6 +340,7 @@
     <button class="tab-btn active" onclick="showTab('overview')">總覽</button>
     <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
     <button class="tab-btn" onclick="showTab('firms')">律師公會</button>
+    <button class="tab-btn" onclick="showTab('offices')">事務所</button>
     <button class="tab-btn" onclick="showTab('trends')">市場趨勢</button>
     <button class="tab-btn" onclick="showTab('news')">新聞與洞察</button>
     <button class="tab-btn" onclick="showTab('input')">手動輸入</button>
@@ -502,6 +503,54 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: OFFICES (事務所) ==================== -->
+    <div id="tab-offices" class="tab-content">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">事務所總數</div>
+          <div class="kpi-value" id="kpiOfficeCount" style="color:var(--blue);">-</div>
+          <div class="kpi-sub">有律師關聯的事務所</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">最大事務所</div>
+          <div class="kpi-value" id="kpiOfficeLargest" style="color:var(--gold);font-size:1.2rem;">-</div>
+          <div class="kpi-sub" id="kpiOfficeLargestSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均規模</div>
+          <div class="kpi-value" id="kpiOfficeAvgSize" style="color:var(--green);">-</div>
+          <div class="kpi-sub">律師/事務所</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">有官網</div>
+          <div class="kpi-value" id="kpiOfficeWebsite" style="color:var(--orange);">-</div>
+          <div class="kpi-sub">已搜尋到官網</div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="officeSearch" placeholder="搜尋事務所名稱..." oninput="searchOffices()">
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="cursor:pointer" onclick="sortOffices('firm_name')">事務所名稱 <span id="sortIcon_o_firm_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('avg_cases')">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
+                <th>官網</th>
+              </tr>
+            </thead>
+            <tbody id="officeTableBody">
+              <tr><td colspan="5" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="officePagination"></div>
       </div>
     </div>
 
@@ -875,6 +924,7 @@ function showTab(tab) {
   // Lazy load data
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
+  if (tab === 'offices') loadOffices();
   if (tab === 'trends') loadTrends();
   if (tab === 'news') { loadNews(); loadInsights(); }
   if (tab === 'input') { loadNotes(); loadUploads(); }
@@ -1258,6 +1308,87 @@ function renderBarPieChart(data, totalActive) {
       }
     }
   });
+}
+
+// ============================================================
+// OFFICES TAB (事務所)
+// ============================================================
+let allOffices = [], officePage = 0, officeTotal = 0;
+let officeSortCol = 'lawyer_count', officeSortAsc = false;
+let officeSearchTimer = null;
+
+function searchOffices() {
+  clearTimeout(officeSearchTimer);
+  officeSearchTimer = setTimeout(() => { officePage = 0; renderOffices(); }, 300);
+}
+
+function sortOffices(col) {
+  if (officeSortCol === col) { officeSortAsc = !officeSortAsc; }
+  else { officeSortCol = col; officeSortAsc = (col === 'lawyer_count' || col === 'avg_cases') ? false : true; }
+  ['firm_name','lawyer_count','main_region','avg_cases'].forEach(c => {
+    const icon = document.getElementById('sortIcon_o_' + c);
+    if (icon) icon.textContent = c === col ? (officeSortAsc ? '↑' : '↓') : '↕';
+  });
+  officePage = 0;
+  renderOffices();
+}
+
+async function loadOffices() {
+  const { data, error } = await db.rpc('firm_statistics');
+  if (error) { console.error('firm_statistics error:', error); return; }
+  allOffices = data || [];
+
+  // KPIs
+  document.getElementById('kpiOfficeCount').textContent = allOffices.length.toLocaleString();
+  if (allOffices.length > 0) {
+    document.getElementById('kpiOfficeLargest').textContent = allOffices[0].firm_name;
+    document.getElementById('kpiOfficeLargestSub').textContent = allOffices[0].lawyer_count + ' 位律師';
+    const avgSize = (allOffices.reduce((s, o) => s + Number(o.lawyer_count), 0) / allOffices.length).toFixed(1);
+    document.getElementById('kpiOfficeAvgSize').textContent = avgSize;
+    const withWeb = allOffices.filter(o => o.website_url).length;
+    document.getElementById('kpiOfficeWebsite').textContent = withWeb;
+  }
+  renderOffices();
+}
+
+function renderOffices() {
+  const search = (document.getElementById('officeSearch')?.value || '').trim().toLowerCase();
+  let filtered = allOffices;
+  if (search) filtered = filtered.filter(o => o.firm_name.toLowerCase().includes(search));
+
+  // Sort
+  filtered.sort((a, b) => {
+    let va = a[officeSortCol], vb = b[officeSortCol];
+    if (va == null) va = officeSortCol === 'firm_name' ? 'zzz' : -1;
+    if (vb == null) vb = officeSortCol === 'firm_name' ? 'zzz' : -1;
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
+    else { va = Number(va) || 0; vb = Number(vb) || 0; }
+    return officeSortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+
+  officeTotal = filtered.length;
+  const start = officePage * PAGE_SIZE;
+  const page = filtered.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('officeTableBody');
+  if (!page.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
+    return;
+  }
+
+  tbody.innerHTML = page.map((o, i) => {
+    const webLink = o.website_url ? `<a href="${escHtml(o.website_url)}" target="_blank" style="color:var(--blue);">🔗 官網</a>` : '<span style="color:var(--text-muted);">-</span>';
+    return `<tr>
+      <td><strong>${escHtml(o.firm_name)}</strong></td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
+      <td>${escHtml(o.main_region || '-')}</td>
+      <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
+      <td style="text-align:center;">${webLink}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
 }
 
 // ============================================================
