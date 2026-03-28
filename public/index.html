@@ -485,7 +485,13 @@
 
     <!-- ==================== TAB: TRENDS ==================== -->
     <div id="tab-trends" class="tab-content">
-      <div class="kpi-grid">
+      <!-- 資料來源標注 -->
+      <div style="margin-bottom:16px;padding:10px 16px;background:var(--blue-dim);border-radius:8px;font-size:0.85rem;color:var(--text-muted);">
+        &#128218; 資料來源：Lawsnote JobBoard《2023 台灣律師職涯市場報告》（調查 430+ 位律師）
+      </div>
+
+      <!-- KPI 卡片 -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
         <div class="kpi-card">
           <div class="kpi-label">律師年複合成長率</div>
           <div class="kpi-value" id="kpiLawyerGrowth">-</div>
@@ -496,7 +502,29 @@
           <div class="kpi-value" id="kpiFirmDensity">-</div>
           <div class="kpi-sub">每萬人口</div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-label">男女比</div>
+          <div class="kpi-value" style="color:var(--blue);">3:2</div>
+          <div class="kpi-sub">男 57.2% / 女 38.8%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">年薪中位數</div>
+          <div class="kpi-value" style="color:var(--green);">71-110萬</div>
+          <div class="kpi-sub">近 60% 落在此區間</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">3年以下年資</div>
+          <div class="kpi-value" style="color:var(--orange);">50%</div>
+          <div class="kpi-sub">市場新進律師多</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">5人以下律所</div>
+          <div class="kpi-value" style="color:var(--purple);">71.7%</div>
+          <div class="kpi-sub">小型事務所為主</div>
+        </div>
       </div>
+
+      <!-- 第一排：趨勢圖 -->
       <div class="grid-2">
         <div class="card">
           <div class="card-title">&#128200; 律師人數趨勢</div>
@@ -507,9 +535,53 @@
           <div class="chart-container"><canvas id="chartFirmTrend"></canvas></div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">&#128202; 事務所規模分布</div>
-        <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
+
+      <!-- 第二排：受僱律師分析 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128188; 受僱律師薪資分佈</div>
+          <div class="chart-container"><canvas id="chartSalary"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128197; 受僱律師工作年資</div>
+          <div class="chart-container"><canvas id="chartExperience"></canvas></div>
+        </div>
+      </div>
+
+      <!-- 第三排：年齡+學歷+區域 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128100; 受僱律師年齡分佈</div>
+          <div class="chart-container"><canvas id="chartAge"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127891; 受僱律師學歷分佈</div>
+          <div class="chart-container"><canvas id="chartEducation"></canvas></div>
+        </div>
+      </div>
+
+      <!-- 第四排：律所分析 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127970; 律所規模分佈</div>
+          <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128197; 律所成立年限</div>
+          <div class="chart-container"><canvas id="chartFirmAge"></canvas></div>
+        </div>
+      </div>
+
+      <!-- 第五排：律所招募+薪資 -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127919; 律所招募重視面向 (1-5分)</div>
+          <div class="chart-container"><canvas id="chartHiringFactors"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128176; 律所提供受僱律師最高年薪</div>
+          <div class="chart-container"><canvas id="chartFirmMaxSalary"></canvas></div>
+        </div>
       </div>
     </div>
 
@@ -1095,13 +1167,12 @@ function renderBarPieChart(data, totalActive) {
 // TRENDS TAB
 // ============================================================
 async function loadTrends() {
-  // Lawyer count by year from industry_stats
+  // === 從 DB 載入趨勢數據 ===
   const { data: lawyerTrend } = await db.from('industry_stats')
     .select('*').eq('stat_type', 'lawyer_count').is('region', null).order('year');
 
   if (lawyerTrend?.length) {
     renderTrendChart('chartLawyerTrend', 'lawyerTrend', lawyerTrend.map(r => r.year), lawyerTrend.map(r => Number(r.value)), '律師總數', '#4f8ef7');
-    // CAGR
     const first = Number(lawyerTrend[0].value), last = Number(lawyerTrend[lawyerTrend.length - 1].value);
     const years = lawyerTrend[lawyerTrend.length - 1].year - lawyerTrend[0].year;
     if (years > 0 && first > 0) {
@@ -1110,19 +1181,123 @@ async function loadTrends() {
     }
   }
 
-  // Firm count by year
   const { data: firmTrend } = await db.from('industry_stats')
     .select('*').eq('stat_type', 'firm_count').is('region', null).order('year');
-
   if (firmTrend?.length) {
     renderTrendChart('chartFirmTrend', 'firmTrend', firmTrend.map(r => r.year), firmTrend.map(r => Number(r.value)), '事務所數', '#c9a84c');
   }
 
-  // Firm size distribution
-  const { data: sizeData } = await db.from('ind_firm_size_distribution').select('*');
-  if (sizeData?.length) {
-    renderFirmSizeChart(sizeData);
-  }
+  // === Lawsnote 2023 報告靜態數據（圖表） ===
+  renderReportCharts();
+}
+
+function renderReportCharts() {
+  const colors = { blue: '#4f8ef7', gold: '#c9a84c', green: '#4caf82', red: '#e05c5c', purple: '#9b7ed8', orange: '#e0954a' };
+  const chartOpts = (indexAxis = 'x') => ({
+    responsive: true, maintainAspectRatio: false, indexAxis,
+    scales: {
+      x: { ticks: { color: '#8899aa' }, grid: { color: indexAxis === 'y' ? 'rgba(255,255,255,0.05)' : 'transparent' } },
+      y: { ticks: { color: '#8899aa' }, grid: { color: indexAxis === 'x' ? 'rgba(255,255,255,0.05)' : 'transparent' } }
+    },
+    plugins: { legend: { display: false } }
+  });
+
+  // 1. 薪資分佈
+  renderBarChart('chartSalary', 'salary',
+    ['50萬以下','51-70萬','71-90萬','91-110萬','111-130萬','131-150萬','151-170萬','171-190萬','191-210萬','211-230萬','231萬以上'],
+    [5.9, 15.6, 25.4, 23.1, 10.0, 12.7, 5.4, 3.6, 4.5, 2.7, 3.2],
+    '佔比 %', colors.green, 'y');
+
+  // 2. 工作年資
+  renderBarChart('chartExperience', 'experience',
+    ['1年以下','1~3年','3~5年','5~7年','7~9年','9~11年','11~13年','13~15年','15年以上'],
+    [20.3, 29.7, 21.3, 10.6, 6.8, 3.8, 2.5, 1.9, 3.1],
+    '佔比 %', colors.blue, 'x');
+
+  // 3. 年齡分佈
+  renderBarChart('chartAge', 'age',
+    ['25歲以下','26-30歲','31-35歲','36-40歲','41-45歲','46-50歲','51歲以上'],
+    [0.2, 16.2, 41.8, 22.1, 5.6, 1.2, 1.5],
+    '佔比 %', colors.orange, 'x');
+
+  // 4. 學歷分佈（圓餅圖）
+  renderPieChart('chartEducation', 'education',
+    ['大學', '國內碩士', '國外碩士', '國內博士'],
+    [36.9, 54.4, 6.9, 1.5],
+    [colors.blue, colors.gold, colors.green, colors.purple]);
+
+  // 5. 律所規模分佈
+  renderBarChart('chartFirmSize', 'firmSize',
+    ['1人','2人','3~5人','6~10人','11~20人','21~50人','51人以上'],
+    [26.3, 12.7, 32.7, 18.1, 6.3, 1.8, 1.8],
+    '佔比 %', colors.gold, 'y');
+
+  // 6. 律所成立年限
+  renderBarChart('chartFirmAge', 'firmAge',
+    ['1年以下','1~3年','4~6年','7~9年','10~12年','13~15年','16~18年','19~21年','22~24年','25~27年','28~30年','30年以上'],
+    [8.8, 31.0, 19.5, 14.2, 7.1, 2.7, 5.3, 0.9, 0.9, 1.8, 2.7, 2.7],
+    '佔比 %', colors.purple, 'y');
+
+  // 7. 招募重視面向（雷達圖）
+  renderRadarChart('chartHiringFactors', 'hiringFactors',
+    ['人格特質','法律工作經驗','學歷','熟識人推薦','有實務經驗証照','碩士學位','自律專業成就比例','新訴案件比例','教育訓練','可遠端工作','出差能力','薪酬','入會費','補助執業費用','員工福利','長期發展'],
+    [4.4, 3.9, 3.5, 3.3, 3.4, 3.1, 3.3, 3.2, 3.1, 3.1, 2.8, 3.5, 3.5, 3.7, 3.5, 3.9]);
+
+  // 8. 律所提供最高年薪
+  renderBarChart('chartFirmMaxSalary', 'firmMaxSalary',
+    ['90~110萬','111~130萬','131~150萬','151~170萬','171~190萬','191~210萬','211~230萬','231~250萬','251~310萬','311~350萬','351~390萬','391~410萬','411萬以上'],
+    [56.3, 10.0, 12.7, 5.4, 3.6, 4.5, 2.7, 0.9, 0.9, 0.9, 0.0, 0.9, 1.8],
+    '佔比 %', colors.red, 'y');
+}
+
+function renderBarChart(canvasId, key, labels, data, label, color, indexAxis) {
+  if (chartInstances[key]) chartInstances[key].destroy();
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  chartInstances[key] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data, backgroundColor: color + 'cc', borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis,
+      scales: {
+        x: { ticks: { color: '#8899aa', font: { size: 11 } }, grid: { color: indexAxis === 'y' ? 'rgba(255,255,255,0.05)' : 'transparent' } },
+        y: { ticks: { color: '#8899aa', font: { size: 11 } }, grid: { color: indexAxis === 'x' ? 'rgba(255,255,255,0.05)' : 'transparent' } }
+      },
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed[indexAxis==='y'?'x':'y'] + '%' } } }
+    }
+  });
+}
+
+function renderPieChart(canvasId, key, labels, data, colors) {
+  if (chartInstances[key]) chartInstances[key].destroy();
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  chartInstances[key] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#8899aa', padding: 12, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '%' } }
+      }
+    }
+  });
+}
+
+function renderRadarChart(canvasId, key, labels, data) {
+  if (chartInstances[key]) chartInstances[key].destroy();
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  chartInstances[key] = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [{ label: '重視程度', data, backgroundColor: 'rgba(79,142,247,0.2)', borderColor: '#4f8ef7', pointBackgroundColor: '#4f8ef7', pointRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { r: { min: 0, max: 5, ticks: { stepSize: 1, color: '#8899aa', backdropColor: 'transparent' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#8899aa', font: { size: 10 } } } },
+      plugins: { legend: { display: false } }
+    }
+  });
 }
 
 function renderTrendChart(canvasId, key, labels, values, label, color) {
@@ -1153,30 +1328,7 @@ function renderTrendChart(canvasId, key, labels, values, label, color) {
   });
 }
 
-function renderFirmSizeChart(data) {
-  if (chartInstances.firmSize) chartInstances.firmSize.destroy();
-  const ctx = document.getElementById('chartFirmSize').getContext('2d');
-  chartInstances.firmSize = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: data.map(r => r.size_category),
-      datasets: [{
-        label: '事務所數',
-        data: data.map(r => r.firm_count),
-        backgroundColor: ['#4f8ef7', '#c9a84c', '#4caf82', '#e05c5c', '#9b7ed8', '#e0954a'],
-        borderRadius: 4
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      scales: {
-        x: { ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#8899aa' }, grid: { display: false } }
-      },
-      plugins: { legend: { display: false } }
-    }
-  });
-}
+/* renderFirmSizeChart removed - now using renderBarChart from report */
 
 // ============================================================
 // NEWS TAB
