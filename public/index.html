@@ -599,8 +599,8 @@
                ondrop="event.preventDefault();this.classList.remove('dragover');handleFileDrop(event)">
             <div style="font-size:2rem;margin-bottom:8px;">📤</div>
             <div>點擊選擇檔案或拖放至此</div>
-            <div style="color:var(--text-muted);font-size:0.8rem;margin-top:4px;">支援 .csv, .xlsx, .xls, .json</div>
-            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display:none" onchange="handleFileSelect(event)">
+            <div style="color:var(--text-muted);font-size:0.8rem;margin-top:4px;">支援 .csv, .xlsx, .xls, .json, .pdf, .jpg, .png, .gif</div>
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json,.pdf,.jpg,.jpeg,.png,.gif,.webp" style="display:none" onchange="handleFileSelect(event)">
           </div>
           <div id="uploadPreview" style="display:none;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px;">
@@ -1300,6 +1300,19 @@ function processFile(file) {
       s.onload = () => readExcel(file);
       document.head.appendChild(s);
     } else { readExcel(file); }
+  } else if (ext === 'pdf') {
+    // Load pdf.js dynamically
+    if (!window.pdfjsLib) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      s.onload = () => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        readPDF(file);
+      };
+      document.head.appendChild(s);
+    } else { readPDF(file); }
+  } else if (['jpg','jpeg','png','gif','webp'].includes(ext)) {
+    readImage(file);
   } else { alert('不支援的檔案格式'); }
 }
 
@@ -1312,6 +1325,47 @@ function readExcel(file) {
     showPreview();
   };
   reader.readAsArrayBuffer(file);
+}
+
+async function readPDF(file) {
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const pdf = await pdfjsLib.getDocument({ data: e.target.result }).promise;
+      const pages = [];
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const text = content.items.map(item => item.str).join(' ');
+        pages.push({ page: i, content: text });
+      }
+      uploadedData = pages;
+      showPreviewFile('PDF', `${pdf.numPages} 頁`, pages.map(p => `【第 ${p.page} 頁】${p.content.substring(0, 200)}...`).join('\n\n'));
+    } catch(err) { alert('PDF 解析失敗：' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function readImage(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result;
+    uploadedData = [{ file_name: file.name, file_size: file.size, mime_type: file.type, base64_data: base64 }];
+    showPreviewFile('圖片', `${(file.size / 1024).toFixed(1)} KB`, null, base64);
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPreviewFile(type, info, textContent, imageData) {
+  document.getElementById('uploadFileName').textContent = `📄 ${uploadedFileName} (${type} - ${info})`;
+  document.getElementById('previewHeader').innerHTML = '';
+  if (imageData) {
+    document.getElementById('previewBody').innerHTML = `<tr><td><img src="${imageData}" style="max-width:100%;max-height:300px;border-radius:8px;"></td></tr>`;
+  } else if (textContent) {
+    document.getElementById('previewBody').innerHTML = `<tr><td><pre style="white-space:pre-wrap;max-height:250px;overflow-y:auto;color:var(--text);font-size:0.85rem;">${textContent.substring(0, 2000)}</pre></td></tr>`;
+  }
+  document.getElementById('previewInfo').textContent = type === 'PDF' ? `PDF 文件內容預覽` : `圖片檔案預覽`;
+  document.getElementById('uploadPreview').style.display = 'block';
 }
 
 function parseCSV(text) {
