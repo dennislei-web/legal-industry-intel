@@ -1,25 +1,17 @@
 """
-Lawsnote 律師專長資料爬蟲
+Lawsnote 律師專長資料爬蟲 (Playwright 版)
 來源：https://page.lawsnote.com/search/expertise/{case_type}/{region}/
 抓取各案件類型 x 地區的律師清單，彙整後 upsert 至 lawsnote_lawyers 表
 
+此網站為 React CSR 應用，需要使用 headless browser 等待 JS 渲染完成
 策略：遍歷 27 種案件類型 x 17 個地區 = 459 組合
-每組合 GET 一頁 HTML，解析 <article> 元素取得律師資料
 """
 import re
-import requests
 from urllib.parse import quote
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from utils import get_supabase, log, scrape_start, scrape_end, polite_delay
 
 BASE_URL = 'https://page.lawsnote.com'
-
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LegalIndustryIntel/1.0',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
-    'Referer': 'https://page.lawsnote.com/',
-}
 
 # 27 種案件類型 (from site dropdown)
 CASE_TYPES = [
@@ -67,37 +59,36 @@ def build_url(case_type, region):
     return f'{BASE_URL}/search/expertise/{encoded_case}/{encoded_region}/'
 
 
-def parse_listing_page(html, case_type, region):
+def parse_articles(page):
     """
-    解析搜尋結果頁面，回傳律師列表
-    每個 <article> 包含：律師名、近5年案件數、lawsnote_id (from link)
+    從已渲染的頁面解析 <article> 元素，回傳律師列表
+    使用 Playwright 的 DOM query 而非 BeautifulSoup
     """
-    soup = BeautifulSoup(html, 'html.parser')
-    articles = soup.find_all('article')
+    articles = page.query_selector_all('article')
     results = []
 
     for article in articles:
         try:
             # 律師名稱 - 在 h2 或 h3 標籤中
-            name_tag = article.find(['h2', 'h3'])
+            name_tag = article.query_selector('h2, h3')
             if not name_tag:
                 continue
-            name = name_tag.get_text(strip=True)
+            name = name_tag.inner_text().strip()
             if not name:
                 continue
 
             # 近5年案件數
             case_count = None
-            text = article.get_text()
+            text = article.inner_text()
             match = re.search(r'近5年案件數[：:]\s*(\d[\d,]*)', text)
             if match:
                 case_count = int(match.group(1).replace(',', ''))
 
             # lawsnote_id from link (/page/{id})
             lawsnote_id = None
-            link = article.find('a', href=re.compile(r'/page/'))
+            link = article.query_selector('a[href*="/page/"]')
             if link:
-                href = link.get('href', '')
+                href = link.get_attribute('href') or ''
                 id_match = re.search(r'/page/([^/?\s]+)', href)
                 if id_match:
                     lawsnote_id = id_match.group(1)
@@ -118,7 +109,7 @@ def parse_listing_page(html, case_type, region):
     return results
 
 
-def scrape_all_combos(session):
+def scrape_all_combos(page):
     """
     遍歷所有 case_type x region 組合
     回傳 dict: lawsnote_id -> { name, case_count_5yr, expertise_areas, regions }
@@ -134,11 +125,20 @@ def scrape_all_combos(session):
             url = build_url(case_type, region)
 
             try:
-                resp = session.get(url, headers=HEADERS, timeout=30)
-                resp.raise_for_status()
-                resp.encoding = 'utf-8'
+                page.goto(url, wait_until='domcontentloaded', timeout=30000)
 
-                results = parse_listing_page(resp.text, case_type, region)
+                # 等待 React 渲染出 article 元素
+                try:
+                    page.wait_for_selector('article', timeout=10000)
+                except PlaywrightTimeout:
+                    # 該組合無結果，跳過
+                    if combo_idx % 17 == 0:
+                        log(f'[{combo_idx}/{total_combos}] {case_type} / {region}'
+                            f' → 無結果 (timeout), 累計 {len(lawyers)} 位律師')
+                    polite_delay(2)
+                    continue
+
+                results = parse_articles(page)
 
                 for r in results:
                     lid = r['lawsnote_id']
@@ -164,19 +164,15 @@ def scrape_all_combos(session):
                     log(f'[{combo_idx}/{total_combos}] {case_type} / {region}'
                         f' → {len(results)} 筆, 累計 {len(lawyers)} 位律師')
 
-            except requests.exceptions.HTTPError as e:
-                if e.response is not None and e.response.status_code == 404:
-                    # 某些組合可能無結果頁面
-                    pass
-                else:
-                    errors += 1
-                    log(f'[{combo_idx}/{total_combos}] HTTP 錯誤 {case_type}/{region}: {e}')
+            except PlaywrightTimeout:
+                errors += 1
+                log(f'[{combo_idx}/{total_combos}] 逾時 {case_type}/{region}')
             except Exception as e:
                 errors += 1
                 log(f'[{combo_idx}/{total_combos}] 錯誤 {case_type}/{region}: {e}')
 
-            # 禮貌延遲 1-2 秒
-            polite_delay(1.5)
+            # 禮貌延遲 2-3 秒
+            polite_delay(2.5)
 
     log(f'所有組合爬取完成，共 {len(lawyers)} 位不重複律師，{errors} 個錯誤')
     return lawyers
@@ -236,16 +232,27 @@ def main():
     sb = get_supabase()
     log_id = scrape_start(sb, 'lawsnote_lawyers')
 
-    try:
-        session = requests.Session()
+    playwright = None
+    browser = None
 
-        log('=== Lawsnote 律師專長爬蟲開始 ===')
+    try:
+        log('=== Lawsnote 律師專長爬蟲開始 (Playwright) ===')
         log(f'案件類型: {len(CASE_TYPES)} 種')
         log(f'地區: {len(REGIONS)} 個')
         log(f'組合數: {len(CASE_TYPES) * len(REGIONS)}')
 
+        # 啟動 headless Chromium
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                       'AppleWebKit/537.36 (KHTML, like Gecko) '
+                       'Chrome/120.0.0.0 Safari/537.36',
+            locale='zh-TW',
+        )
+
         # Phase 1: 爬取所有組合
-        lawyers_dict = scrape_all_combos(session)
+        lawyers_dict = scrape_all_combos(page)
 
         if not lawyers_dict:
             log('未爬取到任何律師資料')
@@ -269,6 +276,13 @@ def main():
         log(f'爬蟲錯誤: {e}')
         scrape_end(sb, log_id, status='error', error_message=str(e)[:500])
         raise
+
+    finally:
+        # 確保瀏覽器資源被釋放
+        if browser:
+            browser.close()
+        if playwright:
+            playwright.stop()
 
 
 if __name__ == '__main__':
