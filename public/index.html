@@ -914,12 +914,22 @@ async function loadLawyers() {
 // FIRMS TAB (律師公會)
 // ============================================================
 async function loadFirms() {
-  // Fetch all lawyer_members with bar_association and is_active
-  const { data: allLawyers, error } = await db.from('lawyer_members')
-    .select('bar_association,region,is_active');
+  // Fetch ALL lawyer_members with pagination (Supabase default limit is 1000)
+  let allLawyers = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error: err } = await db.from('lawyer_members')
+      .select('bar_association,region,is_active')
+      .range(from, from + pageSize - 1);
+    if (err) { console.error(err); return; }
+    if (!data || data.length === 0) break;
+    allLawyers = allLawyers.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
 
-  if (error) { console.error(error); return; }
-  if (!allLawyers || !allLawyers.length) {
+  if (!allLawyers.length) {
     document.getElementById('firmTableBody').innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     return;
   }
