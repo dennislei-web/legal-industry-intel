@@ -352,14 +352,14 @@
     <div id="tab-overview" class="tab-content active">
       <div class="kpi-grid" id="overviewKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
-          <div class="kpi-label">執業律師總數</div>
+          <div class="kpi-label">律師總數（合併）</div>
           <div class="kpi-value" id="kpiLawyerCount">-</div>
           <div class="kpi-sub" id="kpiLawyerSub">載入中...</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">律師公會數</div>
-          <div class="kpi-value" id="kpiFirmCount">-</div>
-          <div class="kpi-sub" id="kpiFirmSub">載入中...</div>
+          <div class="kpi-label">全聯會名冊</div>
+          <div class="kpi-value" id="kpiRegistryCount" style="color:var(--blue);">-</div>
+          <div class="kpi-sub">執業中律師</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Lawsnote 律師</div>
@@ -408,72 +408,49 @@
 
     <!-- ==================== TAB: LAWYERS ==================== -->
     <div id="tab-lawyers" class="tab-content">
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <button class="btn btn-sm btn-ghost" onclick="showLawyerSubTab('registry')" id="regSubBtn" style="border-bottom:2px solid var(--tab-active-color);">全聯會名冊</button>
-        <button class="btn btn-sm btn-ghost" onclick="showLawyerSubTab('lawsnote')" id="lnSubBtn">Lawsnote 專長</button>
+      <div class="kpi-grid" id="lawyerKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">律師總數（合併）</div><div class="kpi-value" id="kpiMergedTotal">-</div><div class="kpi-sub" id="kpiMergedSub">載入中</div></div>
+        <div class="kpi-card"><div class="kpi-label">兩者皆有</div><div class="kpi-value" id="kpiMergedBoth" style="color:var(--green);">-</div><div class="kpi-sub">全聯會 + Lawsnote</div></div>
+        <div class="kpi-card"><div class="kpi-label">僅全聯會</div><div class="kpi-value" id="kpiMergedRegistry" style="color:var(--blue);">-</div><div class="kpi-sub">無案件數資料</div></div>
+        <div class="kpi-card"><div class="kpi-label">僅 Lawsnote</div><div class="kpi-value" id="kpiMergedLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">未在公會名冊中</div></div>
       </div>
-
-      <!-- 子分頁：全聯會名冊 -->
-      <div id="lawyerSubRegistry">
-        <div class="search-bar">
-          <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名..." oninput="searchLawyers()">
-          <select id="lawyerRegionFilter" onchange="searchLawyers()">
-            <option value="">所有地區</option>
-          </select>
-        </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>姓名</th>
-                  <th>所屬公會</th>
-                  <th>地區</th>
-                  <th>執業起始</th>
-                  <th>執業結束</th>
-                  <th>狀態</th>
-                </tr>
-              </thead>
-              <tbody id="lawyerTableBody">
-                <tr><td colspan="6" class="loading">載入中</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="pagination" id="lawyerPagination"></div>
-        </div>
+      <div class="search-bar">
+        <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名..." oninput="searchLawyers()">
+        <select id="lawyerRegionFilter" onchange="searchLawyers()">
+          <option value="">所有地區</option>
+        </select>
+        <select id="lawyerSourceFilter" onchange="searchLawyers()">
+          <option value="">所有來源</option>
+          <option value="兩者皆有">兩者皆有</option>
+          <option value="僅全聯會">僅全聯會</option>
+          <option value="僅Lawsnote">僅Lawsnote</option>
+        </select>
+        <select id="lawyerSortFilter" onchange="searchLawyers()">
+          <option value="name_asc">姓名 A→Z</option>
+          <option value="cases_desc">案件數多→少</option>
+          <option value="cases_asc">案件數少→多</option>
+        </select>
       </div>
-
-      <!-- 子分頁：Lawsnote 專長 -->
-      <div id="lawyerSubLawsnote" style="display:none;">
-        <div class="search-bar">
-          <input type="text" id="lnSearch" placeholder="搜尋律師姓名..." oninput="searchLawsnoteLawyers()">
-          <select id="lnExpertiseFilter" onchange="searchLawsnoteLawyers()">
-            <option value="">所有專長</option>
-          </select>
-          <select id="lnSortFilter" onchange="searchLawsnoteLawyers()">
-            <option value="cases_desc">案件數多→少</option>
-            <option value="cases_asc">案件數少→多</option>
-            <option value="name_asc">姓名 A→Z</option>
-          </select>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>所屬公會</th>
+                <th>地區</th>
+                <th>執業起始</th>
+                <th>案件數(5年)</th>
+                <th>擅長領域</th>
+                <th>來源</th>
+              </tr>
+            </thead>
+            <tbody id="lawyerTableBody">
+              <tr><td colspan="7" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
         </div>
-        <div class="card">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>姓名</th>
-                  <th>近5年案件數</th>
-                  <th>擅長領域</th>
-                  <th>Lawsnote</th>
-                </tr>
-              </thead>
-              <tbody id="lnTableBody">
-                <tr><td colspan="4" class="loading">載入中</td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="pagination" id="lnPagination"></div>
-        </div>
+        <div class="pagination" id="lawyerPagination"></div>
       </div>
     </div>
 
@@ -915,16 +892,14 @@ function toggleTheme() {
 // OVERVIEW
 // ============================================================
 async function loadOverview() {
-  // Lawyer count
-  const { count: lawyerCount } = await db.from('lawyer_members').select('*', { count: 'exact', head: true }).eq('is_active', true);
-  document.getElementById('kpiLawyerCount').textContent = lawyerCount != null ? lawyerCount.toLocaleString() : '0';
-  document.getElementById('kpiLawyerSub').textContent = '執業中 (全聯會)';
+  // Merged lawyer count from combined view
+  const { count: mergedCount } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true });
+  document.getElementById('kpiLawyerCount').textContent = mergedCount != null ? mergedCount.toLocaleString() : '0';
+  document.getElementById('kpiLawyerSub').textContent = '全聯會 + Lawsnote 合併去重';
 
-  // Bar association count (distinct from lawyer_members)
-  const { data: barData } = await db.from('lawyer_members').select('bar_association').eq('is_active', true);
-  const barCount = barData ? new Set(barData.map(r => r.bar_association)).size : 0;
-  document.getElementById('kpiFirmCount').textContent = barCount;
-  document.getElementById('kpiFirmSub').textContent = '全國律師聯合會';
+  // Registry count
+  const { count: registryCount } = await db.from('lawyer_members').select('*', { count: 'exact', head: true }).eq('is_active', true);
+  document.getElementById('kpiRegistryCount').textContent = registryCount != null ? registryCount.toLocaleString() : '0';
 
   // Guild total from industry_stats
   const { data: guildStats } = await db.from('industry_stats').select('value')
@@ -1093,36 +1068,44 @@ function searchLawyers() {
 async function loadLawyers() {
   const search = document.getElementById('lawyerSearch').value.trim();
   const region = document.getElementById('lawyerRegionFilter').value;
+  const source = document.getElementById('lawyerSourceFilter').value;
+  const sort = document.getElementById('lawyerSortFilter').value;
 
-  let query = db.from('lawyer_members').select('*', { count: 'exact' });
+  let query = db.from('lawyers_combined').select('*', { count: 'exact' });
   if (search) query = query.ilike('name', `%${search}%`);
   if (region) query = query.eq('region', region);
+  if (source) query = query.eq('data_source', source);
 
-  query = query.order('name', { ascending: true })
-    .range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
+  if (sort === 'cases_desc') query = query.order('case_count_5yr', { ascending: false, nullsFirst: false });
+  else if (sort === 'cases_asc') query = query.order('case_count_5yr', { ascending: true, nullsFirst: false });
+  else query = query.order('name', { ascending: true });
+
+  query = query.range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
   const { data, count, error } = await query;
   lawyerTotal = count || 0;
 
-  if (error) { console.error(error); return; }
+  if (error) { console.error('lawyers_combined error:', error); return; }
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
     return;
   }
 
   tbody.innerHTML = data.map(l => {
-    const cls = l.is_active ? 'badge-green' : 'badge-orange';
-    const label = l.is_active ? '執業中' : '已屆期';
+    const areas = (l.expertise_areas || []).slice(0, 3).map(e => `<span class="badge badge-blue" style="margin:1px;font-size:0.7rem;">${escHtml(e)}</span>`).join('');
+    const more = (l.expertise_areas || []).length > 3 ? `<span style="color:var(--text-muted);font-size:0.7rem;">+${l.expertise_areas.length - 3}</span>` : '';
+    const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
       <td>${escHtml(l.bar_association || '-')}</td>
       <td>${escHtml(l.region || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
-      <td>${l.practice_end_date || '-'}</td>
-      <td><span class="badge ${cls}">${label}</span></td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
+      <td>${areas}${more || '-'}</td>
+      <td><span class="badge ${srcCls}">${escHtml(l.data_source)}</span></td>
     </tr>`;
   }).join('');
 
@@ -1140,75 +1123,23 @@ async function loadLawyers() {
       });
     }
   }
-}
 
-// ============================================================
-// LAWYER SUB-TABS
-// ============================================================
-function showLawyerSubTab(sub) {
-  document.getElementById('lawyerSubRegistry').style.display = sub === 'registry' ? '' : 'none';
-  document.getElementById('lawyerSubLawsnote').style.display = sub === 'lawsnote' ? '' : 'none';
-  document.getElementById('regSubBtn').style.borderBottom = sub === 'registry' ? '2px solid var(--tab-active-color)' : 'none';
-  document.getElementById('lnSubBtn').style.borderBottom = sub === 'lawsnote' ? '2px solid var(--tab-active-color)' : 'none';
-  if (sub === 'lawsnote') loadLawsnoteLawyers();
-}
-
-let lnPage = 0, lnTotal = 0, lnSearchTimer;
-function searchLawsnoteLawyers() {
-  clearTimeout(lnSearchTimer);
-  lnSearchTimer = setTimeout(() => { lnPage = 0; loadLawsnoteLawyers(); }, 300);
-}
-
-async function loadLawsnoteLawyers() {
-  const search = document.getElementById('lnSearch').value.trim();
-  const expertise = document.getElementById('lnExpertiseFilter').value;
-  const sort = document.getElementById('lnSortFilter').value;
-
-  let query = db.from('lawsnote_lawyers').select('name,case_count_5yr,expertise_areas,lawsnote_id,source_url', { count: 'exact' });
-  if (search) query = query.ilike('name', `%${search}%`);
-  if (expertise) query = query.contains('expertise_areas', [expertise]);
-
-  if (sort === 'cases_desc') query = query.order('case_count_5yr', { ascending: false, nullsFirst: false });
-  else if (sort === 'cases_asc') query = query.order('case_count_5yr', { ascending: true, nullsFirst: false });
-  else query = query.order('name', { ascending: true });
-
-  query = query.range(lnPage * PAGE_SIZE, (lnPage + 1) * PAGE_SIZE - 1);
-  const { data, count, error } = await query;
-  lnTotal = count || 0;
-
-  if (error) { console.error(error); return; }
-
-  const tbody = document.getElementById('lnTableBody');
-  if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
-    renderPagination('lnPagination', lnPage, lnTotal, p => { lnPage = p; loadLawsnoteLawyers(); });
-    return;
+  // Load merged KPI stats (once)
+  if (document.getElementById('kpiMergedTotal').textContent === '-') {
+    loadMergedKpis();
   }
+}
 
-  tbody.innerHTML = data.map(l => {
-    const areas = (l.expertise_areas || []).slice(0, 3).map(e => `<span class="badge badge-blue" style="margin:1px;font-size:0.7rem;">${escHtml(e)}</span>`).join('');
-    const more = (l.expertise_areas || []).length > 3 ? `<span style="color:var(--text-muted);font-size:0.7rem;">+${l.expertise_areas.length - 3}</span>` : '';
-    return `<tr>
-      <td><strong>${escHtml(l.name)}</strong></td>
-      <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
-      <td>${areas}${more}</td>
-      <td><a href="${escHtml(l.source_url || '#')}" target="_blank" style="color:var(--blue);font-size:0.8rem;">查看</a></td>
-    </tr>`;
-  }).join('');
-
-  renderPagination('lnPagination', lnPage, lnTotal, p => { lnPage = p; loadLawsnoteLawyers(); });
-
-  // 填充專長篩選器（只做一次）
-  if (document.getElementById('lnExpertiseFilter').options.length <= 1) {
-    const expertiseSet = new Set();
-    const { data: sample } = await db.from('lawsnote_lawyers').select('expertise_areas').not('expertise_areas', 'is', null).limit(2000);
-    if (sample) sample.forEach(r => (r.expertise_areas || []).forEach(e => expertiseSet.add(e)));
-    [...expertiseSet].sort().forEach(e => {
-      const opt = document.createElement('option');
-      opt.value = e; opt.textContent = e;
-      document.getElementById('lnExpertiseFilter').appendChild(opt);
-    });
-  }
+async function loadMergedKpis() {
+  const { count: total } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true });
+  const { count: both } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '兩者皆有');
+  const { count: regOnly } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '僅全聯會');
+  const { count: lnOnly } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '僅Lawsnote');
+  document.getElementById('kpiMergedTotal').textContent = total != null ? total.toLocaleString() : '0';
+  document.getElementById('kpiMergedSub').textContent = '去重後合併';
+  document.getElementById('kpiMergedBoth').textContent = both != null ? both.toLocaleString() : '0';
+  document.getElementById('kpiMergedRegistry').textContent = regOnly != null ? regOnly.toLocaleString() : '0';
+  document.getElementById('kpiMergedLawsnote').textContent = lnOnly != null ? lnOnly.toLocaleString() : '0';
 }
 
 // ============================================================
