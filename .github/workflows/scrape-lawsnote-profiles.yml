@@ -1,6 +1,9 @@
 name: 爬取 Lawsnote 律師個人資料
 
 on:
+  schedule:
+    # 每小時跑一次，直到全部爬完
+    - cron: '25 * * * *'
   workflow_dispatch:
     inputs:
       batch_size:
@@ -21,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install supabase playwright
+          pip install -r scripts/requirements.txt
           playwright install chromium
           playwright install-deps chromium
 
