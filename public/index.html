@@ -131,6 +131,8 @@
     .btn-ghost:hover { background: var(--ghost-hover-bg); }
     .btn-blue { background: var(--blue); color: #fff; }
     .btn-blue:hover { opacity: 0.9; }
+    .upload-zone { border: 2px dashed var(--border-light); border-radius: 10px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.2s; color: var(--text-muted); }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--blue); background: var(--blue-dim); color: var(--text); }
     .btn-red { background: var(--red); color: #fff; }
 
     /* ===================== HEADER ===================== */
@@ -567,6 +569,54 @@
           </div>
           <button class="btn btn-blue" onclick="saveNote()">儲存筆記</button>
           <span id="noteSaveStatus" style="margin-left:12px;font-size:0.85rem;color:var(--green);display:none;"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📁 上傳資料檔案</div>
+        <div class="note-form">
+          <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+            上傳 CSV 或 Excel 檔案，系統會自動解析並匯入資料庫。支援律師名單、事務所資料、產業統計等。
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>資料類型</label>
+              <select id="uploadDataType">
+                <option value="lawyers">律師資料</option>
+                <option value="law_firms">事務所資料</option>
+                <option value="industry_stats">產業統計</option>
+                <option value="custom">自訂資料</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>說明 (選填)</label>
+              <input type="text" id="uploadDescription" placeholder="例：2026年律師名錄補充">
+            </div>
+          </div>
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+               ondragover="event.preventDefault();this.classList.add('dragover')"
+               ondragleave="this.classList.remove('dragover')"
+               ondrop="event.preventDefault();this.classList.remove('dragover');handleFileDrop(event)">
+            <div style="font-size:2rem;margin-bottom:8px;">📤</div>
+            <div>點擊選擇檔案或拖放至此</div>
+            <div style="color:var(--text-muted);font-size:0.8rem;margin-top:4px;">支援 .csv, .xlsx, .xls, .json</div>
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display:none" onchange="handleFileSelect(event)">
+          </div>
+          <div id="uploadPreview" style="display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0 8px;">
+              <span id="uploadFileName" style="color:var(--blue);font-weight:500;"></span>
+              <button class="btn" style="padding:4px 12px;font-size:0.8rem;background:var(--red-dim);color:var(--red);" onclick="clearUpload()">移除</button>
+            </div>
+            <div class="table-wrap" style="max-height:250px;overflow-y:auto;">
+              <table>
+                <thead id="previewHeader"></thead>
+                <tbody id="previewBody"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:8px;color:var(--text-muted);font-size:0.85rem;" id="previewInfo"></div>
+            <button class="btn btn-blue" style="margin-top:12px;" onclick="uploadData()">確認匯入</button>
+            <span id="uploadStatus" style="margin-left:12px;font-size:0.85rem;display:none;"></span>
+          </div>
         </div>
       </div>
 
@@ -1216,6 +1266,121 @@ async function loadInsights() {
 // ============================================================
 // NOTES TAB
 // ============================================================
+// ============ FILE UPLOAD ============
+let uploadedData = null;
+let uploadedFileName = '';
+
+function handleFileSelect(e) { processFile(e.target.files[0]); }
+function handleFileDrop(e) { processFile(e.dataTransfer.files[0]); }
+
+function processFile(file) {
+  if (!file) return;
+  uploadedFileName = file.name;
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = (e) => { parseCSV(e.target.result); };
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'json') {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        uploadedData = JSON.parse(e.target.result);
+        if (!Array.isArray(uploadedData)) uploadedData = [uploadedData];
+        showPreview();
+      } catch(err) { alert('JSON 解析失敗：' + err.message); }
+    };
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    // Load SheetJS dynamically
+    if (!window.XLSX) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.onload = () => readExcel(file);
+      document.head.appendChild(s);
+    } else { readExcel(file); }
+  } else { alert('不支援的檔案格式'); }
+}
+
+function readExcel(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const wb = XLSX.read(e.target.result, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    uploadedData = XLSX.utils.sheet_to_json(ws);
+    showPreview();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) { alert('CSV 檔案至少需要標題列和一筆資料'); return; }
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  uploadedData = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    if (vals.length === headers.length) {
+      const row = {};
+      headers.forEach((h, j) => row[h] = vals[j]);
+      uploadedData.push(row);
+    }
+  }
+  showPreview();
+}
+
+function showPreview() {
+  if (!uploadedData || !uploadedData.length) return;
+  document.getElementById('uploadFileName').textContent = `📄 ${uploadedFileName} (${uploadedData.length} 筆)`;
+  const cols = Object.keys(uploadedData[0]);
+  document.getElementById('previewHeader').innerHTML = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+  const preview = uploadedData.slice(0, 5);
+  document.getElementById('previewBody').innerHTML = preview.map(r =>
+    '<tr>' + cols.map(c => `<td>${r[c] ?? ''}</td>`).join('') + '</tr>'
+  ).join('');
+  document.getElementById('previewInfo').textContent = `顯示前 ${Math.min(5, uploadedData.length)} 筆，共 ${uploadedData.length} 筆、${cols.length} 欄`;
+  document.getElementById('uploadPreview').style.display = 'block';
+}
+
+function clearUpload() {
+  uploadedData = null;
+  uploadedFileName = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('uploadPreview').style.display = 'none';
+}
+
+async function uploadData() {
+  if (!uploadedData || !uploadedData.length) return;
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.style.display = 'inline';
+  statusEl.style.color = 'var(--orange)';
+  statusEl.textContent = '匯入中...';
+
+  const dataType = document.getElementById('uploadDataType').value;
+  const desc = document.getElementById('uploadDescription').value.trim();
+
+  // Store in user_uploads table
+  const { error } = await db.from('user_uploads').insert({
+    file_name: uploadedFileName,
+    data_type: dataType,
+    description: desc || null,
+    row_count: uploadedData.length,
+    column_names: Object.keys(uploadedData[0]),
+    data: uploadedData,
+    uploaded_by: currentUser.id
+  });
+
+  if (error) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '匯入失敗：' + error.message;
+  } else {
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `✅ 成功匯入 ${uploadedData.length} 筆`;
+    setTimeout(() => { clearUpload(); statusEl.style.display = 'none'; }, 3000);
+  }
+}
+
 async function saveNote() {
   const title = document.getElementById('noteTitle').value.trim();
   const content = document.getElementById('noteContent').value.trim();
