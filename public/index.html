@@ -618,7 +618,7 @@
 const SUPABASE_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwYmtleWh4eXlrYnZvd25ybmdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyNjQyMjksImV4cCI6MjA1NDg0MDIyOX0.xMVwMm2JO7g3mcOPJn1XBqrit8FHCuePFMgCVSiSk5c';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============================================================
 // STATE
@@ -645,7 +645,7 @@ async function handleLogin() {
   btn.disabled = true; btn.textContent = '登入中...';
   errEl.style.display = 'none';
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
   if (error) {
     errEl.textContent = '登入失敗：' + error.message;
     errEl.style.display = 'block';
@@ -657,13 +657,13 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
-  await supabase.auth.signOut();
+  await db.auth.signOut();
   currentUser = null;
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('dashboard').style.display = 'none';
 }
 
-supabase.auth.onAuthStateChange((event, session) => {
+db.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
     currentUser = session.user;
     showDashboard();
@@ -722,42 +722,42 @@ function toggleTheme() {
 // ============================================================
 async function loadOverview() {
   // Lawyer count
-  const { count: lawyerCount } = await supabase.from('industry_lawyers').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  const { count: lawyerCount } = await db.from('industry_lawyers').select('*', { count: 'exact', head: true }).eq('status', 'active');
   document.getElementById('kpiLawyerCount').textContent = lawyerCount != null ? lawyerCount.toLocaleString() : '0';
   document.getElementById('kpiLawyerSub').textContent = '執業中';
 
   // Firm count
-  const { count: firmCount } = await supabase.from('law_firms').select('*', { count: 'exact', head: true }).eq('status', 'active');
+  const { count: firmCount } = await db.from('law_firms').select('*', { count: 'exact', head: true }).eq('status', 'active');
   document.getElementById('kpiFirmCount').textContent = firmCount != null ? firmCount.toLocaleString() : '0';
   document.getElementById('kpiFirmSub').textContent = '營業中';
 
   // New lawyers this year
   const currentYear = new Date().getFullYear();
   const yearStart = `${currentYear}-01-01`;
-  const { count: newLawyers } = await supabase.from('industry_lawyers').select('*', { count: 'exact', head: true })
+  const { count: newLawyers } = await db.from('industry_lawyers').select('*', { count: 'exact', head: true })
     .gte('license_date', yearStart);
   document.getElementById('kpiNewLawyers').textContent = newLawyers != null ? newLawyers.toLocaleString() : '0';
   document.getElementById('kpiNewLawyersSub').textContent = `${currentYear} 年`;
 
   // Data sources
-  const { count: srcCount } = await supabase.from('data_sources').select('*', { count: 'exact', head: true }).eq('is_active', true);
+  const { count: srcCount } = await db.from('data_sources').select('*', { count: 'exact', head: true }).eq('is_active', true);
   document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
   document.getElementById('kpiSourcesSub').textContent = '啟用中';
 
   // Region distribution chart
-  const { data: regionData } = await supabase.from('ind_lawyer_region_distribution').select('*').limit(10);
+  const { data: regionData } = await db.from('ind_lawyer_region_distribution').select('*').limit(10);
   renderRegionChart(regionData || []);
 
   // Yearly new lawyers chart
-  const { data: yearlyData } = await supabase.from('ind_yearly_new_lawyers').select('*');
+  const { data: yearlyData } = await db.from('ind_yearly_new_lawyers').select('*');
   renderYearlyChart(yearlyData || []);
 
   // Latest news
-  const { data: latestNews } = await supabase.from('news_articles').select('title, url, source_name, published_at').order('published_at', { ascending: false }).limit(5);
+  const { data: latestNews } = await db.from('news_articles').select('title, url, source_name, published_at').order('published_at', { ascending: false }).limit(5);
   renderOverviewNews(latestNews || []);
 
   // Latest AI insight
-  const { data: latestInsight } = await supabase.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(1);
+  const { data: latestInsight } = await db.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(1);
   renderOverviewInsight(latestInsight?.[0]);
 }
 
@@ -844,7 +844,7 @@ async function loadLawyers() {
   const region = document.getElementById('lawyerRegionFilter').value;
   const status = document.getElementById('lawyerStatusFilter').value;
 
-  let query = supabase.from('industry_lawyers').select('*', { count: 'exact' });
+  let query = db.from('industry_lawyers').select('*', { count: 'exact' });
   if (search) query = query.or(`name.ilike.%${search}%,license_number.ilike.%${search}%,affiliated_firm_name.ilike.%${search}%`);
   if (region) query = query.eq('region', region);
   if (status) query = query.eq('status', status);
@@ -882,7 +882,7 @@ async function loadLawyers() {
 
   // Populate region filter (once)
   if (document.getElementById('lawyerRegionFilter').options.length <= 1) {
-    const { data: regions } = await supabase.from('ind_lawyer_region_distribution').select('region');
+    const { data: regions } = await db.from('ind_lawyer_region_distribution').select('region');
     if (regions) {
       regions.forEach(r => {
         const opt = document.createElement('option');
@@ -907,7 +907,7 @@ async function loadFirms() {
   const city = document.getElementById('firmCityFilter').value;
   const status = document.getElementById('firmStatusFilter').value;
 
-  let query = supabase.from('law_firms').select('*', { count: 'exact' });
+  let query = db.from('law_firms').select('*', { count: 'exact' });
   if (search) query = query.or(`name.ilike.%${search}%,tax_id.ilike.%${search}%`);
   if (city) query = query.eq('city', city);
   if (status) query = query.eq('status', status);
@@ -945,7 +945,7 @@ async function loadFirms() {
 
   // Populate city filter (once)
   if (document.getElementById('firmCityFilter').options.length <= 1) {
-    const { data: cities } = await supabase.from('law_firms').select('city').not('city', 'is', null);
+    const { data: cities } = await db.from('law_firms').select('city').not('city', 'is', null);
     if (cities) {
       const unique = [...new Set(cities.map(c => c.city))].sort();
       unique.forEach(c => {
@@ -962,7 +962,7 @@ async function loadFirms() {
 // ============================================================
 async function loadTrends() {
   // Lawyer count by year from industry_stats
-  const { data: lawyerTrend } = await supabase.from('industry_stats')
+  const { data: lawyerTrend } = await db.from('industry_stats')
     .select('*').eq('stat_type', 'lawyer_count').is('region', null).order('year');
 
   if (lawyerTrend?.length) {
@@ -977,7 +977,7 @@ async function loadTrends() {
   }
 
   // Firm count by year
-  const { data: firmTrend } = await supabase.from('industry_stats')
+  const { data: firmTrend } = await db.from('industry_stats')
     .select('*').eq('stat_type', 'firm_count').is('region', null).order('year');
 
   if (firmTrend?.length) {
@@ -985,7 +985,7 @@ async function loadTrends() {
   }
 
   // Firm size distribution
-  const { data: sizeData } = await supabase.from('ind_firm_size_distribution').select('*');
+  const { data: sizeData } = await db.from('ind_firm_size_distribution').select('*');
   if (sizeData?.length) {
     renderFirmSizeChart(sizeData);
   }
@@ -1065,7 +1065,7 @@ async function loadNews() {
   const source = document.getElementById('newsSourceFilter').value;
   const starredOnly = document.getElementById('newsStarredFilter').checked;
 
-  let query = supabase.from('news_articles').select('*', { count: 'exact' });
+  let query = db.from('news_articles').select('*', { count: 'exact' });
   if (search) query = query.ilike('title', `%${search}%`);
   if (source) query = query.eq('source_name', source);
   if (starredOnly) query = query.eq('is_starred', true);
@@ -1098,7 +1098,7 @@ async function loadNews() {
 
   // Populate source filter (once)
   if (document.getElementById('newsSourceFilter').options.length <= 1) {
-    const { data: sources } = await supabase.from('news_articles').select('source_name').not('source_name', 'is', null);
+    const { data: sources } = await db.from('news_articles').select('source_name').not('source_name', 'is', null);
     if (sources) {
       [...new Set(sources.map(s => s.source_name))].sort().forEach(s => {
         const opt = document.createElement('option');
@@ -1110,12 +1110,12 @@ async function loadNews() {
 }
 
 async function toggleStar(id, starred) {
-  await supabase.from('news_articles').update({ is_starred: starred }).eq('id', id);
+  await db.from('news_articles').update({ is_starred: starred }).eq('id', id);
   loadNews();
 }
 
 async function loadInsights() {
-  const { data } = await supabase.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(20);
+  const { data } = await db.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(20);
   const el = document.getElementById('insightsList');
 
   if (!data || !data.length) {
@@ -1146,7 +1146,7 @@ async function saveNote() {
 
   if (!title) { alert('請輸入標題'); return; }
 
-  const { error } = await supabase.from('manual_notes').insert({
+  const { error } = await db.from('manual_notes').insert({
     user_id: currentUser.id,
     title, content, category, tags
   });
@@ -1165,7 +1165,7 @@ async function saveNote() {
 }
 
 async function loadNotes() {
-  const { data } = await supabase.from('manual_notes').select('*').order('created_at', { ascending: false });
+  const { data } = await db.from('manual_notes').select('*').order('created_at', { ascending: false });
   const el = document.getElementById('notesList');
 
   if (!data || !data.length) {
@@ -1192,7 +1192,7 @@ async function loadNotes() {
 
 async function deleteNote(id) {
   if (!confirm('確定要刪除這筆筆記嗎？')) return;
-  await supabase.from('manual_notes').delete().eq('id', id);
+  await db.from('manual_notes').delete().eq('id', id);
   loadNotes();
 }
 
@@ -1201,7 +1201,7 @@ async function deleteNote(id) {
 // ============================================================
 async function loadSources() {
   // Data sources
-  const { data: sources } = await supabase.from('data_sources').select('*').order('name');
+  const { data: sources } = await db.from('data_sources').select('*').order('name');
   const srcBody = document.getElementById('sourcesTableBody');
   if (sources?.length) {
     srcBody.innerHTML = sources.map(s => `
@@ -1218,7 +1218,7 @@ async function loadSources() {
   }
 
   // Scrape logs
-  const { data: logs } = await supabase.from('scrape_logs').select('*').order('started_at', { ascending: false }).limit(50);
+  const { data: logs } = await db.from('scrape_logs').select('*').order('started_at', { ascending: false }).limit(50);
   const logBody = document.getElementById('scrapeLogsBody');
   if (logs?.length) {
     const statusMap = { running: ['執行中', 'badge-blue'], success: ['成功', 'badge-green'], error: ['失敗', 'badge-red'], partial: ['部分成功', 'badge-orange'] };
@@ -1276,7 +1276,7 @@ function renderPagination(containerId, page, total, onPageChange) {
 // INIT - Check existing session
 // ============================================================
 (async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await db.auth.getSession();
   if (session?.user) {
     currentUser = session.user;
     showDashboard();
