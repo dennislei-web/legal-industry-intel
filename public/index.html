@@ -438,7 +438,6 @@
               <tr>
                 <th>姓名</th>
                 <th>公會</th>
-                <th>地區</th>
                 <th>執業起始</th>
                 <th>案件數(5年)</th>
                 <th>擅長領域</th>
@@ -446,7 +445,7 @@
               </tr>
             </thead>
             <tbody id="lawyerTableBody">
-              <tr><td colspan="7" class="loading">載入中</td></tr>
+              <tr><td colspan="6" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -1077,7 +1076,7 @@ async function loadLawyers() {
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
     return;
   }
@@ -1088,8 +1087,7 @@ async function loadLawyers() {
     const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
-      <td>${escHtml((l.bar_association || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
-      <td>${escHtml(l.region || '-')}</td>
+      <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td>${l.practice_start_date || '-'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
       <td>${areas}${more || '-'}</td>
