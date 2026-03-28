@@ -916,44 +916,32 @@ async function loadOverview() {
   // Lawsnote KPIs
   const { count: lawsnoteCount } = await db.from('lawsnote_lawyers').select('*', { count: 'exact', head: true });
   document.getElementById('kpiLawsnoteCount').textContent = lawsnoteCount != null ? lawsnoteCount.toLocaleString() : '0';
-  const { data: avgData } = await db.rpc('lawsnote_avg_cases').catch(() => ({ data: null }));
-  if (!avgData) {
-    // fallback: fetch a sample to estimate
-    const { data: sample } = await db.from('lawsnote_lawyers').select('case_count_5yr').not('case_count_5yr', 'is', null).limit(1000);
-    if (sample?.length) {
-      const avg = Math.round(sample.reduce((s, r) => s + r.case_count_5yr, 0) / sample.length);
-      document.getElementById('kpiAvgCases').textContent = avg;
+  try {
+    const { data: avgData } = await db.rpc('lawsnote_avg_cases');
+    if (avgData?.[0]?.avg_cases) {
+      document.getElementById('kpiAvgCases').textContent = avgData[0].avg_cases;
     }
-  }
+  } catch(e) { console.log('avg_cases error:', e); }
 
-  // Region distribution chart - from lawyer_members
-  const { data: regionStats2 } = await db.from('lawyer_members').select('region')
-    .eq('is_active', true).not('region', 'is', null);
-  if (regionStats2?.length) {
-    const regionCounts = {};
-    regionStats2.forEach(r => { regionCounts[r.region] = (regionCounts[r.region] || 0) + 1; });
-    const regionData = Object.entries(regionCounts)
-      .map(([region, count]) => ({ region, count }))
-      .sort((a, b) => b.count - a.count).slice(0, 10);
-    renderRegionChart(regionData);
-  } else {
-    // fallback to industry_stats
-    const { data: regionStats } = await db.from('industry_stats').select('region,value')
-      .eq('stat_type', 'guild_lawyer_count').not('region', 'is', null)
-      .order('value', { ascending: false }).limit(10);
-    renderRegionChart((regionStats || []).map(r => ({ region: r.region, count: Number(r.value) })));
-  }
+  // Region distribution chart - using server-side aggregation
+  try {
+    const { data: regionData, error: regionErr } = await db.rpc('region_distribution');
+    if (regionData?.length) {
+      renderRegionChart(regionData.slice(0, 12));
+    } else {
+      console.log('region_distribution error:', regionErr);
+    }
+  } catch(e) { console.log('region chart error:', e); }
 
-  // Expertise distribution from Lawsnote
-  const { data: expertiseData } = await db.from('lawsnote_lawyers').select('expertise_areas').not('expertise_areas', 'is', null).limit(2000);
-  if (expertiseData?.length) {
-    const expCounts = {};
-    expertiseData.forEach(r => {
-      (r.expertise_areas || []).forEach(e => { expCounts[e] = (expCounts[e] || 0) + 1; });
-    });
-    const sorted = Object.entries(expCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    renderExpertiseChart(sorted);
-  }
+  // Expertise distribution - using server-side aggregation
+  try {
+    const { data: expData, error: expErr } = await db.rpc('expertise_top10');
+    if (expData?.length) {
+      renderExpertiseChart(expData.map(r => [r.expertise, r.count]));
+    } else {
+      console.log('expertise_top10 error:', expErr);
+    }
+  } catch(e) { console.log('expertise chart error:', e); }
 
   // Latest news
   const { data: latestNews } = await db.from('news_articles').select('title, url, source_name, published_at').order('published_at', { ascending: false }).limit(5);
