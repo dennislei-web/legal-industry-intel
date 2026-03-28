@@ -37,8 +37,8 @@ def extract_profile(page, lawsnote_id):
             const body = document.body.innerText;
             const result = {};
 
-            // 證書字號
-            const certMatch = body.match(/(\\d+)台檢證字第(\\d+)號/);
+            // 證書字號 (含各種變體：台/臺、檢證/檢補證/檢覆證)
+            const certMatch = body.match(/(\\d+)[台臺]檢[補覆]?證字第(\\d+)號/);
             result.cert_number = certMatch ? certMatch[0] : null;
 
             // 服務區域
@@ -118,13 +118,26 @@ def extract_profile(page, lawsnote_id):
 def main():
     sb = get_supabase()
 
-    # 取得尚未爬取 profile 的律師
-    resp = sb.table('lawsnote_lawyers') \
-        .select('id, lawsnote_id, name') \
-        .or_('profile_scraped.is.null,profile_scraped.eq.false') \
-        .order('case_count_5yr', desc=True) \
-        .limit(BATCH_SIZE) \
-        .execute()
+    # 取得需要爬取的律師：未爬過 OR 已爬過但缺少證書字號
+    import os
+    rescrape = os.environ.get('RESCRAPE_MISSING_CERT', 'false').lower() == 'true'
+
+    if rescrape:
+        log('模式: 重新爬取缺少證書字號的律師')
+        resp = sb.table('lawsnote_lawyers') \
+            .select('id, lawsnote_id, name') \
+            .eq('profile_scraped', True) \
+            .is_('cert_number', 'null') \
+            .order('case_count_5yr', desc=True) \
+            .limit(BATCH_SIZE) \
+            .execute()
+    else:
+        resp = sb.table('lawsnote_lawyers') \
+            .select('id, lawsnote_id, name') \
+            .or_('profile_scraped.is.null,profile_scraped.eq.false') \
+            .order('case_count_5yr', desc=True) \
+            .limit(BATCH_SIZE) \
+            .execute()
 
     lawyers = resp.data
     total = len(lawyers)
