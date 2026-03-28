@@ -29,37 +29,35 @@ EXCLUDE_DOMAINS = [
 ]
 
 
-def search_google(query):
-    """用 Google 搜尋，回傳前 5 個結果的 URL 和標題"""
-    url = 'https://www.google.com/search'
-    params = {'q': query, 'hl': 'zh-TW', 'num': 10}
+def search_duckduckgo(query):
+    """用 DuckDuckGo HTML 版搜尋，回傳結果列表"""
+    url = 'https://html.duckduckgo.com/html/'
+    data = {'q': query}
 
     try:
-        resp = requests.get(url, params=params, headers=HEADERS, timeout=15)
+        resp = requests.post(url, data=data, headers=HEADERS, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, 'html.parser')
 
         results = []
-        for g in soup.select('div.g, div[data-sokoban-container]'):
-            link = g.find('a', href=True)
+        for r in soup.select('.result'):
+            link = r.find('a', class_='result__a', href=True)
             if not link:
                 continue
             href = link['href']
-            # 過濾 Google 內部連結
-            if href.startswith('/search') or href.startswith('#'):
-                continue
-            # 提取標題
-            title_el = g.find('h3')
-            title = title_el.get_text(strip=True) if title_el else ''
-            # 提取描述
-            desc_el = g.find('div', class_=re.compile('VwiC3b|IsZvec|s3v9rd'))
+            # DuckDuckGo 有時用 redirect URL
+            if 'uddg=' in href:
+                href = unquote(href.split('uddg=')[-1].split('&')[0])
+            title = link.get_text(strip=True)
+            desc_el = r.find('a', class_='result__snippet')
             desc = desc_el.get_text(strip=True) if desc_el else ''
 
-            results.append({'url': href, 'title': title, 'description': desc})
+            if href.startswith('http'):
+                results.append({'url': href, 'title': title, 'description': desc})
 
         return results
     except Exception as e:
-        log(f'  Google 搜尋失敗: {e}')
+        log(f'  DuckDuckGo 搜尋失敗: {e}')
         return []
 
 
@@ -80,7 +78,7 @@ def is_likely_official(url, firm_name):
 def find_firm_website(firm_name):
     """搜尋事務所官網"""
     # 嘗試搜尋「事務所名 官網」
-    results = search_google(f'{firm_name} 律師')
+    results = search_duckduckgo(f'{firm_name}')
 
     if not results:
         return None
@@ -100,10 +98,9 @@ def find_firm_website(firm_name):
 def main():
     sb = get_supabase()
 
-    # 取得未搜尋的事務所
+    # 取得未搜尋的事務所（或搜尋過但沒找到的重試）
     resp = sb.table('firm_websites') \
         .select('id, firm_name') \
-        .eq('website_scraped', False) \
         .is_('website_url', 'null') \
         .limit(BATCH_SIZE) \
         .execute()
