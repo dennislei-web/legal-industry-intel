@@ -2,7 +2,7 @@
 // ai-chat Edge Function (standalone, 可直接貼到 Supabase Dashboard)
 // 多 session 對話 + web_search + 使用者知識庫 context
 // ============================================================
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 
 // ========= CORS =========
 const corsHeaders = {
@@ -190,7 +190,16 @@ Deno.serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } },
     );
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: { user } } = await userClient.auth.getUser(token);
+    let user: { id: string } | null = null;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload.sub && payload.role === 'authenticated') {
+          user = { id: payload.sub };
+        }
+      }
+    } catch (e) { console.warn('JWT decode failed:', e); }
     if (!user) return err('Unauthorized', 401);
 
     const serviceClient = createClient(
