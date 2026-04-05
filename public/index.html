@@ -1345,9 +1345,31 @@ function sortOffices(col) {
 }
 
 async function loadOffices() {
-  const { data, error } = await db.rpc('firm_statistics');
-  if (error) { console.error('firm_statistics error:', error); return; }
-  allOffices = data || [];
+  // 優先使用 MOJ 來源（moj_firm_statistics），資料較新較齊
+  // Supabase 預設每次查詢上限 1000 筆，需分頁讀取全部事務所
+  allOffices = [];
+  const PAGE = 1000;
+  let from = 0;
+  let rpcName = 'moj_firm_statistics';
+  while (true) {
+    let { data, error } = await db.rpc(rpcName).range(from, from + PAGE - 1);
+    if (error) {
+      // Fallback 到舊 RPC
+      if (rpcName === 'moj_firm_statistics') {
+        console.warn('moj_firm_statistics 無法使用，改用 firm_statistics');
+        rpcName = 'firm_statistics';
+        allOffices = [];
+        from = 0;
+        continue;
+      }
+      console.error('firm_statistics error:', error);
+      return;
+    }
+    if (!data || data.length === 0) break;
+    allOffices = allOffices.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
 
   // KPIs
   document.getElementById('kpiOfficeCount').textContent = allOffices.length.toLocaleString();

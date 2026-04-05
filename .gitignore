@@ -7,3 +7,8 @@ __pycache__/
 node_modules/
 .DS_Store
 .claude/
+
+# MOJ scraper artifacts
+app.js
+tmp_cap*.svg
+moj_lawyers_output.json
