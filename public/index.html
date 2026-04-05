@@ -1194,12 +1194,30 @@ async function loadLawyers() {
         ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;margin:1px;" title="Lawsnote 判決資料">Lawsnote</a>`
         : `<span class="badge badge-orange" style="margin:1px;">Lawsnote</span>`);
     }
+    // 懲戒記錄紅色警示
+    if (l.moj_discipline) {
+      badges.push(`<span class="badge" style="margin:1px;background:color-mix(in srgb, var(--red) 25%, transparent);color:var(--red);" title="有懲戒記錄: ${escHtml(l.moj_discipline)}">⚠ 懲戒</span>`);
+    }
     const srcHtml = badges.join('') || '<span style="color:var(--text-muted);">-</span>';
+
+    // 組合 tooltip: 性別/出生年/email/電話/地址
+    const tipParts = [];
+    if (l.moj_sex) tipParts.push(`性別: ${l.moj_sex}`);
+    if (l.moj_birth_year) tipParts.push(`出生: 民國 ${l.moj_birth_year} 年 (${1911 + l.moj_birth_year})`);
+    if (l.moj_email) tipParts.push(`Email: ${l.moj_email}`);
+    if (l.moj_tel) tipParts.push(`電話: ${l.moj_tel}`);
+    if (l.moj_address) tipParts.push(`地址: ${l.moj_address}`);
+    if (l.moj_state_desc && l.moj_state_desc !== '正常') tipParts.push(`狀態: ${l.moj_state_desc}`);
+    const tooltip = tipParts.join('\n');
+
+    // 執業起始日（優先 MOJ，fallback lawyer_members）
+    const startDate = l.moj_practice_start_date || l.practice_start_date || '-';
+
     return `<tr>
-      <td><strong>${escHtml(l.name)}</strong></td>
-      <td style="font-size:0.8rem;" title="${escHtml(l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
+      <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
-      <td>${l.practice_start_date || '-'}</td>
+      <td>${startDate}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
       <td>${srcHtml}</td>
     </tr>`;

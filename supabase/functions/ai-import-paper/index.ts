@@ -23,9 +23,17 @@ const EXTRACT_PROMPT = `請使用 web_fetch 工具抓取以下網址的學術論
 
 步驟：
 1. 先 web_fetch 抓該網址（可能是 NDLTD 論文詳細頁或其他學術資料庫）
-2. 從頁面中找到論文 metadata（標題、作者、年份、學位類型、機構、摘要、關鍵字）
-3. 若頁面有「電子全文 PDF」或「下載全文」連結，再用 web_fetch 抓該 PDF（Claude tool 支援 PDF）
-4. 從 PDF 或內文抽取章節內容
+2. 從頁面中找到論文 metadata（標題、作者、年份、學位類型、機構、摘要、關鍵字、論文目次、相關論文清單）
+3. **積極尋找全文 PDF**：
+   - 在頁面找「電子全文」、「下載全文」、「View/Open」、「PDF」等連結
+   - 追蹤 handle URL（hdl.handle.net）或機構 repository
+   - 嘗試把 NDLTD URL 的 handle/xxxxx 部分轉成直接 PDF URL
+   - 若找到 PDF URL，用 web_fetch 再抓一次（Claude tool 支援 PDF 解析）
+4. 無論是否抓到全文，務必從頁面抽取所有可見文字當作 content：
+   - 論文目次（章節標題）
+   - 摘要全文（中英文都要）
+   - 相關論文資訊
+   - 任何頁面上出現的論文內容段落
 
 輸出格式（嚴格 JSON，不要有任何 markdown 或其他文字包裝）：
 {
@@ -168,8 +176,25 @@ Deno.serve(async (req: Request) => {
     if (!parsed.title) return err('無法抽取論文標題，請確認 URL 是否為論文詳細頁');
 
     // 寫入 academic_papers
-    const sections = parsed.sections || [];
-    const fullText = sections.map((s) => s.content || '').join('\n\n');
+    let sections = parsed.sections || [];
+    let fullText = sections.map((s) => s.content || '').join('\n\n');
+
+    // Fallback: 若沒抓到全文，把 abstract + metadata 當作 chunk 存起來
+    // 至少可以做 full-text search 並被 AI 引用
+    if (fullText.length === 0 && parsed.abstract) {
+      const metadataBlock = [
+        `標題：${parsed.title}`,
+        parsed.authors?.length ? `作者：${parsed.authors.join(', ')}` : '',
+        parsed.year ? `年份：${parsed.year}` : '',
+        parsed.venue ? `機構/期刊：${parsed.venue}` : '',
+        parsed.keywords?.length ? `關鍵字：${parsed.keywords.join('、')}` : '',
+        '',
+        '摘要：',
+        parsed.abstract,
+      ].filter(Boolean).join('\n');
+      sections = [{ title: '論文摘要', content: metadataBlock }];
+      fullText = metadataBlock;
+    }
 
     const { data: paper, error: insertError } = await userClient
       .from('academic_papers')
