@@ -63,7 +63,8 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_ANON_KEY')!,
       { global: { headers: { Authorization: authHeader } } },
     );
-    const { data: { user } } = await userClient.auth.getUser();
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user } } = await userClient.auth.getUser(token);
     if (!user) return err('Unauthorized', 401);
 
     const { query } = await req.json();
