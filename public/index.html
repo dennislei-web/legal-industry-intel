@@ -6,6 +6,7 @@
   <title>台灣法律產業情報儀表板</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <style>
     /* ===================== CSS VARIABLES ===================== */
     :root {
@@ -556,134 +557,140 @@
 
     <!-- ==================== TAB: TRENDS ==================== -->
     <div id="tab-trends" class="tab-content">
-      <!-- 資料來源標注 -->
-      <div style="margin-bottom:16px;padding:10px 16px;background:var(--blue-dim);border-radius:8px;font-size:0.85rem;color:var(--text-muted);">
-        &#128218; 資料來源：Lawsnote JobBoard《2023 台灣律師職涯市場報告》（調查 430+ 位律師）
-      </div>
-
-      <!-- KPI 卡片 -->
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));">
+      <!-- 頂部 KPI -->
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
         <div class="kpi-card">
-          <div class="kpi-label">律師年複合成長率</div>
-          <div class="kpi-value" id="kpiLawyerGrowth">-</div>
-          <div class="kpi-sub">近 5 年</div>
+          <div class="kpi-label">登錄律師總數</div>
+          <div class="kpi-value" id="trendsKpiLawyers">-</div>
+          <div class="kpi-sub">來自 MOJ</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">事務所密度</div>
-          <div class="kpi-value" id="kpiFirmDensity">-</div>
-          <div class="kpi-sub">每萬人口</div>
+          <div class="kpi-label">事務所總數</div>
+          <div class="kpi-value" id="trendsKpiFirms">-</div>
+          <div class="kpi-sub">依事務所名稱聚合</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">男女比</div>
-          <div class="kpi-value" style="color:var(--blue);">3:2</div>
-          <div class="kpi-sub">男 57.2% / 女 38.8%</div>
+          <div class="kpi-label">我的筆記</div>
+          <div class="kpi-value" id="trendsKpiNotes">-</div>
+          <div class="kpi-sub">累積觀察</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">年薪中位數</div>
-          <div class="kpi-value" style="color:var(--green);">71-110萬</div>
-          <div class="kpi-sub">近 60% 落在此區間</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">3年以下年資</div>
-          <div class="kpi-value" style="color:var(--orange);">50%</div>
-          <div class="kpi-sub">市場新進律師多</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">5人以下律所</div>
-          <div class="kpi-value" style="color:var(--purple);">71.7%</div>
-          <div class="kpi-sub">小型事務所為主</div>
+          <div class="kpi-label">對話數</div>
+          <div class="kpi-value" id="trendsKpiChats">-</div>
+          <div class="kpi-sub">與 AI 的問答</div>
         </div>
       </div>
 
-      <!-- 第一排：趨勢圖 -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#128200; 律師人數趨勢</div>
-          <div class="chart-container"><canvas id="chartLawyerTrend"></canvas></div>
+      <!-- 📊 AI 報告 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>&#128202; 產業分析報告</span>
+          <button class="btn btn-sm btn-blue" onclick="generateReport()" id="genReportBtn">重新生成</button>
         </div>
-        <div class="card">
-          <div class="card-title">&#127970; 事務所數量趨勢</div>
-          <div class="chart-container"><canvas id="chartFirmTrend"></canvas></div>
+        <div id="latestReport" style="margin-top:8px;line-height:1.7;">
+          <div class="loading">載入中...</div>
         </div>
+        <div id="reportMeta" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:0.75rem;color:var(--text-muted);"></div>
       </div>
 
-      <!-- 第二排：受僱律師分析 -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#128188; 受僱律師薪資分佈</div>
-          <div class="chart-container"><canvas id="chartSalary"></canvas></div>
+      <!-- 💬 對話區 -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="card-title" style="padding:12px 16px;border-bottom:1px solid var(--border);margin:0;">
+          &#128172; 對話問答
         </div>
-        <div class="card">
-          <div class="card-title">&#128197; 受僱律師工作年資</div>
-          <div class="chart-container"><canvas id="chartExperience"></canvas></div>
-        </div>
-      </div>
+        <div style="display:grid;grid-template-columns:240px 1fr;min-height:600px;">
+          <!-- Session 列表 -->
+          <div style="border-right:1px solid var(--border);padding:12px;background:var(--bg-sub);overflow-y:auto;max-height:700px;">
+            <button class="btn btn-blue" onclick="newChatSession()" style="width:100%;margin-bottom:12px;">+ 新對話</button>
+            <div id="chatSessionList"><div class="loading" style="padding:8px;font-size:0.8rem;">載入中...</div></div>
+          </div>
 
-      <!-- 第三排：年齡+學歷+區域 -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#128100; 受僱律師年齡分佈</div>
-          <div class="chart-container"><canvas id="chartAge"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">&#127891; 受僱律師學歷分佈</div>
-          <div class="chart-container"><canvas id="chartEducation"></canvas></div>
-        </div>
-      </div>
-
-      <!-- 第四排：律所分析 -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#127970; 律所規模分佈</div>
-          <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">&#128197; 律所成立年限</div>
-          <div class="chart-container"><canvas id="chartFirmAge"></canvas></div>
-        </div>
-      </div>
-
-      <!-- 第五排：律所招募+薪資 -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#127919; 律所招募重視面向 (1-5分)</div>
-          <div class="chart-container"><canvas id="chartHiringFactors"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">&#128176; 律所提供受僱律師最高年薪</div>
-          <div class="chart-container"><canvas id="chartFirmMaxSalary"></canvas></div>
+          <!-- 對話區 -->
+          <div style="display:flex;flex-direction:column;max-height:700px;">
+            <div id="chatMessages" style="flex:1;overflow-y:auto;padding:16px;min-height:400px;">
+              <div style="text-align:center;color:var(--text-muted);font-size:0.9rem;padding:40px 20px;">
+                點左側「+ 新對話」或已有對話開始問問題<br>
+                <span style="font-size:0.8rem;opacity:0.7;">AI 會根據你的筆記、新聞、DB 資料回答</span>
+              </div>
+            </div>
+            <div style="border-top:1px solid var(--border);padding:12px;background:var(--bg-sub);">
+              <div style="display:flex;gap:8px;align-items:flex-end;">
+                <textarea id="chatInput" rows="2"
+                          placeholder="問任何法律產業問題...（Enter 送出，Shift+Enter 換行）"
+                          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"
+                          style="flex:1;padding:10px;resize:vertical;"></textarea>
+                <button class="btn btn-blue" onclick="sendChat()" id="chatSendBtn">送出</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- ==================== TAB: NEWS ==================== -->
     <div id="tab-news" class="tab-content">
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <button class="btn btn-sm btn-ghost" onclick="showNewsSubTab('news')" id="newsSubBtn" style="border-bottom:2px solid var(--tab-active-color);">新聞</button>
-        <button class="btn btn-sm btn-ghost" onclick="showNewsSubTab('insights')" id="insightsSubBtn">AI 分析</button>
+      <!-- 🔍 AI 搜尋 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128269; 請 AI 搜尋法律產業新聞</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="newsSearchQuery"
+                 placeholder="例：AI 法律科技、事務所併購、國際所動態、勞動法修法..."
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();aiSearchNews();}"
+                 style="flex:1;padding:10px 12px;">
+          <button class="btn btn-blue" onclick="aiSearchNews()" id="newsSearchBtn">搜尋</button>
+        </div>
+        <div id="newsSearchStatus" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);min-height:1em;"></div>
+        <div id="recentSearches" style="margin-top:12px;"></div>
       </div>
 
-      <div id="newsSubTab">
-        <div class="search-bar">
-          <input type="text" id="newsSearch" placeholder="搜尋新聞標題..." oninput="filterNews()">
+      <!-- 新聞清單 + 篩選 -->
+      <div class="card">
+        <div class="search-bar" style="margin-bottom:12px;">
+          <input type="text" id="newsSearch" placeholder="在現有新聞中搜尋..." oninput="filterNews()">
           <select id="newsSourceFilter" onchange="filterNews()">
             <option value="">所有來源</option>
           </select>
           <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);cursor:pointer;">
             <input type="checkbox" id="newsStarredFilter" onchange="filterNews()"> 僅顯示標星
           </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--text-muted);cursor:pointer;">
+            <input type="checkbox" id="newsAiFilter" onchange="filterNews()"> 僅 AI 搜尋結果
+          </label>
         </div>
         <div id="newsList"><div class="loading">載入中</div></div>
         <div class="pagination" id="newsPagination"></div>
-      </div>
-
-      <div id="insightsSubTab" style="display:none;">
-        <div id="insightsList"><div class="loading">載入中</div></div>
       </div>
     </div>
 
     <!-- ==================== TAB: INPUT ==================== -->
     <div id="tab-input" class="tab-content">
+      <!-- ⚡ 快速記錄 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9889; 快速記錄</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="quickNoteInput"
+                 placeholder="一句話記錄觀察（按 Enter 送出，最長 500 字）"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickNote();}"
+                 maxlength="500"
+                 style="flex:1;padding:10px 12px;">
+          <button class="btn btn-blue" onclick="saveQuickNote()">送出</button>
+        </div>
+        <div id="quickNoteStatus" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);min-height:1em;"></div>
+      </div>
+
+      <!-- 🔗 URL 轉筆記 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128279; URL 轉筆記（AI 抓取內容）</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="url" id="urlNoteInput"
+                 placeholder="貼一個網址，AI 幫你抓內容並摘要成筆記"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();extractUrl();}"
+                 style="flex:1;padding:10px 12px;">
+          <button class="btn btn-blue" onclick="extractUrl()" id="urlExtractBtn">抓取</button>
+        </div>
+        <div id="urlExtractStatus" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);min-height:1em;"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">&#128221; 新增研究筆記</div>
         <div class="note-form">
@@ -926,7 +933,7 @@ function showTab(tab) {
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
   if (tab === 'trends') loadTrends();
-  if (tab === 'news') { loadNews(); loadInsights(); }
+  if (tab === 'news') { loadNews(); loadRecentSearches(); }
   if (tab === 'input') { loadNotes(); loadUploads(); }
   if (tab === 'sources') loadSources();
 }
@@ -1425,199 +1432,287 @@ function renderOffices() {
 }
 
 // ============================================================
-// TRENDS TAB
+// TRENDS TAB - AI 報告 + 多 session 對話
 // ============================================================
+let currentChatSessionId = null;
+
 async function loadTrends() {
-  // === 從 DB 載入趨勢數據 ===
-  const { data: lawyerTrend } = await db.from('industry_stats')
-    .select('*').eq('stat_type', 'lawyer_count').is('region', null).order('year');
+  loadTrendsKpis();
+  loadLatestReport();
+  loadChatSessions();
+}
 
-  if (lawyerTrend?.length) {
-    renderTrendChart('chartLawyerTrend', 'lawyerTrend', lawyerTrend.map(r => r.year), lawyerTrend.map(r => Number(r.value)), '律師總數', '#4f8ef7');
-    const first = Number(lawyerTrend[0].value), last = Number(lawyerTrend[lawyerTrend.length - 1].value);
-    const years = lawyerTrend[lawyerTrend.length - 1].year - lawyerTrend[0].year;
-    if (years > 0 && first > 0) {
-      const cagr = (Math.pow(last / first, 1 / years) - 1) * 100;
-      document.getElementById('kpiLawyerGrowth').textContent = cagr.toFixed(1) + '%';
+async function loadTrendsKpis() {
+  // 律師總數
+  const { count: lawyerCount } = await db.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
+  if (lawyerCount != null) document.getElementById('trendsKpiLawyers').textContent = lawyerCount.toLocaleString();
+
+  // 事務所總數：用 moj_firm_statistics 分頁算
+  try {
+    let firmTotal = 0;
+    let from = 0;
+    const PAGE = 1000;
+    while (true) {
+      const { data } = await db.rpc('moj_firm_statistics').range(from, from + PAGE - 1);
+      if (!data || data.length === 0) break;
+      firmTotal += data.length;
+      if (data.length < PAGE) break;
+      from += PAGE;
     }
+    document.getElementById('trendsKpiFirms').textContent = firmTotal.toLocaleString();
+  } catch (e) { console.warn('firm count error:', e); }
+
+  // 筆記數
+  const { count: noteCount } = await db.from('manual_notes').select('id', { count: 'exact', head: true });
+  if (noteCount != null) document.getElementById('trendsKpiNotes').textContent = noteCount.toLocaleString();
+
+  // 對話數
+  const { count: chatCount } = await db.from('chat_sessions').select('id', { count: 'exact', head: true });
+  if (chatCount != null) document.getElementById('trendsKpiChats').textContent = chatCount.toLocaleString();
+}
+
+// 📊 載入最新的 AI 報告
+async function loadLatestReport() {
+  const el = document.getElementById('latestReport');
+  const meta = document.getElementById('reportMeta');
+  const { data } = await db.from('ai_insights')
+    .select('*').eq('insight_type', 'trend_analysis')
+    .order('created_at', { ascending: false }).limit(1);
+
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:24px;"><div class="msg">尚無報告，點右上角「重新生成」讓 AI 基於你的筆記 + DB 資料生成第一份</div></div>';
+    meta.textContent = '';
+    return;
   }
 
-  const { data: firmTrend } = await db.from('industry_stats')
-    .select('*').eq('stat_type', 'firm_count').is('region', null).order('year');
-  if (firmTrend?.length) {
-    renderTrendChart('chartFirmTrend', 'firmTrend', firmTrend.map(r => r.year), firmTrend.map(r => Number(r.value)), '事務所數', '#c9a84c');
+  const r = data[0];
+  el.innerHTML = renderMarkdown(r.content);
+  meta.textContent = `🕐 生成時間: ${formatDate(r.created_at)}  |  模型: ${r.model_used || 'claude-sonnet-4-5'}`;
+}
+
+// 🔄 生成新報告
+async function generateReport() {
+  const btn = document.getElementById('genReportBtn');
+  const el = document.getElementById('latestReport');
+  btn.disabled = true;
+  btn.textContent = '生成中...';
+  el.innerHTML = '<div class="loading">AI 正在分析你的筆記、新聞與 DB 資料，約需 30-90 秒...</div>';
+
+  try {
+    const { data, error } = await db.functions.invoke('ai-generate-report', { body: {} });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    await loadLatestReport();
+  } catch (e) {
+    el.innerHTML = '<div style="color:var(--red);">生成失敗：' + (e.message || e) + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '重新生成';
+  }
+}
+
+// 💬 載入對話 session 列表
+async function loadChatSessions() {
+  const el = document.getElementById('chatSessionList');
+  const { data } = await db.from('chat_sessions')
+    .select('id, title, last_message_at')
+    .order('last_message_at', { ascending: false })
+    .limit(50);
+
+  if (!data || !data.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px;">尚無對話</div>';
+    return;
   }
 
-  // === Lawsnote 2023 報告靜態數據（圖表） ===
-  renderReportCharts();
+  el.innerHTML = data.map(s => `
+    <div onclick="openChatSession('${s.id}')"
+         class="chat-session-item ${s.id === currentChatSessionId ? 'active' : ''}"
+         style="padding:8px 10px;margin-bottom:4px;border-radius:6px;cursor:pointer;font-size:0.85rem;
+                background:${s.id === currentChatSessionId ? 'var(--blue-dim)' : 'transparent'};
+                color:${s.id === currentChatSessionId ? 'var(--blue)' : 'var(--text)'};
+                border-left:3px solid ${s.id === currentChatSessionId ? 'var(--blue)' : 'transparent'};"
+         onmouseover="if(this.dataset.active!=='1')this.style.background='var(--bg-hover)';"
+         onmouseout="if(this.dataset.active!=='1')this.style.background='transparent';">
+      <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.title)}</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${formatDate(s.last_message_at)}</div>
+    </div>
+  `).join('');
 }
 
-function renderReportCharts() {
-  const colors = { blue: '#4f8ef7', gold: '#c9a84c', green: '#4caf82', red: '#e05c5c', purple: '#9b7ed8', orange: '#e0954a' };
-  const chartOpts = (indexAxis = 'x') => ({
-    responsive: true, maintainAspectRatio: false, indexAxis,
-    scales: {
-      x: { ticks: { color: '#8899aa' }, grid: { color: indexAxis === 'y' ? 'rgba(255,255,255,0.05)' : 'transparent' } },
-      y: { ticks: { color: '#8899aa' }, grid: { color: indexAxis === 'x' ? 'rgba(255,255,255,0.05)' : 'transparent' } }
-    },
-    plugins: { legend: { display: false } }
-  });
-
-  // 1. 薪資分佈
-  renderBarChart('chartSalary', 'salary',
-    ['50萬以下','51-70萬','71-90萬','91-110萬','111-130萬','131-150萬','151-170萬','171-190萬','191-210萬','211-230萬','231萬以上'],
-    [5.9, 15.6, 25.4, 23.1, 10.0, 12.7, 5.4, 3.6, 4.5, 2.7, 3.2],
-    '佔比 %', colors.green, 'y');
-
-  // 2. 工作年資
-  renderBarChart('chartExperience', 'experience',
-    ['1年以下','1~3年','3~5年','5~7年','7~9年','9~11年','11~13年','13~15年','15年以上'],
-    [20.3, 29.7, 21.3, 10.6, 6.8, 3.8, 2.5, 1.9, 3.1],
-    '佔比 %', colors.blue, 'x');
-
-  // 3. 年齡分佈
-  renderBarChart('chartAge', 'age',
-    ['25歲以下','26-30歲','31-35歲','36-40歲','41-45歲','46-50歲','51歲以上'],
-    [0.2, 16.2, 41.8, 22.1, 5.6, 1.2, 1.5],
-    '佔比 %', colors.orange, 'x');
-
-  // 4. 學歷分佈（圓餅圖）
-  renderPieChart('chartEducation', 'education',
-    ['大學', '國內碩士', '國外碩士', '國內博士'],
-    [36.9, 54.4, 6.9, 1.5],
-    [colors.blue, colors.gold, colors.green, colors.purple]);
-
-  // 5. 律所規模分佈
-  renderBarChart('chartFirmSize', 'firmSize',
-    ['1人','2人','3~5人','6~10人','11~20人','21~50人','51人以上'],
-    [26.3, 12.7, 32.7, 18.1, 6.3, 1.8, 1.8],
-    '佔比 %', colors.gold, 'y');
-
-  // 6. 律所成立年限
-  renderBarChart('chartFirmAge', 'firmAge',
-    ['1年以下','1~3年','4~6年','7~9年','10~12年','13~15年','16~18年','19~21年','22~24年','25~27年','28~30年','30年以上'],
-    [8.8, 31.0, 19.5, 14.2, 7.1, 2.7, 5.3, 0.9, 0.9, 1.8, 2.7, 2.7],
-    '佔比 %', colors.purple, 'y');
-
-  // 7. 招募重視面向（雷達圖）
-  renderRadarChart('chartHiringFactors', 'hiringFactors',
-    ['人格特質','法律工作經驗','學歷','熟識人推薦','有實務經驗証照','碩士學位','自律專業成就比例','新訴案件比例','教育訓練','可遠端工作','出差能力','薪酬','入會費','補助執業費用','員工福利','長期發展'],
-    [4.4, 3.9, 3.5, 3.3, 3.4, 3.1, 3.3, 3.2, 3.1, 3.1, 2.8, 3.5, 3.5, 3.7, 3.5, 3.9]);
-
-  // 8. 律所提供最高年薪
-  renderBarChart('chartFirmMaxSalary', 'firmMaxSalary',
-    ['90~110萬','111~130萬','131~150萬','151~170萬','171~190萬','191~210萬','211~230萬','231~250萬','251~310萬','311~350萬','351~390萬','391~410萬','411萬以上'],
-    [56.3, 10.0, 12.7, 5.4, 3.6, 4.5, 2.7, 0.9, 0.9, 0.9, 0.0, 0.9, 1.8],
-    '佔比 %', colors.red, 'y');
+async function openChatSession(sessionId) {
+  currentChatSessionId = sessionId;
+  await loadChatSessions(); // 更新高亮
+  const { data } = await db.from('chat_messages')
+    .select('*').eq('session_id', sessionId).order('created_at', { ascending: true });
+  const el = document.getElementById('chatMessages');
+  if (!data || !data.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px;">空對話</div>';
+    return;
+  }
+  el.innerHTML = data.map(m => renderChatMessage(m)).join('');
+  el.scrollTop = el.scrollHeight;
 }
 
-function renderBarChart(canvasId, key, labels, data, label, color, indexAxis) {
-  if (chartInstances[key]) chartInstances[key].destroy();
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  chartInstances[key] = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label, data, backgroundColor: color + 'cc', borderRadius: 4 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, indexAxis,
-      scales: {
-        x: { ticks: { color: '#8899aa', font: { size: 11 } }, grid: { color: indexAxis === 'y' ? 'rgba(255,255,255,0.05)' : 'transparent' } },
-        y: { ticks: { color: '#8899aa', font: { size: 11 } }, grid: { color: indexAxis === 'x' ? 'rgba(255,255,255,0.05)' : 'transparent' } }
-      },
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed[indexAxis==='y'?'x':'y'] + '%' } } }
-    }
-  });
+function newChatSession() {
+  currentChatSessionId = null;
+  loadChatSessions();
+  document.getElementById('chatMessages').innerHTML =
+    '<div style="text-align:center;color:var(--text-muted);padding:40px;">開始新對話...<br><span style="font-size:0.8rem;">在下方輸入框送出第一個問題</span></div>';
+  document.getElementById('chatInput').focus();
 }
 
-function renderPieChart(canvasId, key, labels, data, colors) {
-  if (chartInstances[key]) chartInstances[key].destroy();
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  chartInstances[key] = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'right', labels: { color: '#8899aa', padding: 12, font: { size: 12 } } },
-        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '%' } }
-      }
-    }
-  });
+function renderChatMessage(m) {
+  const isUser = m.role === 'user';
+  const bg = isUser ? 'var(--blue-dim)' : 'var(--bg-sub)';
+  const border = isUser ? 'var(--blue)' : 'var(--border)';
+  const icon = isUser ? '👤' : '🤖';
+  const content = isUser ? escHtml(m.content).replace(/\n/g, '<br>') : renderMarkdown(m.content);
+  const sources = (m.sources && m.sources.length)
+    ? `<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:0.72rem;color:var(--text-muted);">
+         📚 參考來源: ${m.sources.slice(0, 6).map(s => `${s.type === 'note' ? '📝' : s.type === 'news' ? '📰' : s.type === 'upload' ? '📄' : '💾'}${escHtml(s.title || '')}`).join('  ·  ')}
+       </div>` : '';
+  return `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">${icon} ${isUser ? '你' : 'AI 助手'}</div>
+      <div style="padding:12px 14px;background:${bg};border-left:3px solid ${border};border-radius:6px;line-height:1.6;font-size:0.9rem;">
+        ${content}
+        ${sources}
+      </div>
+    </div>`;
 }
 
-function renderRadarChart(canvasId, key, labels, data) {
-  if (chartInstances[key]) chartInstances[key].destroy();
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  chartInstances[key] = new Chart(ctx, {
-    type: 'radar',
-    data: {
-      labels,
-      datasets: [{ label: '重視程度', data, backgroundColor: 'rgba(79,142,247,0.2)', borderColor: '#4f8ef7', pointBackgroundColor: '#4f8ef7', pointRadius: 3 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: { r: { min: 0, max: 5, ticks: { stepSize: 1, color: '#8899aa', backdropColor: 'transparent' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#8899aa', font: { size: 10 } } } },
-      plugins: { legend: { display: false } }
-    }
-  });
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const btn = document.getElementById('chatSendBtn');
+  const el = document.getElementById('chatMessages');
+  const message = input.value.trim();
+  if (!message) return;
+
+  // 立即顯示使用者訊息
+  const userBlock = renderChatMessage({ role: 'user', content: message, sources: [] });
+  if (el.innerHTML.includes('開始新對話') || el.innerHTML.includes('空對話') || el.innerHTML.includes('點左側')) {
+    el.innerHTML = userBlock;
+  } else {
+    el.insertAdjacentHTML('beforeend', userBlock);
+  }
+  el.insertAdjacentHTML('beforeend',
+    '<div id="pendingAi" style="margin-bottom:14px;"><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">🤖 AI 助手</div><div style="padding:12px 14px;background:var(--bg-sub);border-left:3px solid var(--border);border-radius:6px;color:var(--text-muted);">思考中... (使用筆記 + 新聞 + DB 資料 + web_search)</div></div>');
+  el.scrollTop = el.scrollHeight;
+  input.value = '';
+  input.disabled = true;
+  btn.disabled = true;
+
+  try {
+    const body = currentChatSessionId ? { session_id: currentChatSessionId, message } : { message };
+    const { data, error } = await db.functions.invoke('ai-chat', { body });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    currentChatSessionId = data.session_id;
+    document.getElementById('pendingAi')?.remove();
+    el.insertAdjacentHTML('beforeend', renderChatMessage({
+      role: 'assistant',
+      content: data.assistant_message,
+      sources: data.sources || [],
+    }));
+    el.scrollTop = el.scrollHeight;
+    loadChatSessions();
+  } catch (e) {
+    document.getElementById('pendingAi')?.remove();
+    el.insertAdjacentHTML('beforeend',
+      '<div style="padding:10px;background:var(--red-dim);color:var(--red);border-radius:6px;margin-bottom:14px;">錯誤：' + (e.message || e) + '</div>');
+  } finally {
+    input.disabled = false;
+    btn.disabled = false;
+    input.focus();
+  }
 }
 
-function renderTrendChart(canvasId, key, labels, values, label, color) {
-  if (chartInstances[key]) chartInstances[key].destroy();
-  const ctx = document.getElementById(canvasId).getContext('2d');
-  chartInstances[key] = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label,
-        data: values,
-        borderColor: color,
-        backgroundColor: color + '33',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { ticks: { color: '#8899aa' }, grid: { display: false } },
-        y: { ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-      },
-      plugins: { legend: { display: false } }
-    }
-  });
+// Markdown 渲染（使用 marked.js）
+function renderMarkdown(text) {
+  if (!text) return '';
+  if (typeof marked !== 'undefined') {
+    // 設定安全選項
+    marked.setOptions({ breaks: true, gfm: true });
+    return marked.parse(text);
+  }
+  return escHtml(text).replace(/\n/g, '<br>');
 }
 
-/* renderFirmSizeChart removed - now using renderBarChart from report */
+/* 舊的靜態圖表 helper 已移除（renderBarChart / renderPieChart / renderRadarChart / renderTrendChart）
+   市場趨勢 tab 現在改用 AI 報告 + 對話，不再需要這些函式。
+   若其他 tab 需要圖表，請重新加回。 */
 
 // ============================================================
 // NEWS TAB
 // ============================================================
-function showNewsSubTab(tab) {
-  document.getElementById('newsSubTab').style.display = tab === 'news' ? 'block' : 'none';
-  document.getElementById('insightsSubTab').style.display = tab === 'insights' ? 'block' : 'none';
-  document.getElementById('newsSubBtn').style.borderBottom = tab === 'news' ? '2px solid var(--tab-active-color)' : 'none';
-  document.getElementById('insightsSubBtn').style.borderBottom = tab === 'insights' ? '2px solid var(--tab-active-color)' : 'none';
-}
-
 let newsSearchTimer;
 function filterNews() {
   clearTimeout(newsSearchTimer);
   newsSearchTimer = setTimeout(() => { newsPage = 0; loadNews(); }, 300);
 }
 
+// 🔍 AI 搜尋新聞 (呼叫 ai-search-news Edge Function)
+async function aiSearchNews() {
+  const input = document.getElementById('newsSearchQuery');
+  const status = document.getElementById('newsSearchStatus');
+  const btn = document.getElementById('newsSearchBtn');
+  const query = input.value.trim();
+  if (!query) return;
+
+  btn.disabled = true;
+  btn.textContent = '搜尋中...';
+  status.textContent = `AI 正在用 web_search 搜尋「${query}」相關新聞，約需 20-60 秒...`;
+  status.style.color = 'var(--text-muted)';
+
+  try {
+    const { data, error } = await db.functions.invoke('ai-search-news', {
+      body: { query }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    const count = data?.count || 0;
+    status.textContent = `✓ 找到 ${count} 則新聞`;
+    status.style.color = 'var(--green)';
+    input.value = '';
+    setTimeout(() => { status.textContent = ''; }, 4000);
+    newsPage = 0;
+    await loadNews();
+    loadRecentSearches();
+  } catch (e) {
+    status.textContent = '搜尋失敗：' + (e.message || e);
+    status.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '搜尋';
+  }
+}
+
+async function loadRecentSearches() {
+  const { data } = await db.rpc('recent_news_queries', { lim: 10 });
+  const el = document.getElementById('recentSearches');
+  if (!el) return;
+  if (!data || !data.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">最近搜尋：</div>' +
+    data.map(r => `<span onclick="document.getElementById('newsSearchQuery').value='${escHtml(r.query)}';aiSearchNews();"
+      style="display:inline-block;padding:3px 10px;margin:2px;background:var(--blue-dim);color:var(--blue);border-radius:12px;font-size:0.8rem;cursor:pointer;">
+      ${escHtml(r.query)} <span style="opacity:0.6;">(${r.article_count})</span></span>`).join('');
+}
+
 async function loadNews() {
   const search = document.getElementById('newsSearch').value.trim();
   const source = document.getElementById('newsSourceFilter').value;
   const starredOnly = document.getElementById('newsStarredFilter').checked;
+  const aiOnly = document.getElementById('newsAiFilter')?.checked;
 
   let query = db.from('news_articles').select('*', { count: 'exact' });
   if (search) query = query.ilike('title', `%${search}%`);
   if (source) query = query.eq('source_name', source);
   if (starredOnly) query = query.eq('is_starred', true);
+  if (aiOnly) query = query.eq('ai_fetched', true);
 
-  query = query.order('published_at', { ascending: false })
+  query = query.order('published_at', { ascending: false, nullsFirst: false })
     .range(newsPage * PAGE_SIZE, (newsPage + 1) * PAGE_SIZE - 1);
 
   const { data, count } = await query;
@@ -1625,21 +1720,25 @@ async function loadNews() {
 
   const el = document.getElementById('newsList');
   if (!data || !data.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#128240;</div><div class="msg">尚無新聞資料，等待爬蟲執行</div></div>';
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128240;</div><div class="msg">尚無新聞，試試用 AI 搜尋上方輸入框</div></div>';
+    renderPagination('newsPagination', newsPage, newsTotal, p => { newsPage = p; loadNews(); });
     return;
   }
 
-  el.innerHTML = data.map(n => `
+  el.innerHTML = data.map(n => {
+    const aiBadge = n.ai_fetched ? '<span class="badge" style="margin-left:6px;background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);font-size:0.7rem;">🤖 AI</span>' : '';
+    return `
     <div class="news-card">
       <div style="display:flex;justify-content:space-between;align-items:start;">
-        <div class="news-title"><a href="${escHtml(n.url)}" target="_blank">${escHtml(n.title)}</a></div>
+        <div class="news-title"><a href="${escHtml(n.url)}" target="_blank">${escHtml(n.title)}</a>${aiBadge}</div>
         <button class="star-btn ${n.is_starred ? 'starred' : ''}" onclick="toggleStar('${n.id}', ${!n.is_starred})">&#9733;</button>
       </div>
-      <div class="news-meta">${escHtml(n.source_name || '未知')} &middot; ${formatDate(n.published_at)}</div>
+      <div class="news-meta">${escHtml(n.source_name || '未知')} &middot; ${formatDate(n.published_at)}${n.search_query ? ` &middot; <span style="color:var(--blue);">#${escHtml(n.search_query)}</span>` : ''}</div>
       ${n.summary ? `<div class="news-summary">${escHtml(n.summary)}</div>` : ''}
       ${n.tags?.length ? `<div class="news-tags">${n.tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   renderPagination('newsPagination', newsPage, newsTotal, p => { newsPage = p; loadNews(); });
 
@@ -1659,26 +1758,6 @@ async function loadNews() {
 async function toggleStar(id, starred) {
   await db.from('news_articles').update({ is_starred: starred }).eq('id', id);
   loadNews();
-}
-
-async function loadInsights() {
-  const { data } = await db.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(20);
-  const el = document.getElementById('insightsList');
-
-  if (!data || !data.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">&#129302;</div><div class="msg">尚無 AI 分析報告，等待每週分析排程</div></div>';
-    return;
-  }
-
-  const typeMap = { weekly_summary: '週報', trend_analysis: '趨勢分析', market_forecast: '市場預測', firm_profile: '事務所分析' };
-  el.innerHTML = data.map(i => `
-    <div class="insight-card">
-      <div class="insight-type">${typeMap[i.insight_type] || i.insight_type}</div>
-      <div class="insight-title">${escHtml(i.title)}</div>
-      <div class="insight-content">${escHtml(i.content)}</div>
-      <div class="insight-date">${formatDate(i.created_at)}</div>
-    </div>
-  `).join('');
 }
 
 // ============================================================
@@ -1878,6 +1957,74 @@ async function loadUploads() {
     '</tbody></table></div>';
 }
 
+// ⚡ 快速記錄：一句話存成筆記
+async function saveQuickNote() {
+  const input = document.getElementById('quickNoteInput');
+  const status = document.getElementById('quickNoteStatus');
+  const text = input.value.trim();
+  if (!text) return;
+
+  status.textContent = '儲存中...';
+  input.disabled = true;
+
+  const title = text.length > 30 ? text.slice(0, 30) + '…' : text;
+  const { error } = await db.from('manual_notes').insert({
+    user_id: currentUser.id,
+    title,
+    content: text,
+    category: 'general',
+    tags: [],
+    source_type: 'quick'
+  });
+
+  input.disabled = false;
+  if (error) {
+    status.textContent = '儲存失敗：' + error.message;
+    status.style.color = 'var(--red)';
+    return;
+  }
+  input.value = '';
+  status.textContent = '✓ 已存入筆記';
+  status.style.color = 'var(--green)';
+  setTimeout(() => { status.textContent = ''; }, 2000);
+  loadNotes();
+}
+
+// 🔗 URL 轉筆記：呼叫 ai-url-extract Edge Function
+async function extractUrl() {
+  const input = document.getElementById('urlNoteInput');
+  const status = document.getElementById('urlExtractStatus');
+  const btn = document.getElementById('urlExtractBtn');
+  const url = input.value.trim();
+  if (!url) return;
+  try { new URL(url); } catch { status.textContent = '請輸入有效的 URL'; status.style.color = 'var(--red)'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '抓取中...';
+  status.textContent = 'AI 正在抓取網頁內容並摘要，約需 10-30 秒...';
+  status.style.color = 'var(--text-muted)';
+
+  try {
+    const { data, error } = await db.functions.invoke('ai-url-extract', {
+      body: { url }
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    input.value = '';
+    status.textContent = `✓ 已抓取並存為筆記：${data.title}`;
+    status.style.color = 'var(--green)';
+    setTimeout(() => { status.textContent = ''; }, 5000);
+    loadNotes();
+  } catch (e) {
+    status.textContent = '抓取失敗：' + (e.message || e);
+    status.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '抓取';
+  }
+}
+
 async function saveNote() {
   const title = document.getElementById('noteTitle').value.trim();
   const content = document.getElementById('noteContent').value.trim();
@@ -1889,7 +2036,8 @@ async function saveNote() {
 
   const { error } = await db.from('manual_notes').insert({
     user_id: currentUser.id,
-    title, content, category, tags
+    title, content, category, tags,
+    source_type: 'manual'
   });
 
   if (error) { alert('儲存失敗：' + error.message); return; }
@@ -1915,20 +2063,31 @@ async function loadNotes() {
   }
 
   const catMap = { general: '一般', firm_research: '事務所研究', market_observation: '市場觀察', competitor: '競爭分析' };
-  el.innerHTML = data.map(n => `
+  const srcMap = {
+    manual: { icon: '📝', label: '手動', color: 'var(--blue)' },
+    quick: { icon: '⚡', label: '快速', color: 'var(--orange)' },
+    url: { icon: '🔗', label: 'URL', color: 'var(--green)' },
+    ai_extracted: { icon: '🤖', label: 'AI', color: 'var(--purple)' }
+  };
+  el.innerHTML = data.map(n => {
+    const src = srcMap[n.source_type] || srcMap.manual;
+    const srcBadge = `<span class="badge" style="margin-left:8px;background:color-mix(in srgb, ${src.color} 20%, transparent);color:${src.color};">${src.icon} ${src.label}</span>`;
+    const urlLink = n.source_url ? ` <a href="${escHtml(n.source_url)}" target="_blank" style="font-size:0.75rem;color:var(--blue);margin-left:6px;">🔗 原文</a>` : '';
+    return `
     <div style="padding:12px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <strong>${escHtml(n.title)}</strong>
-          <span class="badge badge-blue" style="margin-left:8px;">${catMap[n.category] || n.category}</span>
-          ${n.tags?.map(t => `<span class="badge badge-purple" style="margin-left:4px;">${escHtml(t)}</span>`).join('') || ''}
+          <strong>${escHtml(n.title)}</strong>${srcBadge}
+          <span class="badge badge-blue" style="margin-left:4px;">${catMap[n.category] || n.category}</span>
+          ${n.tags?.map(t => `<span class="badge badge-purple" style="margin-left:4px;">${escHtml(t)}</span>`).join('') || ''}${urlLink}
         </div>
         <button class="btn btn-sm btn-ghost" style="color:var(--red);" onclick="deleteNote('${n.id}')">刪除</button>
       </div>
       ${n.content ? `<div style="font-size:0.85rem;color:var(--text);margin-top:8px;white-space:pre-wrap;line-height:1.6;">${escHtml(n.content)}</div>` : ''}
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">${formatDate(n.created_at)}</div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function deleteNote(id) {

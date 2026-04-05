@@ -12,3 +12,4 @@ node_modules/
 app.js
 tmp_cap*.svg
 moj_lawyers_output.json
+gap_surnames.txt

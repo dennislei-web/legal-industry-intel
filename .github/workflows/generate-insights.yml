@@ -1,8 +1,8 @@
-name: 產出 AI 市場分析
+name: 產出 AI 市場分析 (已停用 - 改由前端 ai-generate-report Edge Function 觸發)
 
+# 已停用：市場趨勢 tab 改用前端「重新生成」按鈕呼叫 ai-generate-report Edge Function
+# 保留此檔案僅供歷史參考，若需要手動執行可用 workflow_dispatch
 on:
-  schedule:
-    - cron: '0 21 * * 1'  # 每週一 UTC 21:00 = 台灣週二凌晨 5:00
   workflow_dispatch: {}
 
 jobs:
