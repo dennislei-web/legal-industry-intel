@@ -359,9 +359,9 @@
           <div class="kpi-sub" id="kpiLawyerSub">載入中...</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">全聯會名冊</div>
-          <div class="kpi-value" id="kpiRegistryCount" style="color:var(--blue);">-</div>
-          <div class="kpi-sub">執業中律師</div>
+          <div class="kpi-label">法務部 (MOJ)</div>
+          <div class="kpi-value" id="kpiRegistryCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">現役登錄律師</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Lawsnote 律師</div>
@@ -412,9 +412,10 @@
     <div id="tab-lawyers" class="tab-content">
       <div class="kpi-grid" id="lawyerKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">律師總數（合併）</div><div class="kpi-value" id="kpiMergedTotal">-</div><div class="kpi-sub" id="kpiMergedSub">載入中</div></div>
-        <div class="kpi-card"><div class="kpi-label">兩者皆有</div><div class="kpi-value" id="kpiMergedBoth" style="color:var(--green);">-</div><div class="kpi-sub">全聯會 + Lawsnote</div></div>
-        <div class="kpi-card"><div class="kpi-label">僅全聯會</div><div class="kpi-value" id="kpiMergedRegistry" style="color:var(--blue);">-</div><div class="kpi-sub">無案件數資料</div></div>
-        <div class="kpi-card"><div class="kpi-label">僅 Lawsnote</div><div class="kpi-value" id="kpiMergedLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">未在公會名冊中</div></div>
+        <div class="kpi-card"><div class="kpi-label">三者皆有</div><div class="kpi-value" id="kpiMergedAll3" style="color:var(--green);">-</div><div class="kpi-sub">MOJ + 全聯會 + Lawsnote</div></div>
+        <div class="kpi-card"><div class="kpi-label">法務部 (MOJ)</div><div class="kpi-value" id="kpiMergedMoj" style="color:var(--purple);">-</div><div class="kpi-sub">現役登錄律師</div></div>
+        <div class="kpi-card"><div class="kpi-label">全聯會</div><div class="kpi-value" id="kpiMergedTwba" style="color:var(--blue);">-</div><div class="kpi-sub">律師公會名冊</div></div>
+        <div class="kpi-card"><div class="kpi-label">Lawsnote</div><div class="kpi-value" id="kpiMergedLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">含案件數資料</div></div>
       </div>
       <div class="search-bar">
         <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名或事務所..." oninput="searchLawyers()">
@@ -423,9 +424,13 @@
         </select>
         <select id="lawyerSourceFilter" onchange="searchLawyers()">
           <option value="">所有來源</option>
-          <option value="兩者皆有">兩者皆有</option>
+          <option value="三者皆有">三者皆有</option>
+          <option value="MOJ+全聯會">MOJ + 全聯會</option>
+          <option value="MOJ+Lawsnote">MOJ + Lawsnote</option>
+          <option value="全聯會+Lawsnote">全聯會 + Lawsnote</option>
+          <option value="僅法務部">僅法務部</option>
           <option value="僅全聯會">僅全聯會</option>
-          <option value="僅Lawsnote">僅Lawsnote</option>
+          <option value="僅Lawsnote">僅 Lawsnote</option>
         </select>
       </div>
       <div class="card">
@@ -960,14 +965,14 @@ function toggleTheme() {
 // OVERVIEW
 // ============================================================
 async function loadOverview() {
-  // Merged lawyer count from combined view
+  // Merged lawyer count from combined view (三源去重)
   const { count: mergedCount } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true });
   document.getElementById('kpiLawyerCount').textContent = mergedCount != null ? mergedCount.toLocaleString() : '0';
-  document.getElementById('kpiLawyerSub').textContent = '全聯會 + Lawsnote 合併去重';
+  document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
 
-  // Registry count
-  const { count: registryCount } = await db.from('lawyer_members').select('*', { count: 'exact', head: true }).eq('is_active', true);
-  document.getElementById('kpiRegistryCount').textContent = registryCount != null ? registryCount.toLocaleString() : '0';
+  // Registry count (改顯示 MOJ 律師總數)
+  const { count: mojCount } = await db.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
+  document.getElementById('kpiRegistryCount').textContent = mojCount != null ? mojCount.toLocaleString() : '0';
 
   // Guild total from industry_stats
   const { data: guildStats } = await db.from('industry_stats').select('value')
@@ -1148,18 +1153,22 @@ async function loadLawyers() {
   }
 
   tbody.innerHTML = data.map(l => {
-    const srcCls = l.data_source === '兩者皆有' ? 'badge-green' : l.data_source === '僅全聯會' ? 'badge-blue' : 'badge-orange';
     const lawsnoteLink = l.lawsnote_id ? `https://page.lawsnote.com/page/${l.lawsnote_id}` : null;
     const twbaLink = 'https://nab.twba.org.tw/';
-    let srcHtml = '';
-    if (l.data_source === '兩者皆有') {
-      srcHtml = `<a href="${twbaLink}" target="_blank" class="badge badge-blue" style="text-decoration:none;margin:1px;">全聯會</a>` +
-                (lawsnoteLink ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;margin:1px;">Lawsnote</a>` : '');
-    } else if (l.data_source === '僅全聯會') {
-      srcHtml = `<a href="${twbaLink}" target="_blank" class="badge badge-blue" style="text-decoration:none;">全聯會</a>`;
-    } else {
-      srcHtml = lawsnoteLink ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;">Lawsnote</a>` : `<span class="badge badge-orange">Lawsnote</span>`;
+    const mojLink = 'https://lawyerbc.moj.gov.tw/';
+    const badges = [];
+    if (l.has_moj) {
+      badges.push(`<a href="${mojLink}" target="_blank" class="badge" style="text-decoration:none;margin:1px;background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);" title="法務部律師查詢系統${l.moj_lic_no ? ' - ' + escHtml(l.moj_lic_no) : ''}">法務部</a>`);
     }
+    if (l.has_twba) {
+      badges.push(`<a href="${twbaLink}" target="_blank" class="badge badge-blue" style="text-decoration:none;margin:1px;" title="全國律師聯合會">全聯會</a>`);
+    }
+    if (l.has_lawsnote) {
+      badges.push(lawsnoteLink
+        ? `<a href="${lawsnoteLink}" target="_blank" class="badge badge-orange" style="text-decoration:none;margin:1px;" title="Lawsnote 判決資料">Lawsnote</a>`
+        : `<span class="badge badge-orange" style="margin:1px;">Lawsnote</span>`);
+    }
+    const srcHtml = badges.join('') || '<span style="color:var(--text-muted);">-</span>';
     return `<tr>
       <td><strong>${escHtml(l.name)}</strong></td>
       <td style="font-size:0.8rem;" title="${escHtml(l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
@@ -1191,15 +1200,21 @@ async function loadLawyers() {
 }
 
 async function loadMergedKpis() {
-  const { count: total } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true });
-  const { count: both } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '兩者皆有');
-  const { count: regOnly } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '僅全聯會');
-  const { count: lnOnly } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '僅Lawsnote');
-  document.getElementById('kpiMergedTotal').textContent = total != null ? total.toLocaleString() : '0';
-  document.getElementById('kpiMergedSub').textContent = '去重後合併';
-  document.getElementById('kpiMergedBoth').textContent = both != null ? both.toLocaleString() : '0';
-  document.getElementById('kpiMergedRegistry').textContent = regOnly != null ? regOnly.toLocaleString() : '0';
-  document.getElementById('kpiMergedLawsnote').textContent = lnOnly != null ? lnOnly.toLocaleString() : '0';
+  // 平行執行所有 count query
+  const [total, all3, mojTotal, twbaTotal, lnTotal] = await Promise.all([
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }),
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '三者皆有'),
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true),
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_twba', true),
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_lawsnote', true),
+  ]);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
+  set('kpiMergedTotal', total.count);
+  document.getElementById('kpiMergedSub').textContent = '三源去重合併';
+  set('kpiMergedAll3', all3.count);
+  set('kpiMergedMoj', mojTotal.count);
+  set('kpiMergedTwba', twbaTotal.count);
+  set('kpiMergedLawsnote', lnTotal.count);
 }
 
 // ============================================================
@@ -1829,19 +1844,38 @@ async function readPDF(file) {
   reader.onload = async (e) => {
     try {
       const pdf = await pdfjsLib.getDocument({ data: e.target.result }).promise;
-      const pages = [];
+      const pageTexts = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        const text = content.items.map(item => item.str).join(' ');
-        pages.push({ page: i, content: text });
+        const text = content.items.map(item => item.str).join(' ').trim();
+        pageTexts.push(text);
       }
-      uploadedData = pages;
-      showPreviewFile('PDF', `${pdf.numPages} 頁`, pages.map(p => `【第 ${p.page} 頁】${p.content.substring(0, 200)}...`).join('\n\n'));
+      const fullText = pageTexts.map((t, i) => `【第 ${i + 1} 頁】\n${t}`).join('\n\n');
+      const totalChars = pageTexts.join('').length;
+
+      // 檢查是否為空 (可能是圖片掃描 PDF)
+      if (totalChars < 50) {
+        const ok = confirm(`此 PDF 似乎沒有可讀取的文字內容（僅 ${totalChars} 字，可能是掃描影像）。\n是否仍要上傳？`);
+        if (!ok) { clearUpload(); return; }
+      }
+
+      // PDF 存成單一筆記錄，包含完整文字
+      uploadedData = [{
+        file_name: file.name,
+        file_type: 'pdf',
+        num_pages: pdf.numPages,
+        total_chars: totalChars,
+        content: fullText
+      }];
+      uploadedFilePages = pdf.numPages;  // 給 uploadData() 用的顯示數
+      showPreviewFile('PDF', `${pdf.numPages} 頁 / ${totalChars.toLocaleString()} 字`, fullText.substring(0, 2000));
     } catch(err) { alert('PDF 解析失敗：' + err.message); }
   };
   reader.readAsArrayBuffer(file);
 }
+
+let uploadedFilePages = null;
 
 function readImage(file) {
   const reader = new FileReader();
@@ -1897,6 +1931,7 @@ function showPreview() {
 function clearUpload() {
   uploadedData = null;
   uploadedFileName = '';
+  uploadedFilePages = null;
   document.getElementById('fileInput').value = '';
   document.getElementById('uploadPreview').style.display = 'none';
 }
@@ -1910,13 +1945,16 @@ async function uploadData() {
 
   const dataType = document.getElementById('uploadDataType').value;
   const desc = document.getElementById('uploadDescription').value.trim();
+  const isPdf = uploadedFilePages != null;
+  // PDF: row_count = 頁數；其他: row_count = 資料筆數
+  const rowCount = isPdf ? uploadedFilePages : uploadedData.length;
+  const unit = isPdf ? '頁' : '筆';
 
-  // Store in user_uploads table
   const { error } = await db.from('user_uploads').insert({
     file_name: uploadedFileName,
     data_type: dataType,
     description: desc || null,
-    row_count: uploadedData.length,
+    row_count: rowCount,
     column_names: Object.keys(uploadedData[0]),
     data: uploadedData,
     uploaded_by: currentUser.id
@@ -1927,10 +1965,20 @@ async function uploadData() {
     statusEl.textContent = '匯入失敗：' + error.message;
   } else {
     statusEl.style.color = 'var(--green)';
-    statusEl.textContent = `✅ 成功匯入 ${uploadedData.length} 筆`;
-    loadUploads(); // refresh the uploads list
+    statusEl.textContent = `✅ 成功匯入 ${rowCount} ${unit}`;
+    loadUploads();
     setTimeout(() => { clearUpload(); statusEl.style.display = 'none'; }, 3000);
   }
+}
+
+async function deleteUpload(id, fileName) {
+  if (!confirm(`確定要刪除「${fileName}」嗎？`)) return;
+  const { error } = await db.from('user_uploads').delete().eq('id', id);
+  if (error) {
+    alert('刪除失敗：' + error.message);
+    return;
+  }
+  loadUploads();
 }
 
 async function loadUploads() {
@@ -1946,14 +1994,21 @@ async function loadUploads() {
   }
 
   const typeLabels = { lawyers: '律師資料', law_firms: '事務所資料', industry_stats: '產業統計', custom: '自訂資料' };
-  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>檔案名稱</th><th>資料類型</th><th>說明</th><th>筆數</th><th>上傳時間</th></tr></thead><tbody>' +
-    data.map(u => `<tr>
-      <td style="color:var(--blue);">📄 ${u.file_name}</td>
-      <td><span class="badge" style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:0.8rem;">${typeLabels[u.data_type] || u.data_type}</span></td>
-      <td>${u.description || '-'}</td>
-      <td>${u.row_count || '-'}</td>
-      <td style="color:var(--text-muted);font-size:0.85rem;">${new Date(u.created_at).toLocaleString('zh-TW')}</td>
-    </tr>`).join('') +
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>檔案名稱</th><th>資料類型</th><th>說明</th><th>數量</th><th>上傳時間</th><th></th></tr></thead><tbody>' +
+    data.map(u => {
+      const isPdf = (u.file_name || '').toLowerCase().endsWith('.pdf');
+      const unit = isPdf ? '頁' : '筆';
+      const count = u.row_count != null ? `${u.row_count.toLocaleString()} ${unit}` : '-';
+      const fileNameEsc = escHtml(u.file_name || '');
+      return `<tr>
+        <td style="color:var(--blue);">📄 ${fileNameEsc}</td>
+        <td><span class="badge" style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:0.8rem;">${typeLabels[u.data_type] || u.data_type}</span></td>
+        <td>${escHtml(u.description || '-')}</td>
+        <td>${count}</td>
+        <td style="color:var(--text-muted);font-size:0.85rem;">${new Date(u.created_at).toLocaleString('zh-TW')}</td>
+        <td><button class="btn btn-sm btn-ghost" style="color:var(--red);padding:2px 8px;" onclick="deleteUpload('${u.id}', '${fileNameEsc.replace(/'/g, '\\\'')}')">刪除</button></td>
+      </tr>`;
+    }).join('') +
     '</tbody></table></div>';
 }
 
