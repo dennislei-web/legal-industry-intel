@@ -698,13 +698,29 @@
 
       <!-- 📚 匯入學術論文 -->
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128218; 匯入學術論文（NDLTD / Scholar）</div>
+        <div class="card-title">&#128218; 匯入學術論文</div>
+
+        <!-- 1. 上傳 PDF (全文，推薦) -->
+        <div style="padding:12px;background:color-mix(in srgb, var(--green) 8%, transparent);border:1px dashed var(--green);border-radius:8px;margin-bottom:10px;">
+          <div style="font-size:0.85rem;color:var(--green);margin-bottom:6px;font-weight:500;">⭐ 推薦：上傳 PDF 取得完整全文（100% 精準引用）</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="file" id="paperPdfInput" accept=".pdf"
+                   onchange="importPaperFromPdf(event)"
+                   style="flex:1;padding:8px;background:var(--bg-row);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+          </div>
+          <div style="margin-top:4px;font-size:0.72rem;color:var(--text-muted);">
+            從 NDLTD / Airiti / 大學機構典藏下載 PDF → 上傳此處 → 自動抽全文 + Claude 分析 metadata
+          </div>
+        </div>
+
+        <!-- 2. 貼 URL 快速匯入 (僅 metadata + abstract) -->
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">或：貼 URL 快速匯入（僅摘要，無全文）</div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="url" id="paperUrlInput"
-                 placeholder="貼 NDLTD 論文 URL 或 Google Scholar 連結，AI 會抓 metadata + 全文 chunks"
+                 placeholder="貼 NDLTD 論文 URL 或 Google Scholar 連結（只抓 metadata + abstract）"
                  onkeydown="if(event.key==='Enter'){event.preventDefault();importPaper();}"
                  style="flex:1;padding:10px 12px;">
-          <button class="btn btn-blue" onclick="importPaper()" id="paperImportBtn">匯入</button>
+          <button class="btn btn-blue" onclick="importPaper()" id="paperImportBtn">匯入 URL</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
           <input type="text" id="paperSearchInput"
@@ -2125,6 +2141,81 @@ async function extractUrl() {
 }
 
 // 📚 匯入單篇學術論文
+// 📚 上傳 PDF 轉論文（完整全文）
+async function importPaperFromPdf(event) {
+  const file = event.target.files?.[0];
+  const status = document.getElementById('paperImportStatus');
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    status.textContent = '請上傳 PDF 檔案';
+    status.style.color = 'var(--red)';
+    return;
+  }
+
+  status.textContent = '正在載入 PDF...';
+  status.style.color = 'var(--text-muted)';
+
+  // 動態載入 pdfjs
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      s.onload = () => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+        resolve();
+      };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  try {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    status.textContent = `正在抽取 ${pdf.numPages} 頁文字...`;
+
+    const pageTexts = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pageTexts.push(content.items.map(it => it.str).join(' '));
+      if (i % 10 === 0) status.textContent = `抽取中... ${i}/${pdf.numPages} 頁`;
+    }
+    const fullText = pageTexts.join('\n\n');
+
+    if (fullText.length < 200) {
+      status.textContent = `PDF 文字抽取失敗（僅 ${fullText.length} 字），可能是掃描影像`;
+      status.style.color = 'var(--red)';
+      return;
+    }
+
+    status.textContent = `抽取完成（${fullText.length.toLocaleString()} 字 / ${pdf.numPages} 頁），Claude 分析 metadata 中...`;
+
+    const { data, error } = await db.functions.invoke('ai-parse-paper-pdf', {
+      body: {
+        file_name: file.name,
+        full_text: fullText,
+        pages_count: pdf.numPages,
+      },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    if (data?.duplicate) {
+      status.textContent = `⚠️ 已匯入過：${data.title}`;
+      status.style.color = 'var(--orange)';
+    } else {
+      status.textContent = `✓ 已匯入：${data.title}（${data.chunk_count} chunks, ${data.full_text_length.toLocaleString()} 字）`;
+      status.style.color = 'var(--green)';
+    }
+    event.target.value = '';  // reset file input
+    loadPapers();
+    setTimeout(() => { status.textContent = ''; }, 8000);
+  } catch (e) {
+    status.textContent = '匯入失敗：' + (e.message || e);
+    status.style.color = 'var(--red)';
+  }
+}
+
 async function importPaper() {
   const input = document.getElementById('paperUrlInput');
   const status = document.getElementById('paperImportStatus');

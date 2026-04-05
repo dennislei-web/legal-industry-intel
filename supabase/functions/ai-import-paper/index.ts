@@ -17,23 +17,17 @@ const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-5';
 const CHUNK_SIZE = 1500; // characters per chunk
 
-const EXTRACT_PROMPT = `請使用 web_fetch 工具抓取以下網址的學術論文內容，抽取 metadata 與全文。
+const EXTRACT_PROMPT = `請使用 web_fetch 工具抓取以下網址的學術論文 metadata 與摘要。
 
 網址: {URL}
 
 步驟：
-1. 先 web_fetch 抓該網址（可能是 NDLTD 論文詳細頁或其他學術資料庫）
-2. 從頁面中找到論文 metadata（標題、作者、年份、學位類型、機構、摘要、關鍵字、論文目次、相關論文清單）
-3. **積極尋找全文 PDF**：
-   - 在頁面找「電子全文」、「下載全文」、「View/Open」、「PDF」等連結
-   - 追蹤 handle URL（hdl.handle.net）或機構 repository
-   - 嘗試把 NDLTD URL 的 handle/xxxxx 部分轉成直接 PDF URL
-   - 若找到 PDF URL，用 web_fetch 再抓一次（Claude tool 支援 PDF 解析）
-4. 無論是否抓到全文，務必從頁面抽取所有可見文字當作 content：
-   - 論文目次（章節標題）
-   - 摘要全文（中英文都要）
-   - 相關論文資訊
-   - 任何頁面上出現的論文內容段落
+1. web_fetch 抓該網址（NDLTD / Airiti / 機構典藏 等）
+2. 抽取 metadata：標題、作者、年份、學位類型、機構、完整摘要、關鍵字
+3. 若頁面有直接的全文 PDF 連結（例如 .pdf 結尾的 URL），可以用 web_fetch 再抓一次
+4. 若沒找到全文 PDF，就只回傳 metadata + abstract（這很正常）
+
+請勿使用 web_search — 成本考量。只用 web_fetch 抓單一或最多 2 個 URL。
 
 輸出格式（嚴格 JSON，不要有任何 markdown 或其他文字包裝）：
 {
@@ -144,10 +138,12 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 16000,
-        system: '你是學術論文抽取助手。精準使用 web_fetch 工具，嚴格按 JSON 格式輸出，不要加 markdown 包裝。',
+        max_tokens: 8000,
+        system: '你是學術論文抽取助手。用 web_fetch 抓指定 URL 取得 metadata 與 abstract，嚴格按 JSON 格式輸出。如果是 NDLTD 等學術資料庫，只需抓詳細頁拿 metadata，不要額外做 web_search（成本考量）。',
         messages: [{ role: 'user', content: EXTRACT_PROMPT.replace('{URL}', url) }],
-        tools: [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 5 }],
+        tools: [
+          { type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 2 },
+        ],
       }),
     });
     if (!resp.ok) {
