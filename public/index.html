@@ -696,6 +696,27 @@
         <div id="urlExtractStatus" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);min-height:1em;"></div>
       </div>
 
+      <!-- 📚 匯入學術論文 -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128218; 匯入學術論文（NDLTD / Scholar）</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="url" id="paperUrlInput"
+                 placeholder="貼 NDLTD 論文 URL 或 Google Scholar 連結，AI 會抓 metadata + 全文 chunks"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();importPaper();}"
+                 style="flex:1;padding:10px 12px;">
+          <button class="btn btn-blue" onclick="importPaper()" id="paperImportBtn">匯入</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+          <input type="text" id="paperSearchInput"
+                 placeholder="或輸入關鍵字（例：律師職涯、事務所管理），AI 幫你搜尋論文"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();searchPapers();}"
+                 style="flex:1;padding:10px 12px;">
+          <button class="btn btn-ghost" onclick="searchPapers()" id="paperSearchBtn">搜尋</button>
+        </div>
+        <div id="paperImportStatus" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted);min-height:1em;"></div>
+        <div id="paperSearchResults" style="margin-top:10px;"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">&#128221; 新增研究筆記</div>
         <div class="note-form">
@@ -783,6 +804,11 @@
       <div class="card">
         <div class="card-title">&#128203; 我的筆記</div>
         <div id="notesList"><div class="loading">載入中</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">&#128214; 我的學術論文</div>
+        <div id="papersList"><div class="loading">載入中</div></div>
       </div>
     </div>
 
@@ -939,7 +965,7 @@ function showTab(tab) {
   if (tab === 'offices') loadOffices();
   if (tab === 'trends') loadTrends();
   if (tab === 'news') { loadNews(); loadRecentSearches(); }
-  if (tab === 'input') { loadNotes(); loadUploads(); }
+  if (tab === 'input') { loadNotes(); loadUploads(); loadPapers(); }
   if (tab === 'sources') loadSources();
 }
 
@@ -2078,6 +2104,164 @@ async function extractUrl() {
     btn.disabled = false;
     btn.textContent = '抓取';
   }
+}
+
+// 📚 匯入單篇學術論文
+async function importPaper() {
+  const input = document.getElementById('paperUrlInput');
+  const status = document.getElementById('paperImportStatus');
+  const btn = document.getElementById('paperImportBtn');
+  const url = input.value.trim();
+  if (!url) return;
+  try { new URL(url); } catch { status.textContent = '請輸入有效的 URL'; status.style.color = 'var(--red)'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '抓取中...';
+  status.textContent = 'AI 正在抓取論文 metadata 與全文，約需 30-90 秒...';
+  status.style.color = 'var(--text-muted)';
+
+  try {
+    const { data, error } = await db.functions.invoke('ai-import-paper', { body: { url } });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    if (data?.duplicate) {
+      status.textContent = `⚠️ 已匯入過：${data.title}`;
+      status.style.color = 'var(--orange)';
+    } else {
+      status.textContent = `✓ 已匯入：${data.title}（${data.chunk_count} chunks, ${data.full_text_length || 0} 字）`;
+      status.style.color = 'var(--green)';
+      input.value = '';
+    }
+    loadPapers();
+    setTimeout(() => { status.textContent = ''; }, 6000);
+  } catch (e) {
+    status.textContent = '匯入失敗：' + (e.message || e);
+    status.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '匯入';
+  }
+}
+
+// 📚 搜尋學術論文（列出結果讓使用者點選匯入）
+async function searchPapers() {
+  const input = document.getElementById('paperSearchInput');
+  const btn = document.getElementById('paperSearchBtn');
+  const resultsEl = document.getElementById('paperSearchResults');
+  const query = input.value.trim();
+  if (!query) return;
+
+  btn.disabled = true;
+  btn.textContent = '搜尋中...';
+  resultsEl.innerHTML = '<div class="loading">AI 正在搜尋 NDLTD / Scholar...約需 20-60 秒</div>';
+
+  try {
+    const { data, error } = await db.functions.invoke('ai-search-papers', { body: { query } });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    const results = data?.results || [];
+    if (!results.length) {
+      resultsEl.innerHTML = '<div class="empty-state"><div class="msg">找不到相關論文</div></div>';
+      return;
+    }
+    const html = results.map((r, i) => {
+      const imported = r.already_imported;
+      const badgeStyle = imported ? 'background:var(--green-dim);color:var(--green);' : 'background:var(--blue-dim);color:var(--blue);';
+      const btnHtml = imported
+        ? '<span class="badge" style="background:var(--green-dim);color:var(--green);">已匯入</span>'
+        : `<button class="btn btn-sm btn-blue" onclick="importPaperFromSearch(${i})">匯入</button>`;
+      return `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:start;">
+          <div style="flex:1;">
+            <strong><a href="${escHtml(r.url || '#')}" target="_blank" style="color:var(--blue);">${escHtml(r.title || '(無標題)')}</a></strong>
+            <span class="badge" style="${badgeStyle}margin-left:6px;font-size:0.7rem;">${r.year || '?'}</span>
+          </div>
+          <div>${btnHtml}</div>
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+          ${r.authors?.length ? escHtml(r.authors.join(', ')) : ''} ${r.venue ? '・ ' + escHtml(r.venue) : ''}
+        </div>
+        ${r.snippet ? `<div style="font-size:0.8rem;color:var(--text);margin-top:6px;line-height:1.5;">${escHtml(r.snippet)}</div>` : ''}
+      </div>`;
+    }).join('');
+    resultsEl.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">找到 ${results.length} 篇，點右側「匯入」加入知識庫</div>${html}`;
+    // 暫存結果供 importPaperFromSearch 使用
+    window.__paperSearchResults = results;
+  } catch (e) {
+    resultsEl.innerHTML = `<div style="color:var(--red);">搜尋失敗：${escHtml(e.message || String(e))}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '搜尋';
+  }
+}
+
+async function importPaperFromSearch(index) {
+  const results = window.__paperSearchResults;
+  if (!results || !results[index]) return;
+  document.getElementById('paperUrlInput').value = results[index].url;
+  await importPaper();
+  // 刷新搜尋結果的「已匯入」標記
+  document.getElementById('paperSearchInput').value = document.getElementById('paperSearchInput').value;
+}
+
+async function loadPapers() {
+  const el = document.getElementById('papersList');
+  if (!el) return;
+  const { data, error } = await db.from('academic_papers')
+    .select('id, title, authors, year, venue, degree_type, keywords, chunk_count, full_text_length, source, source_url, imported_at')
+    .order('imported_at', { ascending: false });
+
+  if (error || !data || !data.length) {
+    el.innerHTML = '<div class="empty-state"><div class="msg">尚無論文，貼 URL 或用關鍵字搜尋</div></div>';
+    return;
+  }
+
+  const degreeMap = {
+    thesis_master: { label: '碩論', color: 'var(--blue)' },
+    thesis_phd: { label: '博論', color: 'var(--purple)' },
+    journal: { label: '期刊', color: 'var(--green)' },
+    conference: { label: '研討會', color: 'var(--orange)' },
+    book: { label: '專書', color: 'var(--gold)' },
+  };
+  const sourceMap = {
+    ndltd: '📚 NDLTD',
+    scholar: '🎓 Scholar',
+    airiti: '📖 Airiti',
+    manual: '✏️ 手動',
+  };
+
+  el.innerHTML = data.map(p => {
+    const deg = degreeMap[p.degree_type] || { label: p.degree_type || '', color: 'var(--text-muted)' };
+    const degBadge = deg.label ? `<span class="badge" style="background:color-mix(in srgb, ${deg.color} 20%, transparent);color:${deg.color};margin-left:6px;font-size:0.7rem;">${deg.label}</span>` : '';
+    const srcLabel = sourceMap[p.source] || p.source || '';
+    return `
+    <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:8px;">
+        <div style="flex:1;">
+          <strong>${escHtml(p.title)}</strong>${degBadge}
+          <span style="color:var(--text-muted);margin-left:6px;font-size:0.8rem;">${p.year || ''}</span>
+        </div>
+        <button class="btn btn-sm btn-ghost" style="color:var(--red);padding:2px 8px;" onclick="deletePaper('${p.id}', '${(p.title || '').replace(/'/g, "\\'")}')">刪除</button>
+      </div>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">
+        ${p.authors?.length ? '👤 ' + escHtml(p.authors.join(', ')) : ''}
+        ${p.venue ? ' ・ ' + escHtml(p.venue) : ''}
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ${srcLabel} ・ 全文 ${(p.full_text_length || 0).toLocaleString()} 字 / ${p.chunk_count || 0} chunks
+        ${p.source_url ? ` ・ <a href="${escHtml(p.source_url)}" target="_blank" style="color:var(--blue);">🔗 原文</a>` : ''}
+      </div>
+      ${p.keywords?.length ? `<div style="margin-top:6px;">${p.keywords.slice(0, 8).map(k => `<span class="badge badge-purple" style="margin:1px;font-size:0.7rem;">${escHtml(k)}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function deletePaper(id, title) {
+  if (!confirm(`確定要刪除論文「${title}」？（全文 chunks 也會一併刪除）`)) return;
+  const { error } = await db.from('academic_papers').delete().eq('id', id);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  loadPapers();
 }
 
 async function saveNote() {

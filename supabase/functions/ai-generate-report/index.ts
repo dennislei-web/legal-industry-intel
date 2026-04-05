@@ -83,6 +83,29 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
     parts.push('');
   }
 
+  // 學術論文 (最多 15 筆 metadata + abstract)
+  const { data: papers } = await userClient.from('academic_papers')
+    .select('id, title, authors, year, venue, degree_type, abstract, keywords')
+    .order('year', { ascending: false, nullsFirst: false }).limit(15);
+
+  if (papers?.length) {
+    parts.push('## 知識庫中的學術論文（可引用）');
+    const degreeMap: Record<string, string> = {
+      thesis_master: '碩論', thesis_phd: '博論',
+      journal: '期刊', conference: '研討會', book: '專書',
+    };
+    for (const p of papers) {
+      const degree = degreeMap[p.degree_type || ''] || '';
+      parts.push(`### ${p.title} (${p.year || 'N/A'}${degree ? ', ' + degree : ''})`);
+      if (p.authors?.length) parts.push(`作者: ${p.authors.join(', ')}`);
+      if (p.venue) parts.push(`機構/來源: ${p.venue}`);
+      if (p.abstract) parts.push(`摘要: ${String(p.abstract).slice(0, 400)}`);
+      if (p.keywords?.length) parts.push(`關鍵字: ${p.keywords.join(', ')}`);
+      parts.push('');
+      sources.push({ type: 'paper', id: p.id, title: p.title });
+    }
+  }
+
   try {
     const { count: lawyerCount } = await serviceClient.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
     const { data: topFirms } = await serviceClient.rpc('moj_firm_statistics');
