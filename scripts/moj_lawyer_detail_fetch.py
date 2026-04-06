@@ -7,11 +7,15 @@ MOJ 律師詳細資料補掃
 """
 import os
 import re
+import sys
 import time
 import requests
 import urllib3
 from urllib.parse import quote
 from dotenv import load_dotenv
+
+# 強制 stdout unbuffered 讓背景 task 能即時看到 log
+sys.stdout.reconfigure(line_buffering=True)
 
 urllib3.disable_warnings()
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -53,20 +57,29 @@ def parse_ad_date(s):
     return f'{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}'
 
 
-def fetch_detail(lic_no):
-    """呼叫 MOJ API 取得律師詳細資料"""
+def fetch_detail(lic_no, retries=2):
+    """呼叫 MOJ API 取得律師詳細資料，超時 8 秒，失敗重試一次"""
     enc = quote(lic_no)
-    try:
-        r = sess_moj.get(f'{MOJ_BASE}/cert/lyinfosd/{enc}', timeout=15)
-        if r.status_code != 200:
+    for attempt in range(retries):
+        try:
+            r = sess_moj.get(f'{MOJ_BASE}/cert/lyinfosd/{enc}', timeout=(5, 8))
+            if r.status_code != 200:
+                return None
+            data = r.json().get('data')
+            if not data or not isinstance(data, list) or len(data) == 0:
+                return None
+            return data[0]
+        except requests.exceptions.Timeout:
+            if attempt < retries - 1:
+                time.sleep(0.5)
+                continue
             return None
-        data = r.json().get('data')
-        if not data or not isinstance(data, list) or len(data) == 0:
+        except Exception as e:
+            if attempt < retries - 1:
+                time.sleep(0.5)
+                continue
             return None
-        return data[0]
-    except Exception as e:
-        print(f'  fetch err ({lic_no}): {e}')
-        return None
+    return None
 
 
 def detail_to_update(d):
@@ -115,7 +128,7 @@ def fetch_all_lic_nos(only_missing=True):
 
 
 def batch_update(updates):
-    """逐筆 PATCH 更新 moj_lawyers (不用 UPSERT 避免蓋掉原欄位)"""
+    """逐筆 PATCH 更新 moj_lawyers (加 timeout 避免卡住)"""
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).isoformat()
     headers = {
@@ -132,11 +145,16 @@ def batch_update(updates):
             u['detail_fetched_at'] = now_iso
         # PATCH /rest/v1/moj_lawyers?lic_no=eq.<encoded>
         endpoint = f'{SUPABASE_URL}/rest/v1/moj_lawyers?lic_no=eq.{quote(lic_no)}'
-        r = requests.patch(endpoint, headers=headers, json=u, verify=False, timeout=30)
-        if r.status_code not in (200, 204):
+        try:
+            r = requests.patch(endpoint, headers=headers, json=u, verify=False, timeout=(5, 10))
+            if r.status_code not in (200, 204):
+                errors += 1
+                if errors < 3:
+                    print(f'  patch err {r.status_code} for {lic_no}: {r.text[:150]}')
+        except Exception as e:
             errors += 1
             if errors < 3:
-                print(f'  patch err {r.status_code} for {lic_no}: {r.text[:150]}')
+                print(f'  patch exception for {lic_no}: {e}')
     if errors > 0:
         print(f'  total patch errors: {errors}/{len(updates)}')
 
