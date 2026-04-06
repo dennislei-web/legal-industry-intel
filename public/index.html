@@ -294,6 +294,36 @@
     .note-form { max-width: 700px; }
     .note-form .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
     .note-form .form-row > * { flex: 1; }
+
+    /* ===================== MODAL ===================== */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: var(--bg-card); border-radius: 12px;
+      max-width: 960px; width: 100%;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg-card); z-index: 1;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.1rem; }
+    .modal-header button {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 1.5rem; cursor: pointer; padding: 4px 8px;
+    }
+    .modal-header button:hover { color: var(--text); }
+    .modal-body { padding: 20px; }
+    @media (max-width: 600px) {
+      .modal-content { max-width: 100%; border-radius: 0; max-height: 100vh; }
+      .modal-overlay { padding: 0; }
+    }
   </style>
 </head>
 <body>
@@ -1501,7 +1531,7 @@ function renderOffices() {
   tbody.innerHTML = page.map((o, i) => {
     const webLink = o.website_url ? `<a href="${escHtml(o.website_url)}" target="_blank" style="color:var(--blue);">🔗 官網</a>` : '<span style="color:var(--text-muted);">-</span>';
     return `<tr>
-      <td><strong>${escHtml(o.firm_name)}</strong></td>
+      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a></td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
@@ -1511,6 +1541,172 @@ function renderOffices() {
 
   renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
 }
+
+// ============================================================
+// FIRM DETAIL MODAL
+// ============================================================
+const ROC_YEAR = new Date().getFullYear() - 1911;  // 115 in 2026
+
+async function showFirmDetail(firmName) {
+  const modal = document.getElementById('firmModal');
+  const titleEl = document.getElementById('firmModalTitle');
+  const bodyEl = document.getElementById('firmModalBody');
+  modal.style.display = 'flex';
+  titleEl.textContent = firmName;
+  bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
+
+  // 查詢該事務所所有律師（含分所：用 LIKE prefix）
+  let allLawyers = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await db.from('moj_lawyers')
+      .select('name, lic_no, sex, birth_year, office, office_normalized, main_region, email, tel, state_desc')
+      .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
+      .order('name')
+      .range(from, from + 999);
+    if (error) { bodyEl.innerHTML = `<div style="color:var(--red);">查詢失敗: ${error.message}</div>`; return; }
+    if (!data || data.length === 0) break;
+    allLawyers = allLawyers.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+
+  if (allLawyers.length === 0) {
+    bodyEl.innerHTML = '<div class="empty-state"><div class="msg">此事務所無律師資料</div></div>';
+    return;
+  }
+
+  // 統計
+  const total = allLawyers.length;
+  const male = allLawyers.filter(l => l.sex === '男').length;
+  const female = allLawyers.filter(l => l.sex === '女').length;
+  const unknown = total - male - female;
+  const malePct = total > 0 ? (male / total * 100).toFixed(0) : 0;
+  const femalePct = total > 0 ? (female / total * 100).toFixed(0) : 0;
+
+  // 年齡分布
+  const withAge = allLawyers.filter(l => l.birth_year != null);
+  const ages = withAge.map(l => ROC_YEAR - l.birth_year);
+  const avgAge = ages.length > 0 ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : '-';
+  const ageGroups = { '20-29': 0, '30-39': 0, '40-49': 0, '50-59': 0, '60-69': 0, '70+': 0 };
+  for (const a of ages) {
+    if (a < 30) ageGroups['20-29']++;
+    else if (a < 40) ageGroups['30-39']++;
+    else if (a < 50) ageGroups['40-49']++;
+    else if (a < 60) ageGroups['50-59']++;
+    else if (a < 70) ageGroups['60-69']++;
+    else ageGroups['70+']++;
+  }
+
+  // 地區分布
+  const regions = {};
+  for (const l of allLawyers) {
+    const r = l.main_region || '未知';
+    regions[r] = (regions[r] || 0) + 1;
+  }
+
+  // 分所列表
+  const branches = {};
+  for (const l of allLawyers) {
+    const o = l.office_normalized || l.office || firmName;
+    branches[o] = (branches[o] || 0) + 1;
+  }
+  const branchList = Object.entries(branches).sort((a, b) => b[1] - a[1]);
+
+  // 渲染
+  bodyEl.innerHTML = `
+    <!-- KPI -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px;">
+      <div class="kpi-card"><div class="kpi-label">律師人數</div><div class="kpi-value">${total}</div><div class="kpi-sub">現役</div></div>
+      <div class="kpi-card"><div class="kpi-label">男性</div><div class="kpi-value" style="color:var(--blue);">${male}</div><div class="kpi-sub">${malePct}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">女性</div><div class="kpi-value" style="color:var(--pink,#e57bac);">${female}</div><div class="kpi-sub">${femalePct}%</div></div>
+      <div class="kpi-card"><div class="kpi-label">平均年齡</div><div class="kpi-value" style="color:var(--orange);">${avgAge}</div><div class="kpi-sub">${withAge.length}/${total} 有資料</div></div>
+    </div>
+
+    ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${n} (${c}人)`).join('、')}</div>` : ''}
+
+    <!-- Charts -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card"><div class="card-title">性別分布</div><div class="chart-container" style="height:200px;"><canvas id="firmGenderChart"></canvas></div></div>
+      <div class="card"><div class="card-title">年齡分布</div><div class="chart-container" style="height:200px;"><canvas id="firmAgeChart"></canvas></div></div>
+    </div>
+
+    <!-- 律師列表 -->
+    <div class="card">
+      <div class="card-title">律師清單（${total} 位）</div>
+      <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+        <table>
+          <thead><tr>
+            <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th>地區</th><th>聯繫</th>
+          </tr></thead>
+          <tbody>${allLawyers.map(l => {
+            const age = l.birth_year ? `民${l.birth_year} (${ROC_YEAR - l.birth_year}歲)` : '-';
+            const contact = [l.email, l.tel].filter(Boolean).join(' / ') || '-';
+            return `<tr>
+              <td><strong>${escHtml(l.name)}</strong></td>
+              <td>${l.sex || '-'}</td>
+              <td style="font-size:0.8rem;">${age}</td>
+              <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
+              <td>${escHtml(l.main_region || '-')}</td>
+              <td style="font-size:0.75rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escHtml(contact)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // 繪製圖表
+  // 性別 doughnut
+  if (chartInstances['firmGender']) chartInstances['firmGender'].destroy();
+  const gCtx = document.getElementById('firmGenderChart')?.getContext('2d');
+  if (gCtx) {
+    chartInstances['firmGender'] = new Chart(gCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['男', '女', '未知'],
+        datasets: [{ data: [male, female, unknown], backgroundColor: ['#4f8ef7', '#e57bac', '#555'], borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#8899aa', padding: 8, font: { size: 12 } } },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed} 人 (${(ctx.parsed/total*100).toFixed(0)}%)` } }
+        }
+      }
+    });
+  }
+
+  // 年齡 bar
+  if (chartInstances['firmAge']) chartInstances['firmAge'].destroy();
+  const aCtx = document.getElementById('firmAgeChart')?.getContext('2d');
+  if (aCtx) {
+    chartInstances['firmAge'] = new Chart(aCtx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(ageGroups),
+        datasets: [{ label: '人數', data: Object.values(ageGroups), backgroundColor: '#c9a84ccc', borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#8899aa' }, grid: { display: false } },
+          y: { ticks: { color: '#8899aa', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+}
+
+function closeFirmModal() {
+  document.getElementById('firmModal').style.display = 'none';
+  if (chartInstances['firmGender']) { chartInstances['firmGender'].destroy(); delete chartInstances['firmGender']; }
+  if (chartInstances['firmAge']) { chartInstances['firmAge'].destroy(); delete chartInstances['firmAge']; }
+}
+
+// ESC 關閉 modal
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFirmModal(); });
 
 // ============================================================
 // TRENDS TAB - AI 報告 + 多 session 對話
@@ -2595,6 +2791,19 @@ function renderPagination(containerId, page, total, onPageChange) {
   }
 })();
 </script>
+
+<!-- 事務所詳細 Modal -->
+<div id="firmModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeFirmModal();">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="firmModalTitle">載入中...</h2>
+      <button onclick="closeFirmModal()">✕</button>
+    </div>
+    <div class="modal-body" id="firmModalBody">
+      <div class="loading">載入中</div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
