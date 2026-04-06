@@ -471,13 +471,14 @@
                 <th style="cursor:pointer" onclick="sortLawyers('name')">姓名 <span id="sortIcon_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('firm_name')">事務所 <span id="sortIcon_firm_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('region')">公會 <span id="sortIcon_region">↕</span></th>
-                <th style="cursor:pointer" onclick="sortLawyers('practice_start_date')">全國執業起始 <span id="sortIcon_practice_start_date">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('seniority')">年資 <span id="sortIcon_seniority">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('has_practice')">全國執業 <span id="sortIcon_has_practice">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('case_count_5yr')">案件數(5年) <span id="sortIcon_case_count_5yr">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('data_source')">來源 <span id="sortIcon_data_source">↕</span></th>
               </tr>
             </thead>
             <tbody id="lawyerTableBody">
-              <tr><td colspan="6" class="loading">載入中</td></tr>
+              <tr><td colspan="7" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -946,7 +947,7 @@ function sortLawyers(col) {
     lawyerSortAsc = (col === 'case_count_5yr') ? false : true; // 案件數預設降序
   }
   // 更新排序圖示
-  ['name','firm_name','region','practice_start_date','case_count_5yr','data_source'].forEach(c => {
+  ['name','firm_name','region','seniority','has_practice','case_count_5yr','data_source'].forEach(c => {
     const icon = document.getElementById('sortIcon_' + c);
     if (icon) icon.textContent = c === col ? (lawyerSortAsc ? '↑' : '↓') : '↕';
   });
@@ -1218,8 +1219,12 @@ async function loadLawyers() {
   if (region) query = query.eq('region', region);
   if (source) query = query.eq('data_source', source);
 
-  const nullsFirst = lawyerSortAsc;
-  query = query.order(lawyerSortCol, { ascending: lawyerSortAsc, nullsFirst: false });
+  // 虛擬欄位映射到實際 DB 欄位
+  const sortColMap = { seniority: 'moj_lic_no', has_practice: 'moj_practice_start_date' };
+  const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
+  // 年資排序：證號數字越小=年資越高，所以反轉排序方向
+  const actualSortAsc = lawyerSortCol === 'seniority' ? !lawyerSortAsc : lawyerSortAsc;
+  query = query.order(actualSortCol, { ascending: actualSortAsc, nullsFirst: false });
 
   query = query.range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
@@ -1230,7 +1235,7 @@ async function loadLawyers() {
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('lawyerPagination', lawyerPage, lawyerTotal, p => { lawyerPage = p; loadLawyers(); });
     return;
   }
@@ -1267,14 +1272,23 @@ async function loadLawyers() {
     if (l.moj_state_desc && l.moj_state_desc !== '正常') tipParts.push(`狀態: ${l.moj_state_desc}`);
     const tooltip = tipParts.join('\n');
 
-    // 執業起始日（優先 MOJ，fallback lawyer_members）
-    const startDate = l.moj_practice_start_date || l.practice_start_date || '-';
+    // 年資計算：從證號提取民國年（如 105臺檢字第13118號 → 105）
+    const currentRocYear = new Date().getFullYear() - 1911;
+    let seniority = '-';
+    if (l.moj_lic_no) {
+      const m = l.moj_lic_no.match(/^(\d+)/);
+      if (m) { seniority = currentRocYear - parseInt(m[1]); if (seniority < 0) seniority = '-'; }
+    }
+
+    // 全國執業標記
+    const hasPractice = l.moj_practice_start_date || l.practice_start_date;
 
     return `<tr>
       <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
-      <td>${startDate}</td>
+      <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
+      <td style="text-align:center;">${hasPractice ? '<span style="color:var(--green);font-weight:600;">&#10003;</span>' : '<span style="color:var(--text-muted);">-</span>'}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
       <td>${srcHtml}</td>
     </tr>`;
