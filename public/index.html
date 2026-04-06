@@ -1791,12 +1791,33 @@ function renderReportHistory() {
     const d = new Date(r.created_at);
     const label = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
     const active = i === currentReportIdx;
-    return `<button onclick="showReport(${i})" class="btn btn-sm ${active ? 'btn-blue' : 'btn-ghost'}"
-      style="padding:3px 10px;font-size:0.75rem;${active ? '' : 'opacity:0.7;'}"
-      title="${r.title || '報告'} — ${formatDate(r.created_at)}">
-      ${label}
-    </button>`;
+    return `<span style="display:inline-flex;align-items:center;gap:0;position:relative;">
+      <button onclick="showReport(${i})" class="btn btn-sm ${active ? 'btn-blue' : 'btn-ghost'}"
+        style="padding:3px 10px;font-size:0.75rem;border-top-right-radius:0;border-bottom-right-radius:0;${active ? '' : 'opacity:0.7;'}"
+        title="${r.title || '報告'} — ${formatDate(r.created_at)}">
+        ${label}
+      </button><button onclick="deleteReport('${r.id}',event)" class="btn btn-sm ${active ? 'btn-blue' : 'btn-ghost'}"
+        style="padding:3px 4px;font-size:0.65rem;border-top-left-radius:0;border-bottom-left-radius:0;border-left:1px solid rgba(255,255,255,0.15);${active ? '' : 'opacity:0.7;'}"
+        title="刪除此報告">✕</button>
+    </span>`;
   }).join('');
+}
+
+async function deleteReport(id, e) {
+  e.stopPropagation();
+  if (!confirm('確定要刪除這份報告嗎？')) return;
+  const { error } = await db.from('ai_insights').delete().eq('id', id);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  allReports = allReports.filter(r => r.id !== id);
+  if (currentReportIdx >= allReports.length) currentReportIdx = Math.max(0, allReports.length - 1);
+  if (allReports.length) {
+    renderReportHistory();
+    showReport(currentReportIdx);
+  } else {
+    document.getElementById('reportHistory').innerHTML = '';
+    document.getElementById('latestReport').innerHTML = '<div class="empty-state" style="padding:24px;"><div class="msg">尚無報告，點右上角「重新生成」讓 AI 基於你的筆記 + DB 資料生成第一份</div></div>';
+    document.getElementById('reportMeta').textContent = '';
+  }
 }
 
 function showReport(idx) {
