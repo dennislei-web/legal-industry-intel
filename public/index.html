@@ -426,14 +426,32 @@
         </div>
       </div>
 
+      <!-- AI 洞察連結 -->
+      <div class="card" style="margin-bottom:16px;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span id="overviewInsightSummary" style="font-size:0.88rem;color:var(--text-muted);">載入中...</span>
+          <button class="btn btn-sm btn-ghost" onclick="showTab('trends')" style="font-size:0.8rem;">前往 AI 報告 &rarr;</button>
+        </div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">&#128240; 最新產業新聞</div>
-          <div id="overviewNews"><div class="loading">載入中</div></div>
+          <div class="card-title">&#128104; 性別分布</div>
+          <div class="chart-container"><canvas id="chartGender"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">&#129302; 最新 AI 洞察</div>
-          <div id="overviewInsight"><div class="loading">載入中</div></div>
+          <div class="card-title">&#128197; 年齡分布</div>
+          <div class="chart-container"><canvas id="chartAge"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128188; 年資分布</div>
+          <div class="chart-container"><canvas id="chartSeniority"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127970; 事務所規模分布</div>
+          <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
         </div>
       </div>
     </div>
@@ -1100,13 +1118,20 @@ async function loadOverview() {
     }
   } catch(e) { console.log('expertise chart error:', e); }
 
-  // Latest news
-  const { data: latestNews } = await db.from('news_articles').select('title, url, source_name, published_at').order('published_at', { ascending: false }).limit(5);
-  renderOverviewNews(latestNews || []);
+  // AI insight summary link
+  const { data: latestInsight } = await db.from('ai_insights').select('title, created_at').eq('insight_type', 'trend_analysis').order('created_at', { ascending: false }).limit(1);
+  const insightEl = document.getElementById('overviewInsightSummary');
+  if (latestInsight?.[0]) {
+    insightEl.innerHTML = `&#129302; 最新報告：<strong>${escHtml(latestInsight[0].title)}</strong> <span style="color:var(--text-muted);font-size:0.75rem;">(${formatDate(latestInsight[0].created_at)})</span>`;
+  } else {
+    insightEl.textContent = '尚無 AI 報告';
+  }
 
-  // Latest AI insight
-  const { data: latestInsight } = await db.from('ai_insights').select('*').order('created_at', { ascending: false }).limit(1);
-  renderOverviewInsight(latestInsight?.[0]);
+  // 性別、年齡、年資分析（從 moj_lawyers 抓）
+  loadDemographicCharts();
+
+  // 事務所規模分布
+  loadFirmSizeChart();
 }
 
 function renderRegionChart(data) {
@@ -1178,27 +1203,122 @@ function renderYearlyChart(data) {
   });
 }
 
-function renderOverviewNews(news) {
-  const el = document.getElementById('overviewNews');
-  if (!news.length) { el.innerHTML = '<div class="empty-state"><div class="msg">尚無新聞資料</div></div>'; return; }
-  el.innerHTML = news.map(n => `
-    <div style="padding:8px 0;border-bottom:1px solid var(--border);">
-      <a href="${escHtml(n.url)}" target="_blank" style="color:var(--blue);text-decoration:none;font-size:0.88rem;">${escHtml(n.title)}</a>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">${n.source_name || ''} &middot; ${formatDate(n.published_at)}</div>
-    </div>
-  `).join('');
+async function loadDemographicCharts() {
+  const colors10 = ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1','#f093a0','#6dd5ed','#c9c9c9'];
+  const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+
+  // 批次抓 moj_lawyers 的 birth_year, sex, lic_no（分頁取全部）
+  let allRows = [];
+  let from = 0;
+  const batchSize = 1000;
+  while (true) {
+    const { data } = await db.from('moj_lawyers').select('birth_year, sex, lic_no').range(from, from + batchSize - 1);
+    if (!data || !data.length) break;
+    allRows = allRows.concat(data);
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+
+  // === 性別分布 ===
+  const genderCounts = {};
+  allRows.forEach(r => { if (r.sex) genderCounts[r.sex] = (genderCounts[r.sex] || 0) + 1; });
+  if (chartInstances.gender) chartInstances.gender.destroy();
+  chartInstances.gender = new Chart(document.getElementById('chartGender').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(genderCounts),
+      datasets: [{ data: Object.values(genderCounts), backgroundColor: ['#4f8ef7', '#f093a0', '#c9c9c9'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: txtColor, font: { size: 12 } } } } }
+  });
+
+  // === 年齡分布 ===
+  const currentYear = new Date().getFullYear();
+  const ageBuckets = { '25歲以下': 0, '26-30': 0, '31-35': 0, '36-40': 0, '41-45': 0, '46-50': 0, '51-55': 0, '56-60': 0, '61-65': 0, '66歲以上': 0 };
+  allRows.forEach(r => {
+    if (!r.birth_year) return;
+    const age = currentYear - (1911 + r.birth_year);
+    if (age <= 25) ageBuckets['25歲以下']++;
+    else if (age <= 30) ageBuckets['26-30']++;
+    else if (age <= 35) ageBuckets['31-35']++;
+    else if (age <= 40) ageBuckets['36-40']++;
+    else if (age <= 45) ageBuckets['41-45']++;
+    else if (age <= 50) ageBuckets['46-50']++;
+    else if (age <= 55) ageBuckets['51-55']++;
+    else if (age <= 60) ageBuckets['56-60']++;
+    else if (age <= 65) ageBuckets['61-65']++;
+    else ageBuckets['66歲以上']++;
+  });
+  if (chartInstances.age) chartInstances.age.destroy();
+  chartInstances.age = new Chart(document.getElementById('chartAge').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(ageBuckets),
+      datasets: [{ label: '人數', data: Object.values(ageBuckets), backgroundColor: colors10, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+
+  // === 年資分布 ===
+  const currentRocYear = currentYear - 1911;
+  const senBuckets = { '1年以下': 0, '1-3年': 0, '4-5年': 0, '6-10年': 0, '11-15年': 0, '16-20年': 0, '21-30年': 0, '30年以上': 0 };
+  allRows.forEach(r => {
+    if (!r.lic_no) return;
+    const m = r.lic_no.match(/^(\d+)/);
+    if (!m) return;
+    const yrs = currentRocYear - parseInt(m[1]);
+    if (yrs < 1) senBuckets['1年以下']++;
+    else if (yrs <= 3) senBuckets['1-3年']++;
+    else if (yrs <= 5) senBuckets['4-5年']++;
+    else if (yrs <= 10) senBuckets['6-10年']++;
+    else if (yrs <= 15) senBuckets['11-15年']++;
+    else if (yrs <= 20) senBuckets['16-20年']++;
+    else if (yrs <= 30) senBuckets['21-30年']++;
+    else senBuckets['30年以上']++;
+  });
+  if (chartInstances.seniority) chartInstances.seniority.destroy();
+  chartInstances.seniority = new Chart(document.getElementById('chartSeniority').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(senBuckets),
+      datasets: [{ label: '人數', data: Object.values(senBuckets), backgroundColor: colors10, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+      plugins: { legend: { display: false } }
+    }
+  });
 }
 
-function renderOverviewInsight(insight) {
-  const el = document.getElementById('overviewInsight');
-  if (!insight) { el.innerHTML = '<div class="empty-state"><div class="msg">尚無 AI 分析</div></div>'; return; }
-  const typeMap = { weekly_summary: '週報', trend_analysis: '趨勢分析', market_forecast: '市場預測', firm_profile: '事務所分析' };
-  el.innerHTML = `
-    <div style="font-size:0.7rem;color:var(--purple);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${typeMap[insight.insight_type] || insight.insight_type}</div>
-    <div style="font-size:0.95rem;font-weight:600;margin-bottom:8px;">${escHtml(insight.title)}</div>
-    <div style="font-size:0.85rem;color:var(--text);line-height:1.6;max-height:200px;overflow:hidden;">${escHtml(insight.content).substring(0, 500)}...</div>
-    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">${formatDate(insight.created_at)}</div>
-  `;
+async function loadFirmSizeChart() {
+  const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const { data } = await db.rpc('moj_firm_statistics').range(0, 999);
+  if (!data) return;
+  const sizeBuckets = { '1人（獨資）': 0, '2-3人': 0, '4-5人': 0, '6-10人': 0, '11-20人': 0, '21-50人': 0, '50人以上': 0 };
+  data.forEach(f => {
+    const c = f.lawyer_count || 0;
+    if (c <= 1) sizeBuckets['1人（獨資）']++;
+    else if (c <= 3) sizeBuckets['2-3人']++;
+    else if (c <= 5) sizeBuckets['4-5人']++;
+    else if (c <= 10) sizeBuckets['6-10人']++;
+    else if (c <= 20) sizeBuckets['11-20人']++;
+    else if (c <= 50) sizeBuckets['21-50人']++;
+    else sizeBuckets['50人以上']++;
+  });
+  if (chartInstances.firmSize) chartInstances.firmSize.destroy();
+  chartInstances.firmSize = new Chart(document.getElementById('chartFirmSize').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(sizeBuckets),
+      datasets: [{ data: Object.values(sizeBuckets), backgroundColor: ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1'], borderWidth: 0 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: txtColor, font: { size: 11 } } } } }
+  });
 }
 
 // ============================================================
