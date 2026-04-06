@@ -1394,9 +1394,9 @@ async function loadLawyers() {
   if (source) query = query.eq('data_source', source);
 
   // 虛擬欄位映射到實際 DB 欄位
-  const sortColMap = { seniority: 'moj_lic_no', has_practice: 'moj_practice_start_date' };
+  const sortColMap = { seniority: 'moj_lic_no', has_practice: 'practice_start_date' };
   const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
-  // 年資排序：證號數字越小=年資越高，所以反轉排序方向
+  // 年資排序：證號是 text（如 "105臺檢字第13118號"），字串排序即可（小=年資高）
   const actualSortAsc = lawyerSortCol === 'seniority' ? !lawyerSortAsc : lawyerSortAsc;
   query = query.order(actualSortCol, { ascending: actualSortAsc, nullsFirst: false });
 
@@ -1455,7 +1455,7 @@ async function loadLawyers() {
     }
 
     // 全國執業標記
-    const hasPractice = l.moj_practice_start_date || l.practice_start_date;
+    const hasPractice = l.practice_start_date;
 
     return `<tr>
       <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
