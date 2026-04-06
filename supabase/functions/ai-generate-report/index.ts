@@ -108,14 +108,15 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
 
   try {
     const { count: lawyerCount } = await serviceClient.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
-    const { data: topFirms } = await serviceClient.rpc('moj_firm_statistics');
+    const { count: firmCount } = await serviceClient.from('moj_firm_stats_cache').select('firm_name', { count: 'exact', head: true });
+    const { data: topFirms } = await serviceClient.from('moj_firm_stats_cache').select('*').order('lawyer_count', { ascending: false }).limit(20);
     const { data: regions } = await serviceClient.rpc('moj_region_distribution');
     parts.push('## 台灣法律產業 DB 即時數據（來自法務部）');
     if (lawyerCount) parts.push(`- 登錄律師總數: ${lawyerCount.toLocaleString()} 位`);
+    if (firmCount) parts.push(`- 事務所總數: ${firmCount.toLocaleString()} 間`);
     if (topFirms?.length) {
-      parts.push(`- 事務所總數: ${topFirms.length} 間`);
-      parts.push('- Top 15 事務所:');
-      for (const f of topFirms.slice(0, 15)) parts.push(`  * ${f.firm_name}: ${f.lawyer_count} 位律師 (${f.main_region || '-'})`);
+      parts.push('- Top 20 事務所:');
+      for (const f of topFirms) parts.push(`  * ${f.firm_name}: ${f.lawyer_count} 位律師 (${f.main_region || '-'})`);
     }
     if (regions?.length) {
       parts.push('- 律師地區分布:');

@@ -622,6 +622,9 @@
           <span>&#128202; 產業分析報告</span>
           <button class="btn btn-sm btn-blue" onclick="generateReport()" id="genReportBtn">重新生成</button>
         </div>
+        <!-- 報告歷史選擇器 -->
+        <div id="reportHistory" style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <!-- 報告內容 -->
         <div id="latestReport" style="margin-top:8px;line-height:1.7;">
           <div class="loading">載入中...</div>
         </div>
@@ -1739,23 +1742,58 @@ async function loadTrendsKpis() {
   if (chatCount != null) document.getElementById('trendsKpiChats').textContent = chatCount.toLocaleString();
 }
 
-// 📊 載入最新的 AI 報告
+// 📊 載入報告歷史 + 顯示最新
+let allReports = [];
+let currentReportIdx = 0;
+
 async function loadLatestReport() {
   const el = document.getElementById('latestReport');
   const meta = document.getElementById('reportMeta');
+  const histEl = document.getElementById('reportHistory');
+
   const { data } = await db.from('ai_insights')
-    .select('*').eq('insight_type', 'trend_analysis')
-    .order('created_at', { ascending: false }).limit(1);
+    .select('id, title, content, created_at, model_used, insight_type')
+    .eq('insight_type', 'trend_analysis')
+    .order('created_at', { ascending: false })
+    .limit(20);
 
   if (!data || !data.length) {
     el.innerHTML = '<div class="empty-state" style="padding:24px;"><div class="msg">尚無報告，點右上角「重新生成」讓 AI 基於你的筆記 + DB 資料生成第一份</div></div>';
     meta.textContent = '';
+    histEl.innerHTML = '';
     return;
   }
 
-  const r = data[0];
+  allReports = data;
+  currentReportIdx = 0;
+  renderReportHistory();
+  showReport(0);
+}
+
+function renderReportHistory() {
+  const histEl = document.getElementById('reportHistory');
+  if (!allReports.length) { histEl.innerHTML = ''; return; }
+  histEl.innerHTML = allReports.map((r, i) => {
+    const d = new Date(r.created_at);
+    const label = `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const active = i === currentReportIdx;
+    return `<button onclick="showReport(${i})" class="btn btn-sm ${active ? 'btn-blue' : 'btn-ghost'}"
+      style="padding:3px 10px;font-size:0.75rem;${active ? '' : 'opacity:0.7;'}"
+      title="${r.title || '報告'} — ${formatDate(r.created_at)}">
+      ${label}
+    </button>`;
+  }).join('');
+}
+
+function showReport(idx) {
+  if (idx < 0 || idx >= allReports.length) return;
+  currentReportIdx = idx;
+  const r = allReports[idx];
+  const el = document.getElementById('latestReport');
+  const meta = document.getElementById('reportMeta');
   el.innerHTML = renderMarkdown(r.content);
-  meta.textContent = `🕐 生成時間: ${formatDate(r.created_at)}  |  模型: ${r.model_used || 'claude-sonnet-4-5'}`;
+  meta.textContent = `🕐 生成時間: ${formatDate(r.created_at)}  |  模型: ${r.model_used || 'claude-sonnet-4-5'}  |  第 ${idx + 1}/${allReports.length} 份`;
+  renderReportHistory();
 }
 
 // 🔄 生成新報告
