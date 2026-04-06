@@ -1635,6 +1635,113 @@ function renderBarPieChart(data, totalActive) {
 // ============================================================
 // OFFICES TAB (事務所)
 // ============================================================
+// 雷所名單 (2025/11/27 維護)
+const BLACKLIST = {
+  '德勤': '合夥律師只會畫餅，案源不足，實習只做簡報，會追回已發加班費',
+  '歐亞': '老闆私下帶女員工吃飯，法學素養差，用ChatGPT回法律問題全錯，PUA員工',
+  '有澤': '加班沒加班費',
+  '廉貞': '據說操',
+  '鴻邦': '很操，加班到吐',
+  '眾律': '老闆愛罵員工、情緒不穩定、流動率高',
+  '銓律': '老闆情緒不穩定，偷拍女律師',
+  '植根': '加班到生病失聰',
+  '承理': '律師很兇，流動率高',
+  '德久': '老闆情緒不穩定，會吼到整個辦公室都聽到，流動率高',
+  '眾勤': '曾與德久合夥',
+  '利生': '曾與德久合夥',
+  '品仁': '流動率高，不教，羞辱實習律師',
+  '聯鼎': '罵人罵很兇',
+  '泰鼎': '操',
+  '正律': '罵人罵很兇，流動率高',
+  '律大': '老闆情緒不穩，罵三字經，拖欠薪水，要擋黑道',
+  '法瑪': '免洗筷',
+  '圓矩': '老闆情緒管理差，PUA傾向',
+  '耶魯': '雷所',
+  '了凡': '很黑別去',
+  '恩典': '女主管很瘋',
+  '禾和': '所長被起訴洗錢，恐嚇離職律師，騷擾女員工',
+  '育稔': '所長被起訴洗錢，恐嚇離職律師，騷擾女員工',
+  '禮麒': '召妓，罵律師是狗',
+  '權律': '收集別人口水',
+  '法典': '輕度植根',
+  '德益': '性騷擾，高壓過勞，PUA，加班要自費冷氣',
+  '杰論': '老闆有躁鬱症，操',
+  '永然': '免洗筷，不教',
+  '君倫': '裡面有被送懲戒的法官',
+  '兆信': '會兇人',
+  '得耀': '老闆晚上10點還會call，情緒化飆人，加班沒加班費，偷聽員工對話',
+  '理晟': '老闆情緒勒索不愛工作，法學程度差',
+  '尚德': '愛顯官威無法溝通，遲發薪水',
+  '真亮': '實習要掃地拖地擦玻璃包垃圾',
+  '匯眾': '老闆說可以把實習當免洗',
+  '博眾': '老闆情緒不穩定，不教',
+  '宏光展': '環島',
+  '群勝': '逼實習多留一個月，情緒不穩',
+  '尚澄': '面試拖一個月不給offer，公開嘲諷面試者',
+  '宗誠': '配很低，受僱被懲戒',
+  '君綸': '實習做雜事端茶倒水，當免洗',
+  '宏宇': '內鬥，所長個人風格強烈',
+  '德臻': '中午叫你煮飯，精神轟炸',
+  '謙聖': '案量大會壓榨',
+  '尚耘': '過勞，案件量大，老闆不看狀',
+  '詮善': '薪水很低，不願投保，推卸責任',
+  '權麒': '拖薪水，公審員工，甩鍋',
+  '誠遠': '合夥人情緒控管問題，脾氣暴躁',
+  '富達': '辦案態度差',
+  '立勤': '流動率高到爆炸，三個月走五個',
+  '敬業': '老闆人品差',
+  '博思': '老闆情緒化，常態加班，獎金不給',
+  '神川': '老闆翻臉像翻書，PUA，辦公室抽菸',
+  '景德': '所長性騷擾女工讀生，遭判刑',
+  '政勤': '會PUA，戰校',
+  '基礎': '所長很會酸言酸語，精神攻擊',
+  '喆大': '狂打電話找人騷擾',
+  '高德': '老闆交代事情不清不楚，陷害背黑鍋',
+  '遠東聯合': '面試酸人，歧視女性',
+  '誠瀛': '老闆情緒極度不穩定，羞辱人，流動率極高',
+  '經兆': '法學素養低，凹加班不給加班費，職場霸凌',
+  '宸軒': '終極PUA典範',
+  '易信': '把實習當免洗筷，法學素養差',
+  '冠宸': '老闆情緒控管極差',
+  '巨展': '要求員工上心靈成長課程',
+  '碩成': '老闆脾氣暴躁，一人受僱所',
+  '任遠': '流動率高，老闆造謠，性騷擾',
+  '資策會': '主管情緒控管差，PUA，流動率極高',
+  '威律': '雷所（未附理由）',
+  '通律': '雷所（未附理由）',
+  '長江大方': '雷所（未附理由）',
+  '廷律': '雷所（未附理由）',
+  '新時代': '雷所（未附理由）',
+  '典律': '雷所（未附理由）',
+  '法碩': '雷所（未附理由）',
+  '圓方': '雷所（未附理由）',
+  '兆聲': '雷所（未附理由）',
+  '德宇': '雷所（未附理由）',
+  '太平洋': '雷所（未附理由）',
+  '宏景': '雷所（未附理由）',
+  '日恆': '雷所（未附理由）',
+  '圓融': '雷所（未附理由）',
+  '漢華': '雷所（未附理由）',
+  '台陽': '雷所（未附理由）',
+  '正通': '雷所（未附理由）',
+  '聯誠': '雷所（未附理由）',
+  '弘鼎': '雷所（未附理由）',
+  '元亨': '雷所（未附理由）',
+  '大仁': '雷所（未附理由）',
+  '昪正': '雷所（未附理由）',
+  '大恆': '雷所（未附理由）',
+  '萬宏': '雷所（未附理由）',
+  '海天': '雷所（未附理由）',
+  '太吉': '違法資遣（台中）',
+};
+
+function getBlacklistReason(firmName) {
+  for (const [key, reason] of Object.entries(BLACKLIST)) {
+    if (firmName.includes(key)) return reason;
+  }
+  return null;
+}
+
 let allOffices = [], officePage = 0, officeTotal = 0;
 let officeSortCol = 'lawyer_count', officeSortAsc = false;
 let officeSearchTimer = null;
@@ -1733,8 +1840,10 @@ function renderOffices() {
 
   tbody.innerHTML = page.map((o, i) => {
     const webLink = o.website_url ? `<a href="${escHtml(o.website_url)}" target="_blank" style="color:var(--blue);">🔗 官網</a>` : '<span style="color:var(--text-muted);">-</span>';
-    return `<tr>
-      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a></td>
+    const blReason = getBlacklistReason(o.firm_name);
+    const blBadge = blReason ? ` <span title="${escHtml(blReason)}" style="cursor:help;color:var(--red);font-size:0.75rem;vertical-align:middle;">⚠ 雷</span>` : '';
+    return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
+      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
@@ -1832,8 +1941,16 @@ async function showFirmDetail(firmName) {
   }
   const branchList = Object.entries(branches).sort((a, b) => b[1] - a[1]);
 
+  // 雷所警告
+  const blWarning = getBlacklistReason(firmName);
+  const blHtml = blWarning ? `<div style="background:rgba(224,92,92,0.12);border:1px solid rgba(224,92,92,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
+    <span style="font-size:1.2rem;flex-shrink:0;">⚠️</span>
+    <div><div style="font-weight:600;color:var(--red);margin-bottom:4px;">雷所警示</div><div style="font-size:0.85rem;color:var(--text);line-height:1.6;">${escHtml(blWarning)}</div></div>
+  </div>` : '';
+
   // 渲染
   bodyEl.innerHTML = `
+    ${blHtml}
     <!-- KPI -->
     <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px;">
       <div class="kpi-card"><div class="kpi-label">律師人數</div><div class="kpi-value">${total}</div><div class="kpi-sub">現役</div></div>
