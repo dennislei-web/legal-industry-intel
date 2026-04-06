@@ -1145,7 +1145,7 @@ function renderRegionChart(data) {
       labels: data.map(r => r.region),
       datasets: [{
         data: data.map(r => r.count),
-        backgroundColor: ['rgba(79,142,247,0.7)','rgba(79,142,247,0.5)','rgba(79,142,247,0.35)','rgba(79,142,247,0.25)','rgba(150,170,200,0.4)','rgba(150,170,200,0.3)','rgba(150,170,200,0.25)','rgba(150,170,200,0.2)','rgba(150,170,200,0.15)','rgba(150,170,200,0.1)'],
+        backgroundColor: ['rgba(79,142,247,0.7)','rgba(76,175,130,0.65)','rgba(201,168,76,0.65)','rgba(155,126,216,0.6)','rgba(224,149,74,0.55)','rgba(69,183,209,0.5)','rgba(240,147,160,0.5)','rgba(130,160,190,0.4)','rgba(170,170,170,0.35)','rgba(130,160,190,0.25)'],
         borderWidth: 0
       }]
     },
@@ -1206,7 +1206,9 @@ function renderYearlyChart(data) {
 }
 
 async function loadDemographicCharts() {
-  const barColor = 'rgba(79,142,247,0.6)';
+  // 每張圖一個主色調，整體和諧但有區分
+  const ageColor = 'rgba(76,175,130,0.65)';       // 綠
+  const seniorityColor = 'rgba(201,168,76,0.65)';  // 金
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
   // 批次抓 moj_lawyers 的 birth_year, sex, lic_no
@@ -1263,7 +1265,7 @@ async function loadDemographicCharts() {
   if (chartInstances.age) chartInstances.age.destroy();
   chartInstances.age = new Chart(document.getElementById('chartAge').getContext('2d'), {
     type: 'bar',
-    data: { labels: Object.keys(ageBuckets), datasets: [{ label: '人數', data: Object.values(ageBuckets), backgroundColor: barColor, borderRadius: 4 }] },
+    data: { labels: Object.keys(ageBuckets), datasets: [{ label: '人數', data: Object.values(ageBuckets), backgroundColor: ageColor, borderRadius: 4 }] },
     options: chartOpts('x')
   });
 
@@ -1287,14 +1289,14 @@ async function loadDemographicCharts() {
   if (chartInstances.seniority) chartInstances.seniority.destroy();
   chartInstances.seniority = new Chart(document.getElementById('chartSeniority').getContext('2d'), {
     type: 'bar',
-    data: { labels: Object.keys(senBuckets), datasets: [{ label: '人數', data: Object.values(senBuckets), backgroundColor: barColor, borderRadius: 4 }] },
+    data: { labels: Object.keys(senBuckets), datasets: [{ label: '人數', data: Object.values(senBuckets), backgroundColor: seniorityColor, borderRadius: 4 }] },
     options: chartOpts('x')
   });
 }
 
 async function loadFirmSizeChart() {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
-  const barColor = 'rgba(79,142,247,0.6)';
+  const firmColor = 'rgba(155,126,216,0.65)'; // 紫
 
   // 用 cache 表（快 ~0.2s）而非 RPC（慢 ~8s）
   let allFirms = [];
@@ -1332,7 +1334,7 @@ async function loadFirmSizeChart() {
   if (chartInstances.firmSize) chartInstances.firmSize.destroy();
   chartInstances.firmSize = new Chart(document.getElementById('chartFirmSize').getContext('2d'), {
     type: 'bar',
-    data: { labels: Object.keys(sizeBuckets), datasets: [{ label: '事務所數', data: Object.values(sizeBuckets), backgroundColor: barColor, borderRadius: 4 }] },
+    data: { labels: Object.keys(sizeBuckets), datasets: [{ label: '事務所數', data: Object.values(sizeBuckets), backgroundColor: firmColor, borderRadius: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
       scales: {
