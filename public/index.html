@@ -1284,7 +1284,7 @@ async function loadDemographicCharts() {
   const senBuckets = { '1年以下': 0, '1-3': 0, '4-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-30': 0, '30+': 0 };
   allRows.forEach(r => {
     if (!r.lic_no) return;
-    const m = r.lic_no.match(/^(\d+)/);
+    const m = r.lic_no.match(/^\(?(\d+)\)?/);
     if (!m) return;
     const yrs = currentRocYear - parseInt(m[1]);
     if (yrs < 1) senBuckets['1年以下']++;
@@ -1396,8 +1396,9 @@ async function loadLawyers() {
   // 虛擬欄位映射到實際 DB 欄位
   const sortColMap = { has_practice: 'practice_start_date' };
   if (lawyerSortCol === 'seniority') {
-    // 年資排序：用 has_moj 過濾 + cert_number 文字排序（2-3位數字開頭，大致正確）
-    query = query.eq('has_moj', true);
+    // 年資排序：只顯示有 MOJ 證號的，按 cert_number 排序
+    // cert_number 是文字（如 "(55)臺證字..." 或 "105臺檢字..."），排序不完美但可用
+    query = query.not('cert_number', 'is', null);
     query = query.order('cert_number', { ascending: lawyerSortAsc, nullsFirst: false });
   } else {
     const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
@@ -1454,7 +1455,7 @@ async function loadLawyers() {
     const currentRocYear = new Date().getFullYear() - 1911;
     let seniority = '-';
     if (l.moj_lic_no) {
-      const m = l.moj_lic_no.match(/^(\d+)/);
+      const m = l.moj_lic_no.match(/^\(?(\d+)\)?/);
       if (m) { seniority = currentRocYear - parseInt(m[1]); if (seniority < 0) seniority = '-'; }
     }
 
@@ -1917,7 +1918,7 @@ async function showFirmDetail(firmName) {
   // 年資分布
   const currentRocYr = new Date().getFullYear() - 1911;
   const withLic = allLawyers.filter(l => l.lic_no && /^\d+/.test(l.lic_no));
-  const seniorities = withLic.map(l => currentRocYr - parseInt(l.lic_no.match(/^(\d+)/)[1])).filter(y => y >= 0);
+  const seniorities = withLic.map(l => currentRocYr - parseInt(l.lic_no.match(/^\(?(\d+)\)?/)[1])).filter(y => y >= 0);
   const avgSeniority = seniorities.length > 0 ? (seniorities.reduce((a, b) => a + b, 0) / seniorities.length).toFixed(1) : '-';
   const senGroups = { '1-3年': 0, '4-5年': 0, '6-10年': 0, '11-15年': 0, '16-20年': 0, '21-30年': 0, '30+年': 0 };
   for (const y of seniorities) {
