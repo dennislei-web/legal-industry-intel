@@ -695,7 +695,10 @@
               </div>
             </div>
             <div style="border-top:1px solid var(--border);padding:12px;background:var(--bg-sub);">
+              <div id="chatAttachmentList" style="margin-bottom:6px;display:flex;gap:4px;flex-wrap:wrap;"></div>
               <div style="display:flex;gap:8px;align-items:flex-end;">
+                <button onclick="triggerChatFileInput()" title="附加檔案" class="btn btn-ghost" style="padding:8px 10px;font-size:1rem;flex-shrink:0;">📎</button>
+                <input type="file" id="chatFileInput" style="display:none;" onchange="handleChatFile(this)" accept=".pdf,.docx,.xlsx,.csv,.txt,.json,.png,.jpg">
                 <textarea id="chatInput" rows="2"
                           placeholder="問任何法律產業問題...（Enter 送出，Shift+Enter 換行）"
                           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"
@@ -2292,16 +2295,20 @@ async function loadChatSessions() {
   }
 
   el.innerHTML = data.map(s => `
-    <div onclick="openChatSession('${s.id}')"
-         class="chat-session-item ${s.id === currentChatSessionId ? 'active' : ''}"
-         style="padding:8px 10px;margin-bottom:4px;border-radius:6px;cursor:pointer;font-size:0.85rem;
+    <div style="display:flex;align-items:center;margin-bottom:4px;border-radius:6px;
                 background:${s.id === currentChatSessionId ? 'var(--blue-dim)' : 'transparent'};
-                color:${s.id === currentChatSessionId ? 'var(--blue)' : 'var(--text)'};
                 border-left:3px solid ${s.id === currentChatSessionId ? 'var(--blue)' : 'transparent'};"
-         onmouseover="if(this.dataset.active!=='1')this.style.background='var(--bg-hover)';"
-         onmouseout="if(this.dataset.active!=='1')this.style.background='transparent';">
-      <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.title)}</div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${formatDate(s.last_message_at)}</div>
+         onmouseover="this.style.background=this.style.background||'var(--bg-hover)';"
+         onmouseout="this.style.background='${s.id === currentChatSessionId ? 'var(--blue-dim)' : 'transparent'}';">
+      <div onclick="openChatSession('${s.id}')" style="flex:1;padding:8px 10px;cursor:pointer;min-width:0;
+                color:${s.id === currentChatSessionId ? 'var(--blue)' : 'var(--text)'};">
+        <div style="font-weight:500;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.title)}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">${formatDate(s.last_message_at)}</div>
+      </div>
+      <button onclick="deleteChatSession('${s.id}',event)" title="刪除對話"
+              style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px 8px;font-size:0.75rem;opacity:0.5;flex-shrink:0;"
+              onmouseover="this.style.opacity='1';this.style.color='var(--red)';"
+              onmouseout="this.style.opacity='0.5';this.style.color='var(--text-muted)';">&#10005;</button>
     </div>
   `).join('');
 }
@@ -2348,6 +2355,54 @@ function renderChatMessage(m) {
     </div>`;
 }
 
+async function deleteChatSession(sessionId, e) {
+  e.stopPropagation();
+  if (!confirm('確定要刪除這個對話嗎？')) return;
+  await db.from('chat_messages').delete().eq('session_id', sessionId);
+  await db.from('chat_sessions').delete().eq('id', sessionId);
+  if (currentChatSessionId === sessionId) {
+    currentChatSessionId = null;
+    document.getElementById('chatMessages').innerHTML =
+      '<div style="text-align:center;color:var(--text-muted);padding:40px;">對話已刪除</div>';
+  }
+  loadChatSessions();
+}
+
+// 對話附件
+let chatAttachments = [];
+
+function triggerChatFileInput() {
+  document.getElementById('chatFileInput').click();
+}
+
+function handleChatFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    chatAttachments.push({ name: file.name, size: file.size, type: file.type, base64: reader.result.split(',')[1] });
+    renderChatAttachments();
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function removeChatAttachment(idx) {
+  chatAttachments.splice(idx, 1);
+  renderChatAttachments();
+}
+
+function renderChatAttachments() {
+  const el = document.getElementById('chatAttachmentList');
+  if (!chatAttachments.length) { el.innerHTML = ''; return; }
+  el.innerHTML = chatAttachments.map((f, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--bg-row);border-radius:4px;font-size:0.75rem;color:var(--text-muted);">
+      📎 ${escHtml(f.name.length > 20 ? f.name.slice(0,17) + '...' : f.name)}
+      <button onclick="removeChatAttachment(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;">✕</button>
+    </span>`
+  ).join(' ');
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const btn = document.getElementById('chatSendBtn');
@@ -2371,6 +2426,11 @@ async function sendChat() {
 
   try {
     const body = currentChatSessionId ? { session_id: currentChatSessionId, message } : { message };
+    if (chatAttachments.length) {
+      body.attachments = chatAttachments.map(f => ({ name: f.name, type: f.type, size: f.size, base64: f.base64 }));
+      chatAttachments = [];
+      renderChatAttachments();
+    }
     const { data, error } = await db.functions.invoke('ai-chat', { body });
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
