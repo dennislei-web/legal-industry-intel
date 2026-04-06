@@ -1824,10 +1824,13 @@ async function showFirmDetail(firmName) {
     ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${n} (${c}人)`).join('、')}</div>` : ''}
 
     <!-- Charts -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
-      <div class="card"><div class="card-title">性別分布</div><div class="chart-container" style="height:200px;"><canvas id="firmGenderChart"></canvas></div></div>
-      <div class="card"><div class="card-title">年齡分布</div><div class="chart-container" style="height:200px;"><canvas id="firmAgeChart"></canvas></div></div>
-      <div class="card"><div class="card-title">年資分布</div><div class="chart-container" style="height:200px;"><canvas id="firmSeniorityChart"></canvas></div></div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="card"><div class="card-title">性別分布</div><div class="chart-container" style="height:180px;"><canvas id="firmGenderChart"></canvas></div></div>
+      <div class="card"><div class="card-title">年齡分布</div><div class="chart-container" style="height:180px;"><canvas id="firmAgeChart"></canvas></div></div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">年資分布</div>
+      <div class="chart-container" style="height:160px;"><canvas id="firmSeniorityChart"></canvas></div>
     </div>
 
     <!-- 律師列表 -->
