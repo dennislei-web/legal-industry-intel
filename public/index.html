@@ -619,6 +619,8 @@
                 <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('avg_cases')">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('_avg_age')">平均年齡 <span id="sortIcon_o__avg_age">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('_avg_sen')">平均年資 <span id="sortIcon_o__avg_sen">↕</span></th>
                 <th>官網</th>
               </tr>
             </thead>
@@ -1834,7 +1836,7 @@ async function loadOfficeAgeSeniority() {
   let rows = [];
   let from = 0;
   while (true) {
-    const { data } = await db.from('moj_lawyers').select('birth_year, lic_no').range(from, from + 999);
+    const { data } = await db.from('moj_lawyers').select('birth_year, lic_no, office_normalized').range(from, from + 999);
     if (!data || !data.length) break;
     rows = rows.concat(data);
     if (data.length < 1000) break;
@@ -1843,23 +1845,49 @@ async function loadOfficeAgeSeniority() {
   const currentYear = new Date().getFullYear();
   const currentRocYear = currentYear - 1911;
 
+  // 全體 KPI
   const ages = rows.filter(r => r.birth_year).map(r => currentYear - (1911 + r.birth_year));
   if (ages.length) {
-    const avgAge = (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1);
-    document.getElementById('kpiOfficeAvgAge').textContent = avgAge;
-    document.getElementById('kpiOfficeAvgAge').nextElementSibling &&
-      (document.getElementById('kpiOfficeAvgAge').parentElement.querySelector('.kpi-sub').textContent = `${ages.length.toLocaleString()} 人有資料`);
+    document.getElementById('kpiOfficeAvgAge').textContent = (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1);
+    document.getElementById('kpiOfficeAvgAge').parentElement.querySelector('.kpi-sub').textContent = `${ages.length.toLocaleString()} 人有資料`;
   }
-
-  const seniorities = rows.filter(r => r.lic_no).map(r => {
+  const allSen = rows.filter(r => r.lic_no).map(r => {
     const m = r.lic_no.match(/^\(?(\d+)\)?/);
     return m ? currentRocYear - parseInt(m[1]) : null;
   }).filter(y => y != null && y >= 0);
-  if (seniorities.length) {
-    const avgSen = (seniorities.reduce((a, b) => a + b, 0) / seniorities.length).toFixed(1);
-    document.getElementById('kpiOfficeAvgSeniority').textContent = avgSen + ' 年';
-    document.getElementById('kpiOfficeAvgSeniority').parentElement.querySelector('.kpi-sub').textContent = `${seniorities.length.toLocaleString()} 人有資料`;
+  if (allSen.length) {
+    document.getElementById('kpiOfficeAvgSeniority').textContent = (allSen.reduce((a, b) => a + b, 0) / allSen.length).toFixed(1) + ' 年';
+    document.getElementById('kpiOfficeAvgSeniority').parentElement.querySelector('.kpi-sub').textContent = `${allSen.length.toLocaleString()} 人有資料`;
   }
+
+  // 個別事務所平均（用 office_normalized 分組，含分所合併）
+  const firmAgeMap = {};
+  const firmSenMap = {};
+  const firmKeyRe = /^(.+?(?:法律|律師)事務所)/;
+  for (const r of rows) {
+    if (!r.office_normalized) continue;
+    const km = r.office_normalized.match(firmKeyRe);
+    const key = km ? km[1] : r.office_normalized;
+    if (r.birth_year) {
+      if (!firmAgeMap[key]) firmAgeMap[key] = [];
+      firmAgeMap[key].push(currentYear - (1911 + r.birth_year));
+    }
+    if (r.lic_no) {
+      const lm = r.lic_no.match(/^\(?(\d+)\)?/);
+      if (lm) {
+        const y = currentRocYear - parseInt(lm[1]);
+        if (y >= 0) { if (!firmSenMap[key]) firmSenMap[key] = []; firmSenMap[key].push(y); }
+      }
+    }
+  }
+  // 附加到 allOffices
+  for (const o of allOffices) {
+    const ageArr = firmAgeMap[o.firm_name];
+    const senArr = firmSenMap[o.firm_name];
+    o._avg_age = ageArr ? +(ageArr.reduce((a, b) => a + b, 0) / ageArr.length).toFixed(1) : null;
+    o._avg_sen = senArr ? +(senArr.reduce((a, b) => a + b, 0) / senArr.length).toFixed(1) : null;
+  }
+  renderOffices();
 }
 
 function renderOffices() {
@@ -1883,7 +1911,7 @@ function renderOffices() {
 
   const tbody = document.getElementById('officeTableBody');
   if (!page.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
     return;
   }
@@ -1897,6 +1925,8 @@ function renderOffices() {
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
+      <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
+      <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
       <td style="text-align:center;">${webLink}</td>
     </tr>`;
   }).join('');
