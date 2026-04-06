@@ -2375,15 +2375,49 @@ function triggerChatFileInput() {
   document.getElementById('chatFileInput').click();
 }
 
-function handleChatFile(input) {
+async function handleChatFile(input) {
   const file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    chatAttachments.push({ name: file.name, size: file.size, type: file.type, base64: reader.result.split(',')[1] });
-    renderChatAttachments();
-  };
-  reader.readAsDataURL(file);
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') {
+    // 試算表：先在前端轉成 CSV 文字再傳
+    if (ext !== 'csv' && !window.XLSX) {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej; document.head.appendChild(s);
+      });
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      let csvText = '';
+      if (ext === 'csv') {
+        csvText = new TextDecoder().decode(reader.result);
+      } else {
+        const wb = XLSX.read(reader.result, { type: 'array' });
+        // 轉換所有分頁
+        csvText = wb.SheetNames.map(name => {
+          const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]);
+          return `=== 分頁: ${name} ===\n${csv}`;
+        }).join('\n\n');
+      }
+      // 截斷過大的檔案（最多 80000 字元）
+      if (csvText.length > 80000) csvText = csvText.slice(0, 80000) + '\n...(資料過多，已截斷)';
+      const base64 = btoa(unescape(encodeURIComponent(csvText)));
+      chatAttachments.push({ name: file.name, size: file.size, type: 'text/csv', base64 });
+      renderChatAttachments();
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // PDF / 圖片 / 文字檔：直接用 base64
+    const reader = new FileReader();
+    reader.onload = () => {
+      chatAttachments.push({ name: file.name, size: file.size, type: file.type, base64: reader.result.split(',')[1] });
+      renderChatAttachments();
+    };
+    reader.readAsDataURL(file);
+  }
   input.value = '';
 }
 
