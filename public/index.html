@@ -592,8 +592,18 @@
           <div class="kpi-sub">律師/事務所</div>
         </div>
         <div class="kpi-card">
+          <div class="kpi-label">平均年齡</div>
+          <div class="kpi-value" id="kpiOfficeAvgAge" style="color:var(--orange);">-</div>
+          <div class="kpi-sub">有出生年資料</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年資</div>
+          <div class="kpi-value" id="kpiOfficeAvgSeniority" style="color:var(--green);">-</div>
+          <div class="kpi-sub">有證號資料</div>
+        </div>
+        <div class="kpi-card">
           <div class="kpi-label">有官網</div>
-          <div class="kpi-value" id="kpiOfficeWebsite" style="color:var(--orange);">-</div>
+          <div class="kpi-value" id="kpiOfficeWebsite" style="color:var(--blue);">-</div>
           <div class="kpi-sub">已搜尋到官網</div>
         </div>
       </div>
@@ -1813,7 +1823,43 @@ async function loadOffices() {
     const withWeb = allOffices.filter(o => o.website_url).length;
     document.getElementById('kpiOfficeWebsite').textContent = withWeb;
   }
+
+  // 平均年齡和年資（從 moj_lawyers 抓）
+  loadOfficeAgeSeniority();
+
   renderOffices();
+}
+
+async function loadOfficeAgeSeniority() {
+  let rows = [];
+  let from = 0;
+  while (true) {
+    const { data } = await db.from('moj_lawyers').select('birth_year, lic_no').range(from, from + 999);
+    if (!data || !data.length) break;
+    rows = rows.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+  const currentYear = new Date().getFullYear();
+  const currentRocYear = currentYear - 1911;
+
+  const ages = rows.filter(r => r.birth_year).map(r => currentYear - (1911 + r.birth_year));
+  if (ages.length) {
+    const avgAge = (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1);
+    document.getElementById('kpiOfficeAvgAge').textContent = avgAge;
+    document.getElementById('kpiOfficeAvgAge').nextElementSibling &&
+      (document.getElementById('kpiOfficeAvgAge').parentElement.querySelector('.kpi-sub').textContent = `${ages.length.toLocaleString()} 人有資料`);
+  }
+
+  const seniorities = rows.filter(r => r.lic_no).map(r => {
+    const m = r.lic_no.match(/^\(?(\d+)\)?/);
+    return m ? currentRocYear - parseInt(m[1]) : null;
+  }).filter(y => y != null && y >= 0);
+  if (seniorities.length) {
+    const avgSen = (seniorities.reduce((a, b) => a + b, 0) / seniorities.length).toFixed(1);
+    document.getElementById('kpiOfficeAvgSeniority').textContent = avgSen + ' 年';
+    document.getElementById('kpiOfficeAvgSeniority').parentElement.querySelector('.kpi-sub').textContent = `${seniorities.length.toLocaleString()} 人有資料`;
+  }
 }
 
 function renderOffices() {
