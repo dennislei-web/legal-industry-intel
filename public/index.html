@@ -1779,6 +1779,22 @@ async function showFirmDetail(firmName) {
     else ageGroups['70+']++;
   }
 
+  // 年資分布
+  const currentRocYr = new Date().getFullYear() - 1911;
+  const withLic = allLawyers.filter(l => l.lic_no && /^\d+/.test(l.lic_no));
+  const seniorities = withLic.map(l => currentRocYr - parseInt(l.lic_no.match(/^(\d+)/)[1])).filter(y => y >= 0);
+  const avgSeniority = seniorities.length > 0 ? (seniorities.reduce((a, b) => a + b, 0) / seniorities.length).toFixed(1) : '-';
+  const senGroups = { '1-3年': 0, '4-5年': 0, '6-10年': 0, '11-15年': 0, '16-20年': 0, '21-30年': 0, '30+年': 0 };
+  for (const y of seniorities) {
+    if (y <= 3) senGroups['1-3年']++;
+    else if (y <= 5) senGroups['4-5年']++;
+    else if (y <= 10) senGroups['6-10年']++;
+    else if (y <= 15) senGroups['11-15年']++;
+    else if (y <= 20) senGroups['16-20年']++;
+    else if (y <= 30) senGroups['21-30年']++;
+    else senGroups['30+年']++;
+  }
+
   // 地區分布
   const regions = {};
   for (const l of allLawyers) {
@@ -1802,14 +1818,16 @@ async function showFirmDetail(firmName) {
       <div class="kpi-card"><div class="kpi-label">男性</div><div class="kpi-value" style="color:var(--blue);">${male}</div><div class="kpi-sub">${malePct}%</div></div>
       <div class="kpi-card"><div class="kpi-label">女性</div><div class="kpi-value" style="color:var(--pink,#e57bac);">${female}</div><div class="kpi-sub">${femalePct}%</div></div>
       <div class="kpi-card"><div class="kpi-label">平均年齡</div><div class="kpi-value" style="color:var(--orange);">${avgAge}</div><div class="kpi-sub">${withAge.length}/${total} 有資料</div></div>
+      <div class="kpi-card"><div class="kpi-label">平均年資</div><div class="kpi-value" style="color:var(--green);">${avgSeniority}</div><div class="kpi-sub">${seniorities.length}/${total} 有資料</div></div>
     </div>
 
     ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${n} (${c}人)`).join('、')}</div>` : ''}
 
     <!-- Charts -->
-    <div class="grid-2" style="margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
       <div class="card"><div class="card-title">性別分布</div><div class="chart-container" style="height:200px;"><canvas id="firmGenderChart"></canvas></div></div>
       <div class="card"><div class="card-title">年齡分布</div><div class="chart-container" style="height:200px;"><canvas id="firmAgeChart"></canvas></div></div>
+      <div class="card"><div class="card-title">年資分布</div><div class="chart-container" style="height:200px;"><canvas id="firmSeniorityChart"></canvas></div></div>
     </div>
 
     <!-- 律師列表 -->
@@ -1866,12 +1884,33 @@ async function showFirmDetail(firmName) {
       type: 'bar',
       data: {
         labels: Object.keys(ageGroups),
-        datasets: [{ label: '人數', data: Object.values(ageGroups), backgroundColor: '#c9a84ccc', borderRadius: 4 }]
+        datasets: [{ label: '人數', data: Object.values(ageGroups), backgroundColor: 'rgba(201,168,76,0.65)', borderRadius: 4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         scales: {
           x: { ticks: { color: '#8899aa' }, grid: { display: false } },
+          y: { ticks: { color: '#8899aa', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  // 年資 bar
+  if (chartInstances['firmSeniority']) chartInstances['firmSeniority'].destroy();
+  const sCtx = document.getElementById('firmSeniorityChart')?.getContext('2d');
+  if (sCtx) {
+    chartInstances['firmSeniority'] = new Chart(sCtx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(senGroups),
+        datasets: [{ label: '人數', data: Object.values(senGroups), backgroundColor: 'rgba(76,175,130,0.65)', borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#8899aa', font: { size: 10 } }, grid: { display: false } },
           y: { ticks: { color: '#8899aa', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
         },
         plugins: { legend: { display: false } }
@@ -1884,6 +1923,7 @@ function closeFirmModal() {
   document.getElementById('firmModal').style.display = 'none';
   if (chartInstances['firmGender']) { chartInstances['firmGender'].destroy(); delete chartInstances['firmGender']; }
   if (chartInstances['firmAge']) { chartInstances['firmAge'].destroy(); delete chartInstances['firmAge']; }
+  if (chartInstances['firmSeniority']) { chartInstances['firmSeniority'].destroy(); delete chartInstances['firmSeniority']; }
 }
 
 // ESC 關閉 modal
