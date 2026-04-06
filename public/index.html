@@ -1271,7 +1271,7 @@ async function loadDemographicCharts() {
   const currentYear = new Date().getFullYear();
   const ageBuckets = { '25以下': 0, '26-30': 0, '31-35': 0, '36-40': 0, '41-45': 0, '46-50': 0, '51-55': 0, '56-60': 0, '61-65': 0, '66+': 0 };
   allRows.forEach(r => {
-    if (!r.birth_year) return;
+    if (!r.birth_year || r.birth_year >= 200) return;
     const age = currentYear - (1911 + r.birth_year);
     if (age <= 25) ageBuckets['25以下']++;
     else if (age <= 30) ageBuckets['26-30']++;
@@ -1846,7 +1846,7 @@ async function loadOfficeAgeSeniority() {
   const currentRocYear = currentYear - 1911;
 
   // 全體 KPI
-  const ages = rows.filter(r => r.birth_year).map(r => currentYear - (1911 + r.birth_year));
+  const ages = rows.filter(r => r.birth_year && r.birth_year < 200).map(r => currentYear - (1911 + r.birth_year));
   if (ages.length) {
     document.getElementById('kpiOfficeAvgAge').textContent = (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1);
     document.getElementById('kpiOfficeAvgAge').parentElement.querySelector('.kpi-sub').textContent = `${ages.length.toLocaleString()} 人有資料`;
@@ -1868,7 +1868,7 @@ async function loadOfficeAgeSeniority() {
     if (!r.office_normalized) continue;
     const km = r.office_normalized.match(firmKeyRe);
     const key = km ? km[1] : r.office_normalized;
-    if (r.birth_year) {
+    if (r.birth_year && r.birth_year < 200) {
       if (!firmAgeMap[key]) firmAgeMap[key] = [];
       firmAgeMap[key].push(currentYear - (1911 + r.birth_year));
     }
@@ -1977,7 +1977,7 @@ async function showFirmDetail(firmName) {
   const femalePct = total > 0 ? (female / total * 100).toFixed(0) : 0;
 
   // 年齡分布
-  const withAge = allLawyers.filter(l => l.birth_year != null);
+  const withAge = allLawyers.filter(l => l.birth_year != null && l.birth_year < 200);
   const ages = withAge.map(l => ROC_YEAR - l.birth_year);
   const avgAge = ages.length > 0 ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : '-';
   const ageGroups = { '20-29': 0, '30-39': 0, '40-49': 0, '50-59': 0, '60-69': 0, '70+': 0 };
