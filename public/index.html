@@ -1084,8 +1084,8 @@ async function loadOverview() {
   document.getElementById('kpiLawyerCount').textContent = mergedCount != null ? mergedCount.toLocaleString() : '0';
   document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
 
-  // Registry count (改顯示 MOJ 律師總數)
-  const { count: mojCount } = await db.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
+  // Registry count (MOJ 律師總數，用 combined view 去重)
+  const { count: mojCount } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true);
   document.getElementById('kpiRegistryCount').textContent = mojCount != null ? mojCount.toLocaleString() : '0';
 
   // Guild total from industry_stats
