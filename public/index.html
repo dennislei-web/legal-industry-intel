@@ -565,11 +565,21 @@
 
     <!-- ==================== TAB: OFFICES (事務所) ==================== -->
     <div id="tab-offices" class="tab-content">
-      <div class="kpi-grid">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
         <div class="kpi-card">
-          <div class="kpi-label">事務所總數</div>
+          <div class="kpi-label">全部單位</div>
           <div class="kpi-value" id="kpiOfficeCount" style="color:var(--blue);">-</div>
-          <div class="kpi-sub">有律師關聯的事務所</div>
+          <div class="kpi-sub">有律師關聯</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">事務所</div>
+          <div class="kpi-value" id="kpiOfficeFirmCount" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="kpiOfficeFirmSub">法律/律師事務所</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">法人/公司</div>
+          <div class="kpi-value" id="kpiOfficeCorpCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub" id="kpiOfficeCorpSub">-</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">最大事務所</div>
@@ -1670,12 +1680,24 @@ async function loadOffices() {
     from += PAGE;
   }
 
+  // 分類：事務所 vs 法人/公司
+  const isFirm = o => /事務所/.test(o.firm_name);
+  const firms = allOffices.filter(isFirm);
+  const corps = allOffices.filter(o => !isFirm(o));
+
   // KPIs
   document.getElementById('kpiOfficeCount').textContent = allOffices.length.toLocaleString();
+  document.getElementById('kpiOfficeFirmCount').textContent = firms.length.toLocaleString();
+  document.getElementById('kpiOfficeCorpCount').textContent = corps.length.toLocaleString();
+  if (corps.length > 0) {
+    const largestCorp = corps[0]; // already sorted by lawyer_count DESC
+    document.getElementById('kpiOfficeCorpSub').textContent = `最大：${largestCorp.firm_name}（${largestCorp.lawyer_count}人）`;
+  }
   if (allOffices.length > 0) {
-    document.getElementById('kpiOfficeLargest').textContent = allOffices[0].firm_name;
-    document.getElementById('kpiOfficeLargestSub').textContent = allOffices[0].lawyer_count + ' 位律師';
-    const avgSize = (allOffices.reduce((s, o) => s + Number(o.lawyer_count), 0) / allOffices.length).toFixed(1);
+    const largestFirm = firms[0] || allOffices[0];
+    document.getElementById('kpiOfficeLargest').textContent = largestFirm.firm_name;
+    document.getElementById('kpiOfficeLargestSub').textContent = largestFirm.lawyer_count + ' 位律師';
+    const avgSize = (firms.reduce((s, o) => s + Number(o.lawyer_count), 0) / (firms.length || 1)).toFixed(1);
     document.getElementById('kpiOfficeAvgSize').textContent = avgSize;
     const withWeb = allOffices.filter(o => o.website_url).length;
     document.getElementById('kpiOfficeWebsite').textContent = withWeb;
