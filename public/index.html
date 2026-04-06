@@ -1841,7 +1841,7 @@ function renderOffices() {
   tbody.innerHTML = page.map((o, i) => {
     const webLink = o.website_url ? `<a href="${escHtml(o.website_url)}" target="_blank" style="color:var(--blue);">🔗 官網</a>` : '<span style="color:var(--text-muted);">-</span>';
     const blReason = getBlacklistReason(o.firm_name);
-    const blBadge = blReason ? ` <span title="${escHtml(blReason)}" style="cursor:help;color:var(--red);font-size:0.75rem;vertical-align:middle;">⚠ 雷</span>` : '';
+    const blBadge = blReason ? ` <span title="${escHtml(blReason)}" style="cursor:help;color:var(--red);font-size:0.75rem;vertical-align:middle;">⚠️</span>` : '';
     return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
       <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
