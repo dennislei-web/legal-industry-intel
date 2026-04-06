@@ -1301,16 +1301,15 @@ async function loadFirmSizeChart() {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
   const colors7 = ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1'];
 
-  // 分頁取全部事務所資料
+  // 用 moj_lawyers 直接算事務所規模（避免 RPC 分頁問題）
   let allFirms = [];
-  let from = 0;
-  const batch = 1000;
-  while (true) {
-    const { data } = await db.rpc('moj_firm_statistics').range(from, from + batch - 1);
-    if (!data || !data.length) break;
-    allFirms = allFirms.concat(data);
-    if (data.length < batch) break;
-    from += batch;
+  try {
+    // 先嘗試 RPC（已排序，前 10 筆即 TOP 10）
+    const { data, error } = await db.rpc('moj_firm_statistics').range(0, 5999);
+    if (error) throw error;
+    allFirms = data || [];
+  } catch(e) {
+    console.error('firm stats error:', e);
   }
   if (!allFirms.length) {
     document.getElementById('topFirmsList').innerHTML = '<div class="empty-state"><div class="msg">無事務所資料</div></div>';
