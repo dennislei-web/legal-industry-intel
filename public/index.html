@@ -1396,10 +1396,9 @@ async function loadLawyers() {
   // 虛擬欄位映射到實際 DB 欄位
   const sortColMap = { has_practice: 'practice_start_date' };
   if (lawyerSortCol === 'seniority') {
-    // 年資排序：只顯示有 MOJ 證號的，按 cert_number 排序
-    // cert_number 是文字（如 "(55)臺證字..." 或 "105臺檢字..."），排序不完美但可用
-    query = query.not('cert_number', 'is', null);
-    query = query.order('cert_number', { ascending: lawyerSortAsc, nullsFirst: false });
+    // 年資排序：用數值欄位 lic_year（證號民國年），越小=年資越高
+    query = query.not('lic_year', 'is', null);
+    query = query.order('lic_year', { ascending: lawyerSortAsc, nullsFirst: false });
   } else {
     const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
     query = query.order(actualSortCol, { ascending: lawyerSortAsc, nullsFirst: false });
