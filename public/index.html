@@ -1145,7 +1145,7 @@ function renderRegionChart(data) {
       labels: data.map(r => r.region),
       datasets: [{
         data: data.map(r => r.count),
-        backgroundColor: ['#4f8ef7', '#c9a84c', '#4caf82', '#e05c5c', '#9b7ed8', '#e0954a', '#45b7d1', '#f093a0', '#6dd5ed', '#c9c9c9'],
+        backgroundColor: ['rgba(79,142,247,0.7)','rgba(79,142,247,0.5)','rgba(79,142,247,0.35)','rgba(79,142,247,0.25)','rgba(150,170,200,0.4)','rgba(150,170,200,0.3)','rgba(150,170,200,0.25)','rgba(150,170,200,0.2)','rgba(150,170,200,0.15)','rgba(150,170,200,0.1)'],
         borderWidth: 0
       }]
     },
@@ -1164,7 +1164,7 @@ function renderExpertiseChart(sorted) {
     data: {
       labels: sorted.map(r => r[0]),
       datasets: [{ label: '律師人數', data: sorted.map(r => r[1]),
-        backgroundColor: ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1','#f093a0','#6dd5ed','#c9c9c9'],
+        backgroundColor: 'rgba(79,142,247,0.6)',
         borderRadius: 4
       }]
     },
@@ -1206,10 +1206,10 @@ function renderYearlyChart(data) {
 }
 
 async function loadDemographicCharts() {
-  const colors10 = ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1','#f093a0','#6dd5ed','#c9c9c9'];
+  const barColor = 'rgba(79,142,247,0.6)';
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
-  // 批次抓 moj_lawyers 的 birth_year, sex, lic_no（分頁取全部）
+  // 批次抓 moj_lawyers 的 birth_year, sex, lic_no
   let allRows = [];
   let from = 0;
   const batchSize = 1000;
@@ -1221,6 +1221,15 @@ async function loadDemographicCharts() {
     from += batchSize;
   }
 
+  const chartOpts = (indexAxis) => ({
+    responsive: true, maintainAspectRatio: false, indexAxis,
+    scales: {
+      x: { ticks: { color: txtColor, font: { size: 10 } }, grid: { color: indexAxis === 'y' ? 'rgba(255,255,255,0.05)' : 'transparent' } },
+      y: { ticks: { color: txtColor, font: { size: 10 } }, grid: { color: indexAxis === 'x' ? 'rgba(255,255,255,0.05)' : 'transparent' } }
+    },
+    plugins: { legend: { display: false } }
+  });
+
   // === 性別分布 ===
   const genderCounts = {};
   allRows.forEach(r => { if (r.sex) genderCounts[r.sex] = (genderCounts[r.sex] || 0) + 1; });
@@ -1229,18 +1238,18 @@ async function loadDemographicCharts() {
     type: 'doughnut',
     data: {
       labels: Object.keys(genderCounts),
-      datasets: [{ data: Object.values(genderCounts), backgroundColor: ['#4f8ef7', '#f093a0', '#c9c9c9'], borderWidth: 0 }]
+      datasets: [{ data: Object.values(genderCounts), backgroundColor: ['rgba(79,142,247,0.7)', 'rgba(240,147,160,0.7)'], borderWidth: 0 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: txtColor, font: { size: 12 } } } } }
   });
 
   // === 年齡分布 ===
   const currentYear = new Date().getFullYear();
-  const ageBuckets = { '25歲以下': 0, '26-30': 0, '31-35': 0, '36-40': 0, '41-45': 0, '46-50': 0, '51-55': 0, '56-60': 0, '61-65': 0, '66歲以上': 0 };
+  const ageBuckets = { '25以下': 0, '26-30': 0, '31-35': 0, '36-40': 0, '41-45': 0, '46-50': 0, '51-55': 0, '56-60': 0, '61-65': 0, '66+': 0 };
   allRows.forEach(r => {
     if (!r.birth_year) return;
     const age = currentYear - (1911 + r.birth_year);
-    if (age <= 25) ageBuckets['25歲以下']++;
+    if (age <= 25) ageBuckets['25以下']++;
     else if (age <= 30) ageBuckets['26-30']++;
     else if (age <= 35) ageBuckets['31-35']++;
     else if (age <= 40) ageBuckets['36-40']++;
@@ -1249,74 +1258,65 @@ async function loadDemographicCharts() {
     else if (age <= 55) ageBuckets['51-55']++;
     else if (age <= 60) ageBuckets['56-60']++;
     else if (age <= 65) ageBuckets['61-65']++;
-    else ageBuckets['66歲以上']++;
+    else ageBuckets['66+']++;
   });
   if (chartInstances.age) chartInstances.age.destroy();
   chartInstances.age = new Chart(document.getElementById('chartAge').getContext('2d'), {
     type: 'bar',
-    data: {
-      labels: Object.keys(ageBuckets),
-      datasets: [{ label: '人數', data: Object.values(ageBuckets), backgroundColor: colors10, borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
-      plugins: { legend: { display: false } }
-    }
+    data: { labels: Object.keys(ageBuckets), datasets: [{ label: '人數', data: Object.values(ageBuckets), backgroundColor: barColor, borderRadius: 4 }] },
+    options: chartOpts('x')
   });
 
   // === 年資分布 ===
   const currentRocYear = currentYear - 1911;
-  const senBuckets = { '1年以下': 0, '1-3年': 0, '4-5年': 0, '6-10年': 0, '11-15年': 0, '16-20年': 0, '21-30年': 0, '30年以上': 0 };
+  const senBuckets = { '1年以下': 0, '1-3': 0, '4-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-30': 0, '30+': 0 };
   allRows.forEach(r => {
     if (!r.lic_no) return;
     const m = r.lic_no.match(/^(\d+)/);
     if (!m) return;
     const yrs = currentRocYear - parseInt(m[1]);
     if (yrs < 1) senBuckets['1年以下']++;
-    else if (yrs <= 3) senBuckets['1-3年']++;
-    else if (yrs <= 5) senBuckets['4-5年']++;
-    else if (yrs <= 10) senBuckets['6-10年']++;
-    else if (yrs <= 15) senBuckets['11-15年']++;
-    else if (yrs <= 20) senBuckets['16-20年']++;
-    else if (yrs <= 30) senBuckets['21-30年']++;
-    else senBuckets['30年以上']++;
+    else if (yrs <= 3) senBuckets['1-3']++;
+    else if (yrs <= 5) senBuckets['4-5']++;
+    else if (yrs <= 10) senBuckets['6-10']++;
+    else if (yrs <= 15) senBuckets['11-15']++;
+    else if (yrs <= 20) senBuckets['16-20']++;
+    else if (yrs <= 30) senBuckets['21-30']++;
+    else senBuckets['30+']++;
   });
   if (chartInstances.seniority) chartInstances.seniority.destroy();
   chartInstances.seniority = new Chart(document.getElementById('chartSeniority').getContext('2d'), {
     type: 'bar',
-    data: {
-      labels: Object.keys(senBuckets),
-      datasets: [{ label: '人數', data: Object.values(senBuckets), backgroundColor: colors10, borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
-      plugins: { legend: { display: false } }
-    }
+    data: { labels: Object.keys(senBuckets), datasets: [{ label: '人數', data: Object.values(senBuckets), backgroundColor: barColor, borderRadius: 4 }] },
+    options: chartOpts('x')
   });
 }
 
 async function loadFirmSizeChart() {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
-  const colors7 = ['#4f8ef7','#c9a84c','#4caf82','#e05c5c','#9b7ed8','#e0954a','#45b7d1'];
+  const barColor = 'rgba(79,142,247,0.6)';
 
-  // 用 moj_lawyers 直接算事務所規模（避免 RPC 分頁問題）
+  // 用 cache 表（快 ~0.2s）而非 RPC（慢 ~8s）
   let allFirms = [];
-  try {
-    // 先嘗試 RPC（已排序，前 10 筆即 TOP 10）
-    const { data, error } = await db.rpc('moj_firm_statistics').range(0, 5999);
-    if (error) throw error;
-    allFirms = data || [];
-  } catch(e) {
-    console.error('firm stats error:', e);
+  const PAGE = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await db.from('moj_firm_stats_cache')
+      .select('firm_name, lawyer_count, main_region')
+      .order('lawyer_count', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) { console.error('firm cache error:', error); break; }
+    if (!data || !data.length) break;
+    allFirms = allFirms.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
   }
   if (!allFirms.length) {
-    document.getElementById('topFirmsList').innerHTML = '<div class="empty-state"><div class="msg">無事務所資料</div></div>';
+    document.getElementById('topFirmsList').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">無事務所資料</div>';
     return;
   }
 
-  // 規模分布
+  // 規模分布（橫向長條圖）
   const sizeBuckets = { '1人（獨資）': 0, '2-3人': 0, '4-5人': 0, '6-10人': 0, '11-20人': 0, '21-50人': 0, '50人以上': 0 };
   allFirms.forEach(f => {
     const c = Number(f.lawyer_count) || 0;
@@ -1332,10 +1332,7 @@ async function loadFirmSizeChart() {
   if (chartInstances.firmSize) chartInstances.firmSize.destroy();
   chartInstances.firmSize = new Chart(document.getElementById('chartFirmSize').getContext('2d'), {
     type: 'bar',
-    data: {
-      labels: Object.keys(sizeBuckets),
-      datasets: [{ label: '事務所數', data: Object.values(sizeBuckets), backgroundColor: colors7, borderRadius: 4 }]
-    },
+    data: { labels: Object.keys(sizeBuckets), datasets: [{ label: '事務所數', data: Object.values(sizeBuckets), backgroundColor: barColor, borderRadius: 4 }] },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
       scales: {
@@ -1349,12 +1346,20 @@ async function loadFirmSizeChart() {
   // TOP 10 事務所
   const top10 = allFirms.slice(0, 10);
   document.getElementById('topFirmsList').innerHTML = `<div style="margin-top:8px;">
-    ${top10.map((f, i) => `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:10px;">
-      <span style="font-size:1rem;font-weight:700;color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'};min-width:24px;text-align:center;">${i + 1}</span>
-      <span style="flex:1;font-size:0.88rem;">${escHtml(f.firm_name)}</span>
-      <span style="font-size:0.75rem;color:var(--text-muted);">${f.main_region || ''}</span>
-      <span style="font-size:0.9rem;font-weight:600;color:var(--blue);min-width:50px;text-align:right;">${Number(f.lawyer_count).toLocaleString()} 人</span>
-    </div>`).join('')}
+    ${top10.map((f, i) => {
+      const barW = Math.round(Number(f.lawyer_count) / Number(top10[0].lawyer_count) * 100);
+      return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
+        <span style="font-size:0.85rem;font-weight:700;color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'};min-width:20px;text-align:center;">${i + 1}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(f.firm_name)}</div>
+          <div style="margin-top:3px;height:4px;border-radius:2px;background:var(--border);">
+            <div style="height:100%;width:${barW}%;border-radius:2px;background:rgba(79,142,247,0.6);"></div>
+          </div>
+        </div>
+        <span style="font-size:0.7rem;color:var(--text-muted);white-space:nowrap;">${f.main_region || ''}</span>
+        <span style="font-size:0.85rem;font-weight:600;color:var(--text);min-width:40px;text-align:right;">${Number(f.lawyer_count)}</span>
+      </div>`;
+    }).join('')}
   </div>`;
 }
 
