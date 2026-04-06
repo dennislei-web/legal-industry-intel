@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
       { auth: { persistSession: false } },
     );
 
-    const { session_id, message } = await req.json();
+    const { session_id, message, attachments } = await req.json();
     if (!message || typeof message !== 'string') return err('message is required');
 
     let sessionId = session_id;
@@ -230,7 +230,44 @@ Deno.serve(async (req: Request) => {
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
     }));
-    messages.push({ role: 'user', content: message });
+
+    // 建立使用者訊息（含附件）
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const contentBlocks: Array<Record<string, unknown>> = [];
+      for (const att of attachments) {
+        const mediaType = att.type || 'application/octet-stream';
+        if (mediaType.startsWith('image/')) {
+          contentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: att.base64 },
+          });
+        } else if (mediaType === 'application/pdf') {
+          contentBlocks.push({
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: att.base64 },
+            title: att.name || 'document.pdf',
+          });
+        } else {
+          // 文字類檔案（csv, txt, json, docx 等）：解碼 base64 為文字
+          try {
+            const decoded = atob(att.base64);
+            contentBlocks.push({
+              type: 'text',
+              text: `📎 附件「${att.name}」內容：\n${decoded.slice(0, 50000)}`,
+            });
+          } catch {
+            contentBlocks.push({
+              type: 'text',
+              text: `📎 附件「${att.name}」(${mediaType}, ${att.size} bytes) — 無法解碼為文字`,
+            });
+          }
+        }
+      }
+      contentBlocks.push({ type: 'text', text: message });
+      messages.push({ role: 'user', content: contentBlocks });
+    } else {
+      messages.push({ role: 'user', content: message });
+    }
 
     const { context, sources } = await buildUserContext(userClient, serviceClient);
 
