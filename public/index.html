@@ -2373,7 +2373,7 @@ async function loadPapers() {
   if (!el) return;
   const { data, error } = await db.from('academic_papers')
     .select('id, title, authors, year, venue, degree_type, keywords, chunk_count, full_text_length, source, source_url, imported_at')
-    .order('imported_at', { ascending: false });
+    .order('year', { ascending: false, nullsFirst: false });
 
   if (error || !data || !data.length) {
     el.innerHTML = '<div class="empty-state"><div class="msg">尚無論文，貼 URL 或用關鍵字搜尋</div></div>';
