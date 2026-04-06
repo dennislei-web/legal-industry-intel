@@ -1394,11 +1394,15 @@ async function loadLawyers() {
   if (source) query = query.eq('data_source', source);
 
   // 虛擬欄位映射到實際 DB 欄位
-  const sortColMap = { seniority: 'moj_lic_no', has_practice: 'practice_start_date' };
-  const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
-  // 年資排序：證號是 text（如 "105臺檢字第13118號"），字串排序即可（小=年資高）
-  const actualSortAsc = lawyerSortCol === 'seniority' ? !lawyerSortAsc : lawyerSortAsc;
-  query = query.order(actualSortCol, { ascending: actualSortAsc, nullsFirst: false });
+  const sortColMap = { has_practice: 'practice_start_date' };
+  if (lawyerSortCol === 'seniority') {
+    // 年資排序：用 has_moj 過濾 + cert_number 文字排序（2-3位數字開頭，大致正確）
+    query = query.eq('has_moj', true);
+    query = query.order('cert_number', { ascending: lawyerSortAsc, nullsFirst: false });
+  } else {
+    const actualSortCol = sortColMap[lawyerSortCol] || lawyerSortCol;
+    query = query.order(actualSortCol, { ascending: lawyerSortAsc, nullsFirst: false });
+  }
 
   query = query.range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
