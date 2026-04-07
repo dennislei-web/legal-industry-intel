@@ -164,9 +164,18 @@ def sync_moj_firms_to_table(sb):
         start += 1000
     log(f'MOJ 事務所總數: {len(moj_firms)}')
 
-    # 取現有 firm_websites
-    existing = sb.table('firm_websites').select('firm_name').execute().data
-    existing_set = {e['firm_name'] for e in (existing or [])}
+    # 取現有 firm_websites（分頁取全部）
+    existing = []
+    es = 0
+    while True:
+        r = sb.table('firm_websites').select('firm_name').range(es, es + 999).execute()
+        if not r.data or len(r.data) == 0:
+            break
+        existing.extend(r.data)
+        if len(r.data) < 1000:
+            break
+        es += 1000
+    existing_set = {e['firm_name'] for e in existing}
     log(f'現有 firm_websites: {len(existing_set)}')
 
     # 找缺的
