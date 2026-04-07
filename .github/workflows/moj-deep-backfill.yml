@@ -1,0 +1,58 @@
+name: MOJ 律師深度補掃
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '模式: full=全量重掃, backfill=補缺漏姓氏, targeted=精準補掃缺MOJ的律師'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - backfill
+          - targeted
+      detail_fetch:
+        description: '掃完後是否補抓詳細資料（出生年/email/電話等）'
+        required: false
+        default: 'true'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 小時
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run scraper (${{ github.event.inputs.mode }})
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          if [ "$MODE" = "full" ]; then
+            echo "=== 全量掃描 ==="
+            python moj_lawyer_fullscan.py full
+          elif [ "$MODE" = "backfill" ]; then
+            echo "=== 補缺漏姓氏 ==="
+            python moj_lawyer_backfill.py
+          elif [ "$MODE" = "targeted" ]; then
+            echo "=== 精準補掃 ==="
+            python moj_lawyer_targeted_backfill.py
+          fi
+
+      - name: Fetch lawyer details
+        if: github.event.inputs.detail_fetch == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: python moj_lawyer_detail_fetch.py --limit 2000
