@@ -4,23 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '模式: full=全量重掃, backfill=補缺漏姓氏, targeted=精準補掃缺MOJ的律師'
+        description: '模式: test=測試5個姓氏, full=全量重掃, backfill=補缺漏, targeted=精準補掃'
         required: true
-        default: 'full'
+        default: 'test'
         type: choice
         options:
+          - test
           - full
           - backfill
           - targeted
       detail_fetch:
         description: '掃完後是否補抓詳細資料（出生年/email/電話等）'
         required: false
-        default: 'true'
+        default: 'false'
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 小時
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +39,10 @@ jobs:
         working-directory: scripts
         run: |
           MODE="${{ github.event.inputs.mode }}"
-          if [ "$MODE" = "full" ]; then
+          if [ "$MODE" = "test" ]; then
+            echo "=== 測試模式（5 個姓氏）==="
+            python moj_lawyer_fullscan.py demo
+          elif [ "$MODE" = "full" ]; then
             echo "=== 全量掃描 ==="
             python moj_lawyer_fullscan.py full
           elif [ "$MODE" = "backfill" ]; then

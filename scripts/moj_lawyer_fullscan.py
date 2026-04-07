@@ -278,7 +278,7 @@ if __name__ == '__main__':
     for o, c in sorted(offices.items(), key=lambda x: -x[1])[:10]:
         print(f'  {c:4d}  {o}')
 
-    # 寫入 Supabase（僅 full mode）
-    if mode == 'full':
+    # 寫入 Supabase（demo 和 full 都上傳）
+    if mode in ('demo', 'full'):
         print('\n=== 寫入 Supabase ===')
         upload_to_supabase(list(results.values()))
