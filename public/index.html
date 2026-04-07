@@ -2191,8 +2191,19 @@ async function loadFirmResearch(firmName) {
   body.innerHTML = `
     <div style="margin-bottom:16px;">
       <div style="font-weight:600;margin-bottom:8px;">官網</div>
-      ${webUrl ? `<a href="${escHtml(webUrl)}" target="_blank" style="color:var(--blue);">${escHtml(webUrl)}</a>` : '<span style="color:var(--text-muted);">尚未找到</span>'}
-      ${fw?.description ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">${escHtml(fw.description.slice(0, 200))}</div>` : ''}
+      <div id="firmWebsiteDisplay">
+        ${webUrl
+          ? `<a href="${escHtml(webUrl)}" target="_blank" style="color:var(--blue);">${escHtml(webUrl)}</a>
+             <button onclick="document.getElementById('firmWebsiteEdit').style.display='flex';document.getElementById('firmWebsiteDisplay').style.display='none';" class="btn btn-sm btn-ghost" style="margin-left:8px;font-size:0.7rem;">修改</button>`
+          : `<span style="color:var(--text-muted);">尚未找到</span>
+             <button onclick="document.getElementById('firmWebsiteEdit').style.display='flex';document.getElementById('firmWebsiteDisplay').style.display='none';" class="btn btn-sm btn-blue" style="margin-left:8px;font-size:0.75rem;">手動新增</button>`}
+        ${fw?.description ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">${escHtml(fw.description.slice(0, 200))}</div>` : ''}
+      </div>
+      <div id="firmWebsiteEdit" style="display:none;align-items:center;gap:8px;margin-top:4px;">
+        <input type="text" id="firmWebsiteInput" placeholder="https://..." value="${escHtml(webUrl)}" style="flex:1;padding:6px 10px;font-size:0.85rem;">
+        <button class="btn btn-sm btn-blue" onclick="saveFirmWebsite('${escHtml(firmName).replace(/'/g, "\\'")}')">儲存</button>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('firmWebsiteEdit').style.display='none';document.getElementById('firmWebsiteDisplay').style.display='block';">取消</button>
+      </div>
     </div>
 
     <div style="margin-bottom:16px;">
@@ -2211,6 +2222,16 @@ async function loadFirmResearch(firmName) {
       <button class="btn btn-sm btn-blue" onclick="saveFirmNotes('${escHtml(firmName).replace(/'/g, "\\'")}')" style="margin-top:6px;">儲存筆記</button>
     </div>
   `;
+}
+
+async function saveFirmWebsite(firmName) {
+  const url = document.getElementById('firmWebsiteInput')?.value.trim();
+  if (!url) return;
+  // 存到 firm_profiles
+  await db.from('firm_profiles').upsert({ firm_name: firmName, website_url: url }, { onConflict: 'firm_name' });
+  // 也更新 firm_websites（如果存在的話）
+  await db.from('firm_websites').update({ website_url: url, website_scraped: true, scraped_at: new Date().toISOString() }).eq('firm_name', firmName);
+  loadFirmResearch(firmName);
 }
 
 async function addFirmLink(firmName) {
