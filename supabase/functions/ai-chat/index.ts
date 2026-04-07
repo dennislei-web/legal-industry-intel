@@ -69,13 +69,13 @@ async function callClaudeFast(prompt: string): Promise<string> {
 }
 
 // ========= User Context =========
-async function buildUserContext(userClient: SupabaseClient, serviceClient: SupabaseClient) {
+async function buildUserContext(userClient: SupabaseClient, serviceClient: SupabaseClient, ctxOpts: Record<string, boolean> = {}) {
   const sources: Array<{ type: string; id?: string; title: string }> = [];
   const parts: string[] = [];
 
-  const { data: notes } = await userClient.from('manual_notes')
+  const { data: notes } = ctxOpts.notes !== false ? await userClient.from('manual_notes')
     .select('id, title, content, category, tags, source_type, source_url, created_at')
-    .order('created_at', { ascending: false }).limit(50);
+    .order('created_at', { ascending: false }).limit(50) : { data: null };
 
   if (notes?.length) {
     parts.push('## 使用者的研究筆記（時間由新到舊）');
@@ -91,9 +91,9 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
     }
   }
 
-  const { data: news } = await userClient.from('news_articles')
+  const { data: news } = ctxOpts.news !== false ? await userClient.from('news_articles')
     .select('id, title, summary, source_name, published_at, url, search_query')
-    .order('published_at', { ascending: false }).limit(30);
+    .order('published_at', { ascending: false }).limit(30) : { data: null };
 
   if (news?.length) {
     parts.push('## 最近的產業新聞');
@@ -106,9 +106,9 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
     parts.push('');
   }
 
-  const { data: uploads } = await userClient.from('user_uploads')
+  const { data: uploads } = ctxOpts.uploads !== false ? await userClient.from('user_uploads')
     .select('id, file_name, data_type, description, row_count, created_at')
-    .order('created_at', { ascending: false }).limit(20);
+    .order('created_at', { ascending: false }).limit(20) : { data: null };
 
   if (uploads?.length) {
     parts.push('## 使用者上傳的資料檔');
@@ -120,9 +120,9 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
   }
 
   // ========= 學術論文 (最多 15 筆 metadata + abstract) =========
-  const { data: papers } = await userClient.from('academic_papers')
+  const { data: papers } = ctxOpts.papers !== false ? await userClient.from('academic_papers')
     .select('id, title, authors, year, venue, degree_type, abstract, keywords')
-    .order('year', { ascending: false, nullsFirst: false }).limit(15);
+    .order('year', { ascending: false, nullsFirst: false }).limit(15) : { data: null };
 
   if (papers?.length) {
     parts.push('## 知識庫中的學術論文（可引用）');
@@ -142,7 +142,7 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
     }
   }
 
-  try {
+  if (ctxOpts.db !== false) try {
     const { count: lawyerCount } = await serviceClient.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
     const { count: firmCount } = await serviceClient.from('moj_firm_stats_cache').select('firm_name', { count: 'exact', head: true });
     const { data: topFirms } = await serviceClient.from('moj_firm_stats_cache').select('*').order('lawyer_count', { ascending: false }).limit(15);
@@ -209,8 +209,9 @@ Deno.serve(async (req: Request) => {
       { auth: { persistSession: false } },
     );
 
-    const { session_id, message, attachments } = await req.json();
+    const { session_id, message, attachments, context_options } = await req.json();
     if (!message || typeof message !== 'string') return err('message is required');
+    const ctxOpts = context_options ?? { db: true, notes: true, news: true, uploads: true, papers: true, web_search: true };
 
     let sessionId = session_id;
     let isNewSession = false;
@@ -269,11 +270,11 @@ Deno.serve(async (req: Request) => {
       messages.push({ role: 'user', content: message });
     }
 
-    const { context, sources } = await buildUserContext(userClient, serviceClient);
+    const { context, sources } = await buildUserContext(userClient, serviceClient, ctxOpts);
 
-    // 進階：用當前使用者訊息去 chunks 全文搜尋，抓相關段落注入 context
+    // 進階：用當前使用者訊息去 chunks 全文搜尋（僅在論文開啟時）
     let chunksSection = '';
-    try {
+    if (ctxOpts.papers !== false) try {
       const { data: relevantChunks } = await userClient.rpc('search_paper_chunks', {
         query_text: message,
         max_results: 5,
@@ -296,7 +297,7 @@ Deno.serve(async (req: Request) => {
 
     const result = await callClaude({
       system: systemPrompt, messages,
-      enableWebSearch: true, maxTokens: 4096,
+      enableWebSearch: ctxOpts.web_search !== false, maxTokens: 4096,
     });
 
     await userClient.from('chat_messages').insert([

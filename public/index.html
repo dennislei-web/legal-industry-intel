@@ -695,6 +695,20 @@
               </div>
             </div>
             <div style="border-top:1px solid var(--border);padding:12px;background:var(--bg-sub);">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:0.75rem;">
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="律師/事務所/統計等 DB 資料（預設開啟）">
+                  <input type="checkbox" id="ctxDb" checked> DB 資料</label>
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="你的研究筆記">
+                  <input type="checkbox" id="ctxNotes"> 筆記</label>
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="產業新聞">
+                  <input type="checkbox" id="ctxNews"> 新聞</label>
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="上傳的資料檔">
+                  <input type="checkbox" id="ctxUploads"> 上傳檔案</label>
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="學術論文知識庫">
+                  <input type="checkbox" id="ctxPapers"> 論文</label>
+                <label style="color:var(--text-muted);display:flex;align-items:center;gap:3px;cursor:pointer;" title="即時網路搜尋">
+                  <input type="checkbox" id="ctxWeb"> 網路搜尋</label>
+              </div>
               <div id="chatAttachmentList" style="margin-bottom:6px;display:flex;gap:4px;flex-wrap:wrap;"></div>
               <div style="display:flex;gap:8px;align-items:flex-end;">
                 <button onclick="triggerChatFileInput()" title="附加檔案" class="btn btn-ghost" style="padding:8px 10px;font-size:1rem;flex-shrink:0;">📎</button>
@@ -2460,6 +2474,14 @@ async function sendChat() {
 
   try {
     const body = currentChatSessionId ? { session_id: currentChatSessionId, message } : { message };
+    body.context_options = {
+      db: document.getElementById('ctxDb')?.checked ?? true,
+      notes: document.getElementById('ctxNotes')?.checked ?? false,
+      news: document.getElementById('ctxNews')?.checked ?? false,
+      uploads: document.getElementById('ctxUploads')?.checked ?? false,
+      papers: document.getElementById('ctxPapers')?.checked ?? false,
+      web_search: document.getElementById('ctxWeb')?.checked ?? false,
+    };
     if (chatAttachments.length) {
       body.attachments = chatAttachments.map(f => ({ name: f.name, type: f.type, size: f.size, base64: f.base64 }));
       chatAttachments = [];
