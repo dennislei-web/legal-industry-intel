@@ -149,30 +149,19 @@ def find_firm_website(firm_name):
 
 
 def sync_moj_firms_to_table(sb):
-    """從 moj_firm_statistics() 取所有事務所，缺的 INSERT 到 firm_websites"""
+    """從 moj_firm_stats_cache 取所有事務所，缺的 INSERT 到 firm_websites"""
     log('=== Sync MOJ 事務所到 firm_websites ===')
-    # 取所有 MOJ 事務所名稱 (分頁)
+    # 用 cache 表取代 RPC（避免超時）
     moj_firms = []
-    offset = 0
+    start = 0
     while True:
-        r = sb.rpc('moj_firm_statistics').execute()
-        if not r.data:
+        r = sb.table('moj_firm_stats_cache').select('firm_name').range(start, start + 999).execute()
+        if not r.data or len(r.data) == 0:
             break
-        moj_firms = r.data
-        break  # 單次回全部 (若 Supabase 客戶端默認 limit 1000 會需要分頁)
-    # 如果筆數 >= 1000，要手動 range
-    if len(moj_firms) >= 1000:
-        all_firms = []
-        start = 0
-        while True:
-            r = sb.rpc('moj_firm_statistics').range(start, start + 999).execute()
-            if not r.data or len(r.data) == 0:
-                break
-            all_firms.extend(r.data)
-            if len(r.data) < 1000:
-                break
-            start += 1000
-        moj_firms = all_firms
+        moj_firms.extend(r.data)
+        if len(r.data) < 1000:
+            break
+        start += 1000
     log(f'MOJ 事務所總數: {len(moj_firms)}')
 
     # 取現有 firm_websites
