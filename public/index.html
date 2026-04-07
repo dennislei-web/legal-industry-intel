@@ -1861,14 +1861,33 @@ async function loadOffices() {
     }
   } catch(e) { console.warn('firm_profiles website merge error:', e); }
 
-  // 也從 firm_websites 表補（爬蟲結果可能沒進 cache）
+  // 也從 firm_websites 表補（爬蟲結果可能沒進 cache，用模糊匹配）
   try {
-    const { data: fwWebs } = await db.from('firm_websites').select('firm_name, website_url').not('website_url', 'is', null);
-    if (fwWebs && fwWebs.length) {
-      const fwMap = {};
-      for (const fw of fwWebs) if (fw.website_url) fwMap[fw.firm_name] = fw.website_url;
+    let fwAll = [];
+    let fwFrom = 0;
+    while (true) {
+      const { data: fwPage } = await db.from('firm_websites').select('firm_name, website_url').not('website_url', 'is', null).range(fwFrom, fwFrom + 999);
+      if (!fwPage || !fwPage.length) break;
+      fwAll = fwAll.concat(fwPage);
+      if (fwPage.length < 1000) break;
+      fwFrom += 1000;
+    }
+    if (fwAll.length) {
+      // 精確 + 模糊匹配：先精確，再用事務所關鍵字包含匹配
+      const fwExact = {};
+      const fwList = [];
+      for (const fw of fwAll) {
+        if (!fw.website_url) continue;
+        fwExact[fw.firm_name] = fw.website_url;
+        fwList.push(fw);
+      }
       for (const o of allOffices) {
-        if (!o.website_url && fwMap[o.firm_name]) o.website_url = fwMap[o.firm_name];
+        if (o.website_url) continue;
+        // 精確匹配
+        if (fwExact[o.firm_name]) { o.website_url = fwExact[o.firm_name]; continue; }
+        // 模糊匹配：firm_websites 的名稱包含 allOffices 的名稱，或反過來
+        const match = fwList.find(fw => fw.firm_name.includes(o.firm_name) || o.firm_name.includes(fw.firm_name));
+        if (match) o.website_url = match.website_url;
       }
       const withWeb = allOffices.filter(o => o.website_url).length;
       document.getElementById('kpiOfficeWebsite').textContent = withWeb;
