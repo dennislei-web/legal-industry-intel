@@ -2259,7 +2259,11 @@ async function loadFirmResearch(firmName) {
 
     <div style="margin-bottom:16px;">
       <div style="font-weight:600;margin-bottom:8px;">相關新聞/連結</div>
-      ${newsLinks.length ? newsLinks.map(n => `<div style="margin-bottom:6px;"><a href="${escHtml(n.url)}" target="_blank" style="color:var(--blue);font-size:0.88rem;">${escHtml(n.title || n.url)}</a> <span style="font-size:0.7rem;color:var(--text-muted);">${n.date || ''}</span></div>`).join('') : '<span style="color:var(--text-muted);">尚無</span>'}
+      ${newsLinks.length ? newsLinks.map((n, i) => `<div style="margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+        <a href="${escHtml(n.url)}" target="_blank" style="color:var(--blue);font-size:0.88rem;flex:1;">${escHtml(n.title || n.url)}</a>
+        <span style="font-size:0.7rem;color:var(--text-muted);">${n.date || ''}</span>
+        <button onclick="removeFirmLink('${escHtml(firmName).replace(/'/g, "\\'")}',${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;padding:2px 4px;opacity:0.5;" onmouseover="this.style.opacity='1';this.style.color='var(--red)'" onmouseout="this.style.opacity='0.5';this.style.color='var(--text-muted)'">&times;</button>
+      </div>`).join('') : '<span style="color:var(--text-muted);">尚無</span>'}
       <div style="margin-top:8px;">
         <input type="text" id="firmNewLinkUrl" placeholder="貼上新聞/文章連結..." style="width:60%;padding:6px 10px;font-size:0.85rem;">
         <input type="text" id="firmNewLinkTitle" placeholder="標題（選填）" style="width:25%;padding:6px 10px;font-size:0.85rem;">
@@ -2282,6 +2286,14 @@ async function saveFirmWebsite(firmName) {
   await db.from('firm_profiles').upsert({ firm_name: firmName, website_url: url }, { onConflict: 'firm_name' });
   // 也更新 firm_websites（如果存在的話）
   await db.from('firm_websites').update({ website_url: url, website_scraped: true, scraped_at: new Date().toISOString() }).eq('firm_name', firmName);
+  loadFirmResearch(firmName);
+}
+
+async function removeFirmLink(firmName, idx) {
+  const { data: existing } = await db.from('firm_profiles').select('news_links').eq('firm_name', firmName).maybeSingle();
+  const links = existing?.news_links || [];
+  links.splice(idx, 1);
+  await db.from('firm_profiles').upsert({ firm_name: firmName, news_links: links }, { onConflict: 'firm_name' });
   loadFirmResearch(firmName);
 }
 
