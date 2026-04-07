@@ -1845,18 +1845,35 @@ async function loadOffices() {
 
   // 補上 firm_profiles 手動新增的官網
   try {
-    const { data: fpWebs } = await db.from('firm_profiles').select('firm_name, website_url').not('website_url', 'is', null);
-    if (fpWebs) {
+    const { data: fpWebs, error: fpErr } = await db.from('firm_profiles').select('firm_name, website_url').not('website_url', 'is', null);
+    if (fpErr) console.warn('firm_profiles query error:', fpErr);
+    if (fpWebs && fpWebs.length) {
       const fpMap = {};
-      for (const fp of fpWebs) fpMap[fp.firm_name] = fp.website_url;
+      for (const fp of fpWebs) if (fp.website_url) fpMap[fp.firm_name] = fp.website_url;
+      let merged = 0;
       for (const o of allOffices) {
-        if (!o.website_url && fpMap[o.firm_name]) o.website_url = fpMap[o.firm_name];
+        if (!o.website_url && fpMap[o.firm_name]) { o.website_url = fpMap[o.firm_name]; merged++; }
       }
-      // 更新官網計數
+      if (merged) {
+        const withWeb = allOffices.filter(o => o.website_url).length;
+        document.getElementById('kpiOfficeWebsite').textContent = withWeb;
+      }
+    }
+  } catch(e) { console.warn('firm_profiles website merge error:', e); }
+
+  // 也從 firm_websites 表補（爬蟲結果可能沒進 cache）
+  try {
+    const { data: fwWebs } = await db.from('firm_websites').select('firm_name, website_url').not('website_url', 'is', null);
+    if (fwWebs && fwWebs.length) {
+      const fwMap = {};
+      for (const fw of fwWebs) if (fw.website_url) fwMap[fw.firm_name] = fw.website_url;
+      for (const o of allOffices) {
+        if (!o.website_url && fwMap[o.firm_name]) o.website_url = fwMap[o.firm_name];
+      }
       const withWeb = allOffices.filter(o => o.website_url).length;
       document.getElementById('kpiOfficeWebsite').textContent = withWeb;
     }
-  } catch(e) { console.warn('firm_profiles website merge error:', e); }
+  } catch(e) { console.warn('firm_websites merge error:', e); }
 
   // 平均年齡和年資（從 moj_lawyers 抓）
   loadOfficeAgeSeniority();
