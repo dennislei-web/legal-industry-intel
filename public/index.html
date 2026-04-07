@@ -1962,6 +1962,10 @@ async function showFirmDetail(firmName) {
   const bodyEl = document.getElementById('firmModalBody');
   modal.style.display = 'flex';
   titleEl.textContent = firmName;
+  _currentFirmName = firmName;
+  // Reset tabs to overview
+  document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('firmTab_overview')?.classList.add('active');
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
 
   // 查詢該事務所所有律師（含分所：用 LIKE prefix）
@@ -2158,7 +2162,103 @@ async function showFirmDetail(firmName) {
   }
 }
 
+let _currentFirmName = '';
+
+function switchFirmTab(tab) {
+  document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('firmTab_' + tab)?.classList.add('active');
+  if (tab === 'overview') {
+    showFirmDetail(_currentFirmName);
+  } else if (tab === 'research') {
+    loadFirmResearch(_currentFirmName);
+  } else if (tab === 'analysis') {
+    loadFirmAnalysis(_currentFirmName);
+  }
+}
+
+async function loadFirmResearch(firmName) {
+  const body = document.getElementById('firmModalBody');
+  body.innerHTML = '<div class="loading">載入研究資料...</div>';
+  // Load firm_profile
+  const { data: profile } = await db.from('firm_profiles').select('*').eq('firm_name', firmName).maybeSingle();
+  // Load firm_websites
+  const { data: fw } = await db.from('firm_websites').select('website_url, website_title, description').eq('firm_name', firmName).maybeSingle();
+
+  const webUrl = profile?.website_url || fw?.website_url || '';
+  const notes = profile?.user_notes || '';
+  const newsLinks = profile?.news_links || [];
+
+  body.innerHTML = `
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:8px;">官網</div>
+      ${webUrl ? `<a href="${escHtml(webUrl)}" target="_blank" style="color:var(--blue);">${escHtml(webUrl)}</a>` : '<span style="color:var(--text-muted);">尚未找到</span>'}
+      ${fw?.description ? `<div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">${escHtml(fw.description.slice(0, 200))}</div>` : ''}
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:8px;">相關新聞/連結</div>
+      ${newsLinks.length ? newsLinks.map(n => `<div style="margin-bottom:6px;"><a href="${escHtml(n.url)}" target="_blank" style="color:var(--blue);font-size:0.88rem;">${escHtml(n.title || n.url)}</a> <span style="font-size:0.7rem;color:var(--text-muted);">${n.date || ''}</span></div>`).join('') : '<span style="color:var(--text-muted);">尚無</span>'}
+      <div style="margin-top:8px;">
+        <input type="text" id="firmNewLinkUrl" placeholder="貼上新聞/文章連結..." style="width:60%;padding:6px 10px;font-size:0.85rem;">
+        <input type="text" id="firmNewLinkTitle" placeholder="標題（選填）" style="width:25%;padding:6px 10px;font-size:0.85rem;">
+        <button class="btn btn-sm btn-blue" onclick="addFirmLink('${escHtml(firmName).replace(/'/g, "\\'")}')">加入</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div style="font-weight:600;margin-bottom:8px;">研究筆記</div>
+      <textarea id="firmNotesArea" rows="5" style="width:100%;padding:10px;font-size:0.88rem;resize:vertical;">${escHtml(notes)}</textarea>
+      <button class="btn btn-sm btn-blue" onclick="saveFirmNotes('${escHtml(firmName).replace(/'/g, "\\'")}')" style="margin-top:6px;">儲存筆記</button>
+    </div>
+  `;
+}
+
+async function addFirmLink(firmName) {
+  const url = document.getElementById('firmNewLinkUrl')?.value.trim();
+  if (!url) return;
+  const title = document.getElementById('firmNewLinkTitle')?.value.trim() || url;
+  const { data: existing } = await db.from('firm_profiles').select('news_links').eq('firm_name', firmName).maybeSingle();
+  const links = existing?.news_links || [];
+  links.push({ url, title, date: new Date().toISOString().slice(0, 10) });
+  await db.from('firm_profiles').upsert({ firm_name: firmName, news_links: links }, { onConflict: 'firm_name' });
+  loadFirmResearch(firmName);
+}
+
+async function saveFirmNotes(firmName) {
+  const notes = document.getElementById('firmNotesArea')?.value || '';
+  await db.from('firm_profiles').upsert({ firm_name: firmName, user_notes: notes }, { onConflict: 'firm_name' });
+  alert('已儲存');
+}
+
+async function loadFirmAnalysis(firmName) {
+  const body = document.getElementById('firmModalBody');
+  body.innerHTML = '<div class="loading">載入 AI 分析...</div>';
+  const { data: profile } = await db.from('firm_profiles').select('ai_analysis, ai_analyzed_at').eq('firm_name', firmName).maybeSingle();
+
+  if (profile?.ai_analysis) {
+    body.innerHTML = `
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">分析時間: ${formatDate(profile.ai_analyzed_at)}</div>
+      <div style="line-height:1.7;">${renderMarkdown(profile.ai_analysis)}</div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">
+        提示：如需更深入的分析，請在 Claude Code 開啟 <code>/legal-research</code> 輸入「分析 ${escHtml(firmName)}」
+      </div>
+    `;
+  } else {
+    body.innerHTML = `
+      <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+        <div style="font-size:1.5rem;margin-bottom:12px;">📊</div>
+        <div>尚無 AI 分析</div>
+        <div style="font-size:0.82rem;margin-top:8px;">請在 Claude Code 開啟 <code>/legal-research</code></div>
+        <div style="font-size:0.82rem;">輸入「分析 ${escHtml(firmName)} 的經營方式」</div>
+        <div style="font-size:0.82rem;margin-top:4px;">分析完成後可儲存到此處</div>
+      </div>
+    `;
+  }
+}
+
 function closeFirmModal() {
+  _currentFirmName = '';
+  _firmOverviewHtml = '';
   document.getElementById('firmModal').style.display = 'none';
   if (chartInstances['firmGender']) { chartInstances['firmGender'].destroy(); delete chartInstances['firmGender']; }
   if (chartInstances['firmAge']) { chartInstances['firmAge'].destroy(); delete chartInstances['firmAge']; }
@@ -3413,6 +3513,11 @@ function renderPagination(containerId, page, total, onPageChange) {
     <div class="modal-header">
       <h2 id="firmModalTitle">載入中...</h2>
       <button onclick="closeFirmModal()">✕</button>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 16px;">
+      <button class="tab-btn active" onclick="switchFirmTab('overview')" id="firmTab_overview">概覽</button>
+      <button class="tab-btn" onclick="switchFirmTab('research')" id="firmTab_research">研究</button>
+      <button class="tab-btn" onclick="switchFirmTab('analysis')" id="firmTab_analysis">AI 分析</button>
     </div>
     <div class="modal-body" id="firmModalBody">
       <div class="loading">載入中</div>
