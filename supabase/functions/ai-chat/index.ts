@@ -75,32 +75,25 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
 
   const { data: notes } = ctxOpts.notes !== false ? await userClient.from('manual_notes')
     .select('id, title, content, category, tags, source_type, source_url, created_at')
-    .order('created_at', { ascending: false }).limit(50) : { data: null };
+    .order('created_at', { ascending: false }).limit(10) : { data: null };
 
   if (notes?.length) {
-    parts.push('## 使用者的研究筆記（時間由新到舊）');
+    parts.push('## 使用者的研究筆記');
     for (const n of notes) {
-      const tagStr = n.tags?.length ? ` [${n.tags.join(', ')}]` : '';
-      const srcType = n.source_type && n.source_type !== 'manual' ? ` (${n.source_type})` : '';
-      parts.push(`### ${n.title}${tagStr}${srcType}`);
-      parts.push(`_類別: ${n.category || 'general'}, 建立: ${String(n.created_at).slice(0, 10)}_`);
-      if (n.content) parts.push(String(n.content).slice(0, 500));
-      if (n.source_url) parts.push(`來源: ${n.source_url}`);
-      parts.push('');
+      parts.push(`- **${n.title}**: ${String(n.content || '').slice(0, 200)}`);
       sources.push({ type: 'note', id: n.id, title: n.title });
     }
+    parts.push('');
   }
 
   const { data: news } = ctxOpts.news !== false ? await userClient.from('news_articles')
     .select('id, title, summary, source_name, published_at, url, search_query')
-    .order('published_at', { ascending: false }).limit(30) : { data: null };
+    .order('published_at', { ascending: false }).limit(10) : { data: null };
 
   if (news?.length) {
-    parts.push('## 最近的產業新聞');
+    parts.push('## 產業新聞');
     for (const a of news) {
-      const date = String(a.published_at || '').slice(0, 10);
-      parts.push(`- **${a.title}** (${a.source_name || '未知'}, ${date})`);
-      if (a.summary) parts.push(`  ${String(a.summary).slice(0, 300)}`);
+      parts.push(`- ${a.title} (${String(a.published_at || '').slice(0, 10)})`);
       sources.push({ type: 'news', id: a.id, title: a.title });
     }
     parts.push('');
@@ -122,41 +115,25 @@ async function buildUserContext(userClient: SupabaseClient, serviceClient: Supab
   // ========= 學術論文 (最多 15 筆 metadata + abstract) =========
   const { data: papers } = ctxOpts.papers !== false ? await userClient.from('academic_papers')
     .select('id, title, authors, year, venue, degree_type, abstract, keywords')
-    .order('year', { ascending: false, nullsFirst: false }).limit(15) : { data: null };
+    .order('year', { ascending: false, nullsFirst: false }).limit(5) : { data: null };
 
   if (papers?.length) {
-    parts.push('## 知識庫中的學術論文（可引用）');
-    const degreeMap: Record<string, string> = {
-      thesis_master: '碩論', thesis_phd: '博論',
-      journal: '期刊', conference: '研討會', book: '專書',
-    };
+    parts.push('## 知識庫論文');
     for (const p of papers) {
-      const degree = degreeMap[p.degree_type || ''] || '';
-      parts.push(`### ${p.title} (${p.year || 'N/A'}${degree ? ', ' + degree : ''})`);
-      if (p.authors?.length) parts.push(`作者: ${p.authors.join(', ')}`);
-      if (p.venue) parts.push(`機構/來源: ${p.venue}`);
-      if (p.abstract) parts.push(`摘要: ${String(p.abstract).slice(0, 400)}`);
-      if (p.keywords?.length) parts.push(`關鍵字: ${p.keywords.join(', ')}`);
-      parts.push('');
+      parts.push(`- ${p.title} (${p.year || '?'}) ${p.keywords?.slice(0, 3).join(', ') || ''}`);
       sources.push({ type: 'paper', id: p.id, title: p.title });
     }
+    parts.push('');
   }
 
   if (ctxOpts.db !== false) try {
     const { count: lawyerCount } = await serviceClient.from('moj_lawyers').select('lic_no', { count: 'exact', head: true });
     const { count: firmCount } = await serviceClient.from('moj_firm_stats_cache').select('firm_name', { count: 'exact', head: true });
-    const { data: topFirms } = await serviceClient.from('moj_firm_stats_cache').select('*').order('lawyer_count', { ascending: false }).limit(15);
-    const { data: regions } = await serviceClient.rpc('moj_region_distribution');
-    parts.push('## 台灣法律產業 DB 即時數據（來自法務部）');
-    if (lawyerCount) parts.push(`- 登錄律師總數: ${lawyerCount.toLocaleString()} 位`);
-    if (firmCount) parts.push(`- 事務所總數: ${firmCount.toLocaleString()} 間`);
+    const { data: topFirms } = await serviceClient.from('moj_firm_stats_cache').select('firm_name,lawyer_count,main_region').order('lawyer_count', { ascending: false }).limit(5);
+    parts.push('## DB 數據');
+    if (lawyerCount) parts.push(`- 律師: ${lawyerCount.toLocaleString()}, 事務所: ${firmCount?.toLocaleString() || '?'}`);
     if (topFirms?.length) {
-      parts.push('- Top 15 事務所:');
-      for (const f of topFirms) parts.push(`  * ${f.firm_name}: ${f.lawyer_count} 位律師 (${f.main_region || '-'})`);
-    }
-    if (regions?.length) {
-      parts.push('- 律師地區分布:');
-      for (const r of regions.slice(0, 16)) parts.push(`  * ${r.region}: ${r.count} 位`);
+      parts.push('- Top 5: ' + topFirms.map(f => `${f.firm_name}(${f.lawyer_count})`).join(', '));
     }
     sources.push({ type: 'db', title: 'MOJ 律師/事務所資料庫' });
   } catch (e) {
@@ -227,12 +204,12 @@ Deno.serve(async (req: Request) => {
     const { data: history } = await userClient.from('chat_messages')
       .select('role, content').eq('session_id', sessionId).order('created_at', { ascending: true });
 
-    // 只保留最近 6 輪（12 條訊息），避免 token 過多
+    // 只保留最近 4 輪（8 條），AI 回覆截斷以省 token
     const allHistory = (history ?? []).map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
+      content: m.role === 'assistant' ? String(m.content).slice(0, 500) : m.content,
     })) as Msg[];
-    const messages: Msg[] = allHistory.length > 12 ? allHistory.slice(-12) : allHistory;
+    const messages: Msg[] = allHistory.length > 8 ? allHistory.slice(-8) : allHistory;
 
     // 建立使用者訊息（含附件）
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
@@ -256,7 +233,7 @@ Deno.serve(async (req: Request) => {
             const decoded = atob(att.base64);
             contentBlocks.push({
               type: 'text',
-              text: `📎 附件「${att.name}」內容：\n${decoded.slice(0, 50000)}`,
+              text: `📎 附件「${att.name}」內容：\n${decoded.slice(0, 8000)}`,
             });
           } catch {
             contentBlocks.push({
@@ -279,13 +256,13 @@ Deno.serve(async (req: Request) => {
     if (ctxOpts.papers !== false) try {
       const { data: relevantChunks } = await userClient.rpc('search_paper_chunks', {
         query_text: message,
-        max_results: 5,
+        max_results: 3,
       });
       if (relevantChunks && relevantChunks.length > 0) {
         const parts: string[] = ['## 從論文全文中找到的相關段落（與此問題最相關）'];
         for (const c of relevantChunks) {
           parts.push(`### 【${c.paper_title}${c.paper_year ? ' (' + c.paper_year + ')' : ''}】${c.section ? ' - ' + c.section : ''}`);
-          parts.push(String(c.content).slice(0, 800));
+          parts.push(String(c.content).slice(0, 400));
           parts.push('');
           sources.push({ type: 'paper_chunk', id: c.paper_id, title: `${c.paper_title}${c.section ? ' / ' + c.section : ''}` });
         }

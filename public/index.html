@@ -2417,7 +2417,7 @@ async function handleChatFile(input) {
         }).join('\n\n');
       }
       // 截斷過大的檔案（最多 80000 字元）
-      if (csvText.length > 80000) csvText = csvText.slice(0, 80000) + '\n...(資料過多，已截斷)';
+      if (csvText.length > 15000) csvText = csvText.slice(0, 15000) + '\n...(資料過多，已截斷)';
       const base64 = btoa(unescape(encodeURIComponent(csvText)));
       chatAttachments.push({ name: file.name, size: file.size, type: 'text/csv', base64 });
       renderChatAttachments();
