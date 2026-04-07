@@ -111,6 +111,21 @@ def fullscan(delay: float = 0.3, limit_surnames: Optional[int] = None) -> dict:
             print(f'  [{i}/{len(surnames)}] {s}: {total} -> 累計 {len(results)}')
         time.sleep(delay)
 
+    # 中途上傳（每累積 1000 筆新資料就上傳一次）
+    def maybe_upload(force=False):
+        nonlocal results, _uploaded_keys
+        new_records = [v for k, v in results.items() if k not in _uploaded_keys]
+        if len(new_records) >= 1000 or (force and new_records):
+            try:
+                upload_to_supabase(new_records)
+                _uploaded_keys.update(r['now_lic_no'] for r in new_records)
+                print(f'  [batch upload] +{len(new_records)} (total uploaded: {len(_uploaded_keys)})')
+            except Exception as e:
+                print(f'  ! batch upload error: {e}')
+
+    _uploaded_keys = set()
+    maybe_upload()  # no-op, just init
+
     # Pass 2: 雙字（姓 + 名字第一字）細分被截斷的姓氏
     print(f'\n=== Pass 2: 雙字細分 ({len(truncated_surnames)} 個姓氏 × {len(COMMON_NAME_CHARS)} 字) ===')
     for si, s in enumerate(truncated_surnames, 1):
@@ -127,6 +142,10 @@ def fullscan(delay: float = 0.3, limit_surnames: Optional[int] = None) -> dict:
                 pass_total += len(lawyers)
             time.sleep(delay)
         print(f'  [{si}/{len(truncated_surnames)}] {s}*: +{pass_total} -> 累計 {len(results)}')
+        maybe_upload()
+
+    # 最後上傳剩餘
+    maybe_upload(force=True)
 
     return results
 
@@ -220,7 +239,7 @@ def upload_to_supabase(lawyers: list):
             raise RuntimeError(f'upload failed: {r.status_code}')
         uploaded += len(batch)
         print(f'[{time.strftime("%H:%M:%S")}]   已上傳 {uploaded}/{len(records)}')
-    print(f'[{time.strftime("%H:%M:%S")}] ✓ 全部上傳完成')
+    print(f'[{time.strftime("%H:%M:%S")}] done - uploaded {uploaded}')
     return uploaded
 
 
@@ -239,7 +258,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # 寫 JSON 備份
-    out = 'C:/projects/legal-industry-intel/moj_lawyers_output.json'
+    out = os.path.join(os.path.dirname(__file__), '..', 'moj_lawyers_output.json')
     with open(out, 'w', encoding='utf-8') as f:
         json.dump(list(results.values()), f, ensure_ascii=False, indent=2)
     print(f'\n=== 掃描完成 ===')
