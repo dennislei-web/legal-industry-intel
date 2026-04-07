@@ -1843,6 +1843,21 @@ async function loadOffices() {
     document.getElementById('kpiOfficeWebsite').textContent = withWeb;
   }
 
+  // 補上 firm_profiles 手動新增的官網
+  try {
+    const { data: fpWebs } = await db.from('firm_profiles').select('firm_name, website_url').not('website_url', 'is', null);
+    if (fpWebs) {
+      const fpMap = {};
+      for (const fp of fpWebs) fpMap[fp.firm_name] = fp.website_url;
+      for (const o of allOffices) {
+        if (!o.website_url && fpMap[o.firm_name]) o.website_url = fpMap[o.firm_name];
+      }
+      // 更新官網計數
+      const withWeb = allOffices.filter(o => o.website_url).length;
+      document.getElementById('kpiOfficeWebsite').textContent = withWeb;
+    }
+  } catch(e) { console.warn('firm_profiles website merge error:', e); }
+
   // 平均年齡和年資（從 moj_lawyers 抓）
   loadOfficeAgeSeniority();
 
