@@ -215,9 +215,11 @@ def to_db_record(ly: dict) -> dict:
 def upload_to_supabase(lawyers: list):
     """批次寫入 moj_lawyers 表（直接打 PostgREST，避免 SDK 依賴問題）。"""
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
-    url = os.environ['SUPABASE_URL']
-    key = os.environ['SUPABASE_SERVICE_KEY']
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_SERVICE_KEY', '').strip()
+    if not url or not key:
+        raise RuntimeError(f'Missing env vars: URL={bool(url)}, KEY={bool(key)} (len={len(key)})')
     endpoint = f'{url}/rest/v1/moj_lawyers'
     headers = {
         'apikey': key,
