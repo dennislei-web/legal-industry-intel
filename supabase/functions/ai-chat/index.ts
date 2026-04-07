@@ -227,10 +227,12 @@ Deno.serve(async (req: Request) => {
     const { data: history } = await userClient.from('chat_messages')
       .select('role, content').eq('session_id', sessionId).order('created_at', { ascending: true });
 
-    const messages: Msg[] = (history ?? []).map((m) => ({
+    // 只保留最近 6 輪（12 條訊息），避免 token 過多
+    const allHistory = (history ?? []).map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
-    }));
+    })) as Msg[];
+    const messages: Msg[] = allHistory.length > 12 ? allHistory.slice(-12) : allHistory;
 
     // 建立使用者訊息（含附件）
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
