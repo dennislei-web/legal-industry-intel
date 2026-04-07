@@ -1491,7 +1491,7 @@ async function loadLawyers() {
     const hasPractice = l.practice_start_date;
 
     return `<tr>
-      <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${FIRM_LEADERS[l.name] ? ' <span title="' + escHtml(FIRM_LEADERS[l.name]) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
@@ -1668,6 +1668,37 @@ function renderBarPieChart(data, totalActive) {
 // ============================================================
 // OFFICES TAB (事務所)
 // ============================================================
+// 事務所負責人 / Managing Partner / 所長
+const FIRM_LEADERS = {
+  '李家慶': '理律法律事務所｜所長',
+  '張宏賓': '理律法律事務所｜執行長',
+  '陳傳岳': '萬國法律事務所｜所長',
+  '蔡朝安': '普華商務法律事務所｜主持律師',
+  '馬靜如': '國際通商法律事務所｜所長',
+  '陳彥希': '常在國際法律事務所｜所長',
+  '林香君': '常在國際法律事務所｜執行長',
+  '金玉瑩': '協合國際法律事務所｜Managing Partner',
+  '劉韋廷': '立勤國際法律事務所｜主持律師',
+  '黃沛聲': '立勤國際法律事務所｜主持律師',
+  '魏憶龍': '大成台灣律師事務所｜Managing Partner',
+  '林合民': '大成台灣律師事務所｜Managing Partner',
+  '劉志鵬': '有澤法律事務所｜主持律師',
+  '黃馨慧': '有澤法律事務所｜主持律師',
+  '吳詩敏': '有澤法律事務所｜主持律師',
+  '楊大德': '有澤法律事務所｜主持律師',
+};
+
+// 依事務所名稱取得該所負責人名單
+function getFirmLeaders(firmName) {
+  const leaders = [];
+  for (const [name, info] of Object.entries(FIRM_LEADERS)) {
+    if (info.includes(firmName) || firmName.includes(info.split('｜')[0].replace(/法律事務所|律師事務所/g, ''))) {
+      leaders.push(name);
+    }
+  }
+  return leaders;
+}
+
 // 雷所名單 (2025/11/27 維護)
 const BLACKLIST = {
   '德勤': '合夥律師只會畫餅，案源不足，實習只做簡報，會追回已發加班費',
@@ -2132,11 +2163,16 @@ async function showFirmDetail(firmName) {
           <thead><tr>
             <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th>地區</th><th>聯繫</th>
           </tr></thead>
-          <tbody>${allLawyers.map(l => {
-            const age = l.birth_year ? `民${l.birth_year} (${ROC_YEAR - l.birth_year}歲)` : '-';
+          <tbody>${[...allLawyers].sort((a, b) => {
+            const aL = FIRM_LEADERS[a.name] ? 0 : 1;
+            const bL = FIRM_LEADERS[b.name] ? 0 : 1;
+            return aL - bL;
+          }).map(l => {
+            const age = l.birth_year && l.birth_year < 200 ? `民${l.birth_year} (${ROC_YEAR - l.birth_year}歲)` : '-';
             const contact = [l.email, l.tel].filter(Boolean).join(' / ') || '-';
-            return `<tr>
-              <td><strong>${escHtml(l.name)}</strong></td>
+            const isLeader = FIRM_LEADERS[l.name];
+            return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
+              <td><strong>${escHtml(l.name)}</strong>${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}</td>
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
