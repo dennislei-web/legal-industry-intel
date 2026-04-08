@@ -136,6 +136,30 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
+    // ========== 批次刪除沒有 profile 的 auth users ==========
+    if (action === 'purge_unlinked' && req.method === 'POST') {
+      // 列出所有 auth users
+      const { data: authUsers, error: listErr } = await serviceClient.auth.admin.listUsers({ perPage: 1000 });
+      if (listErr) return errorResponse(listErr.message);
+
+      // 取得所有有 profile 的 user ids
+      const { data: profiles } = await serviceClient.from('user_profiles').select('id');
+      const profileIds = new Set((profiles || []).map((p: { id: string }) => p.id));
+
+      // 刪除沒有 profile 的 users
+      const deleted: string[] = [];
+      const errors: string[] = [];
+      for (const u of authUsers.users) {
+        if (!profileIds.has(u.id)) {
+          const { error } = await serviceClient.auth.admin.deleteUser(u.id);
+          if (error) errors.push(`${u.email}: ${error.message}`);
+          else deleted.push(u.email || u.id);
+        }
+      }
+
+      return jsonResponse({ success: true, deleted, errors, kept: profileIds.size });
+    }
+
     return errorResponse('Unknown action: ' + action);
   } catch (e) {
     return errorResponse(e.message || 'Internal error', 500);
