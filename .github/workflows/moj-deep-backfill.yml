@@ -4,19 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '模式: test=測試5個姓氏, full=全量重掃, backfill=補缺漏, targeted=精準補掃'
+        description: '模式'
         required: true
-        default: 'test'
+        default: 'deep-all'
         type: choice
         options:
           - test
           - full
+          - deep-all
+          - deep-targeted
+          - deep-surnames
+          - deep-triple
+          - deep-licno
           - backfill
           - targeted
       detail_fetch:
-        description: '掃完後是否補抓詳細資料（出生年/email/電話等）'
+        description: '掃完後是否補抓詳細資料'
         required: false
-        default: 'false'
+        default: 'true'
 
 jobs:
   scrape:
@@ -39,19 +44,44 @@ jobs:
         working-directory: scripts
         run: |
           MODE="${{ github.event.inputs.mode }}"
-          if [ "$MODE" = "test" ]; then
-            echo "=== 測試模式（5 個姓氏）==="
-            python moj_lawyer_fullscan.py demo
-          elif [ "$MODE" = "full" ]; then
-            echo "=== 全量掃描 ==="
-            python moj_lawyer_fullscan.py full
-          elif [ "$MODE" = "backfill" ]; then
-            echo "=== 補缺漏姓氏 ==="
-            python moj_lawyer_backfill.py
-          elif [ "$MODE" = "targeted" ]; then
-            echo "=== 精準補掃 ==="
-            python moj_lawyer_targeted_backfill.py
-          fi
+          case "$MODE" in
+            test)
+              echo "=== 測試模式（5 個姓氏）==="
+              python moj_lawyer_fullscan.py demo
+              ;;
+            full)
+              echo "=== 全量掃描 ==="
+              python moj_lawyer_fullscan.py full
+              ;;
+            deep-all)
+              echo "=== 深度補掃（四策略全跑）==="
+              python moj_lawyer_deep_backfill.py all
+              ;;
+            deep-targeted)
+              echo "=== 深度補掃：全聯會交叉 ==="
+              python moj_lawyer_deep_backfill.py targeted
+              ;;
+            deep-surnames)
+              echo "=== 深度補掃：罕見姓氏 ==="
+              python moj_lawyer_deep_backfill.py surnames
+              ;;
+            deep-triple)
+              echo "=== 深度補掃：三字展開 ==="
+              python moj_lawyer_deep_backfill.py triple
+              ;;
+            deep-licno)
+              echo "=== 深度補掃：證號遍歷 ==="
+              python moj_lawyer_deep_backfill.py licno
+              ;;
+            backfill)
+              echo "=== 補缺漏姓氏 ==="
+              python moj_lawyer_backfill.py
+              ;;
+            targeted)
+              echo "=== 精準補掃 ==="
+              python moj_lawyer_targeted_backfill.py
+              ;;
+          esac
 
       - name: Refresh firm stats cache
         env:
