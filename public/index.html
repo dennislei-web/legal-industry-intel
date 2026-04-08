@@ -645,6 +645,7 @@
           <table>
             <thead>
               <tr>
+                <th style="width:40px;">#</th>
                 <th style="cursor:pointer" onclick="sortOffices('firm_name')">事務所名稱 <span id="sortIcon_o_firm_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
@@ -2073,7 +2074,7 @@ function renderOffices() {
 
   const tbody = document.getElementById('officeTableBody');
   if (!page.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
     return;
   }
@@ -2082,7 +2083,9 @@ function renderOffices() {
     const webLink = o.website_url ? `<a href="${escHtml(o.website_url)}" target="_blank" style="color:var(--blue);">🔗 官網</a>` : '<span style="color:var(--text-muted);">-</span>';
     const blReason = getBlacklistReason(o.firm_name);
     const blBadge = blReason ? ` <span title="${escHtml(blReason)}" style="cursor:help;color:var(--red);font-size:0.75rem;vertical-align:middle;">⚠️</span>` : '';
+    const rank = start + i + 1;
     return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
+      <td style="text-align:center;color:${rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};font-weight:${rank <= 3 ? '700' : '400'};font-size:0.85rem;">${rank}</td>
       <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
