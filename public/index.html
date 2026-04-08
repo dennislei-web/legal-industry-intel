@@ -372,8 +372,8 @@
     <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
     <button class="tab-btn" onclick="showTab('firms')">律師公會</button>
     <button class="tab-btn" onclick="showTab('offices')">事務所</button>
-    <button class="tab-btn" onclick="showTab('trends')">市場趨勢</button>
-    <button class="tab-btn" onclick="showTab('news')">新聞與洞察</button>
+    <button class="tab-btn" onclick="showTab('trends')" id="tabBtnTrends" style="display:none;">市場趨勢</button>
+    <button class="tab-btn" onclick="showTab('news')" id="tabBtnNews" style="display:none;">新聞與洞察</button>
     <button class="tab-btn" onclick="showTab('input')">手動輸入</button>
     <button class="tab-btn" onclick="showTab('sources')">資料來源</button>
     <button class="tab-btn" onclick="showTab('admin')" id="tabBtnAdmin" style="display:none;">帳號管理</button>
@@ -1163,6 +1163,8 @@ async function showDashboard() {
 
   isAdmin = profile?.role === 'admin';
   document.getElementById('tabBtnAdmin').style.display = isAdmin ? '' : 'none';
+  document.getElementById('tabBtnTrends').style.display = isAdmin ? '' : 'none';
+  document.getElementById('tabBtnNews').style.display = isAdmin ? '' : 'none';
 
   loadOverview();
   loadSources();
