@@ -1,10 +1,11 @@
 """
-司法院法官名冊爬蟲（PDF 解析版）
-來源: 各法院官網的法官名錄 PDF
+司法院法官名冊爬蟲（PDF + HTML 雙模式）
+來源: 各法院官網的法官名錄
 產出: jy_judges 表
 
-每個法院都有自己的法官名錄頁面，內含 PDF 下載連結。
-PDF 表格欄位: 庭別 / 職稱 / 姓名 / 現辦事(職)務 / 承辦專業案件類別 / 學歷
+兩種模式:
+  A) PDF 模式 — 台北地院、高等法院等（表格 PDF）
+  B) HTML 模式 — 新北地院等（按庭別分頁 HTML 列表，格式: 職稱_姓名）
 
 用法:
   pip install pdfplumber playwright
@@ -35,28 +36,32 @@ SCRAPER_NAME = 'jy_judges'
 # 頁面上會有 PDF 下載連結
 # ============================================================
 COURT_PAGES = {
-    # 格式: 法院名稱 → (子域名, 起始搜尋頁面列表)
-    # 爬蟲會依序嘗試每個頁面，在其中搜尋 PDF 下載連結
-    # 優先放已知有 PDF 的 cp- 頁面，再放目錄頁 np- 作為 fallback
+    # 格式: 法院名稱 → (子域名, 模式, 頁面列表)
+    # 模式: 'pdf' = 找 PDF 下載, 'html' = 擷取 HTML 法官列表
 
-    # 高等法院系統（已確認頁面結構：cp- 頁面直接有 PDF）
-    '臺灣高等法院': ('tph', ['/tw/np-1639-051.html']),
+    # ===== PDF 模式（已確認） =====
+    '臺灣高等法院': ('tph', 'pdf', ['/tw/np-1639-051.html']),
+    '臺灣高等法院臺中分院': ('tchb', 'pdf', ['/tw/np-1228-081.html']),
+    '臺灣高等法院臺南分院': ('tnh', 'pdf', ['/tw/np-1286-091.html']),
+    '臺灣高等法院高雄分院': ('ksh', 'pdf', ['/tw/np-2439-121.html']),
+    '臺灣高等法院花蓮分院': ('hlh', 'pdf', ['/tw/np-1049-131.html']),
+    '臺灣臺北地方法院': ('tpd', 'pdf', ['/tw/lp-2927-151.html']),
 
-    # 地方法院（台北地院已確認：np → lp → cp → dl-PDF）
-    '臺灣臺北地方法院': ('tpd', ['/tw/lp-2927-151.html', '/tw/np-2842-151.html']),
-    '臺灣新北地方法院': ('pcd', ['/tw/np-1225-161.html']),
-    '臺灣士林地方法院': ('sld', ['/tw/np-3006-171.html']),
-    '臺灣桃園地方法院': ('tyd', ['/tw/np-1344-181.html']),
-    '臺灣新竹地方法院': ('scd', ['/tw/np-1230-191.html']),
-    '臺灣苗栗地方法院': ('mld', ['/tw/np-1249-201.html']),
-    '臺灣臺中地方法院': ('tcd', ['/tw/np-1328-211.html']),
-    '臺灣彰化地方法院': ('chd', ['/tw/np-1111-231.html']),
-    '臺灣臺南地方法院': ('tnd', ['/tw/np-1334-261.html']),
-    '臺灣高雄地方法院': ('ksd', ['/tw/np-1198-271.html']),
-    '臺灣屏東地方法院': ('ptd', ['/tw/np-1277-291.html']),
-    '臺灣花蓮地方法院': ('hld', ['/tw/np-1183-311.html']),
-    '臺灣宜蘭地方法院': ('ild', ['/tw/np-1188-321.html']),
-    '臺灣基隆地方法院': ('kld', ['/tw/np-1209-331.html']),
+    # ===== HTML 模式（各庭別分頁，格式: 職稱_姓名） =====
+    # 新北地院已確認：首頁 → 關於法官 → 民事/刑事/家事等法官名錄
+    '臺灣新北地方法院': ('pcd', 'html', []),
+    '臺灣士林地方法院': ('sld', 'html', []),
+    '臺灣桃園地方法院': ('tyd', 'html', []),
+    '臺灣新竹地方法院': ('scd', 'html', []),
+    '臺灣苗栗地方法院': ('mld', 'html', []),
+    '臺灣臺中地方法院': ('tcd', 'html', []),
+    '臺灣彰化地方法院': ('chd', 'html', []),
+    '臺灣臺南地方法院': ('tnd', 'html', []),
+    '臺灣高雄地方法院': ('ksd', 'html', []),
+    '臺灣屏東地方法院': ('ptd', 'html', []),
+    '臺灣花蓮地方法院': ('hld', 'html', []),
+    '臺灣宜蘭地方法院': ('ild', 'html', []),
+    '臺灣基隆地方法院': ('kld', 'html', []),
 }
 
 
@@ -274,6 +279,123 @@ def parse_judge_pdf(pdf_path, court_name):
     return unique
 
 
+def scrape_html_judges(page, court_name, subdomain):
+    """
+    HTML 模式：擷取法官名錄（適用於新北等法院）
+    策略：找首頁「關於法官」下所有含「法官名錄」的子連結，逐頁擷取
+    """
+    base_url = f'https://{subdomain}.judicial.gov.tw'
+    judges = []
+
+    try:
+        # 先到首頁
+        page.goto(base_url, wait_until='domcontentloaded', timeout=20000)
+        page.wait_for_timeout(3000)
+
+        # 找所有包含「法官」且含「名錄」的連結
+        roster_links = page.evaluate('''() => {
+            const links = [];
+            const seen = new Set();
+            document.querySelectorAll('a').forEach(a => {
+                const text = a.textContent.trim();
+                const href = a.href;
+                if (text.includes('法官名錄') && !text.includes('國民') && !seen.has(href)) {
+                    seen.add(href);
+                    links.push({ href, text: text.substring(0, 30) });
+                }
+            });
+            return links;
+        }''')
+
+        if not roster_links:
+            log(f'  找不到法官名錄連結，嘗試「關於法官」頁面...')
+            # 嘗試找「關於法官」連結
+            about_link = page.evaluate('''() => {
+                const a = Array.from(document.querySelectorAll('a')).find(
+                    a => a.textContent.trim() === '關於法官'
+                );
+                return a ? a.href : null;
+            }''')
+            if about_link:
+                page.goto(about_link, wait_until='domcontentloaded', timeout=15000)
+                page.wait_for_timeout(2000)
+                roster_links = page.evaluate('''() => {
+                    const links = [];
+                    const seen = new Set();
+                    document.querySelectorAll('a').forEach(a => {
+                        const text = a.textContent.trim();
+                        const href = a.href;
+                        if (text.includes('法官名錄') && !text.includes('國民') && !seen.has(href)) {
+                            seen.add(href);
+                            links.push({ href, text: text.substring(0, 30) });
+                        }
+                    });
+                    return links;
+                }''')
+
+        if not roster_links:
+            log(f'  仍找不到法官名錄連結')
+            return []
+
+        log(f'  找到 {len(roster_links)} 個法官名錄頁面')
+
+        for rl in roster_links:
+            division = rl['text'].replace('法官名錄', '').strip()
+            if not division:
+                division = '未分類'
+
+            try:
+                page.goto(rl['href'], wait_until='domcontentloaded', timeout=15000)
+                page.wait_for_timeout(2000)
+
+                # 擷取「職稱_姓名」格式的法官
+                page_judges = page.evaluate('''() => {
+                    const judges = [];
+                    document.querySelectorAll('a').forEach(a => {
+                        const text = a.textContent.trim();
+                        // 匹配: 院長_xxx, 庭長_xxx, 法官_xxx, 法官兼庭長_xxx 等
+                        const match = text.match(/^(院長|庭長|法官兼庭長|法官兼審判長|審判長|法官)[_＿](.+)/);
+                        if (match) {
+                            judges.push({ rank: match[1], name: match[2].trim() });
+                        }
+                    });
+                    return judges;
+                }''')
+
+                if page_judges:
+                    log(f'    {division}: {len(page_judges)} 位法官')
+                    for j in page_judges:
+                        judges.append({
+                            'name': j['name'],
+                            'court_name': normalize_court(court_name),
+                            'division': division,
+                            'rank': j['rank'],
+                            'status': '現任',
+                            'raw_data': {'source': 'html', 'division_page': rl['text']},
+                            'scraped_at': datetime.now(timezone.utc).isoformat(),
+                        })
+
+                polite_delay(1.5)
+
+            except Exception as e:
+                log(f'    {division} 擷取失敗: {e}')
+                continue
+
+    except Exception as e:
+        log(f'  HTML 擷取錯誤: {e}')
+
+    # 去重
+    seen = set()
+    unique = []
+    for j in judges:
+        key = f"{j['name']}_{j['court_name']}"
+        if key not in seen:
+            seen.add(key)
+            unique.append(j)
+
+    return unique
+
+
 def resolve_court_ids(sb, judges):
     """查詢 courts 表取得 court_id"""
     court_names = list(set(j['court_name'] for j in judges if j.get('court_name')))
@@ -305,7 +427,8 @@ def main():
         log('=== 司法院法官名冊爬蟲啟動（PDF 解析版）===')
 
         playwright_inst = sync_playwright().start()
-        browser = playwright_inst.chromium.launch(headless=True)
+        # 用真實瀏覽器（非 headless）避免司法院網站擋 bot
+        browser = playwright_inst.chromium.launch(headless=False, slow_mo=500)
         context = browser.new_context(
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                        'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -329,11 +452,20 @@ def main():
 
         log(f'將爬取 {len(courts_to_scrape)} 個法院')
 
-        for court_name, (subdomain, paths) in courts_to_scrape.items():
-            log(f'\n--- {court_name} ---')
+        for court_name, (subdomain, mode, paths) in courts_to_scrape.items():
+            log(f'\n--- {court_name} ({mode} 模式) ---')
             base_url = f'https://{subdomain}.judicial.gov.tw'
 
             try:
+                # ===== HTML 模式 =====
+                if mode == 'html':
+                    judges = scrape_html_judges(page, court_name, subdomain)
+                    log(f'  解析出 {len(judges)} 位法官')
+                    all_judges.extend(judges)
+                    polite_delay(3)
+                    continue
+
+                # ===== PDF 模式 =====
                 pdf_url = None
 
                 # 嘗試每個起始頁面
