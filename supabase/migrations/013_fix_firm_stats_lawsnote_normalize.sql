@@ -63,7 +63,7 @@ AS $$
   firm_cases AS (
     SELECT
       firm_name_clean AS firm_name,
-      ROUND(AVG(case_count_5yr)::numeric, 0) AS avg_cases
+      SUM(case_count_5yr) AS total_cases
     FROM lawsnote_normalized
     GROUP BY firm_name_clean
   )
@@ -72,7 +72,11 @@ AS $$
     fl.lawyer_count,
     fl.main_region,
     fl.guild_names,
-    fc.avg_cases,
+    -- 平均案件數 = Lawsnote 總案件數 ÷ MOJ 律師人數
+    CASE WHEN fc.total_cases IS NOT NULL AND fl.lawyer_count > 0
+      THEN ROUND(fc.total_cases::numeric / fl.lawyer_count, 0)
+      ELSE NULL
+    END AS avg_cases,
     fw.website_url
   FROM firm_lawyers fl
   LEFT JOIN firm_cases fc ON fc.firm_name = fl.firm_name
