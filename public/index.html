@@ -373,6 +373,8 @@
     <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
     <button class="tab-btn" onclick="showTab('firms')">律師公會</button>
     <button class="tab-btn" onclick="showTab('offices')">事務所</button>
+    <button class="tab-btn" onclick="showTab('judges')">法官</button>
+    <button class="tab-btn" onclick="showTab('courts')">法院</button>
     <button class="tab-btn" onclick="showTab('trends')" id="tabBtnTrends" style="display:none;">市場趨勢</button>
     <button class="tab-btn" onclick="showTab('news')" id="tabBtnNews" style="display:none;">新聞與洞察</button>
     <button class="tab-btn" onclick="showTab('input')" id="tabBtnInput" style="display:none;">手動輸入</button>
@@ -663,6 +665,96 @@
           </table>
         </div>
         <div class="pagination" id="officePagination"></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: JUDGES (法官) ==================== -->
+    <div id="tab-judges" class="tab-content">
+      <div class="kpi-grid" id="judgeKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">法官總數</div><div class="kpi-value" id="kpiJudgeTotal">-</div><div class="kpi-sub" id="kpiJudgeTotalSub">載入中</div></div>
+        <div class="kpi-card"><div class="kpi-label">司法院名冊數</div><div class="kpi-value" id="kpiJudgeJud" style="color:var(--purple);">-</div><div class="kpi-sub">司法院公開資料</div></div>
+        <div class="kpi-card"><div class="kpi-label">Lawsnote有資料數</div><div class="kpi-value" id="kpiJudgeLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">含裁判資料</div></div>
+        <div class="kpi-card"><div class="kpi-label">平均案件量</div><div class="kpi-value" id="kpiJudgeAvgCases" style="color:var(--gold);">-</div><div class="kpi-sub">每位法官</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="judgeSearch" placeholder="搜尋法官姓名..." oninput="searchJudges()">
+        <select id="judgeCourtFilter" onchange="searchJudges()">
+          <option value="">所有法院</option>
+        </select>
+        <select id="judgeDivisionFilter" onchange="searchJudges()">
+          <option value="">所有庭別</option>
+          <option value="民事庭">民事庭</option>
+          <option value="刑事庭">刑事庭</option>
+          <option value="行政庭">行政庭</option>
+          <option value="家事庭">家事庭</option>
+          <option value="少年庭">少年庭</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="cursor:pointer" onclick="sortJudges('name')">姓名 <span id="sortIcon_j_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('court_name')">法院 <span id="sortIcon_j_court_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('division')">庭別 <span id="sortIcon_j_division">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('title')">職稱 <span id="sortIcon_j_title">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('seniority_years')">年資 <span id="sortIcon_j_seniority_years">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('case_count')">案件數 <span id="sortIcon_j_case_count">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('avg_disposition_days')">平均結案天數 <span id="sortIcon_j_avg_disposition_days">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('data_source')">來源 <span id="sortIcon_j_data_source">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="judgeTableBody">
+              <tr><td colspan="8" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="judgePagination"></div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: COURTS (法院) ==================== -->
+    <div id="tab-courts" class="tab-content">
+      <div class="kpi-grid" id="courtKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">法院總數</div><div class="kpi-value" id="kpiCourtTotal">-</div><div class="kpi-sub" id="kpiCourtTotalSub">載入中</div></div>
+        <div class="kpi-card"><div class="kpi-label">地方法院數</div><div class="kpi-value" id="kpiCourtDistrict" style="color:var(--blue);">-</div><div class="kpi-sub">地方法院</div></div>
+        <div class="kpi-card"><div class="kpi-label">高等法院數</div><div class="kpi-value" id="kpiCourtHigh" style="color:var(--purple);">-</div><div class="kpi-sub">高等法院</div></div>
+        <div class="kpi-card"><div class="kpi-label">全國年收案量</div><div class="kpi-value" id="kpiCourtTotalCases" style="color:var(--gold);">-</div><div class="kpi-sub">年度統計</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="courtSearch" placeholder="搜尋法院名稱..." oninput="searchCourts()">
+        <select id="courtTypeFilter" onchange="searchCourts()">
+          <option value="">所有類型</option>
+          <option value="地方法院">地方法院</option>
+          <option value="高等法院">高等法院</option>
+          <option value="最高法院">最高法院</option>
+          <option value="專業法院">專業法院</option>
+        </select>
+        <select id="courtRegionFilter" onchange="searchCourts()">
+          <option value="">所有地區</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="cursor:pointer" onclick="sortCourts('name')">法院名稱 <span id="sortIcon_c_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('court_type')">類型 <span id="sortIcon_c_court_type">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('region')">地區 <span id="sortIcon_c_region">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('judge_count')">法官人數 <span id="sortIcon_c_judge_count">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('annual_cases')">年收案量 <span id="sortIcon_c_annual_cases">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('clearance_rate')">結案率 <span id="sortIcon_c_clearance_rate">↕</span></th>
+                <th style="cursor:pointer" onclick="sortCourts('avg_disposition_days')">平均結案天數 <span id="sortIcon_c_avg_disposition_days">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="courtTableBody">
+              <tr><td colspan="7" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="courtPagination"></div>
       </div>
     </div>
 
@@ -1109,6 +1201,47 @@ function sortLawyers(col) {
 
 let newsPage = 0, newsTotal = 0;
 
+// Judges & Courts pagination state
+let judgePage = 0, judgeTotal = 0;
+let judgeSortCol = 'name', judgeSortAsc = true;
+let judgeSearchTimer = null;
+
+let courtPage = 0, courtTotal = 0;
+let courtSortCol = 'name', courtSortAsc = true;
+let courtSearchTimer = null;
+
+function sortJudges(col) {
+  if (judgeSortCol === col) { judgeSortAsc = !judgeSortAsc; }
+  else { judgeSortCol = col; judgeSortAsc = (col === 'case_count' || col === 'avg_disposition_days') ? false : true; }
+  ['name','court_name','division','title','seniority_years','case_count','avg_disposition_days','data_source'].forEach(c => {
+    const icon = document.getElementById('sortIcon_j_' + c);
+    if (icon) icon.textContent = c === col ? (judgeSortAsc ? '↑' : '↓') : '↕';
+  });
+  judgePage = 0;
+  loadJudges();
+}
+
+function searchJudges() {
+  clearTimeout(judgeSearchTimer);
+  judgeSearchTimer = setTimeout(() => { judgePage = 0; loadJudges(); }, 300);
+}
+
+function sortCourts(col) {
+  if (courtSortCol === col) { courtSortAsc = !courtSortAsc; }
+  else { courtSortCol = col; courtSortAsc = (col === 'judge_count' || col === 'annual_cases' || col === 'clearance_rate') ? false : true; }
+  ['name','court_type','region','judge_count','annual_cases','clearance_rate','avg_disposition_days'].forEach(c => {
+    const icon = document.getElementById('sortIcon_c_' + c);
+    if (icon) icon.textContent = c === col ? (courtSortAsc ? '↑' : '↓') : '↕';
+  });
+  courtPage = 0;
+  loadCourts();
+}
+
+function searchCourts() {
+  clearTimeout(courtSearchTimer);
+  courtSearchTimer = setTimeout(() => { courtPage = 0; loadCourts(); }, 300);
+}
+
 // ============================================================
 // AUTH
 // ============================================================
@@ -1190,6 +1323,8 @@ function showTab(tab) {
   if (tab === 'trends') loadTrends();
   if (tab === 'news') { loadNews(); loadRecentSearches(); }
   if (tab === 'input') { loadNotes(); loadUploads(); loadPapers(); }
+  if (tab === 'judges') loadJudges();
+  if (tab === 'courts') loadCourts();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
 }
@@ -1216,14 +1351,15 @@ function toggleTheme() {
 // OVERVIEW
 // ============================================================
 async function loadOverview() {
-  // Merged lawyer count from combined view (三源去重)
-  const { count: mergedCount } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true });
-  document.getElementById('kpiLawyerCount').textContent = mergedCount != null ? mergedCount.toLocaleString() : '0';
-  document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
+  // 用 cache 表快速載入 KPI（避免 7+ 次 lawyers_combined 全表掃描）
+  const { data: statsCache } = await db.from('lawyer_stats_cache').select('key, value');
+  const stats = {};
+  if (statsCache) statsCache.forEach(s => stats[s.key] = s.value);
 
-  // Registry count (MOJ 律師總數，用 combined view 去重)
-  const { count: mojCount } = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true);
-  document.getElementById('kpiRegistryCount').textContent = mojCount != null ? mojCount.toLocaleString() : '0';
+  document.getElementById('kpiLawyerCount').textContent = (stats.total || 0).toLocaleString();
+  document.getElementById('kpiLawyerSub').textContent = '三源去重合併';
+
+  document.getElementById('kpiRegistryCount').textContent = (stats.has_moj || 0).toLocaleString();
 
   // Guild total from industry_stats
   const { data: guildStats } = await db.from('industry_stats').select('value')
@@ -1237,9 +1373,8 @@ async function loadOverview() {
   document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
   document.getElementById('kpiSourcesSub').textContent = '資料來源';
 
-  // Lawsnote KPIs
-  const { count: lawsnoteCount } = await db.from('lawsnote_lawyers').select('*', { count: 'exact', head: true });
-  document.getElementById('kpiLawsnoteCount').textContent = lawsnoteCount != null ? lawsnoteCount.toLocaleString() : '0';
+  // Lawsnote KPIs (from cache)
+  document.getElementById('kpiLawsnoteCount').textContent = (stats.lawsnote_raw || 0).toLocaleString();
   try {
     const { data: avgData } = await db.rpc('lawsnote_avg_cases');
     if (avgData?.[0]?.avg_cases) {
@@ -1630,21 +1765,18 @@ async function loadLawyers() {
 }
 
 async function loadMergedKpis() {
-  // 平行執行所有 count query
-  const [total, all3, mojTotal, twbaTotal, lnTotal] = await Promise.all([
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }),
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('data_source', '三者皆有'),
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true),
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_twba', true),
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_lawsnote', true),
-  ]);
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
-  set('kpiMergedTotal', total.count);
+  // 用 cache 表快速載入（避免 5 次 lawyers_combined count 查詢）
+  const { data: statsCache } = await db.from('lawyer_stats_cache').select('key, value');
+  const stats = {};
+  if (statsCache) statsCache.forEach(s => stats[s.key] = s.value);
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? Number(v).toLocaleString() : '0'; };
+  set('kpiMergedTotal', stats.total);
   document.getElementById('kpiMergedSub').textContent = '三源去重合併';
-  set('kpiMergedAll3', all3.count);
-  set('kpiMergedMoj', mojTotal.count);
-  set('kpiMergedTwba', twbaTotal.count);
-  set('kpiMergedLawsnote', lnTotal.count);
+  set('kpiMergedAll3', stats.all_three);
+  set('kpiMergedMoj', stats.has_moj);
+  set('kpiMergedTwba', stats.has_twba);
+  set('kpiMergedLawsnote', stats.has_lawsnote);
 }
 
 // ============================================================
@@ -3960,6 +4092,190 @@ async function submitChangePassword() {
 
   msgEl.textContent = '密碼已修改成功！'; msgEl.style.color = 'var(--green)';
   setTimeout(() => closeChangePassword(), 1500);
+}
+
+// ============================================================
+// JUDGES (法官)
+// ============================================================
+async function loadJudges() {
+  const search = document.getElementById('judgeSearch').value.trim();
+  const court = document.getElementById('judgeCourtFilter').value;
+  const division = document.getElementById('judgeDivisionFilter').value;
+
+  let query = db.from('judges_combined').select('*', { count: 'exact' });
+  if (search) query = query.ilike('name', `%${search}%`);
+  if (court) query = query.eq('court_name', court);
+  if (division) query = query.eq('division', division);
+
+  query = query.order(judgeSortCol, { ascending: judgeSortAsc, nullsFirst: false });
+  query = query.range(judgePage * PAGE_SIZE, (judgePage + 1) * PAGE_SIZE - 1);
+
+  const { data, count, error } = await query;
+  judgeTotal = count || 0;
+
+  if (error) { console.error('judges_combined error:', error); return; }
+
+  const tbody = document.getElementById('judgeTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('judgePagination', judgePage, judgeTotal, p => { judgePage = p; loadJudges(); });
+    return;
+  }
+
+  tbody.innerHTML = data.map(j => {
+    // Data source badge
+    let srcBadge = '';
+    const src = j.data_source || '';
+    if (src.includes('司法院') && src.includes('Lawsnote')) {
+      srcBadge = '<span class="badge" style="margin:1px;background:var(--green-dim);color:var(--green);">司法院+Lawsnote</span>';
+    } else if (src.includes('司法院')) {
+      srcBadge = '<span class="badge badge-blue" style="margin:1px;">僅司法院</span>';
+    } else if (src.includes('Lawsnote')) {
+      srcBadge = '<span class="badge badge-orange" style="margin:1px;">僅Lawsnote</span>';
+    } else {
+      srcBadge = '<span style="color:var(--text-muted);">-</span>';
+    }
+
+    return `<tr>
+      <td><strong>${escHtml(j.name)}</strong></td>
+      <td style="font-size:0.85rem;">${escHtml(j.court_name || '-')}</td>
+      <td>${escHtml(j.division || '-')}</td>
+      <td>${escHtml(j.title || '-')}</td>
+      <td style="text-align:center;">${j.seniority_years != null ? j.seniority_years + ' 年' : '-'}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${j.case_count != null ? j.case_count.toLocaleString() : '-'}</td>
+      <td style="text-align:center;">${j.avg_disposition_days != null ? j.avg_disposition_days.toFixed(1) : '-'}</td>
+      <td>${srcBadge}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('judgePagination', judgePage, judgeTotal, p => { judgePage = p; loadJudges(); });
+
+  // Populate court filter dropdown (once)
+  if (document.getElementById('judgeCourtFilter').options.length <= 1) {
+    const { data: courts } = await db.from('judges_combined')
+      .select('court_name')
+      .not('court_name', 'is', null)
+      .order('court_name');
+    if (courts) {
+      const unique = [...new Set(courts.map(c => c.court_name))];
+      unique.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        document.getElementById('judgeCourtFilter').appendChild(opt);
+      });
+    }
+  }
+
+  // Load KPIs (once)
+  if (document.getElementById('kpiJudgeTotal').textContent === '-') {
+    loadJudgeKpis();
+  }
+}
+
+async function loadJudgeKpis() {
+  const [total, judOnly, lnOnly, avgCases] = await Promise.all([
+    db.from('judges_combined').select('*', { count: 'exact', head: true }),
+    db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%司法院%'),
+    db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%Lawsnote%'),
+    db.from('judges_combined').select('case_count'),
+  ]);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
+  set('kpiJudgeTotal', total.count);
+  document.getElementById('kpiJudgeTotalSub').textContent = '合併去重';
+  set('kpiJudgeJud', judOnly.count);
+  set('kpiJudgeLawsnote', lnOnly.count);
+  // Calculate average case count
+  if (avgCases.data) {
+    const cases = avgCases.data.filter(r => r.case_count != null).map(r => r.case_count);
+    const avg = cases.length > 0 ? Math.round(cases.reduce((a, b) => a + b, 0) / cases.length) : 0;
+    set('kpiJudgeAvgCases', avg);
+  }
+}
+
+// ============================================================
+// COURTS (法院)
+// ============================================================
+async function loadCourts() {
+  const search = document.getElementById('courtSearch').value.trim();
+  const courtType = document.getElementById('courtTypeFilter').value;
+  const region = document.getElementById('courtRegionFilter').value;
+
+  let query = db.from('courts').select('*', { count: 'exact' });
+  if (search) query = query.ilike('name', `%${search}%`);
+  if (courtType) query = query.eq('court_type', courtType);
+  if (region) query = query.eq('region', region);
+
+  query = query.order(courtSortCol, { ascending: courtSortAsc, nullsFirst: false });
+  query = query.range(courtPage * PAGE_SIZE, (courtPage + 1) * PAGE_SIZE - 1);
+
+  const { data, count, error } = await query;
+  courtTotal = count || 0;
+
+  if (error) { console.error('courts error:', error); return; }
+
+  const tbody = document.getElementById('courtTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('courtPagination', courtPage, courtTotal, p => { courtPage = p; loadCourts(); });
+    return;
+  }
+
+  tbody.innerHTML = data.map(c => {
+    const clearanceRate = c.clearance_rate != null ? (c.clearance_rate * 100).toFixed(1) + '%' : '-';
+    const clearanceColor = c.clearance_rate != null
+      ? (c.clearance_rate >= 0.9 ? 'var(--green)' : c.clearance_rate >= 0.7 ? 'var(--orange)' : 'var(--red)')
+      : 'inherit';
+    return `<tr>
+      <td><strong>${escHtml(c.name)}</strong></td>
+      <td>${escHtml(c.court_type || '-')}</td>
+      <td>${escHtml(c.region || '-')}</td>
+      <td style="text-align:center;">${c.judge_count != null ? c.judge_count.toLocaleString() : '-'}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${c.annual_cases != null ? c.annual_cases.toLocaleString() : '-'}</td>
+      <td style="text-align:center;font-weight:600;color:${clearanceColor};">${clearanceRate}</td>
+      <td style="text-align:center;">${c.avg_disposition_days != null ? c.avg_disposition_days.toFixed(1) : '-'}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('courtPagination', courtPage, courtTotal, p => { courtPage = p; loadCourts(); });
+
+  // Populate region filter dropdown (once)
+  if (document.getElementById('courtRegionFilter').options.length <= 1) {
+    const { data: regions } = await db.from('courts')
+      .select('region')
+      .not('region', 'is', null)
+      .order('region');
+    if (regions) {
+      const unique = [...new Set(regions.map(r => r.region))];
+      unique.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        document.getElementById('courtRegionFilter').appendChild(opt);
+      });
+    }
+  }
+
+  // Load KPIs (once)
+  if (document.getElementById('kpiCourtTotal').textContent === '-') {
+    loadCourtKpis();
+  }
+}
+
+async function loadCourtKpis() {
+  const [total, district, high, annualSum] = await Promise.all([
+    db.from('courts').select('*', { count: 'exact', head: true }),
+    db.from('courts').select('*', { count: 'exact', head: true }).eq('court_type', '地方法院'),
+    db.from('courts').select('*', { count: 'exact', head: true }).eq('court_type', '高等法院'),
+    db.from('courts').select('annual_cases'),
+  ]);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
+  set('kpiCourtTotal', total.count);
+  document.getElementById('kpiCourtTotalSub').textContent = '全國法院';
+  set('kpiCourtDistrict', district.count);
+  set('kpiCourtHigh', high.count);
+  if (annualSum.data) {
+    const sum = annualSum.data.filter(r => r.annual_cases != null).reduce((a, b) => a + b.annual_cases, 0);
+    set('kpiCourtTotalCases', sum);
+  }
 }
 
 // ============================================================
