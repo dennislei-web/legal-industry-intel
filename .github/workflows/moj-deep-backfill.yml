@@ -53,6 +53,17 @@ jobs:
             python moj_lawyer_targeted_backfill.py
           fi
 
+      - name: Refresh firm stats cache
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          curl -sk "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
+            -X POST -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -d '{}'
+          echo "Cache refreshed"
+
       - name: Fetch lawyer details
         if: github.event.inputs.detail_fetch == 'true'
         env:
