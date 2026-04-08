@@ -35,36 +35,28 @@ SCRAPER_NAME = 'jy_judges'
 # 頁面上會有 PDF 下載連結
 # ============================================================
 COURT_PAGES = {
-    # 高等法院系統
-    '臺灣高等法院': ('tph', '/tw/np-1639-051.html'),
-    '臺灣高等法院臺中分院': ('tchb', '/tw/np-1228-081.html'),
-    '臺灣高等法院臺南分院': ('tnh', '/tw/np-1286-091.html'),
-    '臺灣高等法院高雄分院': ('ksh', '/tw/np-2439-121.html'),
-    '臺灣高等法院花蓮分院': ('hlh', '/tw/np-1049-131.html'),
+    # 格式: 法院名稱 → (子域名, 起始搜尋頁面列表)
+    # 爬蟲會依序嘗試每個頁面，在其中搜尋 PDF 下載連結
+    # 優先放已知有 PDF 的 cp- 頁面，再放目錄頁 np- 作為 fallback
 
-    # 地方法院
-    '臺灣臺北地方法院': ('tpd', '/tw/np-2842-151.html'),
-    '臺灣新北地方法院': ('pcd', '/tw/np-1225-161.html'),
-    '臺灣士林地方法院': ('sld', '/tw/np-3006-171.html'),
-    '臺灣桃園地方法院': ('tyd', '/tw/np-1344-181.html'),
-    '臺灣新竹地方法院': ('scd', '/tw/np-1230-191.html'),
-    '臺灣苗栗地方法院': ('mld', '/tw/np-1249-201.html'),
-    '臺灣臺中地方法院': ('tcd', '/tw/np-1328-211.html'),
-    '臺灣南投地方法院': ('ntd', '/tw/np-1256-221.html'),
-    '臺灣彰化地方法院': ('chd', '/tw/np-1111-231.html'),
-    '臺灣雲林地方法院': ('uld', '/tw/np-1402-241.html'),
-    '臺灣嘉義地方法院': ('cyd', '/tw/np-1147-251.html'),
-    '臺灣臺南地方法院': ('tnd', '/tw/np-1334-261.html'),
-    '臺灣高雄地方法院': ('ksd', '/tw/np-1198-271.html'),
-    '臺灣橋頭地方法院': ('ctd', '/tw/np-1060-281.html'),
-    '臺灣屏東地方法院': ('ptd', '/tw/np-1277-291.html'),
-    '臺灣臺東地方法院': ('ttd', '/tw/np-1338-301.html'),
-    '臺灣花蓮地方法院': ('hld', '/tw/np-1183-311.html'),
-    '臺灣宜蘭地方法院': ('ild', '/tw/np-1188-321.html'),
-    '臺灣基隆地方法院': ('kld', '/tw/np-1209-331.html'),
-    '臺灣澎湖地方法院': ('phd', '/tw/np-1271-341.html'),
-    '福建金門地方法院': ('kmd', '/tw/np-1214-351.html'),
-    '福建連江地方法院': ('lcd', '/tw/np-1241-361.html'),
+    # 高等法院系統（已確認頁面結構：cp- 頁面直接有 PDF）
+    '臺灣高等法院': ('tph', ['/tw/np-1639-051.html']),
+
+    # 地方法院（台北地院已確認：np → lp → cp → dl-PDF）
+    '臺灣臺北地方法院': ('tpd', ['/tw/lp-2927-151.html', '/tw/np-2842-151.html']),
+    '臺灣新北地方法院': ('pcd', ['/tw/np-1225-161.html']),
+    '臺灣士林地方法院': ('sld', ['/tw/np-3006-171.html']),
+    '臺灣桃園地方法院': ('tyd', ['/tw/np-1344-181.html']),
+    '臺灣新竹地方法院': ('scd', ['/tw/np-1230-191.html']),
+    '臺灣苗栗地方法院': ('mld', ['/tw/np-1249-201.html']),
+    '臺灣臺中地方法院': ('tcd', ['/tw/np-1328-211.html']),
+    '臺灣彰化地方法院': ('chd', ['/tw/np-1111-231.html']),
+    '臺灣臺南地方法院': ('tnd', ['/tw/np-1334-261.html']),
+    '臺灣高雄地方法院': ('ksd', ['/tw/np-1198-271.html']),
+    '臺灣屏東地方法院': ('ptd', ['/tw/np-1277-291.html']),
+    '臺灣花蓮地方法院': ('hld', ['/tw/np-1183-311.html']),
+    '臺灣宜蘭地方法院': ('ild', ['/tw/np-1188-321.html']),
+    '臺灣基隆地方法院': ('kld', ['/tw/np-1209-331.html']),
 }
 
 
@@ -77,6 +69,8 @@ def normalize_court(name):
 
 def find_pdf_url(page, base_url):
     """在法院法官名錄頁面找 PDF 下載連結"""
+    subdomain = base_url.replace('https://', '').split('.')[0]  # e.g. 'tpd'
+
     # 策略 1: 直接在頁面找 PDF 連結
     links = page.evaluate('''() => {
         const results = [];
@@ -96,8 +90,13 @@ def find_pdf_url(page, base_url):
         return results;
     }''')
 
+    # 優先選擇同一法院子域名的連結
     for link in links:
-        if 'dl-' in link['href']:
+        if 'dl-' in link['href'] and subdomain in link['href']:
+            return link['href']
+    # 退而求其次：任何 dl- 連結
+    for link in links:
+        if 'dl-' in link['href'] and 'judicial.gov.tw' in link['href']:
             return link['href']
 
     # 策略 2: 找頁面上的子連結（有些法院名錄放在子頁面）
@@ -105,7 +104,10 @@ def find_pdf_url(page, base_url):
         const results = [];
         document.querySelectorAll('a').forEach(a => {
             const text = a.textContent.trim();
-            if (text.includes('法官名錄') || text.includes('名錄表')) {
+            const href = a.getAttribute('href') || '';
+            // 找包含「法官」「名錄」的連結，或 cp- 開頭的子頁面
+            if (text.includes('法官') || text.includes('名錄') ||
+                (href.includes('cp-') && !href.includes('javascript'))) {
                 results.push({ href: a.href, text });
             }
         });
@@ -114,19 +116,33 @@ def find_pdf_url(page, base_url):
 
     for link in sub_links:
         try:
+            # 只訪問同域名的子連結
+            if subdomain not in link['href'] and 'judicial.gov.tw' not in link['href']:
+                continue
+            log(f'    搜尋子頁面: {link["text"][:30]} → {link["href"][-50:]}')
             page.goto(link['href'], wait_until='domcontentloaded', timeout=15000)
             page.wait_for_timeout(2000)
-            # 遞迴找 PDF
+            # 找同域名的 PDF 下載連結
             inner_links = page.evaluate('''() => {
                 const results = [];
                 document.querySelectorAll('a, iframe').forEach(el => {
                     const href = el.getAttribute('href') || el.getAttribute('src') || '';
-                    if (href.includes('dl-')) results.push(el.href || href);
+                    const fullHref = el.href || href;
+                    if (href.includes('dl-')) {
+                        const text = el.textContent ? el.textContent.trim().toLowerCase() : '';
+                        results.push({ href: fullHref, text });
+                    }
                 });
                 return results;
             }''')
-            if inner_links:
-                return inner_links[0]
+            # 優先同域名 + pdf 相關
+            for il in inner_links:
+                if subdomain in il['href'] and ('pdf' in il['text'] or 'dl-' in il['href']):
+                    return il['href']
+            # 退而求其次：同域名的任何 dl-
+            for il in inner_links:
+                if subdomain in il['href']:
+                    return il['href']
         except:
             continue
 
@@ -134,19 +150,27 @@ def find_pdf_url(page, base_url):
 
 
 def download_pdf(page, pdf_url, court_name):
-    """下載 PDF 到暫存檔"""
+    """下載 PDF 到暫存檔（用 requests 直接下載，避免 Playwright 拿到 HTML wrapper）"""
+    import requests
+    import warnings
+    warnings.filterwarnings('ignore', message='Unverified HTTPS')
+
     tmp_path = os.path.join(tempfile.gettempdir(), f'judge_{court_name}.pdf')
 
     try:
-        # 用 Playwright 下載
-        response = page.request.get(pdf_url)
-        if response.ok:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'}
+        resp = requests.get(pdf_url, headers=headers, timeout=30, verify=False)
+
+        if resp.status_code == 200 and resp.content[:4] == b'%PDF':
             with open(tmp_path, 'wb') as f:
-                f.write(response.body())
-            log(f'  PDF 下載成功: {os.path.getsize(tmp_path)} bytes')
+                f.write(resp.content)
+            log(f'  PDF 下載成功: {len(resp.content):,} bytes')
             return tmp_path
         else:
-            log(f'  PDF 下載失敗: HTTP {response.status}')
+            log(f'  PDF 下載失敗: HTTP {resp.status_code}, content-type={resp.headers.get("content-type")}')
+            # 如果不是 PDF，嘗試看內容是不是 HTML 包含 PDF 連結
+            if b'%PDF' not in resp.content[:10]:
+                log(f'  回傳非 PDF 內容，跳過')
             return None
     except Exception as e:
         log(f'  PDF 下載錯誤: {e}')
@@ -305,37 +329,92 @@ def main():
 
         log(f'將爬取 {len(courts_to_scrape)} 個法院')
 
-        for court_name, (subdomain, path) in courts_to_scrape.items():
+        for court_name, (subdomain, paths) in courts_to_scrape.items():
             log(f'\n--- {court_name} ---')
             base_url = f'https://{subdomain}.judicial.gov.tw'
 
             try:
-                # 訪問法官名錄頁面
-                url = base_url + path
-                log(f'  載入: {url}')
-                page.goto(url, wait_until='domcontentloaded', timeout=30000)
-                page.wait_for_timeout(3000)
+                pdf_url = None
 
-                # 找 PDF 連結
-                pdf_url = find_pdf_url(page, base_url)
-                if not pdf_url:
-                    log(f'  找不到 PDF 連結，嘗試搜尋子頁面...')
-                    # 嘗試找法官名錄子連結
-                    sub = page.evaluate('''() => {
+                # 嘗試每個起始頁面
+                for path in paths:
+                    if pdf_url:
+                        break
+                    url = base_url + path
+                    log(f'  載入: {url}')
+                    try:
+                        page.goto(url, wait_until='domcontentloaded', timeout=30000)
+                        page.wait_for_timeout(3000)
+                    except:
+                        log(f'  載入失敗，跳過此頁面')
+                        continue
+
+                    # Level 1: 直接在此頁找 PDF
+                    pdf_url = find_pdf_url(page, base_url)
+                    if pdf_url:
+                        break
+
+                    # Level 2: 找子頁面（cp- 開頭，或含「法官」「名錄」）
+                    sub_pages = page.evaluate('''() => {
                         const links = [];
+                        const seen = new Set();
                         document.querySelectorAll('a').forEach(a => {
-                            if (a.textContent.includes('法官名錄') || a.textContent.includes('名錄')) {
-                                links.push(a.href);
+                            const href = a.href || '';
+                            const text = a.textContent.trim();
+                            if (seen.has(href)) return;
+                            seen.add(href);
+                            if ((href.includes('cp-') || href.includes('lp-')) &&
+                                (text.includes('法官') || text.includes('名錄') || text.includes('名冊'))) {
+                                links.push({ href, text: text.substring(0, 30) });
                             }
                         });
                         return links;
                     }''')
-                    for sub_url in sub[:3]:
-                        page.goto(sub_url, wait_until='domcontentloaded', timeout=15000)
-                        page.wait_for_timeout(2000)
+
+                    for sp in sub_pages[:5]:
+                        if pdf_url:
+                            break
+                        if subdomain not in sp['href']:
+                            continue
+                        log(f'    L2: {sp["text"]} → ...{sp["href"][-40:]}')
+                        try:
+                            page.goto(sp['href'], wait_until='domcontentloaded', timeout=15000)
+                            page.wait_for_timeout(2000)
+                        except:
+                            continue
                         pdf_url = find_pdf_url(page, base_url)
                         if pdf_url:
                             break
+
+                        # Level 3: 再深入一層
+                        inner_pages = page.evaluate('''() => {
+                            const links = [];
+                            const seen = new Set();
+                            document.querySelectorAll('a').forEach(a => {
+                                const href = a.href || '';
+                                const text = a.textContent.trim();
+                                if (seen.has(href)) return;
+                                seen.add(href);
+                                if (href.includes('cp-') &&
+                                    (text.includes('法官') || text.includes('名錄') || text.includes('pdf'))) {
+                                    links.push({ href, text: text.substring(0, 30) });
+                                }
+                            });
+                            return links;
+                        }''')
+
+                        for ip in inner_pages[:3]:
+                            if subdomain not in ip['href']:
+                                continue
+                            log(f'      L3: {ip["text"]} → ...{ip["href"][-40:]}')
+                            try:
+                                page.goto(ip['href'], wait_until='domcontentloaded', timeout=15000)
+                                page.wait_for_timeout(2000)
+                            except:
+                                continue
+                            pdf_url = find_pdf_url(page, base_url)
+                            if pdf_url:
+                                break
 
                 if not pdf_url:
                     log(f'  ⚠ 無法找到 PDF，跳過')
