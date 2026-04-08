@@ -565,25 +565,17 @@
 
     <!-- ==================== TAB: OFFICES (事務所) ==================== -->
     <div id="tab-offices" class="tab-content">
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));">
+      <!-- 第一列：事務所 -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">事務所（法律/律師事務所）</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
         <div class="kpi-card">
-          <div class="kpi-label">全部單位</div>
-          <div class="kpi-value" id="kpiOfficeCount" style="color:var(--blue);">-</div>
-          <div class="kpi-sub">有律師關聯</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">事務所</div>
+          <div class="kpi-label">事務所數</div>
           <div class="kpi-value" id="kpiOfficeFirmCount" style="color:var(--green);">-</div>
-          <div class="kpi-sub" id="kpiOfficeFirmSub">法律/律師事務所</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">法人/公司</div>
-          <div class="kpi-value" id="kpiOfficeCorpCount" style="color:var(--purple);">-</div>
-          <div class="kpi-sub" id="kpiOfficeCorpSub">-</div>
+          <div class="kpi-sub">法律/律師事務所</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">最大事務所</div>
-          <div class="kpi-value" id="kpiOfficeLargest" style="color:var(--gold);font-size:1.2rem;">-</div>
+          <div class="kpi-value" id="kpiOfficeLargest" style="color:var(--gold);font-size:1.1rem;">-</div>
           <div class="kpi-sub" id="kpiOfficeLargestSub">-</div>
         </div>
         <div class="kpi-card">
@@ -593,13 +585,13 @@
         </div>
         <div class="kpi-card">
           <div class="kpi-label">平均年齡</div>
-          <div class="kpi-value" id="kpiOfficeAvgAge" style="color:var(--orange);">-</div>
-          <div class="kpi-sub">有出生年資料</div>
+          <div class="kpi-value" id="kpiFirmAvgAge" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="kpiFirmAvgAgeSub">-</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">平均年資</div>
-          <div class="kpi-value" id="kpiOfficeAvgSeniority" style="color:var(--green);">-</div>
-          <div class="kpi-sub">有證號資料</div>
+          <div class="kpi-value" id="kpiFirmAvgSen" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="kpiFirmAvgSenSub">-</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">有官網</div>
@@ -607,6 +599,44 @@
           <div class="kpi-sub">已搜尋到官網</div>
         </div>
       </div>
+      <!-- 第二列：法人/公司 -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">法人 / 公司</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">法人/公司數</div>
+          <div class="kpi-value" id="kpiOfficeCorpCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub" id="kpiOfficeCorpSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">最大法人</div>
+          <div class="kpi-value" id="kpiCorpLargest" style="color:var(--purple);font-size:1.1rem;">-</div>
+          <div class="kpi-sub" id="kpiCorpLargestSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均規模</div>
+          <div class="kpi-value" id="kpiCorpAvgSize" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">律師/法人</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年齡</div>
+          <div class="kpi-value" id="kpiCorpAvgAge" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="kpiCorpAvgAgeSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年資</div>
+          <div class="kpi-value" id="kpiCorpAvgSen" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="kpiCorpAvgSenSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">全部單位</div>
+          <div class="kpi-value" id="kpiOfficeCount" style="color:var(--text-muted);">-</div>
+          <div class="kpi-sub">事務所+法人合計</div>
+        </div>
+      </div>
+      <!-- 隱藏的舊 KPI（供 JS 相容）-->
+      <div style="display:none;" id="kpiOfficeFirmSub"></div>
+      <div style="display:none;" id="kpiOfficeAvgAge"></div>
+      <div style="display:none;" id="kpiOfficeAvgSeniority"></div>
       <div class="search-bar">
         <input type="text" id="officeSearch" placeholder="搜尋事務所名稱..." oninput="searchOffices()">
       </div>
@@ -1863,19 +1893,23 @@ async function loadOffices() {
   document.getElementById('kpiOfficeCount').textContent = allOffices.length.toLocaleString();
   document.getElementById('kpiOfficeFirmCount').textContent = firms.length.toLocaleString();
   document.getElementById('kpiOfficeCorpCount').textContent = corps.length.toLocaleString();
+
+  // 事務所 KPIs
+  if (firms.length > 0) {
+    document.getElementById('kpiOfficeLargest').textContent = firms[0].firm_name;
+    document.getElementById('kpiOfficeLargestSub').textContent = firms[0].lawyer_count + ' 位律師';
+    document.getElementById('kpiOfficeAvgSize').textContent = (firms.reduce((s, o) => s + Number(o.lawyer_count), 0) / firms.length).toFixed(1);
+  }
+
+  // 法人/公司 KPIs
   if (corps.length > 0) {
-    const largestCorp = corps[0]; // already sorted by lawyer_count DESC
-    document.getElementById('kpiOfficeCorpSub').textContent = `最大：${largestCorp.firm_name}（${largestCorp.lawyer_count}人）`;
+    document.getElementById('kpiCorpLargest').textContent = corps[0].firm_name;
+    document.getElementById('kpiCorpLargestSub').textContent = corps[0].lawyer_count + ' 位律師';
+    document.getElementById('kpiCorpAvgSize').textContent = (corps.reduce((s, o) => s + Number(o.lawyer_count), 0) / corps.length).toFixed(1);
   }
-  if (allOffices.length > 0) {
-    const largestFirm = firms[0] || allOffices[0];
-    document.getElementById('kpiOfficeLargest').textContent = largestFirm.firm_name;
-    document.getElementById('kpiOfficeLargestSub').textContent = largestFirm.lawyer_count + ' 位律師';
-    const avgSize = (firms.reduce((s, o) => s + Number(o.lawyer_count), 0) / (firms.length || 1)).toFixed(1);
-    document.getElementById('kpiOfficeAvgSize').textContent = avgSize;
-    const withWeb = allOffices.filter(o => o.website_url).length;
-    document.getElementById('kpiOfficeWebsite').textContent = withWeb;
-  }
+
+  const withWeb = allOffices.filter(o => o.website_url).length;
+  document.getElementById('kpiOfficeWebsite').textContent = withWeb;
 
   // 補上 firm_profiles 手動新增的官網
   try {
@@ -1947,19 +1981,45 @@ async function loadOfficeAgeSeniority() {
   const currentYear = new Date().getFullYear();
   const currentRocYear = currentYear - 1911;
 
-  // 全體 KPI
-  const ages = rows.filter(r => r.birth_year && r.birth_year < 200).map(r => currentYear - (1911 + r.birth_year));
-  if (ages.length) {
-    document.getElementById('kpiOfficeAvgAge').textContent = (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1);
-    document.getElementById('kpiOfficeAvgAge').parentElement.querySelector('.kpi-sub').textContent = `${ages.length.toLocaleString()} 人有資料`;
+  // 分開計算事務所 vs 法人的平均年齡和年資
+  const isFirmOffice = o => /事務所/.test(o || '');
+  const firmRows = rows.filter(r => isFirmOffice(r.office_normalized));
+  const corpRows = rows.filter(r => r.office_normalized && !isFirmOffice(r.office_normalized));
+
+  const calcAvgAge = (arr) => {
+    const ages = arr.filter(r => r.birth_year && r.birth_year < 200).map(r => currentYear - (1911 + r.birth_year));
+    return ages.length ? { avg: (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1), count: ages.length } : null;
+  };
+  const calcAvgSen = (arr) => {
+    const sens = arr.filter(r => r.lic_no).map(r => {
+      const m = r.lic_no.match(/^\(?(\d+)\)?/);
+      return m ? currentRocYear - parseInt(m[1]) : null;
+    }).filter(y => y != null && y >= 0);
+    return sens.length ? { avg: (sens.reduce((a, b) => a + b, 0) / sens.length).toFixed(1), count: sens.length } : null;
+  };
+
+  // 事務所平均
+  const firmAge = calcAvgAge(firmRows);
+  if (firmAge) {
+    document.getElementById('kpiFirmAvgAge').textContent = firmAge.avg;
+    document.getElementById('kpiFirmAvgAgeSub').textContent = `${firmAge.count.toLocaleString()} 人有資料`;
   }
-  const allSen = rows.filter(r => r.lic_no).map(r => {
-    const m = r.lic_no.match(/^\(?(\d+)\)?/);
-    return m ? currentRocYear - parseInt(m[1]) : null;
-  }).filter(y => y != null && y >= 0);
-  if (allSen.length) {
-    document.getElementById('kpiOfficeAvgSeniority').textContent = (allSen.reduce((a, b) => a + b, 0) / allSen.length).toFixed(1) + ' 年';
-    document.getElementById('kpiOfficeAvgSeniority').parentElement.querySelector('.kpi-sub').textContent = `${allSen.length.toLocaleString()} 人有資料`;
+  const firmSen = calcAvgSen(firmRows);
+  if (firmSen) {
+    document.getElementById('kpiFirmAvgSen').textContent = firmSen.avg + ' 年';
+    document.getElementById('kpiFirmAvgSenSub').textContent = `${firmSen.count.toLocaleString()} 人有資料`;
+  }
+
+  // 法人/公司平均
+  const corpAge = calcAvgAge(corpRows);
+  if (corpAge) {
+    document.getElementById('kpiCorpAvgAge').textContent = corpAge.avg;
+    document.getElementById('kpiCorpAvgAgeSub').textContent = `${corpAge.count.toLocaleString()} 人有資料`;
+  }
+  const corpSen = calcAvgSen(corpRows);
+  if (corpSen) {
+    document.getElementById('kpiCorpAvgSen').textContent = corpSen.avg + ' 年';
+    document.getElementById('kpiCorpAvgSenSub').textContent = `${corpSen.count.toLocaleString()} 人有資料`;
   }
 
   // 個別事務所平均（用 office_normalized 分組，含分所合併）
