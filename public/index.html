@@ -3762,16 +3762,14 @@ let adminUsers = [];
 
 async function callAdminAPI(action, body = null) {
   const opts = {
+    method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + (await db.auth.getSession()).data.session.access_token,
       'Content-Type': 'application/json',
       'apikey': SUPABASE_ANON_KEY,
     },
+    body: JSON.stringify(body || {}),
   };
-  if (body) {
-    opts.method = 'POST';
-    opts.body = JSON.stringify(body);
-  }
   const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users?action=${action}`, opts);
   return res.json();
 }
