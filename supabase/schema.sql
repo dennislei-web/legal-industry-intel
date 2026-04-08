@@ -123,6 +123,20 @@ CREATE TABLE ai_insights (
 CREATE INDEX idx_insights_type ON ai_insights(insight_type);
 CREATE INDEX idx_insights_created ON ai_insights(created_at DESC);
 
+-- 使用者 profile（連結 auth.users，管理角色）
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  display_name TEXT,
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_user_profiles_role ON user_profiles(role);
+CREATE INDEX idx_user_profiles_email ON user_profiles(email);
+
 -- 使用者筆記
 CREATE TABLE manual_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -226,6 +240,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER lawyers_updated_at BEFORE UPDATE ON lawyers FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER law_firms_updated_at BEFORE UPDATE ON law_firms FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER manual_notes_updated_at BEFORE UPDATE ON manual_notes FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
 -- 4. RLS
@@ -239,6 +254,16 @@ ALTER TABLE ai_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE manual_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scrape_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE data_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+-- user_profiles: 登入可讀，admin 可改
+CREATE POLICY "auth_read_profiles" ON user_profiles FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "admin_update_profiles" ON user_profiles FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
+CREATE POLICY "admin_insert_profiles" ON user_profiles FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+);
 
 -- 登入即可讀取所有公開資料
 CREATE POLICY "auth_read" ON lawyers FOR SELECT USING (auth.uid() IS NOT NULL);
