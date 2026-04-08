@@ -360,6 +360,7 @@
       </div>
       <div class="header-actions">
         <span class="user-badge" id="userBadge"></span>
+        <button class="btn-logout" onclick="showChangePassword()" title="修改密碼" style="font-size:0.75rem;">&#128273; 改密碼</button>
         <button class="theme-toggle" onclick="toggleTheme()" title="切換主題">&#9790;</button>
         <button class="btn-logout" onclick="handleLogout()">登出</button>
       </div>
@@ -3918,6 +3919,50 @@ async function deleteUser(userId, name) {
 }
 
 // ============================================================
+// ============================================================
+// 修改密碼
+// ============================================================
+function showChangePassword() {
+  const modal = document.getElementById('changePwModal');
+  modal.style.display = 'flex';
+  document.getElementById('cpOldPw').value = '';
+  document.getElementById('cpNewPw').value = '';
+  document.getElementById('cpNewPw2').value = '';
+  document.getElementById('cpMsg').textContent = '';
+}
+
+function closeChangePassword() {
+  document.getElementById('changePwModal').style.display = 'none';
+}
+
+async function submitChangePassword() {
+  const oldPw = document.getElementById('cpOldPw').value;
+  const newPw = document.getElementById('cpNewPw').value;
+  const newPw2 = document.getElementById('cpNewPw2').value;
+  const msgEl = document.getElementById('cpMsg');
+
+  if (!oldPw || !newPw) { msgEl.textContent = '請填寫所有欄位'; msgEl.style.color = 'var(--red)'; return; }
+  if (newPw !== newPw2) { msgEl.textContent = '兩次密碼不一致'; msgEl.style.color = 'var(--red)'; return; }
+  if (newPw.length < 6) { msgEl.textContent = '密碼至少 6 個字元'; msgEl.style.color = 'var(--red)'; return; }
+
+  msgEl.textContent = '驗證中...'; msgEl.style.color = 'var(--text-muted)';
+
+  // 先用舊密碼重新登入驗證
+  const { error: verifyErr } = await db.auth.signInWithPassword({
+    email: currentUser.email,
+    password: oldPw,
+  });
+  if (verifyErr) { msgEl.textContent = '舊密碼不正確'; msgEl.style.color = 'var(--red)'; return; }
+
+  // 更新密碼
+  const { error } = await db.auth.updateUser({ password: newPw });
+  if (error) { msgEl.textContent = '修改失敗：' + error.message; msgEl.style.color = 'var(--red)'; return; }
+
+  msgEl.textContent = '密碼已修改成功！'; msgEl.style.color = 'var(--green)';
+  setTimeout(() => closeChangePassword(), 1500);
+}
+
+// ============================================================
 // INIT - Check existing session
 // ============================================================
 (async function init() {
@@ -3928,6 +3973,32 @@ async function deleteUser(userId, name) {
   }
 })();
 </script>
+
+<!-- 修改密碼 Modal -->
+<div id="changePwModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeChangePassword();">
+  <div class="modal-content" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 style="font-size:1.1rem;">&#128273; 修改密碼</h2>
+      <button onclick="closeChangePassword()">&#10005;</button>
+    </div>
+    <div style="padding:20px;">
+      <div class="form-group">
+        <label>目前密碼</label>
+        <input type="password" id="cpOldPw" placeholder="輸入目前密碼">
+      </div>
+      <div class="form-group">
+        <label>新密碼</label>
+        <input type="password" id="cpNewPw" placeholder="輸入新密碼（至少 6 字元）">
+      </div>
+      <div class="form-group">
+        <label>確認新密碼</label>
+        <input type="password" id="cpNewPw2" placeholder="再次輸入新密碼">
+      </div>
+      <div id="cpMsg" style="font-size:0.85rem;margin-bottom:12px;"></div>
+      <button class="btn btn-primary" onclick="submitChangePassword()">確認修改</button>
+    </div>
+  </div>
+</div>
 
 <!-- 事務所詳細 Modal -->
 <div id="firmModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeFirmModal();">
