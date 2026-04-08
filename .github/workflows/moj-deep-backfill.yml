@@ -100,4 +100,4 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         working-directory: scripts
-        run: python moj_lawyer_detail_fetch.py --limit 2000
+        run: python moj_lawyer_detail_fetch.py 2000
