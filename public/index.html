@@ -4214,37 +4214,52 @@ async function loadCourts() {
   const courtType = document.getElementById('courtTypeFilter').value;
   const region = document.getElementById('courtRegionFilter').value;
 
-  let query = db.from('courts').select('*', { count: 'exact' });
-  if (search) query = query.ilike('name', `%${search}%`);
-  if (courtType) query = query.eq('court_type', courtType);
-  if (region) query = query.eq('region', region);
+  // 一次取全部法院（只有 35 個）+ 法官人數，前端排序篩選
+  const [courtsResult, statsResult] = await Promise.all([
+    db.from('courts').select('*'),
+    db.rpc('judge_court_statistics'),
+  ]);
 
-  query = query.order(courtSortCol, { ascending: courtSortAsc, nullsFirst: false });
-  query = query.range(courtPage * PAGE_SIZE, (courtPage + 1) * PAGE_SIZE - 1);
+  if (courtsResult.error) { console.error('courts error:', courtsResult.error); return; }
 
-  const { data, count, error } = await query;
-  courtTotal = count || 0;
+  // 合併法官人數
+  const judgeCountMap = {};
+  if (statsResult.data) {
+    statsResult.data.forEach(s => { judgeCountMap[s.court_name] = s.judge_count; });
+  }
 
-  if (error) { console.error('courts error:', error); return; }
+  let allCourts = (courtsResult.data || []).map(c => {
+    c.judge_count = judgeCountMap[c.name] || 0;
+    return c;
+  });
+
+  // 前端篩選
+  if (search) allCourts = allCourts.filter(c => c.name.includes(search));
+  if (courtType) allCourts = allCourts.filter(c => c.court_type === courtType);
+  if (region) allCourts = allCourts.filter(c => c.region === region);
+
+  // 前端排序
+  allCourts.sort((a, b) => {
+    let va = a[courtSortCol], vb = b[courtSortCol];
+    if (va == null) va = courtSortAsc ? Infinity : -Infinity;
+    if (vb == null) vb = courtSortAsc ? Infinity : -Infinity;
+    if (typeof va === 'string') return courtSortAsc ? va.localeCompare(vb, 'zh') : vb.localeCompare(va, 'zh');
+    return courtSortAsc ? va - vb : vb - va;
+  });
+
+  courtTotal = allCourts.length;
+
+  // 分頁
+  const pageData = allCourts.slice(courtPage * PAGE_SIZE, (courtPage + 1) * PAGE_SIZE);
 
   const tbody = document.getElementById('courtTableBody');
-  if (!data || !data.length) {
+  if (!pageData.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('courtPagination', courtPage, courtTotal, p => { courtPage = p; loadCourts(); });
     return;
   }
 
-  // 查詢每法院的法官人數（用 RPC 避免 1000 筆限制）
-  const { data: courtStats } = await db.rpc('judge_court_statistics');
-  const judgeCountMap = {};
-  if (courtStats) {
-    courtStats.forEach(s => {
-      judgeCountMap[s.court_name] = s.judge_count;
-    });
-  }
-
-  tbody.innerHTML = data.map(c => {
-    c.judge_count = judgeCountMap[c.name] || null;
+  tbody.innerHTML = pageData.map(c => {
     const clearanceRate = c.clearance_rate != null ? (c.clearance_rate * 100).toFixed(1) + '%' : '-';
     const clearanceColor = c.clearance_rate != null
       ? (c.clearance_rate >= 0.9 ? 'var(--green)' : c.clearance_rate >= 0.7 ? 'var(--orange)' : 'var(--red)')
