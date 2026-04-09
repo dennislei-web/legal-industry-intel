@@ -4234,7 +4234,17 @@ async function loadCourts() {
     return;
   }
 
+  // 查詢每法院的法官人數
+  const { data: judgeCounts } = await db.from('jy_judges').select('court_name');
+  const judgeCountMap = {};
+  if (judgeCounts) {
+    judgeCounts.forEach(j => {
+      judgeCountMap[j.court_name] = (judgeCountMap[j.court_name] || 0) + 1;
+    });
+  }
+
   tbody.innerHTML = data.map(c => {
+    c.judge_count = judgeCountMap[c.name] || null;
     const clearanceRate = c.clearance_rate != null ? (c.clearance_rate * 100).toFixed(1) + '%' : '-';
     const clearanceColor = c.clearance_rate != null
       ? (c.clearance_rate >= 0.9 ? 'var(--green)' : c.clearance_rate >= 0.7 ? 'var(--orange)' : 'var(--red)')
