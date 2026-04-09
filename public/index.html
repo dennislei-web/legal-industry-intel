@@ -1284,23 +1284,37 @@ db.auth.onAuthStateChange((event, session) => {
 // DASHBOARD INIT
 // ============================================================
 async function showDashboard() {
+  // 先顯示畫面，不等資料載完
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('userBadge').textContent = currentUser.email;
 
-  // 檢查是否為 admin
-  const { data: profile } = await db
-    .from('user_profiles')
-    .select('role')
-    .eq('id', currentUser.id)
-    .single();
+  // 背景非同步載入（不阻塞畫面）
+  db.from('user_profiles').select('role').eq('id', currentUser.id).single().then(({ data: profile }) => {
+    isAdmin = profile?.role === 'admin';
+    document.getElementById('tabBtnAdmin').style.display = isAdmin ? '' : 'none';
+    document.getElementById('tabBtnTrends').style.display = isAdmin ? '' : 'none';
+    document.getElementById('tabBtnNews').style.display = isAdmin ? '' : 'none';
+    document.getElementById('tabBtnInput').style.display = isAdmin ? '' : 'none';
+  });
 
-  isAdmin = profile?.role === 'admin';
-  document.getElementById('tabBtnAdmin').style.display = isAdmin ? '' : 'none';
-  document.getElementById('tabBtnTrends').style.display = isAdmin ? '' : 'none';
-  document.getElementById('tabBtnNews').style.display = isAdmin ? '' : 'none';
-  document.getElementById('tabBtnInput').style.display = isAdmin ? '' : 'none';
+  // 輕量 KPI 先載入，重量圖表延後
+  loadOverviewFast();
+}
 
+async function loadOverviewFast() {
+  // 先平行載入最重要的 KPI（不含圖表）
+  const [merged, moj, lawsnote] = await Promise.all([
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }),
+    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true),
+    db.from('lawsnote_lawyers').select('*', { count: 'exact', head: true }),
+  ]);
+  document.getElementById('kpiLawyerCount').textContent = merged.count?.toLocaleString() || '0';
+  document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
+  document.getElementById('kpiRegistryCount').textContent = moj.count?.toLocaleString() || '0';
+  document.getElementById('kpiLawsnoteCount').textContent = lawsnote.count?.toLocaleString() || '0';
+
+  // 然後背景載入其餘的（圖表、統計等）
   loadOverview();
   loadSources();
 }
