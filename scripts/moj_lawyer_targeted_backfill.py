@@ -26,20 +26,30 @@ H = {'apikey': KEY, 'Authorization': f'Bearer {KEY}'}
 
 
 def fetch_missing_names():
-    """從 lawyers_missing_from_moj view 分頁取出所有缺失律師姓名，依優先順序排序。"""
+    """從 lawyers_combined 找出 has_moj=false 的律師，依優先順序排序。"""
     names = []
     offset = 0
     while True:
         r = requests.get(
-            f'{URL}/rest/v1/lawyers_missing_from_moj'
-            f'?select=name,missing_category'
+            f'{URL}/rest/v1/lawyers_combined'
+            f'?select=name,has_twba,has_lawsnote,data_source'
+            f'&has_moj=eq.false'
             f'&offset={offset}&limit=1000',
             headers=H, verify=False, timeout=30,
         )
         data = r.json()
+        if isinstance(data, dict):
+            print(f'API error: {data}')
+            break
         if not data:
             break
-        names.extend(data)
+        for row in data:
+            cat = '僅Lawsnote'
+            if row.get('has_twba') and row.get('has_lawsnote'):
+                cat = '全聯會+Lawsnote'
+            elif row.get('has_twba'):
+                cat = '僅全聯會'
+            names.append({'name': row['name'], 'missing_category': cat})
         if len(data) < 1000:
             break
         offset += 1000
