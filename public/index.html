@@ -4234,12 +4234,12 @@ async function loadCourts() {
     return;
   }
 
-  // 查詢每法院的法官人數
-  const { data: judgeCounts } = await db.from('jy_judges').select('court_name');
+  // 查詢每法院的法官人數（用 RPC 避免 1000 筆限制）
+  const { data: courtStats } = await db.rpc('judge_court_statistics');
   const judgeCountMap = {};
-  if (judgeCounts) {
-    judgeCounts.forEach(j => {
-      judgeCountMap[j.court_name] = (judgeCountMap[j.court_name] || 0) + 1;
+  if (courtStats) {
+    courtStats.forEach(s => {
+      judgeCountMap[s.court_name] = s.judge_count;
     });
   }
 
