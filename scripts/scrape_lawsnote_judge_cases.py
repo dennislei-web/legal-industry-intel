@@ -118,9 +118,18 @@ def main():
     }''')
 
     if not is_logged_in:
-        log('⚠ 請在瀏覽器視窗中手動登入 Lawsnote')
-        log('  登入完成後按 Enter 繼續...')
-        input()
+        log('⚠ 請在瀏覽器視窗中手動登入 Lawsnote（等待最多 120 秒）')
+        for _ in range(60):
+            time.sleep(2)
+            is_logged_in = page.evaluate("() => document.cookie.includes('authHeaders')")
+            if is_logged_in:
+                log('✓ 登入成功')
+                break
+        if not is_logged_in:
+            log('✗ 登入超時，退出')
+            context.close()
+            pw.stop()
+            return
 
     log(f'開始查詢 {len(todo)} 位法官的案件數...')
 
