@@ -698,10 +698,10 @@
                 <th style="cursor:pointer" onclick="sortJudges('name')">姓名 <span id="sortIcon_j_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('court_name')">法院 <span id="sortIcon_j_court_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('division')">庭別 <span id="sortIcon_j_division">↕</span></th>
-                <th style="cursor:pointer" onclick="sortJudges('title')">職稱 <span id="sortIcon_j_title">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('rank')">職稱 <span id="sortIcon_j_rank">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('seniority_years')">年資 <span id="sortIcon_j_seniority_years">↕</span></th>
-                <th style="cursor:pointer" onclick="sortJudges('case_count')">案件數 <span id="sortIcon_j_case_count">↕</span></th>
-                <th style="cursor:pointer" onclick="sortJudges('avg_disposition_days')">平均結案天數 <span id="sortIcon_j_avg_disposition_days">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('case_count_total')">案件數 <span id="sortIcon_j_case_count_total">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('avg_processing_days')">平均結案天數 <span id="sortIcon_j_avg_processing_days">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('data_source')">來源 <span id="sortIcon_j_data_source">↕</span></th>
               </tr>
             </thead>
@@ -1212,8 +1212,8 @@ let courtSearchTimer = null;
 
 function sortJudges(col) {
   if (judgeSortCol === col) { judgeSortAsc = !judgeSortAsc; }
-  else { judgeSortCol = col; judgeSortAsc = (col === 'case_count' || col === 'avg_disposition_days') ? false : true; }
-  ['name','court_name','division','title','seniority_years','case_count','avg_disposition_days','data_source'].forEach(c => {
+  else { judgeSortCol = col; judgeSortAsc = (col === 'case_count_total' || col === 'avg_processing_days') ? false : true; }
+  ['name','court_name','division','rank','seniority_years','case_count_total','avg_processing_days','data_source'].forEach(c => {
     const icon = document.getElementById('sortIcon_j_' + c);
     if (icon) icon.textContent = c === col ? (judgeSortAsc ? '↑' : '↓') : '↕';
   });
@@ -4154,10 +4154,10 @@ async function loadJudges() {
       <td><strong>${escHtml(j.name)}</strong></td>
       <td style="font-size:0.85rem;">${escHtml(j.court_name || '-')}</td>
       <td>${escHtml(j.division || '-')}</td>
-      <td>${escHtml(j.title || '-')}</td>
+      <td>${escHtml(j.rank || '-')}</td>
       <td style="text-align:center;">${j.seniority_years != null ? j.seniority_years + ' 年' : '-'}</td>
-      <td style="text-align:center;font-weight:600;color:var(--gold);">${j.case_count != null ? j.case_count.toLocaleString() : '-'}</td>
-      <td style="text-align:center;">${j.avg_disposition_days != null ? j.avg_disposition_days.toFixed(1) : '-'}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${j.case_count_total != null ? j.case_count_total.toLocaleString() : '-'}</td>
+      <td style="text-align:center;">${j.avg_processing_days != null ? j.avg_processing_days.toFixed(1) : '-'}</td>
       <td>${srcBadge}</td>
     </tr>`;
   }).join('');
@@ -4191,7 +4191,7 @@ async function loadJudgeKpis() {
     db.from('judges_combined').select('*', { count: 'exact', head: true }),
     db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%司法院%'),
     db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%Lawsnote%'),
-    db.from('judges_combined').select('case_count'),
+    db.from('judges_combined').select('case_count_total'),
   ]);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
   set('kpiJudgeTotal', total.count);
@@ -4200,7 +4200,7 @@ async function loadJudgeKpis() {
   set('kpiJudgeLawsnote', lnOnly.count);
   // Calculate average case count
   if (avgCases.data) {
-    const cases = avgCases.data.filter(r => r.case_count != null).map(r => r.case_count);
+    const cases = avgCases.data.filter(r => r.case_count_total != null).map(r => r.case_count_total);
     const avg = cases.length > 0 ? Math.round(cases.reduce((a, b) => a + b, 0) / cases.length) : 0;
     set('kpiJudgeAvgCases', avg);
   }
