@@ -82,24 +82,49 @@ def query_lic(lic_no):
     try:
         r = sess.get(f'{MOJ_BASE}/cert/lyinfosd/{lic_no}', timeout=10)
         if r.status_code == 200:
-            data = r.json().get('data', {})
-            if data and data.get('name'):
+            resp = r.json()
+            data = resp.get('data')
+            # data 可能是 list 或 dict
+            if isinstance(data, list):
+                if data and data[0].get('name'):
+                    return data[0]
+            elif isinstance(data, dict) and data.get('name'):
                 return data
-    except Exception as e:
+    except Exception:
         pass
     return None
 
 
 def to_lawyer_record(lic_no, data):
     """轉換為 moj_lawyers 表格式"""
+    # guild_name 可能是字串或 list
+    guilds = data.get('guild_name')
+    if isinstance(guilds, str):
+        guilds = [g.strip() for g in guilds.split(',') if g.strip()] or None
+    elif isinstance(guilds, list):
+        guilds = [g for g in guilds if g] or None
+
+    court = data.get('court')
+    if isinstance(court, str):
+        court = [court] if court else None
+    elif isinstance(court, list):
+        court = [c for c in court if c] or None
+
     return {
         'lic_no': lic_no,
         'name': data.get('name', ''),
         'sex': data.get('sex'),
         'office': data.get('office'),
         'office_normalized': normalize_office(data.get('office')),
-        'guild_names': data.get('guild_name') or None,
-        'court': data.get('court') or None,
+        'guild_names': guilds,
+        'court': court,
+        'birth_year': data.get('birthsday') if isinstance(data.get('birthsday'), int) else None,
+        'state': data.get('state'),
+        'state_desc': data.get('statedesc'),
+        'email': data.get('email') or None,
+        'tel': data.get('tel') or None,
+        'address': data.get('addr') or None,
+        'discipline': data.get('discipline') or None,
         'raw_data': data,
     }
 
@@ -130,36 +155,48 @@ def upload_batch(records):
     return True
 
 
-def scan_year(year, max_num, existing_set, extra_buffer=50):
+def scan_year(year, max_num, existing_set, extra_buffer=30):
     """掃描某年的 1 到 max_num+buffer 編號"""
     found = []
-    miss = 0
+    queried = 0
+    new_count = 0
     scan_to = max_num + extra_buffer
 
-    print(f'\n年份 {year}: 掃描 1 ~ {scan_to}')
+    # 計算這年要查多少（已有的跳過）
+    missing_nums = []
     for num in range(1, scan_to + 1):
         lic_no = f'{year}臺檢證字第{num:05d}號'
-        if lic_no in existing_set:
-            continue
+        if lic_no not in existing_set:
+            missing_nums.append(num)
 
+    print(f'年份 {year}: 範圍 1~{scan_to}, 缺 {len(missing_nums)} 筆, 開始查詢...', flush=True)
+
+    for i, num in enumerate(missing_nums, 1):
+        lic_no = f'{year}臺檢證字第{num:05d}號'
         data = query_lic(lic_no)
+        queried += 1
+
         if data:
             found.append(to_lawyer_record(lic_no, data))
-            if len(found) % 20 == 0:
-                print(f'  [{num}/{scan_to}] 新增 {len(found)}')
-                # 分批上傳
+            new_count += 1
+            # 每 10 筆立刻上傳
+            if len(found) >= 10:
                 if upload_batch(found):
                     existing_set.update(f['lic_no'] for f in found)
-                    found = []
+                found = []
 
-        time.sleep(0.1)
+        # 每 50 筆印一次進度
+        if i % 50 == 0:
+            print(f'  [{year}] {i}/{len(missing_nums)} queried, {new_count} found', flush=True)
+
+        time.sleep(0.08)
 
     # 剩餘上傳
     if found:
         upload_batch(found)
         existing_set.update(f['lic_no'] for f in found)
 
-    print(f'  年份 {year} 完成')
+    print(f'年份 {year} 完成: 查 {queried}, 新增 {new_count}', flush=True)
 
 
 def main():
