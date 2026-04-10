@@ -1748,7 +1748,7 @@ async function loadLawyers() {
     const hasPractice = l.practice_start_date;
 
     return `<tr>
-      <td><strong${tooltip ? ' title="' + escHtml(tooltip) + '" style="cursor:help;border-bottom:1px dotted var(--text-muted);"' : ''}>${escHtml(l.name)}</strong>${FIRM_LEADERS[l.name] ? ' <span title="' + escHtml(FIRM_LEADERS[l.name]) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${FIRM_LEADERS[l.name] ? ' <span title="' + escHtml(FIRM_LEADERS[l.name]) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
@@ -2675,7 +2675,121 @@ function closeFirmModal() {
 }
 
 // ESC 關閉 modal
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFirmModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeFirmModal(); closeLawyerModal(); } });
+
+// ============================================================
+// 律師詳細 Modal
+// ============================================================
+async function showLawyerDetail(name, certNumber) {
+  const modal = document.getElementById('lawyerModal');
+  const titleEl = document.getElementById('lawyerModalTitle');
+  const bodyEl = document.getElementById('lawyerModalBody');
+  modal.style.display = 'flex';
+  titleEl.textContent = name;
+  bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
+
+  // 查 lawyers_combined（含 MOJ + 全聯會 + Lawsnote 整合資料）
+  let query = db.from('lawyers_combined').select('*').eq('name', name);
+  if (certNumber) query = query.eq('cert_number', certNumber);
+  const { data: combined, error } = await query.limit(1);
+
+  if (error || !combined || !combined.length) {
+    bodyEl.innerHTML = `<div style="color:var(--red);padding:20px;">查詢失敗: ${error?.message || '找不到資料'}</div>`;
+    return;
+  }
+  const l = combined[0];
+
+  // 若有 moj_id，額外查 moj_lawyers 取詳細資料
+  let moj = null;
+  if (l.moj_id) {
+    const { data: mojData } = await db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle();
+    moj = mojData;
+  }
+
+  // 年資計算
+  const currentRocYear = new Date().getFullYear() - 1911;
+  let seniority = '-';
+  const licNo = l.moj_lic_no || l.cert_number;
+  if (licNo) {
+    const m = licNo.match(/^\(?(\d+)\)?/);
+    if (m) { const y = currentRocYear - parseInt(m[1]); if (y >= 0) seniority = y + ' 年'; }
+  }
+
+  // 年齡
+  const birthYear = moj?.birth_year;
+  const age = birthYear && birthYear < 200 ? `民國 ${birthYear} 年 (${new Date().getFullYear() - (1911 + birthYear)} 歲)` : '-';
+
+  // 來源標籤
+  const sources = [];
+  if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
+  if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
+  if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
+
+  // 負責人標記
+  const leaderBadge = FIRM_LEADERS[name] ? `<span style="color:var(--gold);font-size:0.85rem;margin-left:8px;" title="${escHtml(FIRM_LEADERS[name])}">👑 ${escHtml(FIRM_LEADERS[name].split('｜')[1] || '負責人')}</span>` : '';
+
+  // 事務所連結
+  const firmLink = l.firm_name
+    ? `<a href="#" onclick="closeLawyerModal();showFirmDetail('${escHtml(l.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);">${escHtml(l.firm_name)}</a>`
+    : '<span style="color:var(--text-muted);">-</span>';
+
+  // 執業地區
+  const region = (l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-';
+
+  const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:100px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
+
+  bodyEl.innerHTML = `
+    <div style="margin-bottom:16px;">
+      ${sources.join(' ')}
+      ${leaderBadge}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;padding:0;">
+      <table style="width:100%;font-size:0.9rem;">
+        <tbody>
+          ${row('事務所', firmLink)}
+          ${row('公會/地區', escHtml(region))}
+          ${row('證號', escHtml(licNo || '-'))}
+          ${row('年資', seniority)}
+          ${row('出生年齡', age)}
+          ${row('性別', escHtml(l.moj_sex || moj?.sex || '-'))}
+          ${moj?.email ? row('Email', `<a href="mailto:${escHtml(moj.email)}" style="color:var(--blue);">${escHtml(moj.email)}</a>`) : ''}
+          ${moj?.tel ? row('電話', escHtml(moj.tel)) : ''}
+          ${moj?.address ? row('地址', escHtml(moj.address)) : ''}
+          ${l.practice_start_date ? row('執業起始', escHtml(l.practice_start_date)) : ''}
+          ${moj?.state_desc && moj.state_desc !== '正常' ? row('狀態', `<span style="color:var(--orange);">${escHtml(moj.state_desc)}</span>`) : ''}
+          ${moj?.discipline ? row('懲戒記錄', `<span style="color:var(--red);">⚠ ${escHtml(moj.discipline)}</span>`) : ''}
+        </tbody>
+      </table>
+    </div>
+
+    ${l.case_count_5yr != null ? `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128203; Lawsnote 案件統計</div>
+      <div style="display:flex;gap:20px;align-items:center;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">近 5 年案件數</div>
+          <div style="font-size:1.8rem;font-weight:700;color:var(--gold);">${l.case_count_5yr.toLocaleString()}</div>
+        </div>
+        ${l.expertise_areas?.length ? `<div style="flex:1;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">擅長領域</div>
+          <div>${l.expertise_areas.slice(0, 8).map(e => `<span class="badge" style="margin:2px;">${escHtml(e)}</span>`).join('')}</div>
+        </div>` : ''}
+      </div>
+    </div>
+    ` : ''}
+
+    ${l.lawsnote_id ? `
+    <div style="text-align:center;margin-top:12px;">
+      <a href="https://page.lawsnote.com/page/${escHtml(l.lawsnote_id)}" target="_blank" class="btn btn-sm btn-blue" style="text-decoration:none;">前往 Lawsnote 頁面 →</a>
+    </div>
+    ` : ''}
+  `;
+}
+
+function closeLawyerModal() {
+  document.getElementById('lawyerModal').style.display = 'none';
+}
 
 // ============================================================
 // TRENDS TAB - AI 報告 + 多 session 對話
@@ -4368,6 +4482,19 @@ async function loadCourtKpis() {
       <button class="tab-btn" onclick="switchFirmTab('analysis')" id="firmTab_analysis">AI 分析</button>
     </div>
     <div class="modal-body" id="firmModalBody">
+      <div class="loading">載入中</div>
+    </div>
+  </div>
+</div>
+
+<!-- 律師詳細 Modal -->
+<div id="lawyerModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeLawyerModal();">
+  <div class="modal-content" style="max-width:680px;">
+    <div class="modal-header">
+      <h2 id="lawyerModalTitle">載入中...</h2>
+      <button onclick="closeLawyerModal()">✕</button>
+    </div>
+    <div class="modal-body" id="lawyerModalBody">
       <div class="loading">載入中</div>
     </div>
   </div>
