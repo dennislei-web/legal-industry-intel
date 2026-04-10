@@ -31,7 +31,7 @@
       let all = [];
       for (let offset = 0; ; offset += 1000) {
         const r = await fetch(
-          `https://zpbkeyhxyykbvownrngf.supabase.co/rest/v1/jy_judges?select=name,court_name&order=name.asc&offset=${offset}&limit=1000`,
+          `https://zpbkeyhxyykbvownrngf.supabase.co/rest/v1/jy_judges?select=name&order=name.asc&offset=${offset}&limit=1000`,
           { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } }
         );
         const d = await r.json();
@@ -86,59 +86,56 @@
     }
 
     const name = todo[i];
+    const searchUrl = '/search/all/' + encodeURIComponent('法官：' + name);
 
-    // 方法：直接修改 URL + 觸發 SPA 路由
-    // Lawsnote 用 React Router，pushState 不會觸發路由
-    // 改用搜尋框輸入 + 按搜尋按鈕
+    // 用搜尋框 + 模擬 Enter 鍵觸發 SPA 路由
     const searchInput = document.querySelector('input[type="search"], input[placeholder*="關鍵字"], textarea');
-    const searchBtn = document.querySelector('button:has(svg), button[type="submit"]') ||
-                      [...document.querySelectorAll('button')].find(b => b.textContent.includes('搜尋'));
-
-    if (searchInput && searchBtn) {
-      // 清空並輸入新搜尋詞
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype, 'value'
-      )?.set || Object.getOwnPropertyDescriptor(
-        window.HTMLTextAreaElement.prototype, 'value'
-      )?.set;
-
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(searchInput, '法官：' + name);
-      } else {
-        searchInput.value = '法官：' + name;
-      }
+    if (searchInput) {
+      searchInput.focus();
+      // React 需要用 nativeInputValueSetter
+      const proto = searchInput.tagName === 'TEXTAREA'
+        ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      setter.call(searchInput, '法官：' + name);
       searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-      // 按搜尋
-      await sleep(300);
-      searchBtn.click();
-
-      // 等結果載入
-      let count = 0;
-      for (let attempt = 0; attempt < 30; attempt++) {
-        await sleep(500);
-        const text = document.body.innerText;
-        const m = text.match(/共(\d[\d,]*)筆結果/);
-        if (m) {
-          count = parseInt(m[1].replace(/,/g, ''));
-          break;
-        }
-      }
-
-      done[name] = count;
-
-      // 每 10 筆存一次
-      if ((Object.keys(done).length) % 10 === 0) {
-        localStorage.setItem('__ln_auto', JSON.stringify(done));
-        console.log(`[${Object.keys(done).length}/${names.length}] ${name}: ${count.toLocaleString()}`);
-      }
-
-      await sleep(1000);
+      await sleep(200);
+      // 模擬按 Enter
+      searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+      searchInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+      searchInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
     } else {
-      console.error('找不到搜尋框，請確認在 Lawsnote 搜尋頁面');
-      break;
+      // Fallback: 直接改 URL（會重新載入頁面）
+      window.history.pushState(null, '', searchUrl);
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
+
+    // 等結果載入（最多 15 秒）
+    let count = 0;
+    let prevText = document.body.innerText;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await sleep(500);
+      const text = document.body.innerText;
+      const m = text.match(/共(\d[\d,]*)筆結果/);
+      if (m && text !== prevText) {
+        count = parseInt(m[1].replace(/,/g, ''));
+        break;
+      }
+      if (attempt > 5 && text !== prevText) {
+        // 頁面更新了但沒找到結果數
+        const m2 = text.match(/共(\d[\d,]*)筆結果/);
+        if (m2) { count = parseInt(m2[1].replace(/,/g, '')); break; }
+      }
+    }
+
+    done[name] = count;
+
+    // 每 10 筆存一次 + 輸出進度
+    if ((Object.keys(done).length) % 10 === 0 || i === todo.length - 1) {
+      localStorage.setItem('__ln_auto', JSON.stringify(done));
+      console.log(`[${Object.keys(done).length}/${names.length}] ${name}: ${count.toLocaleString()}`);
+    }
+
+    await sleep(1500);
   }
 
   // 最終存檔
