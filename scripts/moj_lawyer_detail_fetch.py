@@ -18,10 +18,10 @@ from dotenv import load_dotenv
 sys.stdout.reconfigure(line_buffering=True)
 
 urllib3.disable_warnings()
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 
-SUPABASE_URL = os.environ['SUPABASE_URL']
-SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY']
+SUPABASE_URL = os.environ['SUPABASE_URL'].strip()
+SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY'].strip()
 MOJ_BASE = 'https://lawyerbc.moj.gov.tw/api'
 
 HEADERS_MOJ = {
