@@ -2316,6 +2316,16 @@ async function saveFirmNotes(firmName) {
   alert('已儲存');
 }
 
+// Markdown 渲染（使用 marked.js，fallback 簡單換行）
+function renderMarkdown(text) {
+  if (!text) return '';
+  if (typeof marked !== 'undefined') {
+    marked.setOptions({ breaks: true, gfm: true });
+    return marked.parse(text);
+  }
+  return escHtml(text).replace(/\n/g, '<br>');
+}
+
 async function loadFirmAnalysis(firmName) {
   const body = document.getElementById('firmModalBody');
   body.innerHTML = '<div class="loading">載入 AI 分析...</div>';
