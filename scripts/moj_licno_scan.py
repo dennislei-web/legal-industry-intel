@@ -63,7 +63,7 @@ def fetch_existing_lics():
 
 
 def analyze_year_ranges(existing_lics):
-    """分析每年的編號範圍，推算要補的範圍"""
+    """分析每年的編號範圍，只補 min~max 之間缺的編號"""
     year_nums = defaultdict(set)
     for lic in existing_lics:
         m = re.match(r'^(\d+)臺檢證字第(\d+)號', lic)
@@ -72,9 +72,12 @@ def analyze_year_ranges(existing_lics):
             num = int(m.group(2))
             year_nums[year].add(num)
 
-    # 每年的最大編號
-    year_max = {y: max(nums) for y, nums in year_nums.items() if nums}
-    return year_nums, year_max
+    # 每年的最小/最大編號
+    year_range = {}
+    for y, nums in year_nums.items():
+        if nums:
+            year_range[y] = (min(nums), max(nums))
+    return year_nums, year_range
 
 
 def query_lic(lic_no):
@@ -155,21 +158,22 @@ def upload_batch(records):
     return True
 
 
-def scan_year(year, max_num, existing_set, extra_buffer=30):
-    """掃描某年的 1 到 max_num+buffer 編號"""
+def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
+    """只掃描 min~max 之間缺的編號，加上 max 後面 buffer 個"""
     found = []
     queried = 0
     new_count = 0
+    scan_from = min_num
     scan_to = max_num + extra_buffer
 
     # 計算這年要查多少（已有的跳過）
     missing_nums = []
-    for num in range(1, scan_to + 1):
+    for num in range(scan_from, scan_to + 1):
         lic_no = f'{year}臺檢證字第{num:05d}號'
         if lic_no not in existing_set:
             missing_nums.append(num)
 
-    print(f'年份 {year}: 範圍 1~{scan_to}, 缺 {len(missing_nums)} 筆, 開始查詢...', flush=True)
+    print(f'年份 {year}: 範圍 {scan_from}~{scan_to}, 缺 {len(missing_nums)} 筆, 開始查詢...', flush=True)
 
     for i, num in enumerate(missing_nums, 1):
         lic_no = f'{year}臺檢證字第{num:05d}號'
@@ -203,7 +207,10 @@ def main():
     existing = fetch_existing_lics()
 
     print('\n[2/3] 分析各年度編號範圍...')
-    year_nums, year_max = analyze_year_ranges(existing)
+    year_nums, year_range = analyze_year_ranges(existing)
+    for y in sorted(year_range.keys()):
+        mn, mx = year_range[y]
+        print(f'  {y}: {mn}~{mx} ({len(year_nums[y])} 筆)', flush=True)
 
     # 如果有指定年份
     if len(sys.argv) > 1:
@@ -211,7 +218,7 @@ def main():
         print(f'  指定年份: {target_years}')
     else:
         # 預設掃 92 到最新年份
-        target_years = sorted([y for y in year_max.keys() if y >= 92])
+        target_years = sorted([y for y in year_range.keys() if y >= 92])
         print(f'  自動掃描年份: {target_years[0]} ~ {target_years[-1]}')
 
     print('\n[3/3] 開始掃描...')
@@ -219,9 +226,10 @@ def main():
     total_before = len(existing)
 
     for year in target_years:
-        if year not in year_max:
+        if year not in year_range:
             continue
-        scan_year(year, year_max[year], existing, extra_buffer=30)
+        mn, mx = year_range[year]
+        scan_year(year, mn, mx, existing, extra_buffer=30)
         elapsed = (time.time() - start_time) / 60
         added = len(existing) - total_before
         print(f'  累計新增 {added} 筆, 已跑 {elapsed:.1f} 分鐘')
