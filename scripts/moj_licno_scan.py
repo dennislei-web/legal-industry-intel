@@ -1,0 +1,201 @@
+"""
+MOJ 律師證號遍歷補掃 — 最高效的補掃策略
+
+律師證號是連續遞增的（民國年 + 編號）。
+從每年的編號 1 遍歷到當年最大編號，補齊缺漏。
+
+API: /api/cert/lyinfosd/{lic_no} - 不需要 CAPTCHA，可以大量呼叫
+
+用法:
+  python moj_licno_scan.py            # 補掃缺漏
+  python moj_licno_scan.py 108 109    # 只掃指定年份
+"""
+import os
+import re
+import sys
+import time
+import json
+import requests
+import urllib3
+from collections import defaultdict
+from dotenv import load_dotenv
+
+urllib3.disable_warnings()
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(line_buffering=True, encoding='utf-8')
+
+SUPABASE_URL = os.environ['SUPABASE_URL'].strip()
+SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY'].strip()
+MOJ_BASE = 'https://lawyerbc.moj.gov.tw/api'
+
+HEADERS_MOJ = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LegalIndustryIntel/1.0',
+    'Referer': 'https://lawyerbc.moj.gov.tw/',
+    'Origin': 'https://lawyerbc.moj.gov.tw',
+}
+HEADERS_SB = {'apikey': SERVICE_KEY, 'Authorization': f'Bearer {SERVICE_KEY}'}
+
+sess = requests.Session()
+sess.verify = False
+sess.headers.update(HEADERS_MOJ)
+
+
+def fetch_existing_lics():
+    """從 DB 取所有已有的證號"""
+    print('[1/3] 載入現有證號...')
+    out = set()
+    start = 0
+    while True:
+        r = requests.get(
+            f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&offset={start}&limit=1000',
+            headers=HEADERS_SB, verify=False, timeout=30,
+        )
+        data = r.json()
+        if not data:
+            break
+        out.update(d['lic_no'] for d in data if d.get('lic_no'))
+        if len(data) < 1000:
+            break
+        start += 1000
+    print(f'  已有 {len(out):,} 筆')
+    return out
+
+
+def analyze_year_ranges(existing_lics):
+    """分析每年的編號範圍，推算要補的範圍"""
+    year_nums = defaultdict(set)
+    for lic in existing_lics:
+        m = re.match(r'^(\d+)臺檢證字第(\d+)號', lic)
+        if m:
+            year = int(m.group(1))
+            num = int(m.group(2))
+            year_nums[year].add(num)
+
+    # 每年的最大編號
+    year_max = {y: max(nums) for y, nums in year_nums.items() if nums}
+    return year_nums, year_max
+
+
+def query_lic(lic_no):
+    """查詢單一證號的詳細資料"""
+    try:
+        r = sess.get(f'{MOJ_BASE}/cert/lyinfosd/{lic_no}', timeout=10)
+        if r.status_code == 200:
+            data = r.json().get('data', {})
+            if data and data.get('name'):
+                return data
+    except Exception as e:
+        pass
+    return None
+
+
+def to_lawyer_record(lic_no, data):
+    """轉換為 moj_lawyers 表格式"""
+    return {
+        'lic_no': lic_no,
+        'name': data.get('name', ''),
+        'sex': data.get('sex'),
+        'office': data.get('office'),
+        'office_normalized': normalize_office(data.get('office')),
+        'guild_names': data.get('guild_name') or None,
+        'court': data.get('court') or None,
+        'raw_data': data,
+    }
+
+
+def normalize_office(office):
+    if not office:
+        return None
+    s = office.strip().replace('\u3000', ' ')
+    s = re.sub(r'\s+', '', s)
+    if s in ('律師未提供', '未提供', '無', '未登記', '-', ''):
+        return None
+    return s
+
+
+def upload_batch(records):
+    if not records:
+        return
+    r = requests.post(
+        f'{SUPABASE_URL}/rest/v1/moj_lawyers?on_conflict=lic_no',
+        json=records,
+        headers={**HEADERS_SB, 'Content-Type': 'application/json',
+                 'Prefer': 'resolution=merge-duplicates,return=minimal'},
+        verify=False, timeout=60,
+    )
+    if r.status_code not in (200, 201, 204):
+        print(f'  ! upload error {r.status_code}: {r.text[:200]}')
+        return False
+    return True
+
+
+def scan_year(year, max_num, existing_set, extra_buffer=50):
+    """掃描某年的 1 到 max_num+buffer 編號"""
+    found = []
+    miss = 0
+    scan_to = max_num + extra_buffer
+
+    print(f'\n年份 {year}: 掃描 1 ~ {scan_to}')
+    for num in range(1, scan_to + 1):
+        lic_no = f'{year}臺檢證字第{num:05d}號'
+        if lic_no in existing_set:
+            continue
+
+        data = query_lic(lic_no)
+        if data:
+            found.append(to_lawyer_record(lic_no, data))
+            if len(found) % 20 == 0:
+                print(f'  [{num}/{scan_to}] 新增 {len(found)}')
+                # 分批上傳
+                if upload_batch(found):
+                    existing_set.update(f['lic_no'] for f in found)
+                    found = []
+
+        time.sleep(0.1)
+
+    # 剩餘上傳
+    if found:
+        upload_batch(found)
+        existing_set.update(f['lic_no'] for f in found)
+
+    print(f'  年份 {year} 完成')
+
+
+def main():
+    existing = fetch_existing_lics()
+
+    print('\n[2/3] 分析各年度編號範圍...')
+    year_nums, year_max = analyze_year_ranges(existing)
+
+    # 如果有指定年份
+    if len(sys.argv) > 1:
+        target_years = [int(y) for y in sys.argv[1:]]
+        print(f'  指定年份: {target_years}')
+    else:
+        # 預設掃 92 到最新年份
+        target_years = sorted([y for y in year_max.keys() if y >= 92])
+        print(f'  自動掃描年份: {target_years[0]} ~ {target_years[-1]}')
+
+    print('\n[3/3] 開始掃描...')
+    start_time = time.time()
+    total_before = len(existing)
+
+    for year in target_years:
+        if year not in year_max:
+            continue
+        scan_year(year, year_max[year], existing, extra_buffer=30)
+        elapsed = (time.time() - start_time) / 60
+        added = len(existing) - total_before
+        print(f'  累計新增 {added} 筆, 已跑 {elapsed:.1f} 分鐘')
+
+    total_after = len(existing)
+    print(f'\n=== 完成 ===')
+    print(f'之前: {total_before:,} 筆')
+    print(f'之後: {total_after:,} 筆')
+    print(f'新增: {total_after - total_before:,} 筆')
+    print(f'總耗時: {(time.time() - start_time) / 60:.1f} 分鐘')
+
+
+if __name__ == '__main__':
+    main()

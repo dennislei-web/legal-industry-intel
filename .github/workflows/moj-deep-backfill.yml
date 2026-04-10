@@ -9,6 +9,7 @@ on:
         default: 'deep-all'
         type: choice
         options:
+          - licno-scan
           - test
           - full
           - deep-all
@@ -45,6 +46,10 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode }}"
           case "$MODE" in
+            licno-scan)
+              echo "=== 證號遍歷補掃（最高效）==="
+              python moj_licno_scan.py
+              ;;
             test)
               echo "=== 測試模式（5 個姓氏）==="
               python moj_lawyer_fullscan.py demo
