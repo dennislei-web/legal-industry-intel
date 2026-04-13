@@ -1056,10 +1056,12 @@ async function loadOverview() {
   const stats = {};
   if (statsCache) statsCache.forEach(s => stats[s.key] = s.value);
 
-  document.getElementById('kpiLawyerCount').textContent = (stats.total || 0).toLocaleString();
-  document.getElementById('kpiLawyerSub').textContent = '三源去重合併';
-
-  document.getElementById('kpiRegistryCount').textContent = (stats.has_moj || 0).toLocaleString();
+  // 只在 loadOverviewFast 還沒設過時才用 cache 值（避免覆蓋即時查詢的結果）
+  if (document.getElementById('kpiLawyerCount').textContent === '-') {
+    document.getElementById('kpiLawyerCount').textContent = (stats.total || 0).toLocaleString();
+    document.getElementById('kpiLawyerSub').textContent = '三源去重合併';
+    document.getElementById('kpiRegistryCount').textContent = (stats.has_moj || 0).toLocaleString();
+  }
 
   // Guild total from industry_stats
   const { data: guildStats } = await db.from('industry_stats').select('value')
