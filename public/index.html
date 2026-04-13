@@ -642,6 +642,7 @@
                 <th style="cursor:pointer" onclick="sortOffices('firm_name')">事務所名稱 <span id="sortIcon_o_firm_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
+                <th>主持律師</th>
                 <th style="cursor:pointer" onclick="sortOffices('avg_cases')">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_age')">平均年齡 <span id="sortIcon_o__avg_age">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_sen')">平均年資 <span id="sortIcon_o__avg_sen">↕</span></th>
@@ -649,7 +650,7 @@
               </tr>
             </thead>
             <tbody id="officeTableBody">
-              <tr><td colspan="5" class="loading">載入中</td></tr>
+              <tr><td colspan="9" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -2054,6 +2055,7 @@ function renderOffices() {
       <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
+      <td style="font-size:0.82rem;">${(() => { const ls = getFirmLeaders(o.firm_name); return ls.length ? ls.map(n => `<span style="color:var(--gold);">👑</span> ${escHtml(n)}`).join('<br>') : '<span style="color:var(--text-muted);">-</span>'; })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
