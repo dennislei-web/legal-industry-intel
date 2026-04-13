@@ -166,11 +166,15 @@ def upload_batch(records):
             )
             if r.status_code in (200, 201, 204):
                 return True
+            if r.status_code >= 500:
+                print(f'  ! upload error {r.status_code} (attempt {attempt+1}/3), retrying...', flush=True)
+                time.sleep(5 * (attempt + 1))
+                continue
             print(f'  ! upload error {r.status_code}: {r.text[:200]}', flush=True)
             return False
-        except requests.exceptions.Timeout:
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             print(f'  ! upload timeout (attempt {attempt+1}/3), retrying...', flush=True)
-            time.sleep(5)
+            time.sleep(5 * (attempt + 1))
     print(f'  ! upload failed after 3 retries', flush=True)
     return False
 

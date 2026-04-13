@@ -230,15 +230,26 @@ def upload_to_supabase(lawyers: list):
     records = [to_db_record(ly) for ly in lawyers if ly.get('now_lic_no')]
     print(f'[{time.strftime("%H:%M:%S")}] 準備上傳 {len(records)} 筆到 moj_lawyers')
 
-    batch_size = 500
+    batch_size = 200
     uploaded = 0
     for i in range(0, len(records), batch_size):
         batch = records[i:i + batch_size]
-        # PostgREST upsert via POST with Prefer: resolution=merge-duplicates
-        r = requests.post(endpoint + '?on_conflict=lic_no', json=batch, headers=headers, verify=False, timeout=60)
-        if r.status_code not in (200, 201, 204):
-            print(f'  ! upload error {r.status_code}: {r.text[:300]}')
-            raise RuntimeError(f'upload failed: {r.status_code}')
+        for attempt in range(3):
+            try:
+                r = requests.post(endpoint + '?on_conflict=lic_no', json=batch, headers=headers, verify=False, timeout=120)
+                if r.status_code in (200, 201, 204):
+                    break
+                if r.status_code >= 500:
+                    print(f'  ! upload error {r.status_code} (attempt {attempt+1}/3), retrying...')
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                print(f'  ! upload error {r.status_code}: {r.text[:300]}')
+                raise RuntimeError(f'upload failed: {r.status_code}')
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                print(f'  ! upload timeout (attempt {attempt+1}/3), retrying...')
+                time.sleep(5 * (attempt + 1))
+        else:
+            raise RuntimeError('upload failed after 3 retries')
         uploaded += len(batch)
         print(f'[{time.strftime("%H:%M:%S")}]   已上傳 {uploaded}/{len(records)}')
     print(f'[{time.strftime("%H:%M:%S")}] done - uploaded {uploaded}')
