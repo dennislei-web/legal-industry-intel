@@ -164,7 +164,7 @@ def normalize_office(office):
 def upload_batch(records):
     if not records:
         return True
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             r = requests.post(
                 f'{SUPABASE_URL}/rest/v1/moj_lawyers?on_conflict=lic_no',
@@ -176,15 +176,17 @@ def upload_batch(records):
             if r.status_code in (200, 201, 204):
                 return True
             if r.status_code >= 500:
-                print(f'  ! upload error {r.status_code} (attempt {attempt+1}/3), retrying...', flush=True)
-                time.sleep(5 * (attempt + 1))
+                wait = 10 * (attempt + 1)  # 10s, 20s, 30s, 40s, 50s
+                print(f'  ! upload error {r.status_code} (attempt {attempt+1}/5), waiting {wait}s...', flush=True)
+                time.sleep(wait)
                 continue
             print(f'  ! upload error {r.status_code}: {r.text[:200]}', flush=True)
             return False
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-            print(f'  ! upload timeout (attempt {attempt+1}/3), retrying...', flush=True)
-            time.sleep(5 * (attempt + 1))
-    print(f'  ! upload failed after 3 retries', flush=True)
+            wait = 10 * (attempt + 1)
+            print(f'  ! upload timeout (attempt {attempt+1}/5), waiting {wait}s...', flush=True)
+            time.sleep(wait)
+    print(f'  ! upload failed after 5 retries', flush=True)
     return False
 
 
@@ -213,11 +215,12 @@ def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
         if data:
             found.append(to_lawyer_record(lic_no, data))
             new_count += 1
-            # 每 10 筆立刻上傳
-            if len(found) >= 10:
+            # 每 50 筆上傳一次（減少 DB 壓力）
+            if len(found) >= 50:
                 if upload_batch(found):
                     existing_set.update(f['lic_no'] for f in found)
                 found = []
+                time.sleep(2)  # 讓 DB 喘口氣
 
         # 每 50 筆印一次進度
         if i % 50 == 0:
