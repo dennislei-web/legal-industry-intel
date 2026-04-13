@@ -47,11 +47,20 @@ def fetch_existing_lics():
     out = set()
     start = 0
     while True:
-        r = requests.get(
-            f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&offset={start}&limit=1000',
-            headers=HEADERS_SB, verify=False, timeout=30,
-        )
-        data = r.json()
+        data = None
+        for attempt in range(3):
+            try:
+                r = requests.get(
+                    f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&offset={start}&limit=1000',
+                    headers=HEADERS_SB, verify=False, timeout=60,
+                )
+                data = r.json()
+                break
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                print(f'  ! fetch timeout (attempt {attempt+1}/3), retrying...', flush=True)
+                time.sleep(5 * (attempt + 1))
+        if data is None:
+            raise RuntimeError(f'fetch_existing_lics failed at offset {start}')
         if not data:
             break
         out.update(d['lic_no'] for d in data if d.get('lic_no'))
