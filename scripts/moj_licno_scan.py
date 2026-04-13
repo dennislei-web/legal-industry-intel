@@ -154,18 +154,25 @@ def normalize_office(office):
 
 def upload_batch(records):
     if not records:
-        return
-    r = requests.post(
-        f'{SUPABASE_URL}/rest/v1/moj_lawyers?on_conflict=lic_no',
-        json=records,
-        headers={**HEADERS_SB, 'Content-Type': 'application/json',
-                 'Prefer': 'resolution=merge-duplicates,return=minimal'},
-        verify=False, timeout=60,
-    )
-    if r.status_code not in (200, 201, 204):
-        print(f'  ! upload error {r.status_code}: {r.text[:200]}')
-        return False
-    return True
+        return True
+    for attempt in range(3):
+        try:
+            r = requests.post(
+                f'{SUPABASE_URL}/rest/v1/moj_lawyers?on_conflict=lic_no',
+                json=records,
+                headers={**HEADERS_SB, 'Content-Type': 'application/json',
+                         'Prefer': 'resolution=merge-duplicates,return=minimal'},
+                verify=False, timeout=120,
+            )
+            if r.status_code in (200, 201, 204):
+                return True
+            print(f'  ! upload error {r.status_code}: {r.text[:200]}', flush=True)
+            return False
+        except requests.exceptions.Timeout:
+            print(f'  ! upload timeout (attempt {attempt+1}/3), retrying...', flush=True)
+            time.sleep(5)
+    print(f'  ! upload failed after 3 retries', flush=True)
+    return False
 
 
 def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
