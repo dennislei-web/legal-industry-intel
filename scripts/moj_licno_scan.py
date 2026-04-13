@@ -72,11 +72,17 @@ def analyze_year_ranges(existing_lics):
             num = int(m.group(2))
             year_nums[year].add(num)
 
-    # 每年的最小/最大編號
+    # 每年的最小/最大編號（過濾異常值：某些年份有混入其他格式的小編號）
     year_range = {}
     for y, nums in year_nums.items():
-        if nums:
-            year_range[y] = (min(nums), max(nums))
+        if not nums:
+            continue
+        sorted_nums = sorted(nums)
+        # 如果 min 和第二小的差距超過 1000，用第二小的（跳過異常值）
+        if len(sorted_nums) >= 2 and (sorted_nums[1] - sorted_nums[0]) > 1000:
+            year_range[y] = (sorted_nums[1], sorted_nums[-1])
+        else:
+            year_range[y] = (sorted_nums[0], sorted_nums[-1])
     return year_nums, year_range
 
 
