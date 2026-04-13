@@ -193,7 +193,7 @@ def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
         if i % 50 == 0:
             print(f'  [{year}] {i}/{len(missing_nums)} queried, {new_count} found', flush=True)
 
-        time.sleep(0.08)
+        time.sleep(0.05)
 
     # 剩餘上傳
     if found:

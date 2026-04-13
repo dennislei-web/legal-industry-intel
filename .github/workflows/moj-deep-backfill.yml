@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - licno-scan
+          - licno-recent
           - test
           - full
           - deep-all
@@ -47,8 +48,12 @@ jobs:
           MODE="${{ github.event.inputs.mode }}"
           case "$MODE" in
             licno-scan)
-              echo "=== 證號遍歷補掃（最高效）==="
+              echo "=== 證號遍歷（全部年份）==="
               python moj_licno_scan.py
+              ;;
+            licno-recent)
+              echo "=== 證號遍歷（近 5 年：110-115）==="
+              python moj_licno_scan.py 110 111 112 113 114 115
               ;;
             test)
               echo "=== 測試模式（5 個姓氏）==="
