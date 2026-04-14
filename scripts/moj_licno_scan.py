@@ -41,34 +41,53 @@ sess.verify = False
 sess.headers.update(HEADERS_MOJ)
 
 
-def fetch_existing_lics():
-    """從 DB 取所有已有的證號"""
+def fetch_existing_lics(target_years=None):
+    """從 DB 取已有的證號（可限定年份，大幅減少記憶體用量）"""
     print('[1/3] 載入現有證號...')
     out = set()
-    start = 0
-    while True:
-        data = None
-        for attempt in range(3):
-            try:
-                r = requests.get(
-                    f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&offset={start}&limit=1000',
-                    headers=HEADERS_SB, verify=False, timeout=60,
-                )
-                data = r.json()
+
+    if target_years:
+        # 按年份分批讀取，每次只讀一年（~幾百筆）
+        for year in target_years:
+            prefix = f'{year}臺檢證字第'
+            start = 0
+            while True:
+                data = _fetch_page(
+                    f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&lic_no=like.{year}%25&offset={start}&limit=1000')
+                if not data:
+                    break
+                out.update(d['lic_no'] for d in data if d.get('lic_no'))
+                if len(data) < 1000:
+                    break
+                start += 1000
+            print(f'  年份 {year}: {sum(1 for l in out if l.startswith(str(year)))} 筆', flush=True)
+    else:
+        # 無指定年份，載入全部（fallback）
+        start = 0
+        while True:
+            data = _fetch_page(
+                f'{SUPABASE_URL}/rest/v1/moj_lawyers?select=lic_no&offset={start}&limit=1000')
+            if not data:
                 break
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-                print(f'  ! fetch timeout (attempt {attempt+1}/3), retrying...', flush=True)
-                time.sleep(5 * (attempt + 1))
-        if data is None:
-            raise RuntimeError(f'fetch_existing_lics failed at offset {start}')
-        if not data:
-            break
-        out.update(d['lic_no'] for d in data if d.get('lic_no'))
-        if len(data) < 1000:
-            break
-        start += 1000
-    print(f'  已有 {len(out):,} 筆')
+            out.update(d['lic_no'] for d in data if d.get('lic_no'))
+            if len(data) < 1000:
+                break
+            start += 1000
+
+    print(f'  已載入 {len(out):,} 筆')
     return out
+
+
+def _fetch_page(url):
+    """帶 retry 的單頁讀取"""
+    for attempt in range(3):
+        try:
+            r = requests.get(url, headers=HEADERS_SB, verify=False, timeout=60)
+            return r.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            print(f'  ! fetch timeout (attempt {attempt+1}/3), retrying...', flush=True)
+            time.sleep(5 * (attempt + 1))
+    raise RuntimeError(f'fetch failed: {url}')
 
 
 def analyze_year_ranges(existing_lics):
@@ -237,7 +256,15 @@ def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
 
 
 def main():
-    existing = fetch_existing_lics()
+    # 先解析年份參數
+    if len(sys.argv) > 1:
+        target_years = [int(y) for y in sys.argv[1:]]
+        print(f'  指定年份: {target_years}')
+    else:
+        target_years = None
+
+    # 只載入指定年份的證號（大幅減少 DB 負擔）
+    existing = fetch_existing_lics(target_years)
 
     print('\n[2/3] 分析各年度編號範圍...')
     year_nums, year_range = analyze_year_ranges(existing)
@@ -245,11 +272,7 @@ def main():
         mn, mx = year_range[y]
         print(f'  {y}: {mn}~{mx} ({len(year_nums[y])} 筆)', flush=True)
 
-    # 如果有指定年份
-    if len(sys.argv) > 1:
-        target_years = [int(y) for y in sys.argv[1:]]
-        print(f'  指定年份: {target_years}')
-    else:
+    if target_years is None:
         # 預設掃 92 到最新年份
         target_years = sorted([y for y in year_range.keys() if y >= 92])
         print(f'  自動掃描年份: {target_years[0]} ~ {target_years[-1]}')
