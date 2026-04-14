@@ -11,6 +11,7 @@ on:
         options:
           - licno-scan
           - licno-108-115
+          - licno-112-115
           - licno-recent
           - test
           - full
@@ -55,6 +56,10 @@ jobs:
             licno-108-115)
               echo "=== 證號遍歷（108-115 年）==="
               python moj_licno_scan.py 108 109 110 111 112 113 114 115
+              ;;
+            licno-112-115)
+              echo "=== 證號遍歷（112-115 年）==="
+              python moj_licno_scan.py 112 113 114 115
               ;;
             licno-recent)
               echo "=== 證號遍歷（近 5 年：110-115）==="
