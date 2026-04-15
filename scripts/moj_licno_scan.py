@@ -180,33 +180,54 @@ def normalize_office(office):
     return s
 
 
-def upload_batch(records):
+def upload_batch(records, _depth=0):
+    """上傳一批記錄。回傳「成功上傳的 lic_no set」。
+    若整批 504/522 失敗，會自動切半遞迴重試，最差退到單筆上傳，
+    這樣 Supabase gateway 偶發 timeout 時才不會整批資料都蒸發。
+    """
     if not records:
-        return True
-    for attempt in range(5):
+        return set()
+
+    indent = '  ' + '  ' * _depth
+    size = len(records)
+
+    for attempt in range(3):
         try:
             r = requests.post(
                 f'{SUPABASE_URL}/rest/v1/moj_lawyers?on_conflict=lic_no',
                 json=records,
                 headers={**HEADERS_SB, 'Content-Type': 'application/json',
                          'Prefer': 'resolution=merge-duplicates,return=minimal'},
-                verify=False, timeout=120,
+                verify=False, timeout=60,
             )
             if r.status_code in (200, 201, 204):
-                return True
+                return {rec['lic_no'] for rec in records if rec.get('lic_no')}
             if r.status_code >= 500:
-                wait = 10 * (attempt + 1)  # 10s, 20s, 30s, 40s, 50s
-                print(f'  ! upload error {r.status_code} (attempt {attempt+1}/5), waiting {wait}s...', flush=True)
+                wait = 5 * (attempt + 1)  # 5s, 10s, 15s
+                print(f'{indent}! upload error {r.status_code} (size={size}, attempt {attempt+1}/3), waiting {wait}s...', flush=True)
                 time.sleep(wait)
                 continue
-            print(f'  ! upload error {r.status_code}: {r.text[:200]}', flush=True)
-            return False
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-            wait = 10 * (attempt + 1)
-            print(f'  ! upload timeout (attempt {attempt+1}/5), waiting {wait}s...', flush=True)
+            # 4xx：resource 錯誤，切半不會救，直接 bail
+            print(f'{indent}! upload error {r.status_code}: {r.text[:200]}', flush=True)
+            return set()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            wait = 5 * (attempt + 1)
+            print(f'{indent}! upload timeout (size={size}, attempt {attempt+1}/3), waiting {wait}s...', flush=True)
             time.sleep(wait)
-    print(f'  ! upload failed after 5 retries', flush=True)
-    return False
+
+    # 整批失敗 → 切半遞迴重試
+    if size > 1:
+        print(f'{indent}! batch size={size} 失敗，切半重試', flush=True)
+        half = size // 2
+        succeeded = set()
+        succeeded |= upload_batch(records[:half], _depth=_depth + 1)
+        succeeded |= upload_batch(records[half:], _depth=_depth + 1)
+        return succeeded
+
+    # 單筆也失敗
+    lic = records[0].get('lic_no', '?')
+    print(f'{indent}! 單筆上傳失敗 lic_no={lic}，放棄', flush=True)
+    return set()
 
 
 def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
@@ -234,10 +255,13 @@ def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
         if data:
             found.append(to_lawyer_record(lic_no, data))
             new_count += 1
-            # 每 50 筆上傳一次（減少 DB 壓力）
-            if len(found) >= 50:
-                if upload_batch(found):
-                    existing_set.update(f['lic_no'] for f in found)
+            # 每 30 筆上傳一次（降低 Supabase gateway 504 機率）
+            if len(found) >= 30:
+                uploaded = upload_batch(found)
+                existing_set.update(uploaded)
+                lost = len(found) - len(uploaded)
+                if lost:
+                    print(f'  ⚠ 本批 {lost}/{len(found)} 筆 upload 失敗（已切半重試仍失敗）', flush=True)
                 found = []
                 time.sleep(2)  # 讓 DB 喘口氣
 
@@ -249,8 +273,11 @@ def scan_year(year, min_num, max_num, existing_set, extra_buffer=30):
 
     # 剩餘上傳
     if found:
-        upload_batch(found)
-        existing_set.update(f['lic_no'] for f in found)
+        uploaded = upload_batch(found)
+        existing_set.update(uploaded)
+        lost = len(found) - len(uploaded)
+        if lost:
+            print(f'  ⚠ 收尾 {lost}/{len(found)} 筆 upload 失敗', flush=True)
 
     print(f'年份 {year} 完成: 查 {queried}, 新增 {new_count}', flush=True)
 
