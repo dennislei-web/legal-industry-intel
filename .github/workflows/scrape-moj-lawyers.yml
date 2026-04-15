@@ -26,13 +26,23 @@ jobs:
         working-directory: scripts
         run: python moj_lawyer_scraper.py
 
-      - name: Refresh firm stats cache
+      - name: Trigger firm stats cache refresh (async)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          curl -sk "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
-            -X POST -H "apikey: $SUPABASE_SERVICE_KEY" \
+          # 見 moj-licno-scan.yml 同名 step 的說明：fire-and-forget 避開 CF 521
+          http_code=$(curl -sk -o /tmp/refresh_resp.txt -w "%{http_code}" \
+            --max-time 5 \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-            -H "Content-Type: application/json" -d '{}'
-          echo "Cache refreshed"
+            -H "Content-Type: application/json" -d '{}' || echo "TIMEOUT")
+          echo "Refresh trigger response: $http_code"
+          if [ -f /tmp/refresh_resp.txt ]; then
+            head -c 500 /tmp/refresh_resp.txt; echo
+          fi
+          case "$http_code" in
+            204|200|TIMEOUT) echo "OK — refresh triggered" ;;
+            *) echo "::warning::Cache refresh trigger returned $http_code (non-fatal)" ;;
+          esac

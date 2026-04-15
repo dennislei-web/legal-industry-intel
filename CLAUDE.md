@@ -22,7 +22,7 @@
 ## 資料表（主要）
 
 - `moj_lawyers` — 法務部律師主表（lic_no 為主鍵）
-- `moj_firm_stats_cache` — 事務所統計快取表（materialized），由 `refresh_firm_stats_cache` RPC 更新
+- `moj_firm_stats_cache` — 事務所統計快取表（普通 table，非 MV），由 `refresh_firm_stats_cache` RPC 以 UPSERT 更新（migration 020）
 - `firm_profiles` — 事務所補充資料（官網、備註等手動編輯）
 - `firm_websites` — 爬蟲找到的官網
 - `judges` / `courts` / `judges_combined` — 法官/法院
@@ -47,7 +47,7 @@
 - Supabase 是 **Micro compute (1GB RAM)**，爬蟲若一次載入太多資料會讓 DB 不穩
   - `fetch_existing_lics()` 已優化為按年份分批讀取
   - 上傳 batch size 50、每次上傳後 sleep 2s
-- `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會呼叫）
+- `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會 fire-and-forget 呼叫 RPC，server 端非同步跑完）
 - 前端登入後若無資料可能是 RLS 設定問題（需 auth.uid() IS NOT NULL）
 
 ## Claude Code 相關
