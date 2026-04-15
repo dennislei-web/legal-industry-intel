@@ -281,13 +281,115 @@
     /* ===================== CHART ===================== */
     .chart-container { position: relative; height: 300px; margin-bottom: 16px; }
 
-    /* ===================== MOBILE ===================== */
+    /* ===================== TABLET (≤768px) ===================== */
     @media (max-width: 768px) {
-      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-      .header-inner { padding: 0 12px; }
-      .tabs-bar { padding: 8px 12px 0; }
-      .content { padding: 16px 12px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .kpi-card { padding: 14px; }
+      .kpi-label { font-size: 0.72rem; }
       .kpi-value { font-size: 1.5rem; }
+      .kpi-sub { font-size: 0.72rem; }
+
+      .header { padding: 0 12px; }
+      .header-inner { height: 52px; }
+      .header-brand .name { font-size: 0.95rem; letter-spacing: 0.5px; }
+      .header-actions { gap: 8px; }
+      .user-badge { display: none; }
+      .btn-logout { padding: 6px 10px; font-size: 0.75rem; }
+      .theme-toggle { width: 32px; height: 32px; font-size: 1rem; }
+
+      .tabs-bar { padding: 6px 12px 0; -webkit-overflow-scrolling: touch; }
+      .tab-btn { padding: 9px 12px; font-size: 0.8rem; }
+
+      .content { padding: 14px 12px; }
+      .card { padding: 14px; }
+      .card-title { font-size: 0.95rem; margin-bottom: 12px; }
+
+      th { padding: 8px; font-size: 0.68rem; }
+      td { padding: 8px; font-size: 0.82rem; }
+
+      .search-bar { gap: 8px; }
+      .search-bar input, .search-bar select { flex: 1 1 100%; min-width: 0; }
+
+      .chart-container { height: 240px; }
+
+      .login-card { padding: 32px 24px; }
+
+      .modal-header { padding: 12px 14px; }
+      .modal-header h2 { font-size: 1rem; }
+      .modal-body { padding: 14px; }
+
+      .pagination button { padding: 5px 10px; font-size: 0.78rem; }
+    }
+
+    /* ===================== PHONE (≤480px，含 iPhone 14 Pro 393px) ===================== */
+    @media (max-width: 480px) {
+      body { font-size: 13px; }
+
+      /* iOS Safari: input < 16px 聚焦時會自動放大頁面，強制 16px 防止 */
+      input, select, textarea { font-size: 16px !important; }
+      .form-group input, .form-group select, .form-group textarea,
+      .search-bar input, .search-bar select { font-size: 16px !important; }
+
+      .header-brand .icon { font-size: 1.15rem; }
+      .header-brand .name { font-size: 0.88rem; }
+      .header-brand .name::after {
+        /* 縮短品牌名稱過長時的 gap */
+        letter-spacing: normal;
+      }
+
+      .tab-btn { padding: 8px 10px; font-size: 0.75rem; }
+
+      /* 若 KPI grid 內聯樣式為 auto-fit minmax(150px…)，強制 2 欄 */
+      .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+      .kpi-card { padding: 12px; }
+      .kpi-label { font-size: 0.68rem; margin-bottom: 4px; }
+      .kpi-value { font-size: 1.3rem; }
+      .kpi-sub { font-size: 0.68rem; }
+
+      .card { padding: 12px; border-radius: 10px; }
+
+      /* 表格更緊 + 保留橫向 scroll */
+      .table-wrap { margin: 0 -4px; }
+      th { font-size: 0.65rem; padding: 7px 6px; }
+      td { font-size: 0.78rem; padding: 7px 6px; }
+
+      /* 圖表高度再降 */
+      .chart-container { height: 200px; }
+
+      /* News / Insight / Note card 較緊 */
+      .news-card, .insight-card { padding: 14px; border-radius: 8px; }
+      .news-card .news-title, .insight-card .insight-title { font-size: 0.92rem; }
+      .news-card .news-summary, .insight-card .insight-content { font-size: 0.82rem; }
+
+      /* Modal 已在 600px 全螢幕，這裡再收縮 padding */
+      .modal-body { padding: 12px; }
+
+      /* 登入頁留白更窄 */
+      #loginPage { padding: 12px; }
+      .login-card { padding: 28px 20px; border-radius: 12px; }
+      .login-logo .title { font-size: 1.3rem; }
+
+      /* Badge / 按鈕 icon 尺寸微調 */
+      .badge { font-size: 0.68rem; padding: 2px 6px; }
+      .btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+
+      /* 確保 pagination 不溢出 */
+      .pagination { flex-wrap: wrap; gap: 6px; }
+
+      /* iPhone 安全區域（底部 home bar + 瀏海） */
+      .header {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+      }
+      body {
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
+
+    /* ===================== 強制手機橫向顯示整齊 ===================== */
+    @media (max-width: 480px) and (orientation: landscape) {
+      .chart-container { height: 180px; }
+      .kpi-grid { grid-template-columns: repeat(4, 1fr) !important; }
     }
 
     /* ===================== NOTE FORM ===================== */
