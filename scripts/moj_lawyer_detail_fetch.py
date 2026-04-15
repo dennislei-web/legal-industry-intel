@@ -117,7 +117,18 @@ def fetch_all_lic_nos(only_missing=True):
             f'&offset={page*1000}&limit=1000',
             headers=HEADERS_SB, verify=False, timeout=30,
         )
-        rows = r.json()
+        if r.status_code != 200:
+            raise RuntimeError(
+                f'Supabase fetch lic_no failed: HTTP {r.status_code} '
+                f'body={r.text[:500]!r} url={r.url}'
+            )
+        try:
+            rows = r.json()
+        except Exception as e:
+            raise RuntimeError(
+                f'Supabase lic_no 回應非 JSON: status={r.status_code} '
+                f'body={r.text[:500]!r} content-type={r.headers.get("content-type")}'
+            ) from e
         if not rows or (isinstance(rows, dict) and rows.get('message')):
             break
         out.extend([r['lic_no'] for r in rows if r.get('lic_no')])
