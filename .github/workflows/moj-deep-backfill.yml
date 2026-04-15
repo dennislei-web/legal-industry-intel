@@ -1,27 +1,12 @@
-name: MOJ 律師深度補掃
+name: MOJ 律師補掃（證號遍歷）
 
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: '模式'
-        required: true
-        default: 'deep-all'
-        type: choice
-        options:
-          - licno-scan
-          - licno-108-115
-          - licno-112-115
-          - licno-recent
-          - test
-          - full
-          - deep-all
-          - deep-targeted
-          - deep-surnames
-          - deep-triple
-          - deep-licno
-          - backfill
-          - targeted
+      years:
+        description: '要掃的年份（留空=自動掃 92~最新；可輸入逗號分隔，例如 112,113,114,115）'
+        required: false
+        default: ''
       detail_fetch:
         description: '掃完後是否補抓詳細資料'
         required: false
@@ -41,67 +26,21 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: Run scraper (${{ github.event.inputs.mode }})
+      - name: Run 證號遍歷
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         working-directory: scripts
         run: |
-          MODE="${{ github.event.inputs.mode }}"
-          case "$MODE" in
-            licno-scan)
-              echo "=== 證號遍歷（全部年份）==="
-              python moj_licno_scan.py
-              ;;
-            licno-108-115)
-              echo "=== 證號遍歷（108-115 年）==="
-              python moj_licno_scan.py 108 109 110 111 112 113 114 115
-              ;;
-            licno-112-115)
-              echo "=== 證號遍歷（112-115 年）==="
-              python moj_licno_scan.py 112 113 114 115
-              ;;
-            licno-recent)
-              echo "=== 證號遍歷（近 5 年：110-115）==="
-              python moj_licno_scan.py 110 111 112 113 114 115
-              ;;
-            test)
-              echo "=== 測試模式（5 個姓氏）==="
-              python moj_lawyer_fullscan.py demo
-              ;;
-            full)
-              echo "=== 全量掃描 ==="
-              python moj_lawyer_fullscan.py full
-              ;;
-            deep-all)
-              echo "=== 深度補掃（四策略全跑）==="
-              python moj_lawyer_deep_backfill.py all
-              ;;
-            deep-targeted)
-              echo "=== 深度補掃：全聯會交叉 ==="
-              python moj_lawyer_deep_backfill.py targeted
-              ;;
-            deep-surnames)
-              echo "=== 深度補掃：罕見姓氏 ==="
-              python moj_lawyer_deep_backfill.py surnames
-              ;;
-            deep-triple)
-              echo "=== 深度補掃：三字展開 ==="
-              python moj_lawyer_deep_backfill.py triple
-              ;;
-            deep-licno)
-              echo "=== 深度補掃：證號遍歷 ==="
-              python moj_lawyer_deep_backfill.py licno
-              ;;
-            backfill)
-              echo "=== 補缺漏姓氏 ==="
-              python moj_lawyer_backfill.py
-              ;;
-            targeted)
-              echo "=== 精準補掃 ==="
-              python moj_lawyer_targeted_backfill.py
-              ;;
-          esac
+          YEARS="${{ github.event.inputs.years }}"
+          if [ -z "$YEARS" ]; then
+            echo "=== 證號遍歷（自動：92~最新）==="
+            python moj_licno_scan.py
+          else
+            ARGS=$(echo "$YEARS" | tr ',' ' ')
+            echo "=== 證號遍歷（指定年份：$ARGS）==="
+            python moj_licno_scan.py $ARGS
+          fi
 
       - name: Refresh firm stats cache
         env:
