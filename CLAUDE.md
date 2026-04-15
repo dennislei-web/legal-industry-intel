@@ -50,6 +50,37 @@
 - `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會 fire-and-forget 呼叫 RPC，server 端非同步跑完）
 - 前端登入後若無資料可能是 RLS 設定問題（需 auth.uid() IS NOT NULL）
 
+## DB Schema 關鍵欄位（避免查詢時踩坑）
+
+### `lawyers_combined` view（三源合併：MOJ + 全聯會 + Lawsnote）
+- 律師證號欄位叫 **`moj_lic_no`**（不是 `lic_no`）
+- 年資用 **`lic_year`**（民國年，如 74 = 1985 取證）
+- 性別欄位 **`moj_sex`**（值為「男」「女」）
+- 事務所名 `firm_name`、地區 `region`、案件數 `case_count_5yr`
+- 專長 `expertise_areas`（text[] array，來自 Lawsnote）
+
+### `firm_profiles` 欄位型別
+- **`practice_focus` 是 `text[]`**（array，不是 TEXT）— PATCH 時必須傳 JSON array
+- `founded_year` INT、`ai_analysis` TEXT、`news_links` text[]
+- upsert 用 `Prefer: resolution=merge-duplicates` header
+
+## 分析事務所的標準流程（依序做，避免來回查詢）
+
+1. 查 `moj_firm_stats_cache`（人數、地區、平均案件數、官網）
+2. 查 `lawyers_combined` 完整律師清單（按 `lic_year` 排序，找資深 + 案件量大的 = 所長候選）
+3. 查 `firm_profiles` 既有資料（避免蓋掉使用者筆記）
+4. WebFetch 官網確認所長身分 + 事務所特色
+5. 寫分析到本機暫存檔（避免 bash heredoc 踩 encoding）
+6. Python PATCH `firm_profiles`：`ai_analysis`, `ai_analyzed_at='now()'`, `practice_focus`(array), `founded_year`
+7. 更新 `public/index.html` 的 `FIRM_LEADERS` + `FIRM_TAGLINES`
+8. commit + push（GitHub Pages 自動部署）
+
+## Windows console encoding 注意
+
+- Python print 中文到 stdout 會顯示亂碼（CP950），**不代表 DB 寫入失敗**
+- 驗證時用 `PYTHONIOENCODING=utf-8 python -c ...` 才能看到正確中文
+- 或用 HTTP status code（200/204）判斷成功即可，不要依賴 console 輸出
+
 ## Claude Code 相關
 
 - Skill `/legal-research` — 法律產業深度研究助手（查 DB、分析事務所、討論產業趨勢）
