@@ -50,30 +50,25 @@ jobs:
             python moj_licno_scan.py $ARGS
           fi
 
-      - name: Trigger firm stats cache refresh (async)
+      - name: Refresh all caches (async)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # Fire-and-forget: refresh_firm_stats_cache() 在 server 端可能跑 100s+，
-          # 超過 Cloudflare 100s upstream timeout 會回 521。改成 5s 內斷線，讓
-          # SQL 在 Supabase 繼續跑完（function 內已 SET statement_timeout=600s）。
-          http_code=$(curl -sk -o /tmp/refresh_resp.txt -w "%{http_code}" \
-            --max-time 5 \
-            -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
-            -H "apikey: $SUPABASE_SERVICE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-            -H "Content-Type: application/json" -d '{}' || echo "TIMEOUT")
-          echo "Refresh trigger response: $http_code"
-          if [ -f /tmp/refresh_resp.txt ]; then
-            head -c 500 /tmp/refresh_resp.txt; echo
-          fi
-          # 接受的結果：204(成功)、200(成功)、TIMEOUT(預期，server 端繼續跑)
-          # 失敗才警告：4xx (auth/payload 錯) — 不擋後續 step
-          case "$http_code" in
-            204|200|TIMEOUT) echo "OK — refresh triggered" ;;
-            *) echo "::warning::Cache refresh trigger returned $http_code (non-fatal)" ;;
-          esac
+          # Fire-and-forget 兩個 cache：firm_stats + lawyer_stats
+          for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
+            http_code=$(curl -sk -o /tmp/resp_${rpc}.txt -w "%{http_code}" \
+              --max-time 10 \
+              -X POST "$SUPABASE_URL/rest/v1/rpc/${rpc}" \
+              -H "apikey: $SUPABASE_SERVICE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" -d '{}' || echo "TIMEOUT")
+            echo "${rpc}: HTTP $http_code"
+            case "$http_code" in
+              204|200|TIMEOUT) echo "  OK" ;;
+              *) echo "::warning::${rpc} returned $http_code (non-fatal)"; cat /tmp/resp_${rpc}.txt | head -c 300; echo ;;
+            esac
+          done
 
       - name: Wait for cache refresh to settle
         if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
