@@ -1,6 +1,10 @@
 name: MOJ 律師補掃（證號遍歷）
 
 on:
+  schedule:
+    # === 一次性排程：2026-04-16 00:00 台灣 = 16:00 UTC ===
+    # 跑完後請刪除此 schedule block（改回純 workflow_dispatch）
+    - cron: '0 16 16 4 *'
   workflow_dispatch:
     inputs:
       years:
@@ -33,6 +37,10 @@ jobs:
         working-directory: scripts
         run: |
           YEARS="${{ github.event.inputs.years }}"
+          # schedule 觸發時 inputs 為空，預設跑 112~115
+          if [ -z "$YEARS" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            YEARS="112,113,114,115"
+          fi
           if [ -z "$YEARS" ]; then
             echo "=== 證號遍歷（自動：92~最新）==="
             python moj_licno_scan.py
@@ -68,13 +76,13 @@ jobs:
           esac
 
       - name: Wait for cache refresh to settle
-        if: github.event.inputs.detail_fetch == 'true'
+        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
         run: |
           echo "Sleep 90s 讓 refresh_firm_stats_cache 在 Supabase 跑完，避免下個 step 撞鎖"
           sleep 90
 
       - name: Fetch lawyer details
-        if: github.event.inputs.detail_fetch == 'true'
+        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
