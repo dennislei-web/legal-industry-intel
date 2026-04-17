@@ -17,12 +17,6 @@ BATCH_SIZE = int(os.environ.get('BATCH_SIZE', '0'))  # 0 = 全部
 SCRAPE_DELAY = float(os.environ.get('SCRAPE_DELAY', '1.8'))  # 秒
 RETRY_MISSING = os.environ.get('RETRY_MISSING', 'false').lower() == 'true'  # 重試未找到官網的
 
-# Google Custom Search API (優先使用，命中率遠高於 DDG)
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '').strip()
-GOOGLE_CSE_ID = os.environ.get('GOOGLE_CSE_ID', '').strip()
-GOOGLE_DAILY_LIMIT = 100  # 免費額度
-_google_used_today = 0
-
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
@@ -42,45 +36,6 @@ EXCLUDE_DOMAINS = [
 ]
 
 LEGAL_KEYWORDS = ['law', 'legal', 'lawyer', 'attorney', 'firm', 'law-firm', 'lawfirm', '法律', '律師', '事務所']
-
-
-def search_google_cse(query, num=5):
-    """Google Custom Search API。免費 100/日，超過會回 429。"""
-    global _google_used_today
-    if not GOOGLE_API_KEY or not GOOGLE_CSE_ID:
-        return None  # 未設定，fallback
-    if _google_used_today >= GOOGLE_DAILY_LIMIT:
-        return None  # 額度用完，fallback
-    try:
-        url = 'https://www.googleapis.com/customsearch/v1'
-        params = {
-            'key': GOOGLE_API_KEY,
-            'cx': GOOGLE_CSE_ID,
-            'q': query,
-            'num': num,
-            'lr': 'lang_zh-TW',  # 偏好繁中
-            'gl': 'tw',  # 地區：台灣
-        }
-        resp = requests.get(url, params=params, timeout=15)
-        _google_used_today += 1
-        if resp.status_code == 429:
-            log(f'  Google CSE 額度用完 (已用 {_google_used_today})')
-            return None
-        if resp.status_code != 200:
-            log(f'  Google CSE HTTP {resp.status_code}: {resp.text[:200]}')
-            return []
-        data = resp.json()
-        results = []
-        for item in data.get('items', []):
-            results.append({
-                'url': item.get('link', ''),
-                'title': item.get('title', ''),
-                'description': item.get('snippet', ''),
-            })
-        return results
-    except Exception as e:
-        log(f'  Google CSE 錯誤: {e}')
-        return []
 
 
 def search_duckduckgo(query, retries=2):
@@ -157,52 +112,34 @@ def score_candidate(url, title, description, firm_name):
 
 
 def find_firm_website(firm_name):
-    """搜尋事務所官網，優先 Google CSE，fallback DDG。"""
+    """搜尋事務所官網，多輪 query 取最佳評分"""
+    # 去除尾巴的「律師」等雜字
     clean = firm_name.strip()
-    # 去掉「國際/聯合/商務」後的主名（用於輔助判斷，不用來搜尋）
-    # 搜尋策略：用完整名稱，避免「宏光展」→ 一堆無關結果
     queries = [
         f'{clean} 官網',
-        f'{clean} 律師',
         f'"{clean}"',
         clean,
     ]
-
     all_candidates = []
     seen_urls = set()
-
     for q in queries:
-        # 優先 Google，失敗才 fallback DDG
-        results = search_google_cse(q) if GOOGLE_API_KEY else None
-        if results is None:  # Google 未設定或額度用完
-            results = search_duckduckgo(q)
-
-        for i, r in enumerate(results or []):
+        for r in search_duckduckgo(q):
             if r['url'] in seen_urls:
                 continue
             seen_urls.add(r['url'])
             s = score_candidate(r['url'], r['title'], r['description'], firm_name)
-            # Google 結果的 top 3 額外加分（Google 排名已經是相關性加權）
-            if GOOGLE_API_KEY and i < 3:
-                s += (3 - i) * 5  # top1 +15, top2 +10, top3 +5
             if s > 0:
                 all_candidates.append((s, r))
-
-        # 已有高信心候選就停
         if all_candidates and max(c[0] for c in all_candidates) >= 50:
-            break
-        time.sleep(0.3)
-
+            break  # 已有高信心候選
+        time.sleep(0.5)
     if not all_candidates:
         return None
     all_candidates.sort(key=lambda x: -x[0])
     best_score, best = all_candidates[0]
-
-    # 門檻：Google 結果用較寬鬆的 20，DDG 保留較嚴格的 25
-    threshold = 20 if GOOGLE_API_KEY else 25
-    if best_score < threshold:
+    # 低分不回傳，避免誤判
+    if best_score < 25:
         return None
-
     return {
         'website_url': best['url'],
         'website_title': (best['title'] or '')[:200],

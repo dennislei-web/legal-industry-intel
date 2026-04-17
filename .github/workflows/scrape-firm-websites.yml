@@ -36,9 +36,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          # Google Custom Search API (免費 100/天，優先使用；未設定時 fallback DDG)
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GOOGLE_CSE_ID: ${{ secrets.GOOGLE_CSE_ID }}
           BATCH_SIZE: ${{ github.event.inputs.batch_size || '0' }}
           SCRAPE_DELAY: ${{ github.event.inputs.scrape_delay || '1.8' }}
           RETRY_MISSING: ${{ github.event.inputs.retry_missing || 'false' }}
