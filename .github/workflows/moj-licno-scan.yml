@@ -1,10 +1,6 @@
 name: MOJ 律師補掃（證號遍歷）
 
 on:
-  schedule:
-    # === 一次性排程：2026-04-16 00:00 台灣 = 16:00 UTC ===
-    # 跑完後請刪除此 schedule block（改回純 workflow_dispatch）
-    - cron: '0 16 16 4 *'
   workflow_dispatch:
     inputs:
       years:
@@ -50,24 +46,29 @@ jobs:
             python moj_licno_scan.py $ARGS
           fi
 
-      - name: Refresh all caches (async)
+      - name: Refresh all caches (with retry)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # Fire-and-forget 兩個 cache：firm_stats + lawyer_stats
+          # 剛跑完大量寫入，Supabase 可能還忙。用長 timeout + 重試確保真的 refresh 到
           for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
-            http_code=$(curl -sk -o /tmp/resp_${rpc}.txt -w "%{http_code}" \
-              --max-time 10 \
-              -X POST "$SUPABASE_URL/rest/v1/rpc/${rpc}" \
-              -H "apikey: $SUPABASE_SERVICE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-              -H "Content-Type: application/json" -d '{}' || echo "TIMEOUT")
-            echo "${rpc}: HTTP $http_code"
-            case "$http_code" in
-              204|200|TIMEOUT) echo "  OK" ;;
-              *) echo "::warning::${rpc} returned $http_code (non-fatal)"; cat /tmp/resp_${rpc}.txt | head -c 300; echo ;;
-            esac
+            success=0
+            for attempt in 1 2 3; do
+              http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" \
+                --max-time 180 \
+                -X POST "$SUPABASE_URL/rest/v1/rpc/${rpc}" \
+                -H "apikey: $SUPABASE_SERVICE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+                -H "Content-Type: application/json" -d '{}' 2>&1 || echo "ERR")
+              echo "${rpc} attempt ${attempt}: HTTP $http_code"
+              case "$http_code" in
+                204|200) echo "  ✅ OK"; success=1; break ;;
+                5*|52*|ERR) echo "  retrying in 60s..."; sleep 60 ;;
+                *) echo "::warning::${rpc} returned $http_code"; cat /tmp/resp.txt | head -c 300; echo; break ;;
+              esac
+            done
+            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries (non-fatal, 下次爬蟲會重刷)"
           done
 
       - name: Wait for cache refresh to settle
