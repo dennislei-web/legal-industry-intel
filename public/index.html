@@ -2078,6 +2078,7 @@ async function loadOffices() {
       .from('moj_firm_stats_cache')
       .select('*')
       .order('lawyer_count', { ascending: false })
+      .order('firm_name', { ascending: true })  // 次序：避免同值分頁不穩造成重複
       .range(from, from + PAGE - 1);
     if (error) {
       console.error('moj_firm_stats_cache error:', error);
