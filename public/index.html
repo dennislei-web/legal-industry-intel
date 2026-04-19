@@ -1713,7 +1713,6 @@ const FIRM_LEADERS = {
   '馬靜如': '國際通商法律事務所｜所長',
   '陳彥希': '常在國際法律事務所｜所長',
   '林香君': '常在國際法律事務所｜執行長',
-  '金玉瑩': '協合國際法律事務所｜Managing Partner',
   '劉韋廷': '立勤國際法律事務所｜主持律師',
   '黃沛聲': '立勤國際法律事務所｜主持律師',
   '魏憶龍': '大成台灣律師事務所｜Managing Partner',
@@ -1928,11 +1927,19 @@ const FIRM_TAGLINES = {
   '理常法律事務所': 'DP Law 台北松江路綜合訴訟所，10 人規模不動產特色',
 };
 
-// 依事務所名稱取得該所負責人名單（嚴格完整名稱匹配，避免「公理」誤配到「理律」等問題）
+// 依事務所名稱取得該所負責人名單
+// 匹配規則：exact match OR firmName 是 leaderFirm 的分所（prefix），反之亦然
+// 例：「群策法律事務所」的所長也會出現在「群策法律事務所台中所」
+// 注意：必須用 prefix 而非 substring，否則「公理律師事務所」會被誤配到「理律」（見 commit dc60fa6）
 function getFirmLeaders(firmName) {
   const leaders = [];
   for (const [name, info] of Object.entries(FIRM_LEADERS)) {
-    if (info.split('｜')[0] === firmName) {
+    const leaderFirm = info.split('｜')[0];
+    if (
+      leaderFirm === firmName ||
+      firmName.startsWith(leaderFirm) ||
+      leaderFirm.startsWith(firmName)
+    ) {
       leaders.push(name);
     }
   }
@@ -1941,9 +1948,10 @@ function getFirmLeaders(firmName) {
 
 // 真實存在但未登錄 MOJ 現役律師名冊的所長（已退休/外籍/轉職等）
 // 顯示時改用 ⚠️ icon + 灰色，避免使用者誤以為資料錯誤
+// 註：金玉瑩、卓家立、林孟毅、劉安桓、周嬿容、陳家慶實際在 MOJ 但登記在不同所/分所名，
+// 靠 getFirmLeaders 的 prefix match 處理
 const FIRM_LEADERS_NOT_IN_MOJ = new Set([
-  '金玉瑩', '卓家立', '楊崇森', '林美生', '藍瀛芳', '林孟毅',
-  '孫德柔', '李模', '鄭淑芬', '劉安桓', '周嬿容', '陳家慶', '博仲'
+  '楊崇森', '林美生', '藍瀛芳', '孫德柔', '李模', '鄭淑芬', '博仲'
 ]);
 
 function renderLeaderBadge(name, inline = false) {
