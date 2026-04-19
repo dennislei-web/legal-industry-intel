@@ -2137,14 +2137,21 @@ async function loadOffices() {
 
   // 補上 firm_profiles 手動新增的官網
   try {
-    const { data: fpWebs, error: fpErr } = await db.from('firm_profiles').select('firm_name, website_url').not('website_url', 'is', null);
+    const { data: fpWebs, error: fpErr } = await db.from('firm_profiles').select('firm_name, website_url, ex_judicial_officers');
     if (fpErr) console.warn('firm_profiles query error:', fpErr);
     if (fpWebs && fpWebs.length) {
       const fpMap = {};
-      for (const fp of fpWebs) if (fp.website_url) fpMap[fp.firm_name] = fp.website_url;
+      const fpJudicialMap = {};
+      for (const fp of fpWebs) {
+        if (fp.website_url) fpMap[fp.firm_name] = fp.website_url;
+        if (fp.ex_judicial_officers && fp.ex_judicial_officers.length) {
+          fpJudicialMap[fp.firm_name] = fp.ex_judicial_officers;
+        }
+      }
       let merged = 0;
       for (const o of allOffices) {
         if (!o.website_url && fpMap[o.firm_name]) { o.website_url = fpMap[o.firm_name]; merged++; }
+        if (fpJudicialMap[o.firm_name]) o.ex_judicial_officers = fpJudicialMap[o.firm_name];
       }
       if (merged) {
         const withWeb = allOffices.filter(o => o.website_url).length;
@@ -2309,7 +2316,7 @@ function renderOffices() {
     const rank = start + i + 1;
     return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
       <td style="text-align:center;color:${rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};font-weight:${rank <= 3 ? '700' : '400'};font-size:0.85rem;">${rank}</td>
-      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
+      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <span title="前司法官（${o.ex_judicial_officers.length} 位）&#10;${escHtml(o.ex_judicial_officers.join('\n'))}" style="cursor:help;color:var(--purple);font-size:0.75rem;vertical-align:middle;">⚖️${o.ex_judicial_officers.length}</span>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="font-size:0.82rem;">${(() => { const ls = getFirmLeaders(o.firm_name); return ls.length ? ls.map(n => `${renderLeaderBadge(n)} ${escHtml(n)}`).join('<br>') : '<span style="color:var(--text-muted);">-</span>'; })()}</td>
@@ -2422,6 +2429,10 @@ async function showFirmDetail(firmName) {
   </div>` : '';
 
   // 渲染
+  // 前司法官資料（從 allOffices cache）
+  const currentOffice = (typeof allOffices !== 'undefined' ? allOffices : []).find(o => o.firm_name === firmName);
+  const exJudicial = currentOffice?.ex_judicial_officers || [];
+
   bodyEl.innerHTML = `
     ${blHtml}
     <!-- KPI -->
@@ -2432,6 +2443,20 @@ async function showFirmDetail(firmName) {
       <div class="kpi-card"><div class="kpi-label">平均年齡</div><div class="kpi-value" style="color:var(--orange);">${avgAge}</div><div class="kpi-sub">${withAge.length}/${total} 有資料</div></div>
       <div class="kpi-card"><div class="kpi-label">平均年資</div><div class="kpi-value" style="color:var(--green);">${avgSeniority}</div><div class="kpi-sub">${seniorities.length}/${total} 有資料</div></div>
     </div>
+
+    ${exJudicial.length ? `
+    <!-- 前司法官 -->
+    <div class="card" style="border-left:3px solid var(--purple);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--purple);">⚖️ 前司法官（${exJudicial.length} 位）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">前法官／前檢察官背景的律師 — 通常帶來法庭公信力、判決傾向洞察、實務人脈等競爭優勢</div>
+      <ul style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.6;">
+        ${exJudicial.map(o => {
+          const parts = o.split('｜');
+          return `<li><strong>${escHtml(parts[0] || '')}</strong>${parts[1] ? ` — <span style="color:var(--orange);">${escHtml(parts[1])}</span>` : ''}${parts[2] ? `<span style="color:var(--text-muted);">（${escHtml(parts[2])}）</span>` : ''}</li>`;
+        }).join('')}
+      </ul>
+    </div>
+    ` : ''}
 
     ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${n} (${c}人)`).join('、')}</div>` : ''}
 

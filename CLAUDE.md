@@ -70,10 +70,18 @@
 2. 查 `lawyers_combined` 完整律師清單（按 `lic_year` 排序，找資深 + 案件量大的 = 所長候選）
 3. 查 `firm_profiles` 既有資料（避免蓋掉使用者筆記）
 4. WebFetch 官網確認所長身分 + 事務所特色
-5. 寫分析到本機暫存檔（避免 bash heredoc 踩 encoding）
-6. Python PATCH `firm_profiles`：`ai_analysis`, `ai_analyzed_at='now()'`, `practice_focus`(array), `founded_year`
-7. 更新 `public/index.html` 的 `FIRM_LEADERS` + `FIRM_TAGLINES`
-8. commit + push（GitHub Pages 自動部署）
+5. **分析必查「前司法官」因子**（重要差異化指標）— 從官網、新聞、團隊介紹中找：
+   - 前法官（地方法院／高等法院／最高法院）
+   - 前檢察官（地檢署／高檢署／最高檢／特偵組）
+   - 前司法官訓練所結業律師
+   - 前大法官本人（不含助理）
+6. 寫分析到本機暫存檔（避免 bash heredoc 踩 encoding）
+7. Python PATCH `firm_profiles`：
+   - `ai_analysis`, `ai_analyzed_at='now()'`
+   - `practice_focus`(array), `founded_year`
+   - **`ex_judicial_officers`(array)** — 格式：`['姓名｜職稱｜附註', ...]`，例如 `['陳樹村｜前高雄地方法院法官｜23 年法官資歷']`
+8. 更新 `public/index.html` 的 `FIRM_LEADERS` + `FIRM_TAGLINES`
+9. commit + push（GitHub Pages 自動部署）
 
 ## ⚠️ 所長判斷規則（嚴格防止 LLM hallucination）
 
