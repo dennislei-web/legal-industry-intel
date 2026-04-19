@@ -75,6 +75,11 @@
    - 前檢察官（地檢署／高檢署／最高檢／特偵組）
    - 前司法官訓練所結業律師
    - 前大法官本人（不含助理）
+   - **不算前司法官**：法官助理、檢察事務官、書記官、司法事務官、司法官考試及格但未任職
+   - **驗證規則**：
+     - WebSearch 結果必須與 DB 中該所實際律師**姓名核對**（同音字可能是不同人！我曾把「孫少輔（喆律）」誤認為「孫紹輔（昊鼎）」）
+     - 用 `curl .../lawyers_combined?name=eq.{人名}&firm_name=eq.{所}` 驗證身份存在
+     - ai_analysis 文字掃描+WebSearch 雙重驗證（原分析可能遺漏、WebSearch 可能張冠李戴）
 6. 寫分析到本機暫存檔（避免 bash heredoc 踩 encoding）
 7. Python PATCH `firm_profiles`：
    - `ai_analysis`, `ai_analyzed_at='now()'`
