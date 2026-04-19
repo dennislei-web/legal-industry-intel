@@ -75,6 +75,21 @@
 7. 更新 `public/index.html` 的 `FIRM_LEADERS` + `FIRM_TAGLINES`
 8. commit + push（GitHub Pages 自動部署）
 
+## ⚠️ 所長判斷規則（嚴格防止 LLM hallucination）
+
+寫入 `FIRM_LEADERS` 前**必須驗證**：
+1. **所長姓名必須是該所 `lawyers_combined` 或 `moj_lawyers` 中真實存在的人**
+2. **官網只有英文品牌名（如「Daniel Park Law Office」、「H&W LAW」、「WTW」）時不得自行音譯推測中文名**
+   - ❌ 錯誤案例：看到「Daniel Park Law Office」就寫「朴大同」
+   - ✅ 正確做法：英文品牌名就當作事務所名稱，不強行對應人名
+3. **若真實所長不在 MOJ 名冊中**（已退休、外籍、轉職等），仍可加入 FIRM_LEADERS，但必須同時加入 `FIRM_LEADERS_NOT_IN_MOJ` Set，前端會顯示 ⚠️ 而非 👑
+4. **分析寫入後應跑驗證 script**：
+   ```python
+   # 驗證所長存在於該所 DB 律師名單
+   q(f'/rest/v1/lawyers_combined?firm_name=eq.{firm}&name=eq.{leader}&select=name&limit=1')
+   ```
+   若回傳空陣列 → 要麼刪除該所長，要麼加入 `FIRM_LEADERS_NOT_IN_MOJ`
+
 ## Windows console encoding 注意
 
 - Python print 中文到 stdout 會顯示亂碼（CP950），**不代表 DB 寫入失敗**

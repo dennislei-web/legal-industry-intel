@@ -1939,6 +1939,22 @@ function getFirmLeaders(firmName) {
   return leaders;
 }
 
+// 真實存在但未登錄 MOJ 現役律師名冊的所長（已退休/外籍/轉職等）
+// 顯示時改用 ⚠️ icon + 灰色，避免使用者誤以為資料錯誤
+const FIRM_LEADERS_NOT_IN_MOJ = new Set([
+  '金玉瑩', '卓家立', '楊崇森', '林美生', '藍瀛芳', '林孟毅',
+  '孫德柔', '李模', '鄭淑芬', '劉安桓', '周嬿容', '陳家慶', '博仲'
+]);
+
+function renderLeaderBadge(name, inline = false) {
+  const notInMOJ = FIRM_LEADERS_NOT_IN_MOJ.has(name);
+  if (notInMOJ) {
+    const tooltip = '此律師未登錄於 MOJ 現役律師名冊（可能已退休、轉職、為外籍律師或其他原因）';
+    return `<span title="${tooltip}" style="color:var(--text-muted);cursor:help;">⚠️</span>`;
+  }
+  return '<span style="color:var(--gold);">👑</span>';
+}
+
 // 雷所名單 (2025/11/27 維護)
 const BLACKLIST = {
   '德勤': '合夥律師只會畫餅，案源不足，實習只做簡報，會追回已發加班費',
@@ -2296,7 +2312,7 @@ function renderOffices() {
       <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
-      <td style="font-size:0.82rem;">${(() => { const ls = getFirmLeaders(o.firm_name); return ls.length ? ls.map(n => `<span style="color:var(--gold);">👑</span> ${escHtml(n)}`).join('<br>') : '<span style="color:var(--text-muted);">-</span>'; })()}</td>
+      <td style="font-size:0.82rem;">${(() => { const ls = getFirmLeaders(o.firm_name); return ls.length ? ls.map(n => `${renderLeaderBadge(n)} ${escHtml(n)}`).join('<br>') : '<span style="color:var(--text-muted);">-</span>'; })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
@@ -2721,7 +2737,15 @@ async function showLawyerDetail(name, certNumber) {
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
 
   // 負責人標記
-  const leaderBadge = FIRM_LEADERS[name] ? `<span style="color:var(--gold);font-size:0.85rem;margin-left:8px;" title="${escHtml(FIRM_LEADERS[name])}">👑 ${escHtml(FIRM_LEADERS[name].split('｜')[1] || '負責人')}</span>` : '';
+  const leaderBadge = FIRM_LEADERS[name] ? (() => {
+    const notInMOJ = FIRM_LEADERS_NOT_IN_MOJ.has(name);
+    const icon = notInMOJ ? '⚠️' : '👑';
+    const color = notInMOJ ? 'var(--text-muted)' : 'var(--gold)';
+    const tip = notInMOJ
+      ? FIRM_LEADERS[name] + '\n⚠️ 此律師未登錄於 MOJ 現役律師名冊'
+      : FIRM_LEADERS[name];
+    return `<span style="color:${color};font-size:0.85rem;margin-left:8px;" title="${escHtml(tip)}">${icon} ${escHtml(FIRM_LEADERS[name].split('｜')[1] || '負責人')}</span>`;
+  })() : '';
 
   // 事務所連結
   const firmLink = l.firm_name
