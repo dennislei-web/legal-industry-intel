@@ -17,3 +17,4 @@ gap_surnames.txt
 # Lawsnote 爬蟲中間資料
 scripts/lawsnote_chunk_*.json
 scripts/lawsnote_batches.json
+scripts/.lawsnote_browser/
