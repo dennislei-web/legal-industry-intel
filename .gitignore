@@ -18,3 +18,6 @@ gap_surnames.txt
 scripts/lawsnote_chunk_*.json
 scripts/lawsnote_batches.json
 scripts/.lawsnote_browser/
+
+# Scripts cache (含敏感名單)
+scripts/_*.json
