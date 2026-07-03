@@ -771,7 +771,7 @@
         <div class="kpi-card"><div class="kpi-label">最近偵測</div><div class="kpi-value" id="kpiChgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">最近一筆異動時間</div></div>
       </div>
       <div class="search-bar">
-        <input type="text" id="chgSearch" placeholder="搜尋律師姓名或事務所..." oninput="renderChanges()">
+        <input type="text" id="chgSearch" placeholder="搜尋律師姓名或事務所..." oninput="filterChanges()">
         <select id="chgWindow" onchange="loadChanges(true)">
           <option value="30">近 30 天</option>
           <option value="7">近 7 天</option>
@@ -779,7 +779,7 @@
           <option value="365">近一年</option>
           <option value="0">全部</option>
         </select>
-        <select id="chgType" onchange="renderChanges()">
+        <select id="chgType" onchange="filterChanges()">
           <option value="">所有類型</option>
           <option value="firm_change">事務所異動</option>
           <option value="new_lawyer">新進律師</option>
@@ -3105,11 +3105,17 @@ async function loadSources() {
 // CHANGES (異動追蹤)
 // ============================================================
 let _chgRows = null;
+let chgPage = 0;
 
 async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
+  chgPage = 0;
+  document.getElementById('chgInflow').className = 'loading';
+  document.getElementById('chgOutflow').className = 'loading';
   const days = parseInt(document.getElementById('chgWindow').value, 10);
-  let q = db.from('moj_lawyer_changes').select('*').order('changed_at', { ascending: false }).limit(3000);
+  let q = db.from('moj_lawyer_changes')
+    .select('name,change_type,old_office,new_office,old_state,new_state,changed_at')
+    .order('changed_at', { ascending: false }).limit(3000);
   if (days > 0) q = q.gte('changed_at', new Date(Date.now() - days * 86400000).toISOString());
   const { data, error } = await q;
   if (error) {
@@ -3119,6 +3125,8 @@ async function loadChanges(force) {
   _chgRows = data || [];
   renderChanges();
 }
+
+function filterChanges() { chgPage = 0; renderChanges(); }
 
 const CHG_TYPE_META = {
   firm_change: { label: '事務所異動', cls: 'badge-blue' },
@@ -3162,16 +3170,21 @@ function renderChanges() {
         <span style="font-weight:600;">${n} 人</span>
       </div>`).join('');
   };
-  document.getElementById('chgInflow').innerHTML = rankHtml(inflow);
-  document.getElementById('chgOutflow').innerHTML = rankHtml(outflow);
+  const inflowEl = document.getElementById('chgInflow');
+  const outflowEl = document.getElementById('chgOutflow');
+  inflowEl.className = '';
+  outflowEl.className = '';
+  inflowEl.innerHTML = rankHtml(inflow);
+  outflowEl.innerHTML = rankHtml(outflow);
 
-  // 明細表（最多顯示 500 筆）
-  const MAX = 500;
+  // 明細表（分頁）
   const body = document.getElementById('chgTableBody');
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (chgPage >= totalPages) chgPage = totalPages - 1;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="4" class="loading">此期間無異動紀錄</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無異動紀錄</td></tr>';
   } else {
-    body.innerHTML = rows.slice(0, MAX).map(r => {
+    body.innerHTML = rows.slice(chgPage * PAGE_SIZE, (chgPage + 1) * PAGE_SIZE).map(r => {
       const meta = CHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
       let detail = '';
       if (r.change_type === 'firm_change') {
@@ -3189,8 +3202,11 @@ function renderChanges() {
       </tr>`;
     }).join('');
   }
-  document.getElementById('chgPagination').innerHTML =
-    `<span class="page-info">共 ${rows.length.toLocaleString()} 筆${rows.length > MAX ? `，僅顯示前 ${MAX} 筆` : ''}${_chgRows.length >= 3000 ? '（已達載入上限 3000 筆，請縮短期間）' : ''}</span>`;
+  renderPagination('chgPagination', chgPage, rows.length, p => { chgPage = p; renderChanges(); });
+  if (_chgRows.length >= 3000) {
+    document.getElementById('chgPagination').insertAdjacentHTML('beforeend',
+      '<span class="page-info">（已達載入上限 3000 筆，請縮短期間）</span>');
+  }
 }
 
 function escHtml(str) {
