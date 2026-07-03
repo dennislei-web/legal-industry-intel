@@ -3106,12 +3106,13 @@ async function loadSources() {
 // ============================================================
 let _chgRows = null;
 let chgPage = 0;
-let chgRankShown = { inflow: 10, outflow: 10 };
+let chgRankPage = { inflow: 0, outflow: 0 };
+const CHG_RANK_PAGE_SIZE = 10;
 
 async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
   chgPage = 0;
-  chgRankShown = { inflow: 10, outflow: 10 };
+  chgRankPage = { inflow: 0, outflow: 0 };
   document.getElementById('chgInflow').className = 'loading';
   document.getElementById('chgOutflow').className = 'loading';
   const days = parseInt(document.getElementById('chgWindow').value, 10);
@@ -3128,9 +3129,9 @@ async function loadChanges(force) {
   renderChanges();
 }
 
-function filterChanges() { chgPage = 0; chgRankShown = { inflow: 10, outflow: 10 }; renderChanges(); }
+function filterChanges() { chgPage = 0; chgRankPage = { inflow: 0, outflow: 0 }; renderChanges(); }
 
-function expandChgRank(key) { chgRankShown[key] += 10; renderChanges(); }
+function chgRankNav(key, page) { chgRankPage[key] = page; renderChanges(); }
 
 const CHG_TYPE_META = {
   firm_change: { label: '事務所異動', cls: 'badge-blue' },
@@ -3168,14 +3169,20 @@ function renderChanges() {
   const rankHtml = (obj, key) => {
     const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
     if (!all.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
-    let html = all.slice(0, chgRankShown[key]).map(([firm, n], i) =>
+    const totalPages = Math.ceil(all.length / CHG_RANK_PAGE_SIZE);
+    if (chgRankPage[key] >= totalPages) chgRankPage[key] = totalPages - 1;
+    const page = chgRankPage[key];
+    const start = page * CHG_RANK_PAGE_SIZE;
+    let html = all.slice(start, start + CHG_RANK_PAGE_SIZE).map(([firm, n], i) =>
       `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
-        <span>${i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
+        <span>${start + i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
         <span style="font-weight:600;">${n} 人</span>
       </div>`).join('');
-    if (all.length > chgRankShown[key]) {
-      html += `<div style="text-align:center;margin-top:10px;">
-        <button onclick="expandChgRank('${key}')" style="padding:6px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.82rem;">顯示更多（還有 ${all.length - chgRankShown[key]} 間）</button>
+    if (totalPages > 1) {
+      html += `<div class="pagination" style="margin-top:10px;">
+        <button ${page === 0 ? 'disabled' : ''} onclick="chgRankNav('${key}', ${page - 1})">上一頁</button>
+        <span class="page-info">第 ${page + 1} / ${totalPages} 頁 (共 ${all.length} 間)</span>
+        <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="chgRankNav('${key}', ${page + 1})">下一頁</button>
       </div>`;
     }
     return html;
