@@ -789,6 +789,16 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
         <div class="card"><div class="card-title">&#128200; 人才流入排行</div><div id="chgInflow" class="loading">載入中</div></div>
         <div class="card"><div class="card-title">&#128201; 人才流出排行</div><div id="chgOutflow" class="loading">載入中</div></div>
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>&#9878;&#65039; 淨流動排行</span>
+            <select id="chgNetOrder" onchange="chgNetOrderChange()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="in">淨流入優先</option>
+              <option value="out">淨流出優先</option>
+            </select>
+          </div>
+          <div id="chgNet" class="loading">載入中</div>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">&#128260; 異動明細</div>
@@ -3106,15 +3116,16 @@ async function loadSources() {
 // ============================================================
 let _chgRows = null;
 let chgPage = 0;
-let chgRankPage = { inflow: 0, outflow: 0 };
+let chgRankPage = { inflow: 0, outflow: 0, net: 0 };
 const CHG_RANK_PAGE_SIZE = 10;
 
 async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
   chgPage = 0;
-  chgRankPage = { inflow: 0, outflow: 0 };
+  chgRankPage = { inflow: 0, outflow: 0, net: 0 };
   document.getElementById('chgInflow').className = 'loading';
   document.getElementById('chgOutflow').className = 'loading';
+  document.getElementById('chgNet').className = 'loading';
   const days = parseInt(document.getElementById('chgWindow').value, 10);
   let q = db.from('moj_lawyer_changes')
     .select('name,change_type,old_office,new_office,old_state,new_state,changed_at')
@@ -3129,9 +3140,11 @@ async function loadChanges(force) {
   renderChanges();
 }
 
-function filterChanges() { chgPage = 0; chgRankPage = { inflow: 0, outflow: 0 }; renderChanges(); }
+function filterChanges() { chgPage = 0; chgRankPage = { inflow: 0, outflow: 0, net: 0 }; renderChanges(); }
 
 function chgRankNav(key, page) { chgRankPage[key] = page; renderChanges(); }
+
+function chgNetOrderChange() { chgRankPage.net = 0; renderChanges(); }
 
 const CHG_TYPE_META = {
   firm_change: { label: '事務所異動', cls: 'badge-blue' },
@@ -3193,6 +3206,39 @@ function renderChanges() {
   outflowEl.className = '';
   inflowEl.innerHTML = rankHtml(inflow, 'inflow');
   outflowEl.innerHTML = rankHtml(outflow, 'outflow');
+
+  // 淨流動 = 流入 - 流出
+  const net = {};
+  Object.entries(inflow).forEach(([f, n]) => { net[f] = (net[f] || 0) + n; });
+  Object.entries(outflow).forEach(([f, n]) => { net[f] = (net[f] || 0) - n; });
+  const netEl = document.getElementById('chgNet');
+  netEl.className = '';
+  const netOrder = document.getElementById('chgNetOrder').value;
+  const netAll = Object.entries(net).sort((a, b) => netOrder === 'out' ? a[1] - b[1] : b[1] - a[1]);
+  if (!netAll.length) {
+    netEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
+  } else {
+    const totalPages = Math.ceil(netAll.length / CHG_RANK_PAGE_SIZE);
+    if (chgRankPage.net >= totalPages) chgRankPage.net = totalPages - 1;
+    const page = chgRankPage.net;
+    const start = page * CHG_RANK_PAGE_SIZE;
+    let html = netAll.slice(start, start + CHG_RANK_PAGE_SIZE).map(([firm, n], i) => {
+      const color = n > 0 ? 'var(--green)' : n < 0 ? 'var(--red)' : 'var(--text-muted)';
+      const sign = n > 0 ? '+' : '';
+      return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <span>${start + i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
+        <span style="font-weight:600;color:${color};">${sign}${n} 人</span>
+      </div>`;
+    }).join('');
+    if (totalPages > 1) {
+      html += `<div class="pagination" style="margin-top:10px;">
+        <button ${page === 0 ? 'disabled' : ''} onclick="chgRankNav('net', ${page - 1})">上一頁</button>
+        <span class="page-info">第 ${page + 1} / ${totalPages} 頁 (共 ${netAll.length} 間)</span>
+        <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="chgRankNav('net', ${page + 1})">下一頁</button>
+      </div>`;
+    }
+    netEl.innerHTML = html;
+  }
 
   // 明細表（分頁）
   const body = document.getElementById('chgTableBody');
