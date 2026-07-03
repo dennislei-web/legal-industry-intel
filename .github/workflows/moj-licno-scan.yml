@@ -73,7 +73,7 @@ jobs:
                 *) echo "::warning::${rpc} returned $http_code"; cat /tmp/resp.txt | head -c 300; echo; break ;;
               esac
             done
-            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries (non-fatal, 下次爬蟲會重刷)"
+            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries (non-fatal, 下次爬蟲會重刷)" || true
           done
 
       - name: Wait for cache refresh to settle

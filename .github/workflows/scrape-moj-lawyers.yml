@@ -50,5 +50,5 @@ jobs:
                 *) echo "::warning::${rpc} returned $http_code"; cat /tmp/resp.txt | head -c 300; echo; break ;;
               esac
             done
-            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries"
+            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries" || true
           done
