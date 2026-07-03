@@ -31,6 +31,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
+          # secrets 可能帶尾端空白/換行，會讓 PostgREST 回 400 PGRST102（curl 不像 Python 會 strip）
+          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
           for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
             success=0
             for attempt in 1 2 3; do
