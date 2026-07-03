@@ -787,8 +787,8 @@
         </select>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
-        <div class="card"><div class="card-title">&#128200; 人才流入 Top 10</div><div id="chgInflow" class="loading">載入中</div></div>
-        <div class="card"><div class="card-title">&#128201; 人才流出 Top 10</div><div id="chgOutflow" class="loading">載入中</div></div>
+        <div class="card"><div class="card-title">&#128200; 人才流入排行</div><div id="chgInflow" class="loading">載入中</div></div>
+        <div class="card"><div class="card-title">&#128201; 人才流出排行</div><div id="chgOutflow" class="loading">載入中</div></div>
       </div>
       <div class="card">
         <div class="card-title">&#128260; 異動明細</div>
@@ -3106,10 +3106,12 @@ async function loadSources() {
 // ============================================================
 let _chgRows = null;
 let chgPage = 0;
+let chgRankShown = { inflow: 10, outflow: 10 };
 
 async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
   chgPage = 0;
+  chgRankShown = { inflow: 10, outflow: 10 };
   document.getElementById('chgInflow').className = 'loading';
   document.getElementById('chgOutflow').className = 'loading';
   const days = parseInt(document.getElementById('chgWindow').value, 10);
@@ -3126,7 +3128,9 @@ async function loadChanges(force) {
   renderChanges();
 }
 
-function filterChanges() { chgPage = 0; renderChanges(); }
+function filterChanges() { chgPage = 0; chgRankShown = { inflow: 10, outflow: 10 }; renderChanges(); }
+
+function expandChgRank(key) { chgRankShown[key] += 10; renderChanges(); }
 
 const CHG_TYPE_META = {
   firm_change: { label: '事務所異動', cls: 'badge-blue' },
@@ -3161,21 +3165,27 @@ function renderChanges() {
       inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
     }
   });
-  const rankHtml = obj => {
-    const top = Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    if (!top.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
-    return top.map(([firm, n], i) =>
+  const rankHtml = (obj, key) => {
+    const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    if (!all.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
+    let html = all.slice(0, chgRankShown[key]).map(([firm, n], i) =>
       `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
         <span>${i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
         <span style="font-weight:600;">${n} 人</span>
       </div>`).join('');
+    if (all.length > chgRankShown[key]) {
+      html += `<div style="text-align:center;margin-top:10px;">
+        <button onclick="expandChgRank('${key}')" style="padding:6px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.82rem;">顯示更多（還有 ${all.length - chgRankShown[key]} 間）</button>
+      </div>`;
+    }
+    return html;
   };
   const inflowEl = document.getElementById('chgInflow');
   const outflowEl = document.getElementById('chgOutflow');
   inflowEl.className = '';
   outflowEl.className = '';
-  inflowEl.innerHTML = rankHtml(inflow);
-  outflowEl.innerHTML = rankHtml(outflow);
+  inflowEl.innerHTML = rankHtml(inflow, 'inflow');
+  outflowEl.innerHTML = rankHtml(outflow, 'outflow');
 
   // 明細表（分頁）
   const body = document.getElementById('chgTableBody');
