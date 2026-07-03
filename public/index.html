@@ -475,6 +475,7 @@
     <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
     <button class="tab-btn" onclick="showTab('firms')">律師公會</button>
     <button class="tab-btn" onclick="showTab('offices')">事務所</button>
+    <button class="tab-btn" onclick="showTab('changes')">異動追蹤</button>
     <button class="tab-btn" onclick="showTab('judges')">法官</button>
     <button class="tab-btn" onclick="showTab('courts')">法院</button>
     <button class="tab-btn" onclick="showTab('sources')">資料來源</button>
@@ -761,6 +762,53 @@
     </div>
 
     <!-- ==================== TAB: JUDGES (法官) ==================== -->
+    <!-- ==================== TAB: CHANGES (異動追蹤) ==================== -->
+    <div id="tab-changes" class="tab-content">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">事務所異動</div><div class="kpi-value" id="kpiChgFirm" style="color:var(--blue);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">新進律師</div><div class="kpi-value" id="kpiChgNew" style="color:var(--green);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">執業狀態變更</div><div class="kpi-value" id="kpiChgState" style="color:var(--orange);">-</div><div class="kpi-sub">停業/註銷/回復</div></div>
+        <div class="kpi-card"><div class="kpi-label">最近偵測</div><div class="kpi-value" id="kpiChgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">最近一筆異動時間</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="chgSearch" placeholder="搜尋律師姓名或事務所..." oninput="renderChanges()">
+        <select id="chgWindow" onchange="loadChanges(true)">
+          <option value="30">近 30 天</option>
+          <option value="7">近 7 天</option>
+          <option value="90">近 90 天</option>
+          <option value="365">近一年</option>
+          <option value="0">全部</option>
+        </select>
+        <select id="chgType" onchange="renderChanges()">
+          <option value="">所有類型</option>
+          <option value="firm_change">事務所異動</option>
+          <option value="new_lawyer">新進律師</option>
+          <option value="state_change">執業狀態變更</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card"><div class="card-title">&#128200; 人才流入 Top 10</div><div id="chgInflow" class="loading">載入中</div></div>
+        <div class="card"><div class="card-title">&#128201; 人才流出 Top 10</div><div id="chgOutflow" class="loading">載入中</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128260; 異動明細</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>日期</th><th>律師</th><th>類型</th><th>異動內容</th></tr>
+            </thead>
+            <tbody id="chgTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="chgPagination"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          追蹤機制：每日凌晨自動比對法務部律師登錄資料（一週完整刷新一輪全部律師），偵測事務所變更、新進律師與執業狀態變更。追蹤起始日 2026-07-03，此前的異動無法回溯；第一輪刷新會把 2026-04 以來累積的變動一次記入。
+        </div>
+      </div>
+    </div>
+
     <div id="tab-judges" class="tab-content">
       <div class="kpi-grid" id="judgeKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">法官總數</div><div class="kpi-value" id="kpiJudgeTotal">-</div><div class="kpi-sub" id="kpiJudgeTotalSub">載入中</div></div>
@@ -1126,6 +1174,7 @@ function showTab(tab) {
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
+  if (tab === 'changes') loadChanges();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'sources') loadSources();
@@ -3052,6 +3101,98 @@ async function loadSources() {
 // ============================================================
 // UTILITIES
 // ============================================================
+// ============================================================
+// CHANGES (異動追蹤)
+// ============================================================
+let _chgRows = null;
+
+async function loadChanges(force) {
+  if (_chgRows && !force) { renderChanges(); return; }
+  const days = parseInt(document.getElementById('chgWindow').value, 10);
+  let q = db.from('moj_lawyer_changes').select('*').order('changed_at', { ascending: false }).limit(3000);
+  if (days > 0) q = q.gte('changed_at', new Date(Date.now() - days * 86400000).toISOString());
+  const { data, error } = await q;
+  if (error) {
+    document.getElementById('chgTableBody').innerHTML = `<tr><td colspan="4" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
+    return;
+  }
+  _chgRows = data || [];
+  renderChanges();
+}
+
+const CHG_TYPE_META = {
+  firm_change: { label: '事務所異動', cls: 'badge-blue' },
+  new_lawyer: { label: '新進律師', cls: 'badge-green' },
+  state_change: { label: '狀態變更', cls: 'badge-orange' },
+};
+
+function renderChanges() {
+  if (!_chgRows) return;
+  const kw = (document.getElementById('chgSearch').value || '').trim();
+  const type = document.getElementById('chgType').value;
+
+  let rows = _chgRows;
+  if (type) rows = rows.filter(r => r.change_type === type);
+  if (kw) rows = rows.filter(r =>
+    (r.name || '').includes(kw) || (r.old_office || '').includes(kw) || (r.new_office || '').includes(kw));
+
+  // KPI（依搜尋前的期間資料計）
+  const cnt = t => _chgRows.filter(r => r.change_type === t).length;
+  document.getElementById('kpiChgFirm').textContent = cnt('firm_change').toLocaleString();
+  document.getElementById('kpiChgNew').textContent = cnt('new_lawyer').toLocaleString();
+  document.getElementById('kpiChgState').textContent = cnt('state_change').toLocaleString();
+  document.getElementById('kpiChgLast').textContent = _chgRows.length ? _chgRows[0].changed_at.slice(0, 10) : '尚無資料';
+
+  // 流入/流出排行（僅事務所異動 + 新進律師的目的所）
+  const inflow = {}, outflow = {};
+  _chgRows.forEach(r => {
+    if (r.change_type === 'firm_change') {
+      if (r.new_office) inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
+      if (r.old_office) outflow[r.old_office] = (outflow[r.old_office] || 0) + 1;
+    } else if (r.change_type === 'new_lawyer' && r.new_office) {
+      inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
+    }
+  });
+  const rankHtml = obj => {
+    const top = Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (!top.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
+    return top.map(([firm, n], i) =>
+      `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <span>${i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
+        <span style="font-weight:600;">${n} 人</span>
+      </div>`).join('');
+  };
+  document.getElementById('chgInflow').innerHTML = rankHtml(inflow);
+  document.getElementById('chgOutflow').innerHTML = rankHtml(outflow);
+
+  // 明細表（最多顯示 500 筆）
+  const MAX = 500;
+  const body = document.getElementById('chgTableBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="4" class="loading">此期間無異動紀錄</td></tr>';
+  } else {
+    body.innerHTML = rows.slice(0, MAX).map(r => {
+      const meta = CHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
+      let detail = '';
+      if (r.change_type === 'firm_change') {
+        detail = `${escHtml(r.old_office || '（未登錄）')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_office || '（未登錄）')}`;
+      } else if (r.change_type === 'new_lawyer') {
+        detail = `加入 ${escHtml(r.new_office || '（未登錄事務所）')}`;
+      } else {
+        detail = `${escHtml(r.old_state || '-')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_state || '-')}`;
+      }
+      return `<tr>
+        <td style="white-space:nowrap;">${r.changed_at.slice(0, 10)}</td>
+        <td><a href="#" onclick="showLawyerDetail('${escHtml(r.name || '').replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(r.name || '-')}</a></td>
+        <td><span class="badge ${meta.cls}">${meta.label}</span></td>
+        <td>${detail}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('chgPagination').innerHTML =
+    `<span class="page-info">共 ${rows.length.toLocaleString()} 筆${rows.length > MAX ? `，僅顯示前 ${MAX} 筆` : ''}${_chgRows.length >= 3000 ? '（已達載入上限 3000 筆，請縮短期間）' : ''}</span>`;
+}
+
 function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');

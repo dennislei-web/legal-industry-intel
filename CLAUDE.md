@@ -26,8 +26,16 @@
 - `firm_profiles` — 事務所補充資料（官網、備註等手動編輯）
 - `firm_websites` — 爬蟲找到的官網
 - `judges` / `courts` / `judges_combined` — 法官/法院
+- `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024），前端「異動追蹤」tab 讀取
 - `lawyer_members` — 律師公會會員（按地區公會）
 - `user_profiles` — 使用者角色 (admin/user)
+
+## 律師異動追蹤（工作流動）
+
+- `scripts/moj_office_refresh.py` — 逐位比對 MOJ API 的事務所/執業狀態，只 PATCH 有變動的律師，trigger 自動記到 `moj_lawyer_changes`
+- MOJ API 每筆 ~3-5 秒，全量要 ~15 小時 → `moj-office-refresh.yml` 每日凌晨 1 點按證號 hash 分 7 片跑（`--shard k 7`），一週刷完一輪
+- `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號（發現新進律師，INSERT 也會被 trigger 記錄）
+- 注意：`moj_lawyer_detail_fetch.py` **不會**更新 office 欄位（只補 detail），別誤以為它能偵測異動
 
 ## 爬蟲模式（moj-deep-backfill.yml）
 

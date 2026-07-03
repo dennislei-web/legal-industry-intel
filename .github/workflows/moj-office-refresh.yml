@@ -1,23 +1,23 @@
-name: MOJ 律師補掃（證號遍歷）
+name: MOJ 律師異動刷新（事務所/執業狀態）
 
 on:
   schedule:
-    - cron: '0 18 * * 6'  # 每週六 UTC 18:00 = 台灣週日凌晨 2:00（發現新律師）
+    - cron: '0 17 * * *'  # 每日 UTC 17:00 = 台灣凌晨 1:00，按星期分片，一週刷完全部律師
   workflow_dispatch:
     inputs:
-      years:
-        description: '要掃的年份（留空=自動掃 92~最新；可輸入逗號分隔，例如 112,113,114,115）'
+      shard:
+        description: '分片編號 0~6（留空=依今天星期自動選）'
         required: false
         default: ''
-      detail_fetch:
-        description: '掃完後是否補抓詳細資料'
+      limit:
+        description: '只處理前 N 筆（測試用，留空=整個分片）'
         required: false
-        default: 'true'
+        default: ''
 
 jobs:
-  scrape:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -28,32 +28,26 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: Run 證號遍歷
+      - name: Run office refresh
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         working-directory: scripts
         run: |
-          YEARS="${{ github.event.inputs.years }}"
-          # schedule 觸發時 inputs 為空，預設跑 112~115
-          if [ -z "$YEARS" ] && [ "${{ github.event_name }}" = "schedule" ]; then
-            YEARS="112,113,114,115"
+          SHARD="${{ github.event.inputs.shard }}"
+          LIMIT="${{ github.event.inputs.limit }}"
+          if [ -z "$SHARD" ]; then
+            SHARD=$(( $(date +%u) % 7 ))  # 0~6，依星期自動輪替
           fi
-          if [ -z "$YEARS" ]; then
-            echo "=== 證號遍歷（自動：92~最新）==="
-            python moj_licno_scan.py
-          else
-            ARGS=$(echo "$YEARS" | tr ',' ' ')
-            echo "=== 證號遍歷（指定年份：$ARGS）==="
-            python moj_licno_scan.py $ARGS
-          fi
+          echo "=== 分片 $SHARD/7 ==="
+          python moj_office_refresh.py --shard "$SHARD" 7 $LIMIT
 
       - name: Refresh all caches (with retry)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          # 剛跑完大量寫入，Supabase 可能還忙。用長 timeout + 重試確保真的 refresh 到
+          # 剛跑完寫入，Supabase 可能還忙。用長 timeout + 重試確保真的 refresh 到
           for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
             success=0
             for attempt in 1 2 3; do
@@ -72,17 +66,3 @@ jobs:
             done
             [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries (non-fatal, 下次爬蟲會重刷)"
           done
-
-      - name: Wait for cache refresh to settle
-        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
-        run: |
-          echo "Sleep 90s 讓 refresh_firm_stats_cache 在 Supabase 跑完，避免下個 step 撞鎖"
-          sleep 90
-
-      - name: Fetch lawyer details
-        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        working-directory: scripts
-        run: python moj_lawyer_detail_fetch.py 2000
