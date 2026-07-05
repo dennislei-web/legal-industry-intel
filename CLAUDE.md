@@ -37,6 +37,14 @@
 - `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號（發現新進律師，INSERT 也會被 trigger 記錄）
 - 注意：`moj_lawyer_detail_fetch.py` **不會**更新 office 欄位（只補 detail），別誤以為它能偵測異動
 
+## 裁判書開放資料管線（法官統計）
+
+- `scripts/judgment_stats.py`：opendata.judicial.gov.tw 每月裁判書 RAR → 解析全文抽承審法官 → `judge_month_stats`（月聚合）→ RPC `refresh_judge_judgment_stats()` → `judge_judgment_stats` → `judges_combined` view（官方統計優先、Lawsnote fallback）
+- **裁判書資料集是「會員限定」**：下載需先 POST `/api/MemberTokens` 登入（帳密在 `scripts/.env` 的 `JUDICIAL_OPENDATA_USER/PWD`，不需 Turnstile）；資料集查詢用 `/api/Datasets?Keyword=YYYYMM裁判書`，下載 `/api/FilesetLists/{fileSetId}/file` 帶 Bearer token
+- 月包晚兩個月發布（約每月 15 日）；`judgment-stats-monthly.yml` 每月 17 日自動增量
+- 已回填 2020-01 ~ 2025-04；`avg_processing_days` 是估算值（裁判日 − 案號年 1/1），僅供法官間相對比較
+- **多 session 注意**：backfill 不要兩個 session 同時跑（會撞 `.judgment_work` 檔案鎖與 upload 重複鍵）
+
 ## 爬蟲模式（moj-deep-backfill.yml）
 
 - `licno-scan` — 證號遍歷（全年份）
