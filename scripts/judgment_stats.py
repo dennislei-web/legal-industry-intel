@@ -110,7 +110,21 @@ def download(yyyymm):
 # 「(審判長)法 官 姓名」列，姓名 2-4 個漢字（不含空白時）或全形空白分隔。
 RE_JUDGE = re.compile(
     r'(?:審判長)?法\s*官\s+([一-鿿][一-鿿\s　]{0,8}[一-鿿])\s*(?:\r|\n|$)')
-RE_COURT = re.compile(r'^([一-鿿]{2,15}法院)')
+# 分院要一起捕（臺灣高等法院「高雄分院」），否則各分院判決全被歸到高本院
+RE_COURT = re.compile(r'^([一-鿿]{2,15}法院(?:[一-鿿]{2,4}分院)?)')
+
+# 早年（~2001 前）裁判書全文開頭有異體/缺字：「台灣」「褔建」「灣高等法院」
+# 「臺臺灣」「高等法院」（光桿）等，正規化成官方名稱，避免同法院被拆成多列
+RE_COURT_BARE = re.compile(r'^(?:高等法院|[一-鿿]{2,3}地方法院)$')
+
+
+def normalize_court(name):
+    n = name.replace('台', '臺').replace('褔', '福')
+    n = re.sub(r'^臺臺灣', '臺灣', n)
+    n = re.sub(r'^灣', '臺灣', n)
+    if RE_COURT_BARE.match(n):
+        n = '臺灣' + n
+    return n
 RE_NOT_JUDGE_LINE = re.compile(r'書\s*記\s*官|檢\s*察\s*官|辯\s*護\s*人|司法事務官|法官助理')
 
 # 字別 → 案類（粗分）。JID 內含裁判類別碼，但月包檔名/ID 較可靠的是全文首行。
@@ -316,7 +330,7 @@ def parse(yyyymm):
                 continue
             head = jfull[:60]
             mc = RE_COURT.search(head.strip())
-            court = mc.group(1) if mc else '未知法院'
+            court = normalize_court(mc.group(1)) if mc else '未知法院'
             cat = classify(head, doc.get('JCASE') or '')
             for lname in extract_lawyers(jfull):
                 la = lagg[(lname, court)]
