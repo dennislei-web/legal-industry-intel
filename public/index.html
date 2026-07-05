@@ -177,11 +177,16 @@
     }
     .tab-btn:hover { color: var(--text); background: var(--ghost-bg); }
     .tab-btn.active { color: var(--tab-active-color); border-bottom-color: var(--tab-active-color); background: var(--tab-active-bg); }
-    .tab-group-label { align-self: center; padding: 0 4px 2px 12px; font-size: 0.68rem; letter-spacing: 2px; color: var(--text-muted); white-space: nowrap; user-select: none; }
-    .tab-sep { align-self: center; width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
 
-    .ov-sec-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 4px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
-    .ov-sec-title .sub { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+    /* 第一層導覽（律師 / 法官 / 資料來源） */
+    .nav-bar { display: flex; gap: 8px; max-width: 1400px; margin: 0 auto; padding: 12px 24px 4px; overflow-x: auto; align-items: center; }
+    .nav-btn {
+      padding: 8px 22px; font-size: 0.92rem; font-weight: 600; color: var(--text-muted);
+      background: none; border: 1px solid transparent; border-radius: 10px;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: inherit;
+    }
+    .nav-btn:hover { color: var(--text); background: var(--ghost-bg); }
+    .nav-btn.active { color: var(--tab-active-color); background: var(--tab-active-bg); border-color: var(--tab-active-color); }
 
     /* ===================== CONTENT ===================== */
     .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
@@ -304,6 +309,8 @@
 
       .tabs-bar { padding: 6px 12px 0; -webkit-overflow-scrolling: touch; }
       .tab-btn { padding: 9px 12px; font-size: 0.8rem; }
+      .nav-bar { padding: 8px 12px 2px; -webkit-overflow-scrolling: touch; }
+      .nav-btn { padding: 7px 14px; font-size: 0.85rem; }
 
       .content { padding: 14px 12px; }
       .card { padding: 14px; }
@@ -343,6 +350,7 @@
       }
 
       .tab-btn { padding: 8px 10px; font-size: 0.75rem; }
+      .nav-btn { padding: 6px 12px; font-size: 0.8rem; }
 
       /* 若 KPI grid 內聯樣式為 auto-fit minmax(150px…)，強制 2 欄 */
       .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
@@ -475,28 +483,20 @@
   </div>
 
   <!-- Tabs -->
-  <div class="tabs-bar">
-    <button class="tab-btn active" onclick="showTab('overview')">總覽</button>
-    <div class="tab-sep"></div>
-    <span class="tab-group-label">律師</span>
-    <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
-    <button class="tab-btn" onclick="showTab('firms')">公會</button>
-    <button class="tab-btn" onclick="showTab('offices')">事務所</button>
-    <button class="tab-btn" onclick="showTab('changes')">異動追蹤</button>
-    <div class="tab-sep"></div>
-    <span class="tab-group-label">法官</span>
-    <button class="tab-btn" onclick="showTab('judges')">法官</button>
-    <button class="tab-btn" onclick="showTab('courts')">法院</button>
-    <div class="tab-sep"></div>
-    <button class="tab-btn" onclick="showTab('sources')">資料來源</button>
-    <button class="tab-btn" onclick="showTab('admin')" id="tabBtnAdmin" style="display:none;">帳號管理</button>
+  <!-- 第一層：律師 / 法官 / 資料來源 / 帳號管理 -->
+  <div class="nav-bar">
+    <button class="nav-btn active" id="navBtn_lawyer" onclick="showSection('lawyer')">&#9878;&#65039; 律師</button>
+    <button class="nav-btn" id="navBtn_judge" onclick="showSection('judge')">&#127963;&#65039; 法官</button>
+    <button class="nav-btn" id="navBtn_sources" onclick="showSection('sources')">資料來源</button>
+    <button class="nav-btn" id="navBtn_admin" onclick="showSection('admin')" style="display:none;">帳號管理</button>
   </div>
+  <!-- 第二層：所選區塊的子頁 -->
+  <div class="tabs-bar" id="subTabsBar"></div>
 
   <div class="content">
 
     <!-- ==================== TAB: OVERVIEW ==================== -->
     <div id="tab-overview" class="tab-content active">
-      <div class="ov-sec-title">&#9878;&#65039; 律師市場 <span class="sub">法務部登錄 + 全聯會名冊 + 判決資料</span></div>
       <div class="kpi-grid" id="overviewKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
           <div class="kpi-label">律師總數（合併）</div>
@@ -563,9 +563,10 @@
           <div id="topFirmsList"><div class="loading">載入中</div></div>
         </div>
       </div>
+    </div>
 
-      <!-- ========== 法官體系總覽 ========== -->
-      <div class="ov-sec-title" style="margin-top:28px;">&#127963;&#65039; 法官體系 <span class="sub">司法院名冊 + 裁判書開放資料</span></div>
+    <!-- ==================== TAB: JUDGE OVERVIEW (法官總覽) ==================== -->
+    <div id="tab-judge-overview" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
           <div class="kpi-label">法官總數</div>
@@ -1209,8 +1210,11 @@ async function showDashboard() {
   // 背景非同步載入（不阻塞畫面）
   db.from('user_profiles').select('role').eq('id', currentUser.id).single().then(({ data: profile }) => {
     isAdmin = profile?.role === 'admin';
-    document.getElementById('tabBtnAdmin').style.display = isAdmin ? '' : 'none';
+    document.getElementById('navBtn_admin').style.display = isAdmin ? '' : 'none';
   });
+
+  // 初始化導覽（預設律師區）
+  showSection('lawyer');
 
   // 輕量 KPI 先載入，重量圖表延後
   loadOverviewFast();
@@ -1234,17 +1238,57 @@ async function loadOverviewFast() {
 }
 
 // ============================================================
-// TABS
+// NAV（第一層：律師/法官/資料來源；第二層：子頁）
 // ============================================================
+const SECTIONS = {
+  lawyer: [
+    { tab: 'overview', label: '總覽' },
+    { tab: 'lawyers', label: '律師' },
+    { tab: 'firms', label: '公會' },
+    { tab: 'offices', label: '事務所' },
+    { tab: 'changes', label: '異動追蹤' },
+  ],
+  judge: [
+    { tab: 'judge-overview', label: '總覽' },
+    { tab: 'judges', label: '法官' },
+    { tab: 'courts', label: '法院' },
+  ],
+  sources: [],
+  admin: [],
+};
+let currentSection = 'lawyer';
+const lastTabBySection = {};
+
+function showSection(sec) {
+  currentSection = sec;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const navBtn = document.getElementById('navBtn_' + sec);
+  if (navBtn) navBtn.classList.add('active');
+
+  const bar = document.getElementById('subTabsBar');
+  const tabs = SECTIONS[sec] || [];
+  if (tabs.length) {
+    bar.style.display = '';
+    bar.innerHTML = tabs.map(t =>
+      `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
+    showTab(lastTabBySection[sec] || tabs[0].tab);
+  } else {
+    // 資料來源 / 帳號管理沒有子頁
+    bar.style.display = 'none';
+    showTab(sec);
+  }
+}
+
 function showTab(tab) {
+  if ((SECTIONS[currentSection] || []).some(t => t.tab === tab)) lastTabBySection[currentSection] = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    if (btn.getAttribute('onclick') === "showTab('" + tab + "')") btn.classList.add('active');
-  });
+  const content = document.getElementById('tab-' + tab);
+  if (content) content.classList.add('active');
+  document.querySelectorAll('#subTabsBar .tab-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.id === 'tabBtn_' + tab));
 
   // Lazy load data
+  if (tab === 'judge-overview') loadJudgeOverviewOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
@@ -1335,9 +1379,6 @@ async function loadOverview() {
 
   // 事務所規模分布
   loadFirmSizeChart();
-
-  // 法官體系總覽
-  loadJudgeOverview();
 }
 
 function renderRegionChart(data) {
@@ -3580,8 +3621,15 @@ async function submitChangePassword() {
 }
 
 // ============================================================
-// JUDGE OVERVIEW (總覽頁法官體系區塊)
+// JUDGE OVERVIEW (法官總覽頁)
 // ============================================================
+let _judgeOvLoaded = false;
+function loadJudgeOverviewOnce() {
+  if (_judgeOvLoaded) return;
+  _judgeOvLoaded = true;
+  loadJudgeOverview();
+}
+
 async function loadJudgeOverview() {
   try {
     const el = id => document.getElementById(id);
