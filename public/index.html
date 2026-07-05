@@ -550,6 +550,7 @@
     <button class="nav-btn" id="navBtn_judge" onclick="showSection('judge')">&#127963;&#65039; 法官</button>
     <button class="nav-btn" id="navBtn_prosecutor" onclick="showSection('prosecutor')">&#9876;&#65039; 檢察官</button>
     <button class="nav-btn" id="navBtn_jstat" onclick="showSection('jstat')">&#128202; 司法統計</button>
+    <button class="nav-btn" id="navBtn_industry" onclick="showSection('industry')">&#128269; 產業分析</button>
     <button class="nav-btn" id="navBtn_sources" onclick="showSection('sources')">資料來源</button>
     <button class="nav-btn" id="navBtn_admin" onclick="showSection('admin')" style="display:none;">帳號管理</button>
   </div>
@@ -2343,7 +2344,6 @@ async function loadOverviewFast() {
 const SECTIONS = {
   lawyer: [
     { tab: 'overview', label: '總覽' },
-    { tab: 'fam-lawyers', label: '家事律師' },
     { tab: 'lawyers', label: '律師' },
     { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
@@ -2351,7 +2351,6 @@ const SECTIONS = {
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
-    { tab: 'family', label: '家事分析' },
     { tab: 'judges', label: '法官' },
     { tab: 'courts', label: '法院' },
   ],
@@ -2368,6 +2367,11 @@ const SECTIONS = {
     { tab: 'jstat-enforcement', label: '強制執行' },
     { tab: 'jstat-efficiency', label: '法院效率' },
     { tab: 'jstat-organs', label: '各法院比較' },
+  ],
+  // 產業分析：垂直領域深度分析（目前為家事，未來可加刑事/勞動等）
+  industry: [
+    { tab: 'family', label: '家事法官' },
+    { tab: 'fam-lawyers', label: '家事律師' },
   ],
   sources: [],
   admin: [],
