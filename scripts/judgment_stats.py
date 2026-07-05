@@ -117,6 +117,93 @@ RE_NOT_JUDGE_LINE = re.compile(r'書\s*記\s*官|檢\s*察\s*官|辯\s*護\s*人
 CAT_BY_DOCNAME = [('刑事', '刑事'), ('民事', '民事'), ('行政', '行政'),
                   ('家事', '家事'), ('少年', '少年'), ('懲戒', '懲戒')]
 
+# 家事案件的全文開頭一律寫「民事判決/裁定」（含少家法院），只能靠字別（JCASE）辨識。
+# 實測 2020-10：字別含婚/家/繼/親/監宣等 = 1,757/87,563 件（全文開頭只抓得到 13 件）。
+FAM_JCASE_KEYS = ('婚', '家', '繼', '親', '收養', '監宣', '輔宣', '死宣')
+
+# 律師（訴訟代理人/辯護人）抽取：姓名後必須接「律師」，排除法定代理人等非律師
+RE_LAWYER = re.compile(
+    r'(?:訴\s*訟\s*代\s*理\s*人|辯\s*護\s*人|複\s*代\s*理\s*人|上\s*訴\s*代\s*理\s*人)'
+    r'[\s　:：]*([一-鿿][一-鿿\s　]{0,6}[一-鿿])\s*律\s*師')
+
+
+def extract_lawyers(jfull):
+    """從裁判書當事人欄抽出律師姓名（去重）；只認「…代理人/辯護人 X 律師」格式"""
+    names = []
+    for m in RE_LAWYER.finditer(jfull[:4000]):
+        name = re.sub(r'[\s　]', '', m.group(1))
+        if 2 <= len(name) <= 4 and name not in names:
+            names.append(name)
+    return names
+
+
+# ── 檢察官（刑事裁判書）──
+# 檢察署名稱；2018-05 改制前叫「地方法院檢察署」，一併相容（normalize_office 正規化為新名）
+RE_PROS_OFFICE = re.compile(
+    r'((?:臺灣|福建)[一-鿿]{2,4}地方(?:法院)?檢察署'
+    r'|(?:臺灣|福建)高等(?:法院)?檢察署(?:[一-鿿]{2,4}(?:檢察)?分署)?'
+    r'|最高(?:法院)?檢察署)')
+# 動作式：「本案經檢察官○○○提起公訴/聲請簡易判決」「檢察官○○○到庭執行職務」
+RE_PROS_ACT = re.compile(
+    r'檢\s*察\s*官\s*([一-鿿][一-鿿\s　]{0,6}[一-鿿])\s*'
+    r'(?:提\s*起\s*公\s*訴|聲\s*請\s*(?:以\s*)?簡\s*易\s*判\s*決|到\s*庭\s*執\s*行\s*職\s*務)')
+# 署名式：附錄起訴書/聲請書結尾的「檢　察　官　○○○」列
+RE_PROS_SIG = re.compile(
+    r'檢\s*察\s*官\s+([一-鿿][一-鿿\s　]{0,8}[一-鿿])\s*(?:\r|\n|$)')
+# 當事人欄：「公訴人/聲請人 ○○檢察署檢察官○○○」（多數無姓名，有寫才抓）
+RE_PROS_HEAD = re.compile(
+    r'檢察署檢\s*察\s*官\s*([一-鿿][一-鿿\s　]{0,6}[一-鿿])\s*(?:\r|\n|$)')
+# 動作式會把「經檢察官偵查後提起公訴」的「偵查後」當名字，用停用字過濾
+RE_PROS_BAD = re.compile(r'偵|查|訴|聲請|後|依法|職務|到庭|執行|命令|指揮|書記')
+
+
+def _pros_name(raw):
+    n = re.sub(r'[\s　]', '', raw)
+    return n if 2 <= len(n) <= 4 and not RE_PROS_BAD.search(n) else None
+
+
+def normalize_office(name):
+    return name.replace('地方法院檢察署', '地方檢察署') \
+               .replace('高等法院檢察署', '高等檢察署') \
+               .replace('最高法院檢察署', '最高檢察署')
+
+
+def court_to_office(court):
+    """裁判書內找不到檢察署名時，用法院名推對應檢察署"""
+    if '地方法院' in court:
+        return court.replace('地方法院', '地方檢察署')
+    if '高等法院' in court:
+        return re.sub(r'高等法院.*', '高等檢察署', court)
+    if court == '最高法院':
+        return '最高檢察署'
+    return '未知檢察署'
+
+
+def extract_prosecutors(jfull, court):
+    """從刑事裁判書抽出 (檢察署, [檢察官姓名])；抽不到姓名時回傳空 list
+    （約半數刑事判決全文只寫「經檢察官提起公訴」不具名，無從抽取）"""
+    head = jfull[:1500]
+    tail = jfull[-3000:]
+    mo = RE_PROS_OFFICE.search(head) or RE_PROS_OFFICE.search(tail)
+    office = normalize_office(mo.group(1)) if mo else court_to_office(court)
+    names = []
+    for m in RE_PROS_ACT.finditer(tail):
+        n = _pros_name(m.group(1))
+        if n and n not in names:
+            names.append(n)
+    if not names:
+        for m in RE_PROS_SIG.finditer(tail):
+            n = _pros_name(m.group(1))
+            if n and n not in names:
+                names.append(n)
+    if not names:
+        for m in RE_PROS_HEAD.finditer(head):
+            if m.group(1):
+                n = _pros_name(m.group(1))
+                if n and n not in names:
+                    names.append(n)
+    return office, names
+
 
 def extract_judges(jfull):
     """從裁判書全文結尾抽出法官姓名（去重、排除書記官等）"""
@@ -135,6 +222,11 @@ def extract_judges(jfull):
 
 
 def classify(jfull_head, jcase):
+    jc = jcase or ''
+    if any(k in jc for k in FAM_JCASE_KEYS):
+        return '家事'
+    if '少' in jc:
+        return '少年'
     for kw, cat in CAT_BY_DOCNAME:
         if kw in jfull_head:
             return cat
@@ -162,6 +254,10 @@ def parse(yyyymm):
     # 聚合鍵：(name, court) → {n, sum_days, cats{}, years{}}
     agg = defaultdict(lambda: {'n': 0, 'sum_days': 0, 'n_days': 0,
                                'cats': defaultdict(int)})
+    # 律師聚合：(name, court) → {n, cats{}}
+    lagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
+    # 檢察官聚合：(name, office) → {n, cats{}}
+    pagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
     n_files = 0
     n_no_judge = 0
     t0 = time.time()
@@ -178,14 +274,24 @@ def parse(yyyymm):
             jfull = doc.get('JFULL') or ''
             if not jfull:
                 continue
-            judges = extract_judges(jfull)
-            if not judges:
-                n_no_judge += 1
-                continue
             head = jfull[:60]
             mc = RE_COURT.search(head.strip())
             court = mc.group(1) if mc else '未知法院'
             cat = classify(head, doc.get('JCASE') or '')
+            for lname in extract_lawyers(jfull):
+                la = lagg[(lname, court)]
+                la['n'] += 1
+                la['cats'][cat] += 1
+            if cat in ('刑事', '少年') or '檢察署' in jfull[:1500]:
+                office, pnames = extract_prosecutors(jfull, court)
+                for pname in pnames:
+                    pa = pagg[(pname, office)]
+                    pa['n'] += 1
+                    pa['cats'][cat] += 1
+            judges = extract_judges(jfull)
+            if not judges:
+                n_no_judge += 1
+                continue
             # 審理天數估算：裁判日 - 案號年度起算日（民國年 1/1）。有一致性偏差，
             # 僅供法官間相對比較，前端標示「估算」。
             days = None
@@ -212,9 +318,14 @@ def parse(yyyymm):
     rows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
              'case_count': v['n'], 'sum_days': v['sum_days'], 'n_days': v['n_days'],
              'cats': dict(v['cats'])} for k, v in agg.items()]
+    lrows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
+              'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in lagg.items()]
+    prows = [{'name': k[0], 'office_name': k[1], 'yyyymm': yyyymm,
+              'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in pagg.items()]
     with open(out_path, 'w', encoding='utf-8') as f:
-        json.dump(rows, f, ensure_ascii=False)
+        json.dump({'judges': rows, 'lawyers': lrows, 'prosecutors': prows}, f, ensure_ascii=False)
     print(f'  解析完成：{n_files} 份裁判書，{len(rows)} 個 (法官,法院) 組合，'
+          f'{len(lrows)} 個 (律師,法院) 組合，{len(prows)} 個 (檢察官,檢察署) 組合，'
           f'{n_no_judge} 份未抽到法官，{(time.time()-t0)/60:.1f} 分鐘')
     return out_path
 
@@ -230,18 +341,15 @@ def month_uploaded(yyyymm):
     return r.status_code == 200 and len(r.json()) > 0
 
 
-def upload(yyyymm):
-    out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
-    with open(out_path, encoding='utf-8') as f:
-        rows = json.load(f)
-    print(f'  上傳 {len(rows)} 列到 judge_month_stats ...')
+def _upload_rows(table, yyyymm, rows):
+    print(f'  上傳 {len(rows)} 列到 {table} ...')
     # 先刪同月舊資料（冪等重跑）
-    requests.delete(f'{SUPABASE_URL}/rest/v1/judge_month_stats',
+    requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
                     params={'yyyymm': f'eq.{yyyymm}'},
-                    headers=HEADERS_SB, timeout=60, verify=False)
+                    headers=HEADERS_SB, timeout=120, verify=False)
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
-        r = requests.post(f'{SUPABASE_URL}/rest/v1/judge_month_stats',
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/{table}',
                           json=batch,
                           headers={**HEADERS_SB, 'Content-Type': 'application/json',
                                    'Prefer': 'return=minimal'},
@@ -249,15 +357,29 @@ def upload(yyyymm):
         if r.status_code not in (200, 201, 204):
             raise RuntimeError(f'上傳失敗 {r.status_code}: {r.text[:300]}')
         time.sleep(1)
+
+
+def upload(yyyymm):
+    out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
+    with open(out_path, encoding='utf-8') as f:
+        data = json.load(f)
+    if isinstance(data, list):  # 舊格式（只有法官）
+        data = {'judges': data, 'lawyers': []}
+    _upload_rows('judge_month_stats', yyyymm, data['judges'])
+    if data['lawyers']:
+        _upload_rows('lawyer_month_stats', yyyymm, data['lawyers'])
+    if data.get('prosecutors'):
+        _upload_rows('prosecutor_month_stats', yyyymm, data['prosecutors'])
     print('  上傳完成')
 
 
 def refresh_stats():
-    print('  呼叫 refresh_judge_judgment_stats() ...')
-    r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/refresh_judge_judgment_stats',
-                      json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
-                      timeout=300, verify=False)
-    print(f'  HTTP {r.status_code}')
+    for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats'):
+        print(f'  呼叫 {rpc}() ...')
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
+                          json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          timeout=300, verify=False)
+        print(f'  HTTP {r.status_code}')
 
 
 def cleanup(yyyymm, purge_rar=False):
@@ -311,6 +433,17 @@ if __name__ == '__main__':
         for ym in month_range(sys.argv[2], sys.argv[3]):
             try:
                 run_month(ym, skip_uploaded=True, purge_rar=True)
+            except Exception as e:
+                print(f'{ym}: 失敗 — {e}')
+        refresh_stats()
+    elif cmd == 'reclassify':
+        # 分類邏輯改版後強制重跑：刪 agg 快取、無視已上傳紀錄，逐月重新 download+parse+upload
+        for ym in month_range(sys.argv[2], sys.argv[3]):
+            try:
+                old_agg = os.path.join(WORK_DIR, f'{ym}_agg.json')
+                if os.path.exists(old_agg):
+                    os.remove(old_agg)
+                run_month(ym, skip_uploaded=False, purge_rar=True)
             except Exception as e:
                 print(f'{ym}: 失敗 — {e}')
         refresh_stats()

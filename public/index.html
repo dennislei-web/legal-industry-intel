@@ -623,6 +623,94 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: FAMILY (家事分析) ==================== -->
+    <div id="tab-family" class="tab-content">
+      <div id="famBackfillNote" style="display:none;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:var(--orange);"></div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="kpi-card">
+          <div class="kpi-label">家事裁判數</div>
+          <div class="kpi-value" id="famKpiRecent" style="color:var(--blue);">-</div>
+          <div class="kpi-sub" id="famKpiRecentSub">載入中</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">佔公開裁判比</div>
+          <div class="kpi-value" id="famKpiShare">-</div>
+          <div class="kpi-sub" id="famKpiShareSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">家事專責法官</div>
+          <div class="kpi-value" id="famKpiJudges" style="color:var(--gold);">-</div>
+          <div class="kpi-sub">家事佔比 ≥ 50%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">現任家事庭法官</div>
+          <div class="kpi-value" id="famKpiRoster" style="color:var(--green);">-</div>
+          <div class="kpi-sub">司法院名冊</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均結案天數</div>
+          <div class="kpi-value" id="famKpiDays" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="famKpiDaysSub">家事專責估算</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128202; 年度家事裁判量</div>
+          <div class="chart-container"><canvas id="chartFamYearly"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#9202;&#65039; 家事平均結案天數（年度）</div>
+          <div class="chart-container"><canvas id="chartFamDays"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127963;&#65039; 各法院家事裁判量 TOP 10</div>
+          <div class="chart-container"><canvas id="chartFamCourts"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128293; 家事案件量 TOP 10 法官</div>
+          <div id="famTopJudges"><div class="loading">載入中</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128203; 家事法官名單</div>
+        <div class="search-bar">
+          <input type="text" id="famSearch" placeholder="搜尋法官姓名或法院..." oninput="renderFamTable()">
+          <select id="famShareFilter" onchange="renderFamTable()">
+            <option value="0.5" selected>家事佔比 ≥ 50%</option>
+            <option value="0.8">家事佔比 ≥ 80%</option>
+            <option value="0.3">家事佔比 ≥ 30%</option>
+            <option value="0">全部（含少量家事）</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>法官</th>
+                <th>法院</th>
+                <th style="cursor:pointer" onclick="sortFam('family_cases')">家事案件 <span id="famSort_family_cases">↓</span></th>
+                <th style="cursor:pointer" onclick="sortFam('family_share')">家事佔比 <span id="famSort_family_share">↕</span></th>
+                <th style="cursor:pointer" onclick="sortFam('total_cases')">總案件 <span id="famSort_total_cases">↕</span></th>
+                <th style="cursor:pointer" onclick="sortFam('avg_days')">平均結案天數 <span id="famSort_avg_days">↕</span></th>
+                <th>最近裁判</th>
+                <th>現任家事庭</th>
+              </tr>
+            </thead>
+            <tbody id="famTableBody">
+              <tr><td colspan="8" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="famTableNote" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;"></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 家事案件以字別（婚/家/繼/親/監宣等）自裁判書辨識；家事裁定多數不公開，數字僅反映公開裁判。
+        結案天數為估算值（裁判日 − 案號年度起算日），法官的平均結案天數為其全部案件之平均（家事專責法官可視為家事均值），僅供相對比較。
+      </div>
+    </div>
+
     <!-- ==================== TAB: LAWYERS ==================== -->
     <div id="tab-lawyers" class="tab-content">
       <div class="kpi-grid" id="lawyerKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -977,6 +1065,46 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: PROSECUTORS (檢察官) ==================== -->
+    <div id="tab-prosecutors" class="tab-content">
+      <div class="kpi-grid" id="prosKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">檢察官總數</div><div class="kpi-value" id="kpiProsTotal">-</div><div class="kpi-sub">裁判書具名萃取</div></div>
+        <div class="kpi-card"><div class="kpi-label">檢察署數</div><div class="kpi-value" id="kpiProsOffices" style="color:var(--purple);">-</div><div class="kpi-sub">地檢/高檢/最高檢</div></div>
+        <div class="kpi-card"><div class="kpi-label">統計案件總數</div><div class="kpi-value" id="kpiProsCases" style="color:var(--green);">-</div><div class="kpi-sub">起訴/蒞庭具名案件</div></div>
+        <div class="kpi-card"><div class="kpi-label">平均案件量</div><div class="kpi-value" id="kpiProsAvgCases" style="color:var(--gold);">-</div><div class="kpi-sub">每位檢察官</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="prosSearch" placeholder="搜尋檢察官姓名..." oninput="searchProsecutors()">
+        <select id="prosOfficeFilter" onchange="searchProsecutors()">
+          <option value="">所有檢察署</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="cursor:pointer" onclick="sortProsecutors('name')">姓名 <span id="sortIcon_p_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortProsecutors('office_name')">檢察署 <span id="sortIcon_p_office_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortProsecutors('case_count_total')">案件數 <span id="sortIcon_p_case_count_total">↓</span></th>
+                <th>案類分布</th>
+                <th style="cursor:pointer" onclick="sortProsecutors('first_yyyymm')">統計期間 <span id="sortIcon_p_first_yyyymm">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="prosTableBody">
+              <tr><td colspan="5" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="prosPagination"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          資料來源：司法院裁判書開放資料（每月更新）。檢察官姓名與所屬檢察署由刑事裁判書「本案經檢察官○○○提起公訴/聲請簡易判決」「檢察官○○○到庭執行職務」等段落萃取；約半數刑事判決全文僅寫「經檢察官提起公訴」未具名，該類案件無法計入，故案件數為下限估計，僅供檢察官間相對比較。
+        </div>
+      </div>
+    </div>
+
 
     <!-- ==================== TAB: SOURCES ==================== -->
     <div id="tab-sources" class="tab-content">
@@ -1164,6 +1292,27 @@ function searchCourts() {
   courtSearchTimer = setTimeout(() => { courtPage = 0; loadCourts(); }, 300);
 }
 
+// Prosecutors pagination state
+let prosPage = 0, prosTotal = 0;
+let prosSortCol = 'case_count_total', prosSortAsc = false;
+let prosSearchTimer = null;
+
+function sortProsecutors(col) {
+  if (prosSortCol === col) { prosSortAsc = !prosSortAsc; }
+  else { prosSortCol = col; prosSortAsc = (col === 'case_count_total') ? false : true; }
+  ['name','office_name','case_count_total','first_yyyymm'].forEach(c => {
+    const icon = document.getElementById('sortIcon_p_' + c);
+    if (icon) icon.textContent = c === col ? (prosSortAsc ? '↑' : '↓') : '↕';
+  });
+  prosPage = 0;
+  loadProsecutors();
+}
+
+function searchProsecutors() {
+  clearTimeout(prosSearchTimer);
+  prosSearchTimer = setTimeout(() => { prosPage = 0; loadProsecutors(); }, 300);
+}
+
 // ============================================================
 // AUTH
 // ============================================================
@@ -1254,8 +1403,10 @@ const SECTIONS = {
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
+    { tab: 'family', label: '家事分析' },
     { tab: 'judges', label: '法官' },
     { tab: 'courts', label: '法院' },
+    { tab: 'prosecutors', label: '檢察官' },
   ],
   sources: [],
   admin: [],
@@ -1293,12 +1444,14 @@ function showTab(tab) {
 
   // Lazy load data
   if (tab === 'judge-overview') loadJudgeOverviewOnce();
+  if (tab === 'family') loadFamilyOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') loadChanges();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
+  if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
 }
@@ -3791,6 +3944,176 @@ async function loadJudgeOverview() {
 }
 
 // ============================================================
+// FAMILY (家事分析)
+// ============================================================
+let _famLoaded = false;
+let _famRows = [];            // family_judge_stats 全部列
+let _famRoster = new Set();   // 現任家事庭法官 name|court
+let famSortCol = 'family_cases';
+let famSortAsc = false;
+
+function loadFamilyOnce() {
+  if (_famLoaded) return;
+  _famLoaded = true;
+  loadFamily();
+}
+
+async function loadFamily() {
+  try {
+    const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+    const [yearlyR, statsR, rosterR] = await Promise.all([
+      db.rpc('family_cases_by_year'),
+      db.rpc('family_judge_stats'),
+      db.from('judges_combined').select('name, court_name').ilike('division', '%家%'),
+    ]);
+    const yearly = yearlyR.data || [];
+    _famRows = statsR.data || [];
+    _famRoster = new Set((rosterR.data || []).map(j => j.name + '|' + j.court_name));
+
+    // 回填提示（有任何年度 ok_months < months 就顯示，補完自動消失）
+    const pending = yearly.filter(y => y.ok_months < y.months);
+    const note = document.getElementById('famBackfillNote');
+    if (pending.length) {
+      note.style.display = '';
+      note.textContent = '⏳ 家事分類回填中：' + pending.map(y => `${y.year}（${y.ok_months}/${y.months} 月）`).join('、') + ' — 完成前歷史數字會偏低。';
+    } else {
+      note.style.display = 'none';
+    }
+
+    // KPI（取最新一個有新分類資料的年度）
+    const okYears = yearly.filter(y => y.ok_months > 0);
+    const latest = okYears[okYears.length - 1];
+    const el = id => document.getElementById(id);
+    if (latest) {
+      el('famKpiRecent').textContent = Number(latest.family_cases).toLocaleString();
+      el('famKpiRecentSub').textContent = `${latest.year} 年（${latest.months} 個月資料）`;
+      el('famKpiShare').textContent = (latest.family_cases / latest.total_cases * 100).toFixed(1) + '%';
+      el('famKpiShareSub').textContent = `${latest.year} 年公開裁判`;
+      const days = okYears.filter(y => y.fam_avg_days != null).slice(-1)[0];
+      if (days) {
+        el('famKpiDays').textContent = Number(days.fam_avg_days);
+        el('famKpiDaysSub').textContent = `${days.year} 年・家事專責估算`;
+      }
+    }
+    el('famKpiJudges').textContent = _famRows.filter(r => r.family_share >= 0.5).length;
+    el('famKpiRoster').textContent = _famRoster.size;
+
+    // 年度家事裁判量（bar，回填中年度標註）
+    if (chartInstances.famYearly) chartInstances.famYearly.destroy();
+    chartInstances.famYearly = new Chart(document.getElementById('chartFamYearly').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: yearly.map(y => y.ok_months < y.months ? y.year + '（回填中）' : y.year),
+        datasets: [{ label: '家事裁判數', data: yearly.map(y => Number(y.family_cases)),
+          backgroundColor: yearly.map(y => y.ok_months < y.months ? 'rgba(130,160,190,0.35)' : 'rgba(69,183,209,0.65)'),
+          borderRadius: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { x: { ticks: { color: txtColor }, grid: { display: false } },
+                  y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 年度家事平均結案天數（line）
+    const daysYears = yearly.filter(y => y.fam_avg_days != null && y.ok_months > 0);
+    if (chartInstances.famDays) chartInstances.famDays.destroy();
+    chartInstances.famDays = new Chart(document.getElementById('chartFamDays').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: daysYears.map(y => y.ok_months < y.months ? y.year + '*' : y.year),
+        datasets: [{ label: '平均結案天數（估算）', data: daysYears.map(y => Number(y.fam_avg_days)),
+          borderColor: 'rgba(224,149,74,0.9)', backgroundColor: 'rgba(224,149,74,0.12)',
+          fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: 'rgba(224,149,74,1)' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { x: { ticks: { color: txtColor }, grid: { display: false } },
+                  y: { ticks: { color: txtColor, callback: v => v + ' 天' }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 各法院家事裁判量 TOP 10
+    const byCourt = {};
+    _famRows.forEach(r => { byCourt[r.court_name] = (byCourt[r.court_name] || 0) + Number(r.family_cases); });
+    const topCourts = Object.entries(byCourt).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (chartInstances.famCourts) chartInstances.famCourts.destroy();
+    chartInstances.famCourts = new Chart(document.getElementById('chartFamCourts').getContext('2d'), {
+      type: 'bar',
+      data: { labels: topCourts.map(r => r[0]),
+        datasets: [{ label: '家事裁判數', data: topCourts.map(r => r[1]), backgroundColor: 'rgba(155,126,216,0.6)', borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                  y: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 家事案件量 TOP 10 法官
+    const topJ = [..._famRows].sort((a, b) => b.family_cases - a.family_cases).slice(0, 10);
+    document.getElementById('famTopJudges').innerHTML = topJ.length ? `<div style="margin-top:8px;">
+      ${topJ.map((j, i) => {
+        const barW = Math.round(j.family_cases / topJ[0].family_cases * 100);
+        return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
+          <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
+          <span style="min-width:64px;font-weight:600;">${escHtml(j.name)}</span>
+          <span style="flex:1;color:var(--text-muted);font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(j.court_name || '')}</span>
+          <span class="badge" style="background:var(--ghost-bg);color:var(--text-muted);font-size:0.7rem;">${Math.round(j.family_share * 100)}%</span>
+          <span style="width:${Math.max(barW, 4) * 0.4}%;max-width:25%;height:8px;background:rgba(69,183,209,0.55);border-radius:4px;"></span>
+          <span style="min-width:48px;text-align:right;font-weight:600;color:var(--blue);">${Number(j.family_cases).toLocaleString()}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無資料</div>';
+
+    renderFamTable();
+  } catch (e) { console.log('family analysis error:', e); }
+}
+
+function sortFam(col) {
+  if (famSortCol === col) famSortAsc = !famSortAsc;
+  else { famSortCol = col; famSortAsc = false; }
+  ['family_cases', 'family_share', 'total_cases', 'avg_days'].forEach(c => {
+    const ic = document.getElementById('famSort_' + c);
+    if (ic) ic.textContent = c === famSortCol ? (famSortAsc ? '↑' : '↓') : '↕';
+  });
+  renderFamTable();
+}
+
+function renderFamTable() {
+  const tbody = document.getElementById('famTableBody');
+  if (!tbody) return;
+  const q = (document.getElementById('famSearch')?.value || '').trim();
+  const minShare = parseFloat(document.getElementById('famShareFilter')?.value || '0.5');
+  let rows = _famRows.filter(r => r.family_share >= minShare);
+  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.court_name || '').includes(q));
+  rows.sort((a, b) => {
+    const va = a[famSortCol] ?? -Infinity, vb = b[famSortCol] ?? -Infinity;
+    return famSortAsc ? va - vb : vb - va;
+  });
+  const shown = rows.slice(0, 300);
+  if (!shown.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無符合條件的法官</div></td></tr>';
+    document.getElementById('famTableNote').textContent = '';
+    return;
+  }
+  tbody.innerHTML = shown.map(r => {
+    const share = Math.round(r.family_share * 100);
+    const shareColor = share >= 80 ? 'var(--green)' : share >= 50 ? 'var(--gold)' : 'var(--text-muted)';
+    const roster = _famRoster.has(r.name + '|' + r.court_name);
+    const lastYm = r.last_ym ? `${r.last_ym.slice(0, 4)}-${r.last_ym.slice(4)}` : '-';
+    return `<tr>
+      <td><strong>${escHtml(r.name)}</strong></td>
+      <td style="font-size:0.85rem;">${escHtml(r.court_name || '-')}</td>
+      <td style="text-align:center;font-weight:600;color:var(--blue);">${Number(r.family_cases).toLocaleString()}</td>
+      <td style="text-align:center;font-weight:600;color:${shareColor};">${share}%</td>
+      <td style="text-align:center;">${Number(r.total_cases).toLocaleString()}</td>
+      <td style="text-align:center;">${r.avg_days != null ? Number(r.avg_days).toLocaleString() : '-'}</td>
+      <td style="text-align:center;font-size:0.85rem;">${lastYm}</td>
+      <td style="text-align:center;">${roster ? '<span class="badge badge-green">✓ 家事庭</span>' : '<span style="color:var(--text-muted);">-</span>'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('famTableNote').textContent =
+    `符合條件 ${rows.length} 位` + (rows.length > 300 ? '（僅顯示前 300 位，可用搜尋縮小範圍）' : '');
+}
+
+// ============================================================
 // JUDGES (法官)
 // ============================================================
 async function loadJudges() {
@@ -3999,6 +4322,83 @@ async function loadCourtKpis() {
     const sum = annualSum.data.filter(r => r.annual_cases != null).reduce((a, b) => a + b.annual_cases, 0);
     set('kpiCourtTotalCases', sum);
   }
+}
+
+// ============================================================
+// PROSECUTORS (檢察官) — 讀 prosecutor_stats（裁判書萃取彙總）
+// ============================================================
+async function loadProsecutors() {
+  const search = document.getElementById('prosSearch').value.trim();
+  const office = document.getElementById('prosOfficeFilter').value;
+
+  let query = db.from('prosecutor_stats').select('*', { count: 'exact' });
+  if (search) query = query.ilike('name', `%${search}%`);
+  if (office) query = query.eq('office_name', office);
+
+  query = query.order(prosSortCol, { ascending: prosSortAsc, nullsFirst: false });
+  query = query.range(prosPage * PAGE_SIZE, (prosPage + 1) * PAGE_SIZE - 1);
+
+  const { data, count, error } = await query;
+  prosTotal = count || 0;
+
+  if (error) { console.error('prosecutor_stats error:', error); return; }
+
+  const tbody = document.getElementById('prosTableBody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    renderPagination('prosPagination', prosPage, prosTotal, p => { prosPage = p; loadProsecutors(); });
+    return;
+  }
+
+  tbody.innerHTML = data.map(p => {
+    // 案類分布 badge（多為刑事，少數少年）
+    const cats = p.case_type_distribution || {};
+    const catBadges = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 3)
+      .map(([k, v]) => `<span class="badge badge-blue" style="margin:1px;">${escHtml(k)} ${Number(v).toLocaleString()}</span>`)
+      .join('') || '<span style="color:var(--text-muted);">-</span>';
+    const period = (p.first_yyyymm && p.last_yyyymm)
+      ? `${p.first_yyyymm.slice(0,4)}/${p.first_yyyymm.slice(4)} ~ ${p.last_yyyymm.slice(0,4)}/${p.last_yyyymm.slice(4)}`
+      : '-';
+    return `<tr>
+      <td><strong>${escHtml(p.name)}</strong></td>
+      <td style="font-size:0.85rem;">${escHtml(p.office_name || '-')}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${p.case_count_total != null ? p.case_count_total.toLocaleString() : '-'}</td>
+      <td>${catBadges}</td>
+      <td style="text-align:center;font-size:0.85rem;">${period}</td>
+    </tr>`;
+  }).join('');
+
+  renderPagination('prosPagination', prosPage, prosTotal, p => { prosPage = p; loadProsecutors(); });
+
+  // Populate office filter dropdown (once)
+  if (document.getElementById('prosOfficeFilter').options.length <= 1) {
+    const { data: offices } = await db.rpc('prosecutor_office_statistics');
+    if (offices) {
+      offices.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.office_name;
+        opt.textContent = `${o.office_name}（${o.prosecutor_count}）`;
+        document.getElementById('prosOfficeFilter').appendChild(opt);
+      });
+    }
+  }
+
+  // Load KPIs (once)
+  if (document.getElementById('kpiProsTotal').textContent === '-') {
+    loadProsecutorKpis();
+  }
+}
+
+async function loadProsecutorKpis() {
+  const { data: offices } = await db.rpc('prosecutor_office_statistics');
+  if (!offices || !offices.length) return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
+  const totalPros = offices.reduce((a, o) => a + Number(o.prosecutor_count || 0), 0);
+  const totalCases = offices.reduce((a, o) => a + Number(o.total_cases || 0), 0);
+  set('kpiProsTotal', totalPros);
+  set('kpiProsOffices', offices.length);
+  set('kpiProsCases', totalCases);
+  set('kpiProsAvgCases', totalPros ? Math.round(totalCases / totalPros) : 0);
 }
 
 // ============================================================
