@@ -1,0 +1,48 @@
+name: 終結案件微資料統計（每月增量）
+
+on:
+  schedule:
+    - cron: '0 20 19 * *'  # 每月 19 日 UTC 20:00 = 台灣 20 日凌晨 4:00（月包約 16 日發布，晚 1.5 個月）
+  workflow_dispatch:
+    inputs:
+      yyyymm:
+        description: '要跑的西元年月（留空=自動抓最新缺月）'
+        required: false
+        default: ''
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full
+
+      - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
+        run: |
+          IP=$(curl -s "https://dns.google/resolve?name=opendata.judicial.gov.tw&type=A" | jq -r '[.Answer[]? | select(.type==1)][0].data // empty')
+          if [ -z "$IP" ]; then IP=210.69.124.89; fi
+          echo "resolved: $IP"
+          echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
+
+      - name: Run closed case stats pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SEVENZ_PATH: 7z
+        working-directory: scripts
+        run: |
+          YM="${{ github.event.inputs.yyyymm }}"
+          if [ -z "$YM" ]; then
+            python closed_case_stats.py auto
+          else
+            python closed_case_stats.py run "$YM"
+          fi

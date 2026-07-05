@@ -2051,6 +2051,14 @@
                     <div class="chart-title">各地方法院刑事案件新收件數（114 年）</div>
                     <div class="chart-container tall"><canvas id="jstat_chartOrganCriminal"></canvas></div>
                 </div>
+                <div class="chart-card full">
+                    <div class="chart-title">各地區律師供需比 — 每位律師平均分到幾件民事訴訟（114 年）</div>
+                    <div class="chart-container tall"><canvas id="jstat_chartSupplyDemand"></canvas></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+                        地院民事「訴訟程序」新收（官方案件統計）÷ 該地區執業律師數（三源合併名冊的公會地區）。
+                        比值越高代表該地區每位律師的潛在案源越多（市場越不飽和）。僅含地院本院訴訟案件，不含簡易庭、非訟、執行。
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -4859,10 +4867,23 @@ async function loadJudgeOverview() {
         plugins: { legend: { display: false } } }
     });
 
-    // 案件量 TOP 10 法官
-    const top10 = judges.filter(j => j.case_count_total != null)
-      .sort((a, b) => b.case_count_total - a.case_count_total).slice(0, 10);
-    el('topJudgesList').innerHTML = top10.length ? `<div style="margin-top:8px;">
+    // 案件量 TOP 10 法官 — 抓自家裁判書管線（judge_judgment_stats），
+    // 不用 judges_combined.case_count_total（無官方統計時 fallback 到 Lawsnote 歷年總數，會膨脹數倍）
+    // 只列司法院名冊上的法官：署名解析偶有司法事務官/已離職人員混入（如大量本票裁定的極端值）
+    const rosterNames = new Set(judges.filter(j => (j.data_source || '').includes('司法院')).map(j => j.name));
+    const { data: jjsTop } = await db.from('judge_judgment_stats')
+      .select('name,court_name,case_count_total')
+      .not('case_count_total', 'is', null)
+      .order('case_count_total', { ascending: false })
+      .limit(100);
+    const top10 = (jjsTop || []).filter(j => rosterNames.has(j.name)).slice(0, 10);
+    let jRangeNote = '資料期間 2020-01 起';
+    try {
+      const { data: mrow } = await db.from('judge_month_stats')
+        .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
+      if (mrow?.[0]?.yyyymm) jRangeNote = `資料期間 2020-01 ~ ${mrow[0].yyyymm.slice(0, 4)}-${mrow[0].yyyymm.slice(4)}`;
+    } catch (e) { /* 標註取不到最新月就顯示起始年 */ }
+    el('topJudgesList').innerHTML = top10?.length ? `<div style="margin-top:8px;">
       ${top10.map((j, i) => {
         const barW = Math.round(j.case_count_total / top10[0].case_count_total * 100);
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
@@ -4873,6 +4894,9 @@ async function loadJudgeOverview() {
           <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${j.case_count_total.toLocaleString()}</span>
         </div>`;
       }).join('')}
+      <div style="margin-top:8px;color:var(--text-muted);font-size:0.72rem;line-height:1.5;">
+        &#128196; 裁判書開放資料署名統計｜${jRangeNote}｜含判決與裁定，合議庭每位署名法官各計 1 件（高院/最高院偏高）｜僅列司法院名冊法官
+      </div>
     </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無案件統計資料</div>';
 
     // 年度平均結案天數趨勢（judge_month_stats 逐月回填，months<12 標 *）
@@ -5421,7 +5445,7 @@ async function loadCourts() {
       ? (c.clearance_rate >= 0.9 ? 'var(--green)' : c.clearance_rate >= 0.7 ? 'var(--orange)' : 'var(--red)')
       : 'inherit';
     return `<tr>
-      <td><strong>${escHtml(c.name)}</strong></td>
+      <td><a href="javascript:void(0)" onclick="showCourtDetail('${escHtml(c.name)}')" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(c.name)}</a></td>
       <td>${escHtml(c.court_type || '-')}</td>
       <td>${escHtml(c.region || '-')}</td>
       <td style="text-align:center;">${c.judge_count != null ? c.judge_count.toLocaleString() : '-'}</td>
@@ -5755,6 +5779,173 @@ async function loadProsecutorOverview() {
     showDashboard();
   }
 })();
+
+// ============================================================
+// 法院詳情 Modal（官方案件統計 × 裁判書 × 終結案件微資料整合）
+// ============================================================
+const COURT_CHART_COLORS = ['#4f8ef7', '#e05c5c', '#9b7ed8', '#4caf82', '#e0954a', '#319795', '#d53f8c', '#8899aa'];
+
+function closeCourtModal() {
+  document.getElementById('courtModal').style.display = 'none';
+}
+
+async function showCourtDetail(name) {
+  const modal = document.getElementById('courtModal');
+  modal.style.display = 'flex';
+  document.getElementById('courtModalTitle').textContent = name;
+  const body = document.getElementById('courtModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+
+  const [detailRes, repRes] = await Promise.all([
+    db.rpc('court_detail_stats', { p_court: name }),
+    db.from('closed_case_month_stats')
+      .select('yyyymm,file_type,total_cases,plaintiff_rep,defendant_rep,both_rep,outcomes')
+      .eq('court_name', name).order('yyyymm'),
+  ]);
+  const d = detailRes.data || {};
+  const official = d.official_yearly || [];
+  const litClosed = d.official_lit_closed_yearly || [];
+  const judgments = d.judgment_yearly || [];
+  const repRows = repRes.data || [];
+
+  if (!official.length && !repRows.length) {
+    body.innerHTML = '<div class="empty-state" style="padding:30px;text-align:center;color:var(--text-muted);">此法院尚無官方統計資料（官方案件統計目前涵蓋普通法院體系）</div>';
+    return;
+  }
+
+  // ---- KPI 計算 ----
+  const latestYear = official.length ? Math.max(...official.map(r => r.year_tw)) : null;
+  const latestNew = official.filter(r => r.year_tw === latestYear).reduce((s, r) => s + r.new_cases, 0);
+  const civRep = repRows.filter(r => r.file_type === '民事訴訟');
+  const civRecent = civRep.slice(-12);
+  const civTotal = civRecent.reduce((s, r) => s + r.total_cases, 0);
+  const civPRep = civRecent.reduce((s, r) => s + r.plaintiff_rep, 0);
+  const civBoth = civRecent.reduce((s, r) => s + r.both_rep, 0);
+  // 裁判書公開比（最近一個雙方都有資料的年）
+  let covText = '-', covYear = '';
+  for (const j of [...judgments].reverse()) {
+    const lit = litClosed.find(r => r.year_tw + 1911 === parseInt(j.y));
+    if (lit && lit.closed_cases) {
+      covText = (j.judgments / lit.closed_cases * 100).toFixed(0) + '%';
+      covYear = j.y + ' 年';
+      break;
+    }
+  }
+
+  body.innerHTML = `
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+      <div class="kpi-card"><div class="kpi-label">${latestYear ? '民國 ' + latestYear + ' 年新收' : '年新收'}</div>
+        <div class="kpi-value" style="font-size:1.4rem;">${latestNew ? latestNew.toLocaleString() : '-'}</div>
+        <div class="kpi-sub">官方統計（全部案類）</div></div>
+      <div class="kpi-card"><div class="kpi-label">民訴原告委任率</div>
+        <div class="kpi-value" style="font-size:1.4rem;color:var(--blue);">${civTotal ? (civPRep / civTotal * 100).toFixed(0) + '%' : '-'}</div>
+        <div class="kpi-sub">近 12 個月終結案件</div></div>
+      <div class="kpi-card"><div class="kpi-label">民訴兩造皆委任</div>
+        <div class="kpi-value" style="font-size:1.4rem;color:var(--purple);">${civTotal ? (civBoth / civTotal * 100).toFixed(0) + '%' : '-'}</div>
+        <div class="kpi-sub">雙方都有律師</div></div>
+      <div class="kpi-card"><div class="kpi-label">裁判書公開比</div>
+        <div class="kpi-value" style="font-size:1.4rem;color:var(--gold);">${covText}</div>
+        <div class="kpi-sub">${covYear ? covYear + ' 裁判書÷訴訟終結' : '需裁判書資料'}</div></div>
+    </div>
+    ${official.length ? `<div class="card"><div class="card-title">📈 官方年度新收趨勢（按案類）</div>
+      <div style="position:relative;height:260px;"><canvas id="courtChartOfficial"></canvas></div></div>` : ''}
+    ${judgments.length ? `<div class="card"><div class="card-title">📄 官方訴訟終結 vs 公開裁判書（差距≈和解/撤回/不公開）</div>
+      <div style="position:relative;height:240px;"><canvas id="courtChartCoverage"></canvas></div></div>` : ''}
+    ${civRep.length ? `<div class="grid-2">
+      <div class="card"><div class="card-title">⚖️ 民事訴訟律師委任率趨勢</div>
+        <div style="position:relative;height:240px;"><canvas id="courtChartRep"></canvas></div></div>
+      <div class="card"><div class="card-title">🏁 民事訴訟終結情形（近 12 個月）</div>
+        <div style="position:relative;height:240px;"><canvas id="courtChartOutcome"></canvas></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">委任率/終結情形來自司法院「終結案件資料」月包（案件層級，${repRows[0]?.yyyymm} 起）；官方統計含歷史全期間。</div>` : ''}
+  `;
+
+  Chart.defaults.color = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+
+  // ---- 圖 1：官方年度新收（按案類） ----
+  if (official.length) {
+    const years = [...new Set(official.map(r => r.year_tw))].sort((a, b) => a - b).filter(y => y >= 99);
+    const cats = [...new Set(official.map(r => r.case_category))];
+    if (chartInstances.courtOfficial) chartInstances.courtOfficial.destroy();
+    chartInstances.courtOfficial = new Chart(document.getElementById('courtChartOfficial'), {
+      type: 'line',
+      data: {
+        labels: years.map(y => y + 1911),
+        datasets: cats.map((c, i) => ({
+          label: c,
+          data: years.map(y => official.find(r => r.year_tw === y && r.case_category === c)?.new_cases ?? null),
+          borderColor: COURT_CHART_COLORS[i % COURT_CHART_COLORS.length],
+          tension: 0.3, pointRadius: 2, spanGaps: true,
+        })),
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw ?? 0).toLocaleString() + ' 件' } } } },
+    });
+  }
+
+  // ---- 圖 2：訴訟終結 vs 裁判書 ----
+  if (judgments.length) {
+    const jYears = judgments.map(j => parseInt(j.y));
+    if (chartInstances.courtCoverage) chartInstances.courtCoverage.destroy();
+    chartInstances.courtCoverage = new Chart(document.getElementById('courtChartCoverage'), {
+      type: 'bar',
+      data: {
+        labels: jYears,
+        datasets: [
+          { label: '官方訴訟終結件數', data: jYears.map(y => litClosed.find(r => r.year_tw + 1911 === y)?.closed_cases ?? null), backgroundColor: 'rgba(79,142,247,0.55)' },
+          { label: '公開裁判書件數', data: judgments.map(j => j.judgments), backgroundColor: 'rgba(201,168,76,0.55)' },
+        ],
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.raw ?? 0).toLocaleString() + ' 件' } } } },
+    });
+  }
+
+  // ---- 圖 3：民訴委任率趨勢（年聚合） ----
+  if (civRep.length) {
+    const byYear = {};
+    civRep.forEach(r => {
+      const y = r.yyyymm.slice(0, 4);
+      const a = byYear[y] || (byYear[y] = { t: 0, p: 0, d: 0, b: 0 });
+      a.t += r.total_cases; a.p += r.plaintiff_rep; a.d += r.defendant_rep; a.b += r.both_rep;
+    });
+    const repYears = Object.keys(byYear).sort();
+    const pct = f => repYears.map(y => byYear[y].t ? +(f(byYear[y]) / byYear[y].t * 100).toFixed(1) : null);
+    if (chartInstances.courtRep) chartInstances.courtRep.destroy();
+    chartInstances.courtRep = new Chart(document.getElementById('courtChartRep'), {
+      type: 'line',
+      data: {
+        labels: repYears,
+        datasets: [
+          { label: '原告有律師', data: pct(a => a.p), borderColor: '#4f8ef7', tension: 0.3, pointRadius: 3 },
+          { label: '被告有律師', data: pct(a => a.d), borderColor: '#e05c5c', tension: 0.3, pointRadius: 3 },
+          { label: '兩造皆有', data: pct(a => a.b), borderColor: '#9b7ed8', tension: 0.3, pointRadius: 3 },
+        ],
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { y: { min: 0, ticks: { callback: v => v + '%' } } },
+        plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } } } },
+    });
+
+    // ---- 圖 4：終結情形 doughnut（近 12 個月民訴） ----
+    const outcome = {};
+    civRecent.forEach(r => Object.entries(r.outcomes || {}).forEach(([k, v]) => { outcome[k] = (outcome[k] || 0) + v; }));
+    const sorted = Object.entries(outcome).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 7);
+    const rest = sorted.slice(7).reduce((s, [, v]) => s + v, 0);
+    if (rest) top.push(['其他', rest]);
+    if (chartInstances.courtOutcome) chartInstances.courtOutcome.destroy();
+    chartInstances.courtOutcome = new Chart(document.getElementById('courtChartOutcome'), {
+      type: 'doughnut',
+      data: {
+        labels: top.map(([k]) => k),
+        datasets: [{ data: top.map(([, v]) => v), backgroundColor: COURT_CHART_COLORS }],
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } },
+    });
+  }
+}
 
 // ============================================================
 // 司法統計（司法院統計月報聚合，靜態 JSON；見 CLAUDE.md 司法統計章節）
@@ -6826,6 +7017,7 @@ async function loadProsecutorOverview() {
     }
 
     function buildOrganCharts(data) {
+        buildSupplyDemandChart();  // 供需比（Supabase 資料，非同步補建）
         // Civil by organ - only individual courts, not subtotals
         const civilOrgans = data.district_civil_by_organ
             .filter(d => !d.is_subtotal && d.organ !== '總計')
@@ -6881,6 +7073,71 @@ async function loadProsecutorOverview() {
                 }
             }
         });
+    }
+
+    // 律師供需比：官方民事訴訟新收 ÷ 地區律師數（跨 court_case_stats × lawyers_combined）
+    let supplyDemandBuilt = false;
+    async function buildSupplyDemandChart() {
+        if (supplyDemandBuilt || typeof db === 'undefined') return;
+        supplyDemandBuilt = true;
+        try {
+            const [casesRes, regionRes, courtsRes] = await Promise.all([
+                db.from('court_case_stats')
+                  .select('court_name,new_cases')
+                  .eq('year_tw', 114).eq('case_category', '民事').eq('proc_l2', '民事訴訟')
+                  .eq('court_level', '地方法院').limit(2000),
+                db.rpc('region_distribution'),
+                db.from('courts').select('name,region').eq('court_type', '地方法院'),
+            ]);
+            const courtRegion = {};
+            (courtsRes.data || []).forEach(c => { if (c.region) courtRegion[c.name] = c.region; });
+            const lawyerCnt = {};
+            (regionRes.data || []).forEach(r => { if (r.region) lawyerCnt[r.region] = r.count; });
+            // 新北公會律師若極少（多數掛台北公會），把新北法院案件併入台北一起看
+            const mergeMap = {};
+            if ((lawyerCnt['新北'] || 0) < 100) mergeMap['新北'] = '台北';
+            const regionCases = {};
+            (casesRes.data || []).forEach(r => {
+                let reg = courtRegion[r.court_name];
+                if (!reg) return;
+                reg = mergeMap[reg] || reg;
+                regionCases[reg] = (regionCases[reg] || 0) + r.new_cases;
+            });
+            const rows = Object.entries(regionCases)
+                .filter(([reg]) => (lawyerCnt[reg] || 0) >= 10)
+                .map(([reg, cases]) => ({
+                    reg: mergeMap['新北'] === '台北' && reg === '台北' ? '台北（含新北）' : reg,
+                    cases, lawyers: lawyerCnt[reg],
+                    ratio: +(cases / lawyerCnt[reg]).toFixed(1),
+                }))
+                .sort((a, b) => b.ratio - a.ratio);
+            if (!rows.length) return;
+            new Chart(document.getElementById('jstat_chartSupplyDemand'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map(r => r.reg),
+                    datasets: [{
+                        label: '件/律師',
+                        data: rows.map(r => r.ratio),
+                        backgroundColor: rows.map(r => r.ratio >= 10 ? COLORS_ALPHA(COLORS.green, 0.7) : r.ratio >= 5 ? COLORS_ALPHA(COLORS.orange, 0.7) : COLORS_ALPHA(COLORS.red, 0.7)),
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => {
+                            const r = rows[ctx.dataIndex];
+                            return `${r.ratio} 件/律師（新收 ${formatNumber(r.cases)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`;
+                        } } },
+                    },
+                },
+            });
+        } catch (err) {
+            console.error('供需比圖載入失敗', err);
+        }
     }
 
     let jstatData = null;
@@ -6954,6 +7211,19 @@ async function loadProsecutorOverview() {
       <button class="tab-btn" onclick="switchFirmTab('analysis')" id="firmTab_analysis">AI 分析</button>
     </div>
     <div class="modal-body" id="firmModalBody">
+      <div class="loading">載入中</div>
+    </div>
+  </div>
+</div>
+
+<!-- 法院詳細 Modal（官方統計 × 裁判書 × 終結案件微資料） -->
+<div id="courtModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCourtModal();">
+  <div class="modal-content" style="max-width:860px;">
+    <div class="modal-header">
+      <h2 id="courtModalTitle">載入中...</h2>
+      <button onclick="closeCourtModal()">✕</button>
+    </div>
+    <div class="modal-body" id="courtModalBody">
       <div class="loading">載入中</div>
     </div>
   </div>

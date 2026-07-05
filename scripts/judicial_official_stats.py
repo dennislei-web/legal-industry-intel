@@ -6,7 +6,8 @@
 民國 90 年起、月 × 法院 × 案件種類 × 三層訴訟程序別的新收/終結件數，約 50 萬列。
 
 處理：串流解析 ODS（不整檔載入記憶體）→ 去除欄位值的數字編號前綴 →
-聚合到訴訟程序別第 1 層 → 全量 upsert 到 court_case_stats（冪等，來源修訂會覆蓋）。
+聚合到訴訟程序別第 2 層（僅聚掉第 3 層）→ 全量 upsert 到 court_case_stats（冪等）。
+注意：地院「民事」的 l1 只分 民事/民執，「民事訴訟 vs 民事非訟」要看 proc_l2。
 
 已知來源特性：
 - 最高法院各案類新收件數恆為 0（來源只填終結），前端呈現最高法院時用終結數
@@ -116,10 +117,11 @@ def parse():
         court = strip_prefix(cells[3])
         cat = strip_prefix(cells[4])
         l1 = strip_prefix(cells[5])
+        l2 = strip_prefix(cells[6])
         if not court or not cat:
             bad += 1
             continue
-        k = (y, m, court, cat, l1)
+        k = (y, m, court, cat, l1, l2)
         agg[k][0] += new
         agg[k][1] += closed
         levels[court] = level
@@ -128,8 +130,9 @@ def parse():
             print(f'  ...{rows} 列（{time.time() - t0:.0f}s）')
     out = [
         {'year_tw': y, 'month': m, 'court_level': levels[court], 'court_name': court,
-         'case_category': cat, 'proc_l1': l1, 'new_cases': v[0], 'closed_cases': v[1]}
-        for (y, m, court, cat, l1), v in agg.items()
+         'case_category': cat, 'proc_l1': l1, 'proc_l2': l2,
+         'new_cases': v[0], 'closed_cases': v[1]}
+        for (y, m, court, cat, l1, l2), v in agg.items()
     ]
     with io.open(AGG_PATH, 'w', encoding='utf-8') as fo:
         json.dump(out, fo, ensure_ascii=False)
@@ -147,7 +150,7 @@ def upload(batch_size=1000):
     records = json.load(io.open(AGG_PATH, encoding='utf-8'))
     print(f'上傳 {len(records)} 列到 court_case_stats（batch {batch_size}）...')
     url = (f'{SUPABASE_URL}/rest/v1/court_case_stats'
-           f'?on_conflict=year_tw,month,court_name,case_category,proc_l1')
+           f'?on_conflict=year_tw,month,court_name,case_category,proc_l1,proc_l2')
     headers = {**HEADERS_SB, 'Content-Type': 'application/json',
                'Prefer': 'resolution=merge-duplicates,return=minimal'}
     t0 = time.time()

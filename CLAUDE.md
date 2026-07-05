@@ -50,9 +50,10 @@
 ## 司法統計（前端「司法統計」區塊 + 官方案件統計管線）
 
 - **前端**：第一層導覽「司法統計」7 分頁（總覽/民事/家事/刑事/強制執行/法院效率/各法院比較），從獨立站 judicial-stats 移植進 `public/index.html`。所有 id 加 `jstat_` / `tab-jstat-` 前綴、CSS scope 在 `.jstat` 下、深度分析文章固定白底紙張樣式。資料源是**靜態** `public/data/judicial_stats.json`（統計月報聚合，離婚原因/罪名/家事細項等專題表，年更、半自動——產生 script 不在 repo）
-- **官方案件統計管線**：`scripts/judicial_official_stats.py`（download/parse/upload/run）→ `court_case_stats` 表（migration 034）。來源：opendata datasetId 43994「各級法院各案類新收及終結件數統計」，**公開免會員**，單一 ODS（~18MB，content.xml ~600MB 要串流解析），民國 90 年起 月×法院×案類×程序別，50 萬列聚合成 ~11 萬列（程序別聚到第 1 層）。`judicial-official-stats.yml` 每月 5 日全量 upsert（冪等）
-- **來源怪癖**：最高法院新收件數恆 0（只填終結）；此資料集「民事」含民執（proc_l1='民執'），與統計月報「強制執行」口徑不同；114 地院家事新收 183,028 可當解析驗證基準
-- **「終結案件資料」月包（未來金礦，尚未建管線）**：opendata 另有按月的案件層級微資料（搜「終結案件資料」，每月 ~1MB 7z、晚 1.5 個月），`!` 分隔 txt，每案一筆：**法官名有值**（「無姓名版」指當事人）、**原告/被告是否有律師代理**、訴訟標的金額、終結情形（勝訴/敗訴/和解/撤回）。可做真實法官終結統計（含非裁判終結）、各法院律師委任率、勝敗訴分布。無收案日期（辦案期間仍只能用案號年估）
+- **官方案件統計管線**：`scripts/judicial_official_stats.py`（download/parse/upload/run）→ `court_case_stats` 表（migration 034/037）。來源：opendata datasetId 43994「各級法院各案類新收及終結件數統計」，**公開免會員**，單一 ODS（~18MB，content.xml ~600MB 要串流解析），民國 90 年起 月×法院×案類×程序別（保留至第 2 層），50 萬列聚合成 ~43 萬列。`judicial-official-stats.yml` 每月 5 日全量 upsert（冪等）
+- **來源怪癖（查詢必讀）**：最高法院新收件數恆 0（只填終結）；**地院「民事」的 proc_l1 只分 民事/民執**，「民事訴訟 vs 民事非訟（支付命令等）」要看 **proc_l2**（114 年地院：民事訴訟 18.9 萬、民事非訟 83.7 萬、民執執行 204.6 萬=月報強制執行）；刑事訴訟在 l1='訴訟'；114 地院家事新收 183,028 可當解析驗證基準
+- **終結案件微資料管線**：`scripts/closed_case_stats.py`（run/auto/backfill）→ `closed_case_month_stats`（migration 035）。月包每月 ~1MB 7z（搜「終結案件資料」，晚 1.5 個月），`!` 分隔 txt 每案一筆。目前解析**民事訴訟+家事訴訟**檔 →（月×法院×檔型）律師委任率/終結情形分布/標的金額，已回填 2021-01 起。`closed-case-stats-monthly.yml` 每月 20 日 auto 模式。**版式防呆**：欄 15-17 須為合理民國日期，不符跳過（最高法院民訴版式不同、刑事檔是階層式含「選任律師辯護」，均未納入，是未來擴充點）。法官名有值但尚未做 per-judge 聚合（合議庭歸屬待定義）
+- **整合呈現**：法院 tab 法院名可點 → `courtModal`（RPC `court_detail_stats`，migration 036/037：官方年度趨勢＋訴訟終結vs公開裁判書＋委任率＋終結情形）；司法統計>各法院比較有「律師供需比」圖（民事訴訟新收÷公會地區律師數，新北律師少時併台北）
 
 ## 爬蟲模式（moj-deep-backfill.yml）
 
