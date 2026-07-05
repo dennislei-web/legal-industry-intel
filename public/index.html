@@ -487,6 +487,7 @@
   <div class="nav-bar">
     <button class="nav-btn active" id="navBtn_lawyer" onclick="showSection('lawyer')">&#9878;&#65039; 律師</button>
     <button class="nav-btn" id="navBtn_judge" onclick="showSection('judge')">&#127963;&#65039; 法官</button>
+    <button class="nav-btn" id="navBtn_prosecutor" onclick="showSection('prosecutor')">&#9876;&#65039; 檢察官</button>
     <button class="nav-btn" id="navBtn_sources" onclick="showSection('sources')">資料來源</button>
     <button class="nav-btn" id="navBtn_admin" onclick="showSection('admin')" style="display:none;">帳號管理</button>
   </div>
@@ -1065,6 +1066,60 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: PROSECUTOR OVERVIEW (檢察官總覽) ==================== -->
+    <div id="tab-prosecutor-overview" class="tab-content">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="kpi-card">
+          <div class="kpi-label">檢察官總數</div>
+          <div class="kpi-value" id="ovProsTotal">-</div>
+          <div class="kpi-sub">裁判書具名萃取</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">檢察署數</div>
+          <div class="kpi-value" id="ovProsOffices" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">地檢/高檢/最高檢</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">統計案件總數</div>
+          <div class="kpi-value" id="ovProsCases" style="color:var(--green);">-</div>
+          <div class="kpi-sub">起訴/蒞庭具名案件</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均案件量</div>
+          <div class="kpi-value" id="ovProsAvgCases" style="color:var(--gold);">-</div>
+          <div class="kpi-sub">每位檢察官</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">資料涵蓋月數</div>
+          <div class="kpi-value" id="ovProsMonths" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="ovProsMonthsSub">裁判書逐月回填</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127963;&#65039; 檢察署層級分布</div>
+          <div class="chart-container"><canvas id="chartProsLevel"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128101; 檢察官人數 TOP 10 檢察署</div>
+          <div class="chart-container"><canvas id="chartProsOfficeTop"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#128293; 案件量 TOP 10 檢察官</div>
+          <div id="topProsList"><div class="loading">載入中</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128200; 年度具名案件量趨勢</div>
+          <div class="chart-container"><canvas id="chartProsTrend"></canvas></div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 檢察官資料來自司法院裁判書開放資料（刑事裁判書具名段落萃取）；約半數刑事判決未具名檢察官，案件數為下限估計，僅供相對比較。年度標「*」表示該年裁判書尚未回填滿 12 個月。高等檢察署平均案件數偏低為上訴審蒞庭歸屬特性所致。
+      </div>
+    </div>
+
     <!-- ==================== TAB: PROSECUTORS (檢察官) ==================== -->
     <div id="tab-prosecutors" class="tab-content">
       <div class="kpi-grid" id="prosKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -1406,6 +1461,9 @@ const SECTIONS = {
     { tab: 'family', label: '家事分析' },
     { tab: 'judges', label: '法官' },
     { tab: 'courts', label: '法院' },
+  ],
+  prosecutor: [
+    { tab: 'prosecutor-overview', label: '總覽' },
     { tab: 'prosecutors', label: '檢察官' },
   ],
   sources: [],
@@ -1444,6 +1502,7 @@ function showTab(tab) {
 
   // Lazy load data
   if (tab === 'judge-overview') loadJudgeOverviewOnce();
+  if (tab === 'prosecutor-overview') loadProsecutorOverviewOnce();
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
@@ -4399,6 +4458,131 @@ async function loadProsecutorKpis() {
   set('kpiProsOffices', offices.length);
   set('kpiProsCases', totalCases);
   set('kpiProsAvgCases', totalPros ? Math.round(totalCases / totalPros) : 0);
+}
+
+// ============================================================
+// PROSECUTOR OVERVIEW (檢察官總覽)
+// ============================================================
+let _prosOvLoaded = false;
+
+function loadProsecutorOverviewOnce() {
+  if (_prosOvLoaded) return;
+  _prosOvLoaded = true;
+  loadProsecutorOverview();
+}
+
+async function loadProsecutorOverview() {
+  try {
+    const el = id => document.getElementById(id);
+    const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+
+    const [{ data: offices }, { data: yearly }, { data: topPros }] = await Promise.all([
+      db.rpc('prosecutor_office_statistics'),
+      db.rpc('prosecutor_cases_by_year'),
+      db.from('prosecutor_stats')
+        .select('name,office_name,case_count_total')
+        .order('case_count_total', { ascending: false, nullsFirst: false })
+        .limit(10),
+    ]);
+    if (!offices?.length) return;
+
+    // KPI
+    const totalPros = offices.reduce((a, o) => a + Number(o.prosecutor_count || 0), 0);
+    const totalCases = offices.reduce((a, o) => a + Number(o.total_cases || 0), 0);
+    el('ovProsTotal').textContent = totalPros.toLocaleString();
+    el('ovProsOffices').textContent = offices.length;
+    el('ovProsCases').textContent = totalCases.toLocaleString();
+    el('ovProsAvgCases').textContent = totalPros ? Math.round(totalCases / totalPros).toLocaleString() : '-';
+    if (yearly?.length) {
+      const months = yearly.reduce((a, r) => a + Number(r.months || 0), 0);
+      el('ovProsMonths').textContent = months;
+      el('ovProsMonthsSub').textContent = `${yearly[0].year} ~ ${yearly[yearly.length - 1].year} 年`;
+    }
+
+    // 檢察署層級分布（doughnut）
+    const levelOf = n => n.includes('最高') ? '最高檢察署'
+      : n.includes('分署') ? '高檢分署'
+      : n.includes('高等') ? '高等檢察署'
+      : n.includes('地方') ? '地方檢察署' : '其他';
+    const levelAgg = {};
+    offices.forEach(o => {
+      const lv = levelOf(o.office_name || '');
+      levelAgg[lv] = (levelAgg[lv] || 0) + Number(o.prosecutor_count || 0);
+    });
+    const levels = Object.entries(levelAgg).sort((a, b) => b[1] - a[1]);
+    if (chartInstances.prosLevel) chartInstances.prosLevel.destroy();
+    chartInstances.prosLevel = new Chart(document.getElementById('chartProsLevel').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: levels.map(r => r[0]),
+        datasets: [{ data: levels.map(r => r[1]),
+          backgroundColor: ['rgba(79,142,247,0.7)','rgba(155,126,216,0.6)','rgba(201,168,76,0.65)','rgba(76,175,130,0.65)','rgba(224,149,74,0.55)'],
+          borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: getComputedStyle(document.body).getPropertyValue('--text').trim(), font: { size: 11 } } } } }
+    });
+
+    // 檢察官人數 TOP 10 檢察署（bar）
+    const topOffices = offices.slice(0, 10);
+    if (chartInstances.prosOfficeTop) chartInstances.prosOfficeTop.destroy();
+    chartInstances.prosOfficeTop = new Chart(document.getElementById('chartProsOfficeTop').getContext('2d'), {
+      type: 'bar',
+      data: { labels: topOffices.map(o => o.office_name.replace('臺灣', '').replace('地方檢察署', '地檢')),
+        datasets: [{ label: '檢察官人數', data: topOffices.map(o => Number(o.prosecutor_count)), backgroundColor: 'rgba(155,126,216,0.6)', borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                  y: { ticks: { color: txtColor, font: { size: 11 } }, grid: { display: false } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 案件量 TOP 10 檢察官
+    const t10 = (topPros || []).filter(p => p.case_count_total != null);
+    el('topProsList').innerHTML = t10.length ? `<div style="margin-top:8px;">
+      ${t10.map((p, i) => {
+        const barW = Math.round(p.case_count_total / t10[0].case_count_total * 100);
+        return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
+          <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
+          <span style="min-width:64px;font-weight:600;">${escHtml(p.name)}</span>
+          <span style="flex:1;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.office_name || '')}</span>
+          <span style="width:${Math.max(barW, 4) * 0.5}%;max-width:30%;height:8px;background:rgba(201,168,76,0.5);border-radius:4px;"></span>
+          <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${p.case_count_total.toLocaleString()}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無案件統計資料</div>';
+
+    // 年度具名案件量趨勢（line，months<12 標 *）
+    if (yearly?.length) {
+      if (chartInstances.prosTrend) chartInstances.prosTrend.destroy();
+      chartInstances.prosTrend = new Chart(document.getElementById('chartProsTrend').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: yearly.map(r => r.months < 12 ? r.year + '*' : r.year),
+          datasets: [{
+            label: '具名案件數',
+            data: yearly.map(r => Number(r.cases)),
+            borderColor: 'rgba(76,175,130,0.9)',
+            backgroundColor: 'rgba(76,175,130,0.12)',
+            fill: true, tension: 0.3, pointRadius: 4,
+            pointBackgroundColor: 'rgba(76,175,130,1)',
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: txtColor }, grid: { display: false } },
+            y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: ctx => `${Number(ctx.parsed.y).toLocaleString()} 件（${Number(yearly[ctx.dataIndex].prosecutors).toLocaleString()} 位檢察官、${yearly[ctx.dataIndex].months} 個月資料）`,
+            } }
+          }
+        }
+      });
+    }
+  } catch (e) { console.log('prosecutor overview error:', e); }
 }
 
 // ============================================================
