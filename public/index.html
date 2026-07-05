@@ -1070,14 +1070,14 @@
     <div id="tab-prosecutor-overview" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
-          <div class="kpi-label">檢察官總數</div>
+          <div class="kpi-label">現職檢察官（估）</div>
           <div class="kpi-value" id="ovProsTotal">-</div>
-          <div class="kpi-sub">裁判書具名萃取</div>
+          <div class="kpi-sub" id="ovProsTotalSub">最新月具名・官方 1,460</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">檢察署數</div>
-          <div class="kpi-value" id="ovProsOffices" style="color:var(--purple);">-</div>
-          <div class="kpi-sub">地檢/高檢/最高檢</div>
+          <div class="kpi-label">累計具名人數</div>
+          <div class="kpi-value" id="ovProsNames" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">2020 起・含離退調動</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">統計案件總數</div>
@@ -1101,7 +1101,7 @@
           <div class="chart-container"><canvas id="chartProsLevel"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">&#128101; 檢察官人數 TOP 10 檢察署</div>
+          <div class="card-title">&#128101; 現職檢察官 TOP 10 檢察署（估）</div>
           <div class="chart-container"><canvas id="chartProsOfficeTop"></canvas></div>
         </div>
       </div>
@@ -1116,17 +1116,17 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 檢察官資料來自司法院裁判書開放資料（刑事裁判書具名段落萃取）；約半數刑事判決未具名檢察官，案件數為下限估計，僅供相對比較。年度標「*」表示該年裁判書尚未回填滿 12 個月。高等檢察署平均案件數偏低為上訴審蒞庭歸屬特性所致。
+        ※ 檢察官資料來自司法院裁判書開放資料（刑事裁判書具名段落萃取）；約半數刑事判決未具名檢察官，案件數為下限估計，僅供相對比較。「現職檢察官（估）」＝最新資料月具名的不重複人數（跨署以案件量最多的署為主要歸屬），與法務統計官方數（114 年底 1,460 人）誤差 &lt;1%；「累計具名人數」為 2020 年起所有出現過的姓名，含離退與調動，故遠大於現職數。年度標「*」表示該年裁判書尚未回填滿 12 個月。
       </div>
     </div>
 
     <!-- ==================== TAB: PROSECUTORS (檢察官) ==================== -->
     <div id="tab-prosecutors" class="tab-content">
       <div class="kpi-grid" id="prosKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
-        <div class="kpi-card"><div class="kpi-label">檢察官總數</div><div class="kpi-value" id="kpiProsTotal">-</div><div class="kpi-sub">裁判書具名萃取</div></div>
-        <div class="kpi-card"><div class="kpi-label">檢察署數</div><div class="kpi-value" id="kpiProsOffices" style="color:var(--purple);">-</div><div class="kpi-sub">地檢/高檢/最高檢</div></div>
+        <div class="kpi-card"><div class="kpi-label">現職檢察官（估）</div><div class="kpi-value" id="kpiProsTotal">-</div><div class="kpi-sub">最新月具名・官方 1,460</div></div>
+        <div class="kpi-card"><div class="kpi-label">檢察署數</div><div class="kpi-value" id="kpiProsOffices" style="color:var(--purple);">-</div><div class="kpi-sub">具名來源機關</div></div>
         <div class="kpi-card"><div class="kpi-label">統計案件總數</div><div class="kpi-value" id="kpiProsCases" style="color:var(--green);">-</div><div class="kpi-sub">起訴/蒞庭具名案件</div></div>
-        <div class="kpi-card"><div class="kpi-label">平均案件量</div><div class="kpi-value" id="kpiProsAvgCases" style="color:var(--gold);">-</div><div class="kpi-sub">每位檢察官</div></div>
+        <div class="kpi-card"><div class="kpi-label">平均案件量</div><div class="kpi-value" id="kpiProsAvgCases" style="color:var(--gold);">-</div><div class="kpi-sub">每位累計具名檢察官</div></div>
       </div>
       <div class="search-bar">
         <input type="text" id="prosSearch" placeholder="搜尋檢察官姓名..." oninput="searchProsecutors()">
@@ -1156,6 +1156,41 @@
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
           資料來源：司法院裁判書開放資料（每月更新）。檢察官姓名與所屬檢察署由刑事裁判書「本案經檢察官○○○提起公訴/聲請簡易判決」「檢察官○○○到庭執行職務」等段落萃取；約半數刑事判決全文僅寫「經檢察官提起公訴」未具名，該類案件無法計入，故案件數為下限估計，僅供檢察官間相對比較。
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: PROSECUTOR OFFICES (檢察署) ==================== -->
+    <div id="tab-pros-offices" class="tab-content">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">檢察署總數</div><div class="kpi-value" id="kpiPofTotal">-</div><div class="kpi-sub">全國檢察機關</div></div>
+        <div class="kpi-card"><div class="kpi-label">地方檢察署</div><div class="kpi-value" id="kpiPofDistrict" style="color:var(--blue);">-</div><div class="kpi-sub">含福建金門/連江</div></div>
+        <div class="kpi-card"><div class="kpi-label">高檢及分署</div><div class="kpi-value" id="kpiPofHigh" style="color:var(--purple);">-</div><div class="kpi-sub">含智財/金門分署</div></div>
+        <div class="kpi-card"><div class="kpi-label">官方檢察官總數</div><div class="kpi-value" id="kpiPofOfficial" style="color:var(--green);">1,460</div><div class="kpi-sub">法務統計 114 年底</div></div>
+        <div class="kpi-card"><div class="kpi-label">現職估計</div><div class="kpi-value" id="kpiPofActive" style="color:var(--gold);">-</div><div class="kpi-sub" id="kpiPofActiveSub">最新月具名</div></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="cursor:pointer" onclick="sortPof('name')">檢察署名稱 <span id="sortIcon_pof_name">↕</span></th>
+                <th style="cursor:pointer" onclick="sortPof('office_type')">類型 <span id="sortIcon_pof_office_type">↕</span></th>
+                <th style="cursor:pointer" onclick="sortPof('region')">地區 <span id="sortIcon_pof_region">↕</span></th>
+                <th style="cursor:pointer" onclick="sortPof('active_latest')">現職檢察官（估） <span id="sortIcon_pof_active_latest">↓</span></th>
+                <th style="cursor:pointer" onclick="sortPof('active_12m')">近一年具名 <span id="sortIcon_pof_active_12m">↕</span></th>
+                <th style="cursor:pointer" onclick="sortPof('cases_total')">累計案件數 <span id="sortIcon_pof_cases_total">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="pofTableBody">
+              <tr><td colspan="6" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          「現職檢察官（估）」＝最新資料月在裁判書具名的不重複檢察官數（同一人跨署以案件量最多的署為主要歸屬）。全國合計與法務統計官方數（114 年底 1,460 人）誤差 &lt;1%，但單署數字受具名率與歸屬推定影響，僅供參考。「近一年具名」為近 12 個資料月的累計不重複人數，含期間內調動/離退者，會高於現職數。
         </div>
       </div>
     </div>
@@ -1465,6 +1500,7 @@ const SECTIONS = {
   prosecutor: [
     { tab: 'prosecutor-overview', label: '總覽' },
     { tab: 'prosecutors', label: '檢察官' },
+    { tab: 'pros-offices', label: '檢察署' },
   ],
   sources: [],
   admin: [],
@@ -1503,6 +1539,7 @@ function showTab(tab) {
   // Lazy load data
   if (tab === 'judge-overview') loadJudgeOverviewOnce();
   if (tab === 'prosecutor-overview') loadProsecutorOverviewOnce();
+  if (tab === 'pros-offices') loadProsOffices();
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
@@ -4449,15 +4486,81 @@ async function loadProsecutors() {
 }
 
 async function loadProsecutorKpis() {
-  const { data: offices } = await db.rpc('prosecutor_office_statistics');
+  const [{ data: offices }, { data: summary }] = await Promise.all([
+    db.rpc('prosecutor_office_statistics'),
+    db.rpc('prosecutor_active_summary'),
+  ]);
   if (!offices || !offices.length) return;
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
-  const totalPros = offices.reduce((a, o) => a + Number(o.prosecutor_count || 0), 0);
   const totalCases = offices.reduce((a, o) => a + Number(o.total_cases || 0), 0);
-  set('kpiProsTotal', totalPros);
+  const sm = summary?.[0];
+  set('kpiProsTotal', sm ? Number(sm.active_latest) : null);
   set('kpiProsOffices', offices.length);
   set('kpiProsCases', totalCases);
-  set('kpiProsAvgCases', totalPros ? Math.round(totalCases / totalPros) : 0);
+  set('kpiProsAvgCases', sm?.names_total ? Math.round(totalCases / Number(sm.names_total)) : 0);
+}
+
+// ============================================================
+// PROSECUTOR OFFICES (檢察署)
+// ============================================================
+let _pofRows = null;
+let pofSortCol = 'active_latest', pofSortAsc = false;
+
+async function loadProsOffices() {
+  if (!_pofRows) {
+    const [{ data: offices }, { data: stats }, { data: summary }] = await Promise.all([
+      db.from('prosecutor_offices').select('*'),
+      db.rpc('prosecutor_active_by_office'),
+      db.rpc('prosecutor_active_summary'),
+    ]);
+    if (!offices?.length) return;
+    const statByName = {};
+    (stats || []).forEach(s => { statByName[s.office_name] = s; });
+    _pofRows = offices.map(o => ({
+      name: o.name, office_type: o.office_type, region: o.region,
+      active_latest: Number(statByName[o.name]?.active_latest ?? 0),
+      active_12m: Number(statByName[o.name]?.active_12m ?? 0),
+      cases_total: Number(statByName[o.name]?.cases_total ?? 0),
+    }));
+    // KPI
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
+    set('kpiPofTotal', offices.length);
+    set('kpiPofDistrict', offices.filter(o => o.office_type === '地方檢察署').length);
+    set('kpiPofHigh', offices.filter(o => o.office_type === '高等檢察署' || o.office_type === '高檢分署').length);
+    const sm = summary?.[0];
+    if (sm) {
+      set('kpiPofActive', Number(sm.active_latest));
+      const ym = sm.latest_ym || '';
+      document.getElementById('kpiPofActiveSub').textContent = ym ? `${ym.slice(0,4)}/${ym.slice(4)} 具名` : '最新月具名';
+    }
+  }
+  renderPofTable();
+}
+
+function renderPofTable() {
+  const rows = [..._pofRows].sort((a, b) => {
+    const va = a[pofSortCol], vb = b[pofSortCol];
+    const cmp = (typeof va === 'number') ? va - vb : String(va || '').localeCompare(String(vb || ''), 'zh-Hant');
+    return pofSortAsc ? cmp : -cmp;
+  });
+  document.getElementById('pofTableBody').innerHTML = rows.map(o => `<tr>
+    <td><strong>${escHtml(o.name)}</strong></td>
+    <td>${escHtml(o.office_type)}</td>
+    <td>${escHtml(o.region || '-')}</td>
+    <td style="text-align:center;font-weight:600;color:var(--gold);">${o.active_latest ? o.active_latest.toLocaleString() : '-'}</td>
+    <td style="text-align:center;">${o.active_12m ? o.active_12m.toLocaleString() : '-'}</td>
+    <td style="text-align:center;">${o.cases_total ? o.cases_total.toLocaleString() : '-'}</td>
+  </tr>`).join('');
+}
+
+function sortPof(col) {
+  if (pofSortCol === col) { pofSortAsc = !pofSortAsc; }
+  else { pofSortCol = col; pofSortAsc = !(col === 'active_latest' || col === 'active_12m' || col === 'cases_total'); }
+  ['name','office_type','region','active_latest','active_12m','cases_total'].forEach(c => {
+    const icon = document.getElementById('sortIcon_pof_' + c);
+    if (icon) icon.textContent = c === col ? (pofSortAsc ? '↑' : '↓') : '↕';
+  });
+  renderPofTable();
 }
 
 // ============================================================
@@ -4476,30 +4579,36 @@ async function loadProsecutorOverview() {
     const el = id => document.getElementById(id);
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
-    const [{ data: offices }, { data: yearly }, { data: topPros }] = await Promise.all([
-      db.rpc('prosecutor_office_statistics'),
+    const [{ data: activeStats }, { data: summary }, { data: yearly }, { data: topPros }] = await Promise.all([
+      db.rpc('prosecutor_active_by_office'),
+      db.rpc('prosecutor_active_summary'),
       db.rpc('prosecutor_cases_by_year'),
       db.from('prosecutor_stats')
         .select('name,office_name,case_count_total')
         .order('case_count_total', { ascending: false, nullsFirst: false })
         .limit(10),
     ]);
-    if (!offices?.length) return;
+    const offices = (activeStats || []).sort((a, b) => Number(b.active_latest) - Number(a.active_latest));
+    if (!offices.length) return;
 
-    // KPI
-    const totalPros = offices.reduce((a, o) => a + Number(o.prosecutor_count || 0), 0);
-    const totalCases = offices.reduce((a, o) => a + Number(o.total_cases || 0), 0);
-    el('ovProsTotal').textContent = totalPros.toLocaleString();
-    el('ovProsOffices').textContent = offices.length;
+    // KPI（現職 = 最新資料月具名數，主要歸屬去重）
+    const sm = summary?.[0];
+    const totalCases = offices.reduce((a, o) => a + Number(o.cases_total || 0), 0);
+    if (sm) {
+      el('ovProsTotal').textContent = Number(sm.active_latest).toLocaleString();
+      const ym = sm.latest_ym || '';
+      if (ym) el('ovProsTotalSub').textContent = `${ym.slice(0,4)}/${ym.slice(4)} 具名・官方 1,460`;
+      el('ovProsNames').textContent = Number(sm.names_total).toLocaleString();
+      el('ovProsAvgCases').textContent = sm.names_total ? Math.round(totalCases / Number(sm.names_total)).toLocaleString() : '-';
+    }
     el('ovProsCases').textContent = totalCases.toLocaleString();
-    el('ovProsAvgCases').textContent = totalPros ? Math.round(totalCases / totalPros).toLocaleString() : '-';
     if (yearly?.length) {
       const months = yearly.reduce((a, r) => a + Number(r.months || 0), 0);
       el('ovProsMonths').textContent = months;
       el('ovProsMonthsSub').textContent = `${yearly[0].year} ~ ${yearly[yearly.length - 1].year} 年`;
     }
 
-    // 檢察署層級分布（doughnut）
+    // 檢察署層級分布（doughnut，現職估計）
     const levelOf = n => n.includes('最高') ? '最高檢察署'
       : n.includes('分署') ? '高檢分署'
       : n.includes('高等') ? '高等檢察署'
@@ -4507,7 +4616,7 @@ async function loadProsecutorOverview() {
     const levelAgg = {};
     offices.forEach(o => {
       const lv = levelOf(o.office_name || '');
-      levelAgg[lv] = (levelAgg[lv] || 0) + Number(o.prosecutor_count || 0);
+      levelAgg[lv] = (levelAgg[lv] || 0) + Number(o.active_latest || 0);
     });
     const levels = Object.entries(levelAgg).sort((a, b) => b[1] - a[1]);
     if (chartInstances.prosLevel) chartInstances.prosLevel.destroy();
@@ -4523,13 +4632,13 @@ async function loadProsecutorOverview() {
         plugins: { legend: { position: 'right', labels: { color: getComputedStyle(document.body).getPropertyValue('--text').trim(), font: { size: 11 } } } } }
     });
 
-    // 檢察官人數 TOP 10 檢察署（bar）
+    // 現職檢察官 TOP 10 檢察署（bar，最新月具名、主要歸屬去重）
     const topOffices = offices.slice(0, 10);
     if (chartInstances.prosOfficeTop) chartInstances.prosOfficeTop.destroy();
     chartInstances.prosOfficeTop = new Chart(document.getElementById('chartProsOfficeTop').getContext('2d'), {
       type: 'bar',
       data: { labels: topOffices.map(o => o.office_name.replace('臺灣', '').replace('地方檢察署', '地檢')),
-        datasets: [{ label: '檢察官人數', data: topOffices.map(o => Number(o.prosecutor_count)), backgroundColor: 'rgba(155,126,216,0.6)', borderRadius: 4 }] },
+        datasets: [{ label: '現職檢察官（估）', data: topOffices.map(o => Number(o.active_latest)), backgroundColor: 'rgba(155,126,216,0.6)', borderRadius: 4 }] },
       options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
         scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
                   y: { ticks: { color: txtColor, font: { size: 11 } }, grid: { display: false } } },

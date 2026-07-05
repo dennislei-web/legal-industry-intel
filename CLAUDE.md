@@ -27,6 +27,7 @@
 - `firm_websites` — 爬蟲找到的官網
 - `judges` / `courts` / `judges_combined` — 法官/法院
 - `prosecutor_month_stats` / `prosecutor_stats` — 檢察官統計（migration 029），`judgment_stats.py` 從刑事裁判書萃取「檢察官○○○提起公訴/到庭執行職務」＋所屬檢察署，`refresh_prosecutor_stats` RPC 彙總；約半數刑事判決不具名檢察官，案件數為下限估計
+- `prosecutor_offices` — 檢察署基本資料 30 署（migration 033 種子）；**現職檢察官數用 `prosecutor_active_summary()` / `prosecutor_active_by_office()` RPC**（最新資料月具名數＋跨署主要歸屬去重，實測與法務統計官方 114 年底 1,460 誤差 <1%）。`prosecutor_stats` 的列數是五年累計（人×署）組合，**不是現職人數**，別直接當檢察官總數用
 - `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024），前端「異動追蹤」tab 讀取
 - `lawyer_members` — 律師公會會員（按地區公會）
 - `user_profiles` — 使用者角色 (admin/user)
