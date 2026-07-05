@@ -3537,7 +3537,9 @@ async function loadJudges() {
     // Data source badge
     let srcBadge = '';
     const src = j.data_source || '';
-    if (src.includes('司法院') && src.includes('Lawsnote')) {
+    if (src.includes('裁判書')) {
+      srcBadge = `<span class="badge" style="margin:1px;background:var(--green-dim);color:var(--green);">${escHtml(src)}</span>`;
+    } else if (src.includes('司法院') && src.includes('Lawsnote')) {
       srcBadge = '<span class="badge" style="margin:1px;background:var(--green-dim);color:var(--green);">司法院+Lawsnote</span>';
     } else if (src.includes('司法院')) {
       srcBadge = '<span class="badge badge-blue" style="margin:1px;">僅司法院</span>';
