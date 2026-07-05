@@ -19,6 +19,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
+      - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
+        run: |
+          IP=$(curl -s "https://dns.google/resolve?name=opendata.judicial.gov.tw&type=A" | jq -r '[.Answer[]? | select(.type==1)][0].data // empty')
+          if [ -z "$IP" ]; then IP=210.69.124.89; fi
+          echo "resolved: $IP"
+          echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
+
       - name: Run official court stats pipeline
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
