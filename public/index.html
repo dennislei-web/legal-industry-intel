@@ -177,6 +177,11 @@
     }
     .tab-btn:hover { color: var(--text); background: var(--ghost-bg); }
     .tab-btn.active { color: var(--tab-active-color); border-bottom-color: var(--tab-active-color); background: var(--tab-active-bg); }
+    .tab-group-label { align-self: center; padding: 0 4px 2px 12px; font-size: 0.68rem; letter-spacing: 2px; color: var(--text-muted); white-space: nowrap; user-select: none; }
+    .tab-sep { align-self: center; width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+
+    .ov-sec-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 4px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
+    .ov-sec-title .sub { font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
 
     /* ===================== CONTENT ===================== */
     .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
@@ -472,12 +477,17 @@
   <!-- Tabs -->
   <div class="tabs-bar">
     <button class="tab-btn active" onclick="showTab('overview')">總覽</button>
+    <div class="tab-sep"></div>
+    <span class="tab-group-label">律師</span>
     <button class="tab-btn" onclick="showTab('lawyers')">律師</button>
-    <button class="tab-btn" onclick="showTab('firms')">律師公會</button>
+    <button class="tab-btn" onclick="showTab('firms')">公會</button>
     <button class="tab-btn" onclick="showTab('offices')">事務所</button>
     <button class="tab-btn" onclick="showTab('changes')">異動追蹤</button>
+    <div class="tab-sep"></div>
+    <span class="tab-group-label">法官</span>
     <button class="tab-btn" onclick="showTab('judges')">法官</button>
     <button class="tab-btn" onclick="showTab('courts')">法院</button>
+    <div class="tab-sep"></div>
     <button class="tab-btn" onclick="showTab('sources')">資料來源</button>
     <button class="tab-btn" onclick="showTab('admin')" id="tabBtnAdmin" style="display:none;">帳號管理</button>
   </div>
@@ -486,6 +496,7 @@
 
     <!-- ==================== TAB: OVERVIEW ==================== -->
     <div id="tab-overview" class="tab-content active">
+      <div class="ov-sec-title">&#9878;&#65039; 律師市場 <span class="sub">法務部登錄 + 全聯會名冊 + 判決資料</span></div>
       <div class="kpi-grid" id="overviewKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
           <div class="kpi-label">律師總數（合併）</div>
@@ -551,6 +562,59 @@
           <div class="card-title" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">&#127942; 律師人數 TOP 10 事務所</div>
           <div id="topFirmsList"><div class="loading">載入中</div></div>
         </div>
+      </div>
+
+      <!-- ========== 法官體系總覽 ========== -->
+      <div class="ov-sec-title" style="margin-top:28px;">&#127963;&#65039; 法官體系 <span class="sub">司法院名冊 + 裁判書開放資料</span></div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="kpi-card">
+          <div class="kpi-label">法官總數</div>
+          <div class="kpi-value" id="ovJudgeTotal">-</div>
+          <div class="kpi-sub">合併去重</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">法院數</div>
+          <div class="kpi-value" id="ovCourtCount" style="color:var(--blue);">-</div>
+          <div class="kpi-sub">各級法院</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均案件量</div>
+          <div class="kpi-value" id="ovJudgeAvgCases" style="color:var(--gold);">-</div>
+          <div class="kpi-sub">每位法官</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均結案天數</div>
+          <div class="kpi-value" id="ovJudgeAvgDays" style="color:var(--orange);">-</div>
+          <div class="kpi-sub">估算值</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">官方裁判書統計</div>
+          <div class="kpi-value" id="ovJudgeOfficial" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="ovJudgeOfficialSub">司法院開放資料</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127963;&#65039; 各法院層級法官人數</div>
+          <div class="chart-container"><canvas id="chartJudgeLevel"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128194; 庭別分布</div>
+          <div class="chart-container"><canvas id="chartJudgeDivision"></canvas></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#9202;&#65039; 平均結案天數分布</div>
+          <div class="chart-container"><canvas id="chartJudgeDays"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128293; 案件量 TOP 10 法官</div>
+          <div id="topJudgesList"><div class="loading">載入中</div></div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 案件量與結案天數來自司法院裁判書開放資料；結案天數為估算值（裁判日 − 案號年度起算日），僅供法官間相對比較。
       </div>
     </div>
 
@@ -761,7 +825,6 @@
       </div>
     </div>
 
-    <!-- ==================== TAB: JUDGES (法官) ==================== -->
     <!-- ==================== TAB: CHANGES (異動追蹤) ==================== -->
     <div id="tab-changes" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -819,11 +882,12 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: JUDGES (法官) ==================== -->
     <div id="tab-judges" class="tab-content">
       <div class="kpi-grid" id="judgeKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">法官總數</div><div class="kpi-value" id="kpiJudgeTotal">-</div><div class="kpi-sub" id="kpiJudgeTotalSub">載入中</div></div>
         <div class="kpi-card"><div class="kpi-label">司法院名冊數</div><div class="kpi-value" id="kpiJudgeJud" style="color:var(--purple);">-</div><div class="kpi-sub">司法院公開資料</div></div>
-        <div class="kpi-card"><div class="kpi-label">Lawsnote有資料數</div><div class="kpi-value" id="kpiJudgeLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">含裁判資料</div></div>
+        <div class="kpi-card"><div class="kpi-label">官方裁判書統計</div><div class="kpi-value" id="kpiJudgeJudgment" style="color:var(--green);">-</div><div class="kpi-sub">司法院開放資料</div></div>
         <div class="kpi-card"><div class="kpi-label">平均案件量</div><div class="kpi-value" id="kpiJudgeAvgCases" style="color:var(--gold);">-</div><div class="kpi-sub">每位法官</div></div>
       </div>
       <div class="search-bar">
@@ -1271,6 +1335,9 @@ async function loadOverview() {
 
   // 事務所規模分布
   loadFirmSizeChart();
+
+  // 法官體系總覽
+  loadJudgeOverview();
 }
 
 function renderRegionChart(data) {
@@ -3072,15 +3139,22 @@ async function loadSources() {
   const { data: sources } = await db.from('data_sources').select('*').order('name');
   const srcBody = document.getElementById('sourcesTableBody');
   if (sources?.length) {
-    srcBody.innerHTML = sources.map(s => `
+    srcBody.innerHTML = sources.map(s => {
+      // Lawsnote 來源正逐步由司法院裁判書開放資料取代
+      const status = !s.is_active
+        ? '<span class="badge badge-red">停用</span>'
+        : s.name.includes('Lawsnote')
+          ? '<span class="badge badge-orange">淘汰中</span>'
+          : '<span class="badge badge-green">啟用</span>';
+      return `
       <tr>
-        <td><strong>${escHtml(s.name)}</strong>${s.url ? ` <a href="${escHtml(s.url)}" target="_blank" style="color:var(--blue);font-size:0.8rem;">&#8599;</a>` : ''}</td>
+        <td><strong>${escHtml(s.name)}</strong>${s.url ? ` <a href="${escHtml(s.url)}" target="_blank" style="color:var(--blue);font-size:0.8rem;">&#8599;</a>` : ''}${s.notes ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escHtml(s.notes)}</div>` : ''}</td>
         <td>${escHtml(s.data_type || '-')}</td>
         <td>${escHtml(s.update_frequency || '-')}</td>
         <td>${s.last_scraped_at ? formatDate(s.last_scraped_at) : '尚未執行'}</td>
-        <td><span class="badge ${s.is_active ? 'badge-green' : 'badge-red'}">${s.is_active ? '啟用' : '停用'}</span></td>
-      </tr>
-    `).join('');
+        <td>${status}</td>
+      </tr>`;
+    }).join('');
   } else {
     srcBody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料來源</div></td></tr>';
   }
@@ -3506,6 +3580,130 @@ async function submitChangePassword() {
 }
 
 // ============================================================
+// JUDGE OVERVIEW (總覽頁法官體系區塊)
+// ============================================================
+async function loadJudgeOverview() {
+  try {
+    const el = id => document.getElementById(id);
+    const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+
+    // 法院清單（~35 個）→ 名稱對層級
+    const { data: courts } = await db.from('courts').select('name, court_type');
+    const typeByCourt = {};
+    (courts || []).forEach(c => { typeByCourt[c.name] = c.court_type; });
+    if (courts) el('ovCourtCount').textContent = courts.length;
+
+    // 分批抓全部法官（~2,100 列，Supabase 單次上限 1000）
+    let judges = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from('judges_combined')
+        .select('name,court_name,division,seniority_years,case_count_total,avg_processing_days,data_source')
+        .range(from, from + 999);
+      if (error || !data?.length) break;
+      judges = judges.concat(data);
+      if (data.length < 1000) break;
+    }
+    if (!judges.length) return;
+
+    // KPI
+    el('ovJudgeTotal').textContent = judges.length.toLocaleString();
+    const official = judges.filter(j => (j.data_source || '').includes('裁判書')).length;
+    el('ovJudgeOfficial').textContent = official.toLocaleString();
+    el('ovJudgeOfficialSub').textContent = '覆蓋率 ' + Math.round(official / judges.length * 100) + '%';
+    const cases = judges.map(j => j.case_count_total).filter(v => v != null);
+    el('ovJudgeAvgCases').textContent = cases.length
+      ? Math.round(cases.reduce((a, b) => a + b, 0) / cases.length).toLocaleString() : '-';
+    const days = judges.map(j => j.avg_processing_days).filter(v => v != null);
+    el('ovJudgeAvgDays').textContent = days.length
+      ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : '-';
+
+    // 各法院層級法官人數（doughnut）
+    const levelCount = {};
+    judges.forEach(j => {
+      const n = j.court_name || '';
+      let t = typeByCourt[n];
+      if (!t) {
+        t = n.includes('最高') ? '最高法院'
+          : (n.includes('高等') || n.includes('高分')) ? '高等法院'
+          : n.includes('地方') ? '地方法院'
+          : n ? '專業法院' : '未知';
+      }
+      levelCount[t] = (levelCount[t] || 0) + 1;
+    });
+    const levels = Object.entries(levelCount).sort((a, b) => b[1] - a[1]);
+    if (chartInstances.judgeLevel) chartInstances.judgeLevel.destroy();
+    chartInstances.judgeLevel = new Chart(document.getElementById('chartJudgeLevel').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: levels.map(r => r[0]),
+        datasets: [{ data: levels.map(r => r[1]),
+          backgroundColor: ['rgba(79,142,247,0.7)','rgba(155,126,216,0.6)','rgba(201,168,76,0.65)','rgba(76,175,130,0.65)','rgba(224,149,74,0.55)','rgba(130,160,190,0.4)'],
+          borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { color: getComputedStyle(document.body).getPropertyValue('--text').trim(), font: { size: 11 } } } } }
+    });
+
+    // 庭別分布（bar）— 原始庭名很雜（民三庭/刑二十六庭…），先歸大類
+    const normDivision = d => {
+      if (!d) return null;
+      if (d.includes('少')) return '少年庭';
+      if (d.includes('家')) return '家事庭';
+      if (d.includes('行政')) return '行政庭';
+      if (d.includes('民')) return '民事庭';
+      if (d.includes('刑')) return '刑事庭';
+      if (d.includes('勞')) return '勞動庭';
+      if (d.includes('商業') || d.includes('智')) return '智財/商業庭';
+      return '其他';
+    };
+    const divCount = {};
+    judges.forEach(j => { const d = normDivision(j.division); if (d) divCount[d] = (divCount[d] || 0) + 1; });
+    const divs = Object.entries(divCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (chartInstances.judgeDivision) chartInstances.judgeDivision.destroy();
+    chartInstances.judgeDivision = new Chart(document.getElementById('chartJudgeDivision').getContext('2d'), {
+      type: 'bar',
+      data: { labels: divs.map(r => r[0]),
+        datasets: [{ label: '法官人數', data: divs.map(r => r[1]), backgroundColor: 'rgba(155,126,216,0.6)', borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                  y: { ticks: { color: txtColor, font: { size: 11 } }, grid: { display: false } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 平均結案天數分布（bar，估算值）
+    const buckets = [['<90 天', 0, 90], ['90-180 天', 90, 180], ['180-270 天', 180, 270], ['270-365 天', 270, 365], ['1 年以上', 365, 99999]];
+    const dayCount = buckets.map(([label, lo, hi]) =>
+      [label, judges.filter(j => j.avg_processing_days != null && j.avg_processing_days >= lo && j.avg_processing_days < hi).length]);
+    if (chartInstances.judgeDays) chartInstances.judgeDays.destroy();
+    chartInstances.judgeDays = new Chart(document.getElementById('chartJudgeDays').getContext('2d'), {
+      type: 'bar',
+      data: { labels: dayCount.map(r => r[0]),
+        datasets: [{ label: '法官人數', data: dayCount.map(r => r[1]), backgroundColor: 'rgba(224,149,74,0.6)', borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { x: { ticks: { color: txtColor }, grid: { display: false } },
+                  y: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 案件量 TOP 10 法官
+    const top10 = judges.filter(j => j.case_count_total != null)
+      .sort((a, b) => b.case_count_total - a.case_count_total).slice(0, 10);
+    el('topJudgesList').innerHTML = top10.length ? `<div style="margin-top:8px;">
+      ${top10.map((j, i) => {
+        const barW = Math.round(j.case_count_total / top10[0].case_count_total * 100);
+        return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
+          <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
+          <span style="min-width:64px;font-weight:600;">${escHtml(j.name)}</span>
+          <span style="flex:1;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(j.court_name || '')}</span>
+          <span style="width:${Math.max(barW, 4) * 0.5}%;max-width:30%;height:8px;background:rgba(201,168,76,0.5);border-radius:4px;"></span>
+          <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${j.case_count_total.toLocaleString()}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無案件統計資料</div>';
+  } catch (e) { console.log('judge overview error:', e); }
+}
+
+// ============================================================
 // JUDGES (法官)
 // ============================================================
 async function loadJudges() {
@@ -3586,17 +3784,17 @@ async function loadJudges() {
 }
 
 async function loadJudgeKpis() {
-  const [total, judOnly, lnOnly, avgCases] = await Promise.all([
+  const [total, judOnly, jdgOnly, avgCases] = await Promise.all([
     db.from('judges_combined').select('*', { count: 'exact', head: true }),
     db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%司法院%'),
-    db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%Lawsnote%'),
+    db.from('judges_combined').select('*', { count: 'exact', head: true }).ilike('data_source', '%裁判書%'),
     db.from('judges_combined').select('case_count_total'),
   ]);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
   set('kpiJudgeTotal', total.count);
   document.getElementById('kpiJudgeTotalSub').textContent = '合併去重';
   set('kpiJudgeJud', judOnly.count);
-  set('kpiJudgeLawsnote', lnOnly.count);
+  set('kpiJudgeJudgment', jdgOnly.count);
   // Calculate average case count
   if (avgCases.data) {
     const cases = avgCases.data.filter(r => r.case_count_total != null).map(r => r.case_count_total);

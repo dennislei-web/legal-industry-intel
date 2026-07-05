@@ -260,15 +260,20 @@ def refresh_stats():
     print(f'  HTTP {r.status_code}')
 
 
-def cleanup(yyyymm):
-    """刪掉解壓目錄（保留 rar 與 agg.json）以省磁碟"""
+def cleanup(yyyymm, purge_rar=False):
+    """刪掉解壓目錄（保留 agg.json）以省磁碟；purge_rar 時連 rar 一起刪
+    （backfill 幾十個月會累積數十 GB；agg.json 留著即可冪等重傳）"""
     import shutil
     d = os.path.join(WORK_DIR, yyyymm)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)
+    if purge_rar:
+        rar = os.path.join(WORK_DIR, f'{yyyymm}.rar')
+        if os.path.exists(rar):
+            os.remove(rar)
 
 
-def run_month(yyyymm, skip_uploaded=False):
+def run_month(yyyymm, skip_uploaded=False, purge_rar=False):
     if skip_uploaded and month_uploaded(yyyymm):
         print(f'{yyyymm}: 已上傳過，跳過')
         return
@@ -276,7 +281,7 @@ def run_month(yyyymm, skip_uploaded=False):
     download(yyyymm)
     parse(yyyymm)
     upload(yyyymm)
-    cleanup(yyyymm)
+    cleanup(yyyymm, purge_rar=purge_rar)
 
 
 def month_range(start, end):
@@ -305,7 +310,7 @@ if __name__ == '__main__':
     elif cmd == 'backfill':
         for ym in month_range(sys.argv[2], sys.argv[3]):
             try:
-                run_month(ym, skip_uploaded=True)
+                run_month(ym, skip_uploaded=True, purge_rar=True)
             except Exception as e:
                 print(f'{ym}: 失敗 — {e}')
         refresh_stats()
