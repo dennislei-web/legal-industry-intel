@@ -47,6 +47,13 @@
 - 已回填 2020-01 ~ 2025-04；`avg_processing_days` 是估算值（裁判日 − 案號年 1/1），僅供法官間相對比較
 - **多 session 注意**：backfill 不要兩個 session 同時跑（會撞 `.judgment_work` 檔案鎖與 upload 重複鍵）
 
+## 司法統計（前端「司法統計」區塊 + 官方案件統計管線）
+
+- **前端**：第一層導覽「司法統計」7 分頁（總覽/民事/家事/刑事/強制執行/法院效率/各法院比較），從獨立站 judicial-stats 移植進 `public/index.html`。所有 id 加 `jstat_` / `tab-jstat-` 前綴、CSS scope 在 `.jstat` 下、深度分析文章固定白底紙張樣式。資料源是**靜態** `public/data/judicial_stats.json`（統計月報聚合，離婚原因/罪名/家事細項等專題表，年更、半自動——產生 script 不在 repo）
+- **官方案件統計管線**：`scripts/judicial_official_stats.py`（download/parse/upload/run）→ `court_case_stats` 表（migration 034）。來源：opendata datasetId 43994「各級法院各案類新收及終結件數統計」，**公開免會員**，單一 ODS（~18MB，content.xml ~600MB 要串流解析），民國 90 年起 月×法院×案類×程序別，50 萬列聚合成 ~11 萬列（程序別聚到第 1 層）。`judicial-official-stats.yml` 每月 5 日全量 upsert（冪等）
+- **來源怪癖**：最高法院新收件數恆 0（只填終結）；此資料集「民事」含民執（proc_l1='民執'），與統計月報「強制執行」口徑不同；114 地院家事新收 183,028 可當解析驗證基準
+- **「終結案件資料」月包（未來金礦，尚未建管線）**：opendata 另有按月的案件層級微資料（搜「終結案件資料」，每月 ~1MB 7z、晚 1.5 個月），`!` 分隔 txt，每案一筆：**法官名有值**（「無姓名版」指當事人）、**原告/被告是否有律師代理**、訴訟標的金額、終結情形（勝訴/敗訴/和解/撤回）。可做真實法官終結統計（含非裁判終結）、各法院律師委任率、勝敗訴分布。無收案日期（辦案期間仍只能用案號年估）
+
 ## 爬蟲模式（moj-deep-backfill.yml）
 
 - `licno-scan` — 證號遍歷（全年份）

@@ -21,3 +21,4 @@ scripts/.lawsnote_browser/
 
 # Scripts cache (含敏感名單)
 scripts/_*.json
+scripts/.official_stats_work/

@@ -1,0 +1,27 @@
+name: 司法院官方案件統計（每月全量更新）
+
+on:
+  schedule:
+    - cron: '0 20 4 * *'  # 每月 4 日 UTC 20:00 = 台灣 5 日凌晨 4:00（來源不定期修訂，全量 upsert 冪等）
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run official court stats pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: python judicial_official_stats.py run
