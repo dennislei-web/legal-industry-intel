@@ -121,19 +121,59 @@ CAT_BY_DOCNAME = [('刑事', '刑事'), ('民事', '民事'), ('行政', '行政
 # 實測 2020-10：字別含婚/家/繼/親/監宣等 = 1,757/87,563 件（全文開頭只抓得到 13 件）。
 FAM_JCASE_KEYS = ('婚', '家', '繼', '親', '收養', '監宣', '輔宣', '死宣')
 
-# 律師（訴訟代理人/辯護人）抽取：姓名後必須接「律師」，排除法定代理人等非律師
-RE_LAWYER = re.compile(
-    r'(?:訴\s*訟\s*代\s*理\s*人|辯\s*護\s*人|複\s*代\s*理\s*人|上\s*訴\s*代\s*理\s*人)'
-    r'[\s　:：]*([一-鿿][一-鿿\s　]{0,6}[一-鿿])\s*律\s*師')
+# 律師（訴訟代理人/辯護人）抽取。當事人欄一個標籤常帶多位律師（同行或續行縮排）：
+#   訴訟代理人　雷皓明律師
+#   　　　　　　張○○律師（兼送達代收人）   ← 續行沒有標籤，舊版會漏
+# 標籤行抓行內全部「X律師」，之後的續行若整行只剩姓名+律師（括號附註忽略）也收，
+# 遇到其他欄位（原告/法定代理人/送達代收人…）即結束 block。
+# (?!\s*事\s*務\s*所) 避免把「可道律師事務所」的「可道」誤當人名。
+# 中段 {0,6}? 非貪婪：同行多位律師「張三律師　李四律師」才不會被一個 match 吞掉。
+RE_NAME_LAWYER = re.compile(r'([一-鿿][一-鿿\s　]{0,6}?[一-鿿])\s*律\s*師(?!\s*事\s*務\s*所)')
+LAWYER_ROLES = ('訴訟代理人', '複代理人', '上訴代理人', '再抗告代理人', '非訟代理人', '辯護人')
+# 標籤 regex：抽名字前先把行內標籤（含其前所有字）切掉，
+# 否則姓名字元類會把「訴訟代理人」吞進姓名、長度檢查後整段作廢
+RE_ROLE_TOKEN = re.compile(
+    r'(?:訴\s*訟|複|上\s*訴|再\s*抗\s*告|非\s*訟)\s*代\s*理\s*人'
+    r'|(?:選\s*任|指\s*定)?\s*辯\s*護\s*人|代\s*理\s*人')
+# 非人名停用詞：「法扶律師」「法律扶助基金會指派之律師」「義務辯護律師」等片語
+# 會被姓名 pattern 抓成假名字（實測 202503：法扶 1,876 次），一律排除
+RE_BAD_NAME = re.compile(
+    r'扶助|法扶|義務|指定|指派|辯護|送達|代收|基金會|具有|條及|本院|到庭|職務|事務|律師')
 
 
 def extract_lawyers(jfull):
-    """從裁判書當事人欄抽出律師姓名（去重）；只認「…代理人/辯護人 X 律師」格式"""
+    """從裁判書當事人欄抽出律師姓名（去重；含同標籤多律師與續行）"""
     names = []
-    for m in RE_LAWYER.finditer(jfull[:4000]):
-        name = re.sub(r'[\s　]', '', m.group(1))
-        if 2 <= len(name) <= 4 and name not in names:
-            names.append(name)
+
+    def add(seg):
+        for m in RE_NAME_LAWYER.finditer(seg):
+            n = re.sub(r'[\s　]', '', m.group(1))
+            if 2 <= len(n) <= 4 and not RE_BAD_NAME.search(n) and n not in names:
+                names.append(n)
+
+    in_block = False
+    for line in jfull[:4000].splitlines():
+        flat = re.sub(r'[\s　]', '', line)
+        if not flat:
+            continue
+        has_role = any(k in flat for k in LAWYER_ROLES)
+        # 行政訴訟用光桿「代理人」欄；排除法定代理人/送達代收人
+        bare_agent = (not has_role and '代理人' in flat
+                      and '法定代理人' not in flat and '送達代收' not in flat)
+        if has_role or bare_agent:
+            last = None
+            for m in RE_ROLE_TOKEN.finditer(line):
+                last = m
+            add(line[last.end():] if last else line)
+            in_block = True
+        elif in_block:
+            # 續行：去掉括號附註後整行只剩「姓名+律師」才視為同 block
+            stripped = re.sub(r'[（(][^）)]*[）)]?', '', line)
+            leftover = re.sub(r'[\s　]', '', RE_NAME_LAWYER.sub('', stripped))
+            if RE_NAME_LAWYER.search(stripped) and not leftover:
+                add(stripped)
+            else:
+                in_block = False
     return names
 
 
