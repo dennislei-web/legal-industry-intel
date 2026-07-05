@@ -628,6 +628,97 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: FAM-LAWYERS (家事律師版圖) ==================== -->
+    <div id="tab-fam-lawyers" class="tab-content">
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="kpi-card">
+          <div class="kpi-label">家事量最大律師</div>
+          <div class="kpi-value" id="flKpiTop" style="color:var(--gold);font-size:1.3rem;">-</div>
+          <div class="kpi-sub" id="flKpiTopSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">家事律師人數</div>
+          <div class="kpi-value" id="flKpiCount" style="color:var(--blue);">-</div>
+          <div class="kpi-sub">家事案件 ≥ 10 件</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">喆律家事案量</div>
+          <div class="kpi-value" id="flKpiZhelu" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="flKpiZheluSub">5 年合計</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">喆律家事律師</div>
+          <div class="kpi-value" id="flKpiZheluN" style="color:var(--green);">-</div>
+          <div class="kpi-sub">出現於家事裁判</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">有代理家事律師</div>
+          <div class="kpi-value" id="flKpiAny">-</div>
+          <div class="kpi-sub" id="flKpiAnySub">≥ 3 件</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#127942; 家事案件量 TOP 10 律師</div>
+          <div id="flTopList"><div class="loading">載入中</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127970; 事務所家事版圖 TOP 10</div>
+          <div class="chart-container"><canvas id="chartFlFirms"></canvas></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">僅計姓名可唯一對應事務所的律師</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#127963;&#65039; 法院視角 — 各法院的家事常勝軍</div>
+        <div class="search-bar">
+          <select id="flCourtSelect" onchange="renderFlCourtTable()" style="min-width:240px;">
+            <option value="">選擇法院...</option>
+          </select>
+        </div>
+        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th>該法院家事案件</th></tr></thead>
+            <tbody id="flCourtTableBody"><tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128203; 家事律師名單</div>
+        <div class="search-bar">
+          <input type="text" id="flSearch" placeholder="搜尋律師姓名或事務所..." oninput="renderFlTable()">
+          <select id="flMinFilter" onchange="renderFlTable()">
+            <option value="10" selected>家事案件 ≥ 10</option>
+            <option value="30">家事案件 ≥ 30</option>
+            <option value="3">家事案件 ≥ 3（全部）</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>律師</th>
+                <th>事務所</th>
+                <th style="cursor:pointer" onclick="sortFl('family_cases')">家事案件 <span id="flSort_family_cases">↓</span></th>
+                <th style="cursor:pointer" onclick="sortFl('family_share')">家事佔比 <span id="flSort_family_share">↕</span></th>
+                <th style="cursor:pointer" onclick="sortFl('total_cases')">總案件 <span id="flSort_total_cases">↕</span></th>
+                <th>主要法院</th>
+                <th style="cursor:pointer" onclick="sortFl('n_courts')">活躍法院數 <span id="flSort_n_courts">↕</span></th>
+                <th>最近出現</th>
+              </tr>
+            </thead>
+            <tbody id="flTableBody">
+              <tr><td colspan="8" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="flTableNote" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;"></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 案件量以「訴訟代理人/辯護人 ○○○律師」自公開裁判書抽取（2020-01 起），家事裁定多數不公開，數字為下限估計、僅供相對比較。
+        事務所歸屬以法務部名冊姓名唯一對應為準，同名多筆律師不歸屬（表中標「同名多筆」）。
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGE OVERVIEW (法官總覽) ==================== -->
     <div id="tab-judge-overview" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
@@ -2252,6 +2343,7 @@ async function loadOverviewFast() {
 const SECTIONS = {
   lawyer: [
     { tab: 'overview', label: '總覽' },
+    { tab: 'fam-lawyers', label: '家事律師' },
     { tab: 'lawyers', label: '律師' },
     { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
@@ -2316,6 +2408,7 @@ function showTab(tab) {
   if (tab === 'prosecutor-overview') loadProsecutorOverviewOnce();
   if (tab === 'pros-offices') loadProsOffices();
   if (tab === 'family') loadFamilyOnce();
+  if (tab === 'fam-lawyers') loadFamLawyersOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
@@ -4989,6 +5082,179 @@ function renderFamTable() {
     </tr>`;
   }).join('');
   document.getElementById('famTableNote').textContent =
+    `符合條件 ${rows.length} 位` + (rows.length > 300 ? '（僅顯示前 300 位，可用搜尋縮小範圍）' : '');
+}
+
+// ============================================================
+// FAM-LAWYERS (家事律師版圖)
+// ============================================================
+let _flLoaded = false;
+let _flRows = [];       // family_lawyer_stats（每位律師）
+let _flByCourt = [];    // family_lawyer_by_court（律師×法院）
+let flSortCol = 'family_cases';
+let flSortAsc = false;
+
+function loadFamLawyersOnce() {
+  if (_flLoaded) return;
+  _flLoaded = true;
+  loadFamLawyers();
+}
+
+// RPC 回傳受 max-rows=1000 限制，用 range 分批抓完
+async function fetchAllRpc(fn) {
+  let all = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.rpc(fn).range(from, from + 999);
+    if (error) { console.log(fn + ' error:', error); break; }
+    if (!data?.length) break;
+    all = all.concat(data);
+    if (data.length < 1000) break;
+  }
+  return all;
+}
+
+const isZheluFirm = f => !!f && f.includes('喆律');
+
+async function loadFamLawyers() {
+  try {
+    const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+    const [rows, byCourt] = await Promise.all([
+      fetchAllRpc('family_lawyer_stats'),
+      fetchAllRpc('family_lawyer_by_court'),
+    ]);
+    _flRows = rows;
+    _flByCourt = byCourt;
+    const el = id => document.getElementById(id);
+
+    // KPI
+    if (rows.length) {
+      const top = rows[0];
+      el('flKpiTop').textContent = top.name;
+      el('flKpiTopSub').textContent = `${Number(top.family_cases).toLocaleString()} 件・${escHtml(top.firm_name || '')}`;
+    }
+    el('flKpiCount').textContent = rows.filter(r => r.family_cases >= 10).length.toLocaleString();
+    const zhelu = rows.filter(r => isZheluFirm(r.firm_name));
+    el('flKpiZhelu').textContent = zhelu.reduce((s, r) => s + Number(r.family_cases), 0).toLocaleString();
+    el('flKpiZheluN').textContent = zhelu.length;
+    el('flKpiAny').textContent = rows.length.toLocaleString();
+
+    // TOP 10 律師
+    const top10 = rows.slice(0, 10);
+    el('flTopList').innerHTML = top10.length ? `<div style="margin-top:8px;">
+      ${top10.map((r, i) => {
+        const barW = Math.round(r.family_cases / top10[0].family_cases * 100);
+        const firm = r.firm_name
+          ? `<span class="badge" style="background:${isZheluFirm(r.firm_name) ? 'var(--green-dim)' : 'var(--ghost-bg)'};color:${isZheluFirm(r.firm_name) ? 'var(--green)' : 'var(--text-muted)'};font-size:0.7rem;">${escHtml(r.firm_name)}</span>`
+          : (r.firm_ambiguous ? '<span class="badge" style="background:var(--ghost-bg);color:var(--text-muted);font-size:0.7rem;">同名多筆</span>' : '');
+        return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
+          <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
+          <span style="min-width:64px;font-weight:600;">${escHtml(r.name)}</span>
+          <span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${firm}</span>
+          <span style="width:${Math.max(barW, 4) * 0.4}%;max-width:25%;height:8px;background:rgba(201,168,76,0.55);border-radius:4px;"></span>
+          <span style="min-width:48px;text-align:right;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無資料</div>';
+
+    // 事務所家事版圖 TOP 10（唯一同名歸屬；排除「律師未提供」等名冊空值字串）
+    const byFirm = {};
+    rows.forEach(r => {
+      if (r.firm_name && !r.firm_name.includes('未提供')) byFirm[r.firm_name] = (byFirm[r.firm_name] || 0) + Number(r.family_cases);
+    });
+    const topFirms = Object.entries(byFirm).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (chartInstances.flFirms) chartInstances.flFirms.destroy();
+    chartInstances.flFirms = new Chart(document.getElementById('chartFlFirms').getContext('2d'), {
+      type: 'bar',
+      data: { labels: topFirms.map(r => r[0]),
+        datasets: [{ label: '家事案件數', data: topFirms.map(r => r[1]),
+          backgroundColor: topFirms.map(r => isZheluFirm(r[0]) ? 'rgba(76,175,130,0.75)' : 'rgba(69,183,209,0.55)'),
+          borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                  y: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } } },
+        plugins: { legend: { display: false } } }
+    });
+
+    // 法院下拉（按該院家事總量排序）
+    const courtTotals = {};
+    byCourt.forEach(r => { courtTotals[r.court_name] = (courtTotals[r.court_name] || 0) + Number(r.family_cases); });
+    const sel = el('flCourtSelect');
+    Object.entries(courtTotals).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = `${c}（${n.toLocaleString()} 件）`;
+      sel.appendChild(opt);
+    });
+
+    renderFlTable();
+  } catch (e) { console.log('fam lawyers error:', e); }
+}
+
+function renderFlCourtTable() {
+  const court = document.getElementById('flCourtSelect').value;
+  const tbody = document.getElementById('flCourtTableBody');
+  if (!court) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr>';
+    return;
+  }
+  const firmByName = {};
+  _flRows.forEach(r => { firmByName[r.name] = r.firm_name || (r.firm_ambiguous ? '（同名多筆）' : ''); });
+  const rows = _flByCourt.filter(r => r.court_name === court)
+    .sort((a, b) => b.family_cases - a.family_cases).slice(0, 30);
+  tbody.innerHTML = rows.map((r, i) => {
+    const firm = firmByName[r.name] || '';
+    const zhelu = isZheluFirm(firm);
+    return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
+      <td style="color:var(--text-muted);">${i + 1}</td>
+      <td><strong>${escHtml(r.name)}</strong>${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td style="font-size:0.85rem;">${escHtml(firm)}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty-state"><div class="msg">該法院無資料</div></td></tr>';
+}
+
+function sortFl(col) {
+  if (flSortCol === col) flSortAsc = !flSortAsc;
+  else { flSortCol = col; flSortAsc = false; }
+  ['family_cases', 'family_share', 'total_cases', 'n_courts'].forEach(c => {
+    const ic = document.getElementById('flSort_' + c);
+    if (ic) ic.textContent = c === flSortCol ? (flSortAsc ? '↑' : '↓') : '↕';
+  });
+  renderFlTable();
+}
+
+function renderFlTable() {
+  const tbody = document.getElementById('flTableBody');
+  if (!tbody) return;
+  const q = (document.getElementById('flSearch')?.value || '').trim();
+  const minFam = parseInt(document.getElementById('flMinFilter')?.value || '10', 10);
+  let rows = _flRows.filter(r => r.family_cases >= minFam);
+  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.firm_name || '').includes(q));
+  rows.sort((a, b) => {
+    const va = a[flSortCol] ?? -Infinity, vb = b[flSortCol] ?? -Infinity;
+    return flSortAsc ? va - vb : vb - va;
+  });
+  const shown = rows.slice(0, 300);
+  if (!shown.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無符合條件的律師</div></td></tr>';
+    document.getElementById('flTableNote').textContent = '';
+    return;
+  }
+  tbody.innerHTML = shown.map(r => {
+    const zhelu = isZheluFirm(r.firm_name);
+    const firm = r.firm_name ? escHtml(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
+    const lastYm = r.last_ym ? `${r.last_ym.slice(0, 4)}-${r.last_ym.slice(4)}` : '-';
+    return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
+      <td><strong>${escHtml(r.name)}</strong>${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td style="font-size:0.85rem;">${firm}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
+      <td style="text-align:center;">${Math.round(r.family_share * 100)}%</td>
+      <td style="text-align:center;">${Number(r.total_cases).toLocaleString()}</td>
+      <td style="font-size:0.85rem;">${escHtml(r.top_court || '-')}</td>
+      <td style="text-align:center;">${r.n_courts}</td>
+      <td style="text-align:center;font-size:0.85rem;">${lastYm}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('flTableNote').textContent =
     `符合條件 ${rows.length} 位` + (rows.length > 300 ? '（僅顯示前 300 位，可用搜尋縮小範圍）' : '');
 }
 
