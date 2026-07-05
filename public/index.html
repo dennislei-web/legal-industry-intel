@@ -744,6 +744,7 @@
             <option value="0.5" selected>家事佔比 ≥ 50%</option>
             <option value="0.8">家事佔比 ≥ 80%</option>
             <option value="0.3">家事佔比 ≥ 30%</option>
+            <option value="roster">現任家事庭法官</option>
             <option value="0">全部（含少量家事）</option>
           </select>
         </div>
@@ -4951,8 +4952,10 @@ function renderFamTable() {
   const tbody = document.getElementById('famTableBody');
   if (!tbody) return;
   const q = (document.getElementById('famSearch')?.value || '').trim();
-  const minShare = parseFloat(document.getElementById('famShareFilter')?.value || '0.5');
-  let rows = _famRows.filter(r => r.family_share >= minShare);
+  const filterVal = document.getElementById('famShareFilter')?.value || '0.5';
+  let rows = filterVal === 'roster'
+    ? _famRows.filter(r => _famRoster.has(r.name + '|' + r.court_name))
+    : _famRows.filter(r => r.family_share >= parseFloat(filterVal));
   if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.court_name || '').includes(q));
   rows.sort((a, b) => {
     if (famSortCol === 'court_name') {
