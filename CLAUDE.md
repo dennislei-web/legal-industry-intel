@@ -26,6 +26,7 @@
 - `firm_profiles` — 事務所補充資料（官網、備註等手動編輯）
 - `firm_websites` — 爬蟲找到的官網
 - `judges` / `courts` / `judges_combined` — 法官/法院
+- `prosecutor_month_stats` / `prosecutor_stats` — 檢察官統計（migration 029），`judgment_stats.py` 從刑事裁判書萃取「檢察官○○○提起公訴/到庭執行職務」＋所屬檢察署，`refresh_prosecutor_stats` RPC 彙總；約半數刑事判決不具名檢察官，案件數為下限估計
 - `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024），前端「異動追蹤」tab 讀取
 - `lawyer_members` — 律師公會會員（按地區公會）
 - `user_profiles` — 使用者角色 (admin/user)
