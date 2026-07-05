@@ -752,7 +752,7 @@
             <thead>
               <tr>
                 <th>法官</th>
-                <th>法院</th>
+                <th style="cursor:pointer" onclick="sortFam('court_name')">法院 <span id="famSort_court_name">↕</span></th>
                 <th style="cursor:pointer" onclick="sortFam('family_cases')">家事案件 <span id="famSort_family_cases">↓</span></th>
                 <th style="cursor:pointer" onclick="sortFam('family_share')">家事佔比 <span id="famSort_family_share">↕</span></th>
                 <th style="cursor:pointer" onclick="sortFam('total_cases')">總案件 <span id="famSort_total_cases">↕</span></th>
@@ -4939,8 +4939,8 @@ async function loadFamily() {
 
 function sortFam(col) {
   if (famSortCol === col) famSortAsc = !famSortAsc;
-  else { famSortCol = col; famSortAsc = false; }
-  ['family_cases', 'family_share', 'total_cases', 'avg_days'].forEach(c => {
+  else { famSortCol = col; famSortAsc = (col === 'court_name'); }
+  ['court_name', 'family_cases', 'family_share', 'total_cases', 'avg_days'].forEach(c => {
     const ic = document.getElementById('famSort_' + c);
     if (ic) ic.textContent = c === famSortCol ? (famSortAsc ? '↑' : '↓') : '↕';
   });
@@ -4955,6 +4955,11 @@ function renderFamTable() {
   let rows = _famRows.filter(r => r.family_share >= minShare);
   if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.court_name || '').includes(q));
   rows.sort((a, b) => {
+    if (famSortCol === 'court_name') {
+      const cmp = (a.court_name || '').localeCompare(b.court_name || '', 'zh-Hant');
+      // 同法院內依家事案件數多到少排，方便看各法院的主力法官
+      return (famSortAsc ? cmp : -cmp) || (b.family_cases - a.family_cases);
+    }
     const va = a[famSortCol] ?? -Infinity, vb = b[famSortCol] ?? -Infinity;
     return famSortAsc ? va - vb : vb - va;
   });
