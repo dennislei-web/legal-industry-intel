@@ -1,0 +1,43 @@
+name: 裁判書法官統計（每月增量）
+
+on:
+  schedule:
+    - cron: '0 20 16 * *'  # 每月 16 日 UTC 20:00 = 台灣 17 日凌晨 4:00（官方約 15 日發布兩個月前的月包）
+  workflow_dispatch:
+    inputs:
+      yyyymm:
+        description: '要跑的月份（留空=自動抓兩個月前）'
+        required: false
+        default: ''
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full p7zip-rar
+
+      - name: Run judgment stats pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
+          JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
+          SEVENZ_PATH: 7z
+        working-directory: scripts
+        run: |
+          YM="${{ github.event.inputs.yyyymm }}"
+          if [ -z "$YM" ]; then
+            YM=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y%m)
+          fi
+          echo "目標月份: $YM"
+          python judgment_stats.py run "$YM"
