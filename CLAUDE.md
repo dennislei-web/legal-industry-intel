@@ -53,6 +53,29 @@
 - `deep-all` / `deep-targeted` / `deep-surnames` / `deep-triple` — 不同策略補掃
 - `full` — 全量掃描
 
+## 裁判書管線（judgment_stats.py）
+
+- 產出三張月統計表：`judge_month_stats` / `lawyer_month_stats` / `prosecutor_month_stats`
+  （法官署名、訴訟代理人/辯護人、檢察官，均含 cats 案類 jsonb）
+- **分類地雷**：家事裁判全文開頭一律寫「民事判決/裁定」（含少家法院），案類必須靠
+  字別 JCASE 辨識（婚/家/繼/親/監宣…見 `FAM_JCASE_KEYS`）；改分類邏輯後要用
+  `python judgment_stats.py reclassify <起> <迄>` 強制重跑（會刪 agg 快取、覆蓋上傳）
+- 家事分析 RPC：`family_judge_stats()`、`family_cases_by_year()`（含 ok_months 回填偵測，
+  月家事 >= 300 視為新分類已回填），法官年度趨勢：`judge_days_by_year()`
+- 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
+- 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
+
+## 前端導覽結構
+
+- 兩層導覽：第一層 `showSection()`（律師/法官/資料來源/帳號管理），
+  第二層子頁定義在 `SECTIONS` 常數（index.html），新增子頁要同時加 tab-content div
+  和 `showTab()` 的 lazy load 分支
+
+## Migration 注意
+
+- **新增 migration 前先看目錄最大編號**（曾發生兩個 session 同時開 029 撞號）
+- 套用方式：`supabase db query --linked -f supabase/migrations/xxx.sql`（CLI 已 link）
+
 ## 使用者偏好
 
 - 溝通語言：中文
