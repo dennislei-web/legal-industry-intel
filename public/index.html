@@ -4930,13 +4930,13 @@ function loadFamilyOnce() {
 async function loadFamily() {
   try {
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
-    const [yearlyR, statsR, rosterR] = await Promise.all([
+    const [yearlyR, famRows, rosterR] = await Promise.all([
       db.rpc('family_cases_by_year'),
-      db.rpc('family_judge_stats'),
+      fetchAllRpc('family_judge_stats'),   // 1,148 列 > max-rows 1000，必須分批
       db.from('judges_combined').select('name, court_name').ilike('division', '%家%'),
     ]);
     const yearly = yearlyR.data || [];
-    _famRows = statsR.data || [];
+    _famRows = famRows;
     _famRoster = new Set((rosterR.data || []).map(j => j.name + '|' + j.court_name));
 
     // 回填提示（有任何年度 ok_months < months 就顯示，補完自動消失）
