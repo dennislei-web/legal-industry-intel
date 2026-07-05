@@ -1,0 +1,3549 @@
+{
+  "metadata": {
+    "source": "司法院統計月報 114年12月",
+    "url": "https://www.judicial.gov.tw/tw/lp-2389-1.html",
+    "generated": "2026-04-10T18:45:34.062271"
+  },
+  "cases_by_year": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "total": 3036007,
+      "constitutional_court": 427,
+      "citizen_petition": 9322,
+      "criminal_compensation": 95,
+      "administrative": 22825,
+      "disciplinary": 1410,
+      "civil": 1057282,
+      "criminal": 503884,
+      "enforcement": 1296074,
+      "notarization": 95081,
+      "lodgment": 49607,
+      "public_defense": 15860,
+      "investigation_probation": 32975,
+      "family_investigation": 730
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "total": 3134394,
+      "constitutional_court": 467,
+      "citizen_petition": 7277,
+      "criminal_compensation": 71,
+      "administrative": 26019,
+      "disciplinary": 524,
+      "civil": 1074335,
+      "criminal": 510837,
+      "enforcement": 1364684,
+      "notarization": 93322,
+      "lodgment": 56858,
+      "public_defense": 15624,
+      "investigation_probation": 30899,
+      "family_investigation": 1390
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "total": 3120818,
+      "constitutional_court": 497,
+      "citizen_petition": 7845,
+      "criminal_compensation": 65,
+      "administrative": 28256,
+      "disciplinary": 247,
+      "civil": 1098069,
+      "criminal": 522162,
+      "enforcement": 1325250,
+      "notarization": 90447,
+      "lodgment": 47980,
+      "public_defense": 16786,
+      "investigation_probation": 31213,
+      "family_investigation": 1476
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "total": 3141528,
+      "constitutional_court": 492,
+      "citizen_petition": 7470,
+      "criminal_compensation": 96,
+      "administrative": 29472,
+      "disciplinary": 252,
+      "civil": 1139090,
+      "criminal": 520659,
+      "enforcement": 1319386,
+      "notarization": 84092,
+      "lodgment": 40519,
+      "public_defense": 17594,
+      "investigation_probation": 29470,
+      "family_investigation": 1890
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "total": 3272998,
+      "constitutional_court": 627,
+      "citizen_petition": 8000,
+      "criminal_compensation": 113,
+      "administrative": 33901,
+      "disciplinary": 198,
+      "civil": 1213443,
+      "criminal": 508213,
+      "enforcement": 1384850,
+      "notarization": 83505,
+      "lodgment": 40148,
+      "public_defense": 16710,
+      "investigation_probation": 30046,
+      "family_investigation": 2214
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 3375910,
+      "constitutional_court": 634,
+      "citizen_petition": 9851,
+      "criminal_compensation": 304,
+      "administrative": 31337,
+      "disciplinary": 190,
+      "civil": 1291725,
+      "criminal": 499118,
+      "enforcement": 1443041,
+      "notarization": 58922,
+      "lodgment": 40788,
+      "public_defense": 17114,
+      "investigation_probation": 33464,
+      "family_investigation": 2580
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 3247571,
+      "constitutional_court": 747,
+      "citizen_petition": 7725,
+      "criminal_compensation": 344,
+      "administrative": 26936,
+      "disciplinary": 179,
+      "civil": 1220606,
+      "criminal": 454307,
+      "enforcement": 1438382,
+      "notarization": 56158,
+      "lodgment": 42187,
+      "public_defense": 14514,
+      "investigation_probation": 31084,
+      "family_investigation": 2208
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 3579411,
+      "constitutional_court": 4371,
+      "citizen_petition": 8089,
+      "criminal_compensation": 363,
+      "administrative": 29305,
+      "disciplinary": 157,
+      "civil": 1290921,
+      "criminal": 503771,
+      "enforcement": 1633135,
+      "notarization": 67598,
+      "lodgment": 41701,
+      "public_defense": 16429,
+      "investigation_probation": 33525,
+      "family_investigation": 2331
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 3876061,
+      "constitutional_court": 1359,
+      "citizen_petition": 8503,
+      "criminal_compensation": 411,
+      "administrative": 34347,
+      "disciplinary": 113,
+      "civil": 1371759,
+      "criminal": 534247,
+      "enforcement": 1804967,
+      "notarization": 77660,
+      "lodgment": 42695,
+      "public_defense": 17930,
+      "investigation_probation": 35922,
+      "family_investigation": 2350
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 4177668,
+      "constitutional_court": 1137,
+      "citizen_petition": 7486,
+      "criminal_compensation": 358,
+      "administrative": 39545,
+      "disciplinary": 141,
+      "civil": 1417846,
+      "criminal": 571359,
+      "enforcement": 2023759,
+      "notarization": 71564,
+      "lodgment": 44473,
+      "public_defense": 14739,
+      "investigation_probation": 38415,
+      "family_investigation": 2576
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "total": 4214912,
+      "constitutional_court": 2042,
+      "citizen_petition": 8181,
+      "criminal_compensation": 382,
+      "administrative": 44965,
+      "disciplinary": 124,
+      "civil": 1381812,
+      "criminal": 618175,
+      "enforcement": 2046200,
+      "notarization": 66953,
+      "lodgment": 46078,
+      "public_defense": 17911,
+      "investigation_probation": 39643,
+      "family_investigation": 3402
+    }
+  ],
+  "cases_by_organ": [
+    {
+      "organ": "總計",
+      "is_subtotal": true,
+      "total": 4214912,
+      "civil": 1381812,
+      "criminal": 618175,
+      "enforcement": 2046200,
+      "administrative": 44965,
+      "notarization": 66953
+    },
+    {
+      "organ": "司法院",
+      "is_subtotal": false,
+      "total": 10605,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "最高法院",
+      "is_subtotal": false,
+      "total": 14797,
+      "civil": 4844,
+      "criminal": 9953,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "最高行政法院",
+      "is_subtotal": false,
+      "total": 3543,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 3543,
+      "notarization": 0
+    },
+    {
+      "organ": "懲戒法院",
+      "is_subtotal": false,
+      "total": 124,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "高等行政法院計",
+      "is_subtotal": true,
+      "total": 41294,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 41294,
+      "notarization": 0
+    },
+    {
+      "organ": "臺北高等行政法院",
+      "is_subtotal": false,
+      "total": 20244,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 20244,
+      "notarization": 0
+    },
+    {
+      "organ": "臺中高等行政法院",
+      "is_subtotal": false,
+      "total": 10818,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 10818,
+      "notarization": 0
+    },
+    {
+      "organ": "高雄高等行政法院",
+      "is_subtotal": false,
+      "total": 10232,
+      "civil": 0,
+      "criminal": 0,
+      "enforcement": 0,
+      "administrative": 10232,
+      "notarization": 0
+    },
+    {
+      "organ": "智慧財產及商業法院",
+      "is_subtotal": false,
+      "total": 1325,
+      "civil": 860,
+      "criminal": 337,
+      "enforcement": 0,
+      "administrative": 128,
+      "notarization": 0
+    },
+    {
+      "organ": "高等法院及分院合計",
+      "is_subtotal": true,
+      "total": 76080,
+      "civil": 23253,
+      "criminal": 52827,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院及分院計",
+      "is_subtotal": true,
+      "total": 75845,
+      "civil": 23194,
+      "criminal": 52651,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院",
+      "is_subtotal": false,
+      "total": 37348,
+      "civil": 12004,
+      "criminal": 25344,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院臺中分院",
+      "is_subtotal": false,
+      "total": 16272,
+      "civil": 5005,
+      "criminal": 11267,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院臺南分院",
+      "is_subtotal": false,
+      "total": 9892,
+      "civil": 2948,
+      "criminal": 6944,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院高雄分院",
+      "is_subtotal": false,
+      "total": 10617,
+      "civil": 2807,
+      "criminal": 7810,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣高等法院花蓮分院",
+      "is_subtotal": false,
+      "total": 1716,
+      "civil": 430,
+      "criminal": 1286,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "福建高等法院金門分院",
+      "is_subtotal": false,
+      "total": 235,
+      "civil": 59,
+      "criminal": 176,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "地方法院合計",
+      "is_subtotal": true,
+      "total": 4067144,
+      "civil": 1352855,
+      "criminal": 555058,
+      "enforcement": 2046200,
+      "administrative": 0,
+      "notarization": 66953
+    },
+    {
+      "organ": "臺灣各地方法院計",
+      "is_subtotal": true,
+      "total": 4051521,
+      "civil": 1348949,
+      "criminal": 553258,
+      "enforcement": 2036880,
+      "administrative": 0,
+      "notarization": 66465
+    },
+    {
+      "organ": "臺灣臺北地方法院",
+      "is_subtotal": false,
+      "total": 485787,
+      "civil": 172830,
+      "criminal": 50633,
+      "enforcement": 242530,
+      "administrative": 0,
+      "notarization": 9262
+    },
+    {
+      "organ": "臺灣士林地方法院",
+      "is_subtotal": false,
+      "total": 276513,
+      "civil": 116533,
+      "criminal": 27073,
+      "enforcement": 123633,
+      "administrative": 0,
+      "notarization": 6654
+    },
+    {
+      "organ": "臺灣新北地方法院",
+      "is_subtotal": false,
+      "total": 452997,
+      "civil": 163886,
+      "criminal": 66872,
+      "enforcement": 211580,
+      "administrative": 0,
+      "notarization": 6504
+    },
+    {
+      "organ": "臺灣桃園地方法院",
+      "is_subtotal": false,
+      "total": 362727,
+      "civil": 126449,
+      "criminal": 66084,
+      "enforcement": 158476,
+      "administrative": 0,
+      "notarization": 7707
+    },
+    {
+      "organ": "臺灣新竹地方法院",
+      "is_subtotal": false,
+      "total": 146846,
+      "civil": 51947,
+      "criminal": 20986,
+      "enforcement": 67080,
+      "administrative": 0,
+      "notarization": 4730
+    },
+    {
+      "organ": "臺灣苗栗地方法院",
+      "is_subtotal": false,
+      "total": 84328,
+      "civil": 25955,
+      "criminal": 13776,
+      "enforcement": 42699,
+      "administrative": 0,
+      "notarization": 1147
+    },
+    {
+      "organ": "臺灣臺中地方法院",
+      "is_subtotal": false,
+      "total": 462324,
+      "civil": 158962,
+      "criminal": 64049,
+      "enforcement": 226631,
+      "administrative": 0,
+      "notarization": 7275
+    },
+    {
+      "organ": "臺灣南投地方法院",
+      "is_subtotal": false,
+      "total": 82916,
+      "civil": 24035,
+      "criminal": 10445,
+      "enforcement": 45793,
+      "administrative": 0,
+      "notarization": 2131
+    },
+    {
+      "organ": "臺灣彰化地方法院",
+      "is_subtotal": false,
+      "total": 173338,
+      "civil": 55526,
+      "criminal": 26082,
+      "enforcement": 86140,
+      "administrative": 0,
+      "notarization": 3025
+    },
+    {
+      "organ": "臺灣雲林地方法院",
+      "is_subtotal": false,
+      "total": 106352,
+      "civil": 33487,
+      "criminal": 14650,
+      "enforcement": 55800,
+      "administrative": 0,
+      "notarization": 1559
+    },
+    {
+      "organ": "臺灣嘉義地方法院",
+      "is_subtotal": false,
+      "total": 126859,
+      "civil": 38681,
+      "criminal": 17243,
+      "enforcement": 69304,
+      "administrative": 0,
+      "notarization": 636
+    },
+    {
+      "organ": "臺灣臺南地方法院",
+      "is_subtotal": false,
+      "total": 325068,
+      "civil": 95116,
+      "criminal": 41103,
+      "enforcement": 182614,
+      "administrative": 0,
+      "notarization": 3786
+    },
+    {
+      "organ": "臺灣高雄地方法院",
+      "is_subtotal": false,
+      "total": 315264,
+      "civil": 89413,
+      "criminal": 38921,
+      "enforcement": 178512,
+      "administrative": 0,
+      "notarization": 4355
+    },
+    {
+      "organ": "臺灣橋頭地方法院",
+      "is_subtotal": false,
+      "total": 178256,
+      "civil": 47952,
+      "criminal": 24804,
+      "enforcement": 102072,
+      "administrative": 0,
+      "notarization": 2009
+    },
+    {
+      "organ": "臺灣高雄少家法院",
+      "is_subtotal": false,
+      "total": 32292,
+      "civil": 24522,
+      "criminal": 7770,
+      "enforcement": 0,
+      "administrative": 0,
+      "notarization": 0
+    },
+    {
+      "organ": "臺灣屏東地方法院",
+      "is_subtotal": false,
+      "total": 154814,
+      "civil": 40487,
+      "criminal": 20592,
+      "enforcement": 91338,
+      "administrative": 0,
+      "notarization": 1095
+    },
+    {
+      "organ": "臺灣臺東地方法院",
+      "is_subtotal": false,
+      "total": 47619,
+      "civil": 13683,
+      "criminal": 6874,
+      "enforcement": 25506,
+      "administrative": 0,
+      "notarization": 1256
+    },
+    {
+      "organ": "臺灣花蓮地方法院",
+      "is_subtotal": false,
+      "total": 64433,
+      "civil": 20718,
+      "criminal": 9127,
+      "enforcement": 33978,
+      "administrative": 0,
+      "notarization": 150
+    },
+    {
+      "organ": "臺灣宜蘭地方法院",
+      "is_subtotal": false,
+      "total": 68712,
+      "civil": 20639,
+      "criminal": 10242,
+      "enforcement": 35513,
+      "administrative": 0,
+      "notarization": 1483
+    },
+    {
+      "organ": "臺灣基隆地方法院",
+      "is_subtotal": false,
+      "total": 89341,
+      "civil": 24896,
+      "criminal": 13889,
+      "enforcement": 48805,
+      "administrative": 0,
+      "notarization": 1229
+    },
+    {
+      "organ": "臺灣澎湖地方法院",
+      "is_subtotal": false,
+      "total": 14735,
+      "civil": 3232,
+      "criminal": 2043,
+      "enforcement": 8876,
+      "administrative": 0,
+      "notarization": 472
+    },
+    {
+      "organ": "福建金門地方法院",
+      "is_subtotal": false,
+      "total": 13884,
+      "civil": 3496,
+      "criminal": 1485,
+      "enforcement": 8409,
+      "administrative": 0,
+      "notarization": 411
+    },
+    {
+      "organ": "福建連江地方法院",
+      "is_subtotal": false,
+      "total": 1739,
+      "civil": 410,
+      "criminal": 315,
+      "enforcement": 911,
+      "administrative": 0,
+      "notarization": 77
+    }
+  ],
+  "district_civil_by_year": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "cases_lodged": 2465361,
+      "previously_lodged": 138268,
+      "newly_lodged": 2327093,
+      "cases_closed": 2325681,
+      "pending_cases": 139680,
+      "avg_days_to_close": 32.59,
+      "avg_cases_per_judge": 25.14,
+      "avg_cases_per_judge_nonlit": 40.52,
+      "appeal_affirmed_rate": 86.07,
+      "ruling_affirmed_rate": 87.37
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "cases_lodged": 2552684,
+      "previously_lodged": 139680,
+      "newly_lodged": 2413004,
+      "cases_closed": 2405796,
+      "pending_cases": 146888,
+      "avg_days_to_close": 31.35,
+      "avg_cases_per_judge": 25.64,
+      "avg_cases_per_judge_nonlit": 40.41,
+      "appeal_affirmed_rate": 85.57,
+      "ruling_affirmed_rate": 88.07
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "cases_lodged": 2545111,
+      "previously_lodged": 146888,
+      "newly_lodged": 2398223,
+      "cases_closed": 2389013,
+      "pending_cases": 156098,
+      "avg_days_to_close": 33.13,
+      "avg_cases_per_judge": 26.63,
+      "avg_cases_per_judge_nonlit": 41.28,
+      "appeal_affirmed_rate": 85.29,
+      "ruling_affirmed_rate": 86.43
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "cases_lodged": 2588801,
+      "previously_lodged": 156098,
+      "newly_lodged": 2432703,
+      "cases_closed": 2425617,
+      "pending_cases": 163184,
+      "avg_days_to_close": 34.41,
+      "avg_cases_per_judge": 28.0,
+      "avg_cases_per_judge_nonlit": 40.29,
+      "appeal_affirmed_rate": 84.96,
+      "ruling_affirmed_rate": 85.54
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "cases_lodged": 2733792,
+      "previously_lodged": 163184,
+      "newly_lodged": 2570608,
+      "cases_closed": 2562005,
+      "pending_cases": 171787,
+      "avg_days_to_close": 34.25,
+      "avg_cases_per_judge": 30.54,
+      "avg_cases_per_judge_nonlit": 40.93,
+      "appeal_affirmed_rate": 85.0,
+      "ruling_affirmed_rate": 84.63
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "cases_lodged": 2875561,
+      "previously_lodged": 171787,
+      "newly_lodged": 2703774,
+      "cases_closed": 2706108,
+      "pending_cases": 169453,
+      "avg_days_to_close": 33.37,
+      "avg_cases_per_judge": 30.54,
+      "avg_cases_per_judge_nonlit": 43.83,
+      "appeal_affirmed_rate": 85.36,
+      "ruling_affirmed_rate": 84.75
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "cases_lodged": 2799446,
+      "previously_lodged": 169453,
+      "newly_lodged": 2629993,
+      "cases_closed": 2614215,
+      "pending_cases": 185231,
+      "avg_days_to_close": 33.34,
+      "avg_cases_per_judge": 27.76,
+      "avg_cases_per_judge_nonlit": 40.96,
+      "appeal_affirmed_rate": 85.12,
+      "ruling_affirmed_rate": 84.18
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "cases_lodged": 3079603,
+      "previously_lodged": 185231,
+      "newly_lodged": 2894372,
+      "cases_closed": 2876460,
+      "pending_cases": 203143,
+      "avg_days_to_close": 32.53,
+      "avg_cases_per_judge": 30.1,
+      "avg_cases_per_judge_nonlit": 44.25,
+      "appeal_affirmed_rate": 84.9,
+      "ruling_affirmed_rate": 84.9
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "cases_lodged": 3350116,
+      "previously_lodged": 203143,
+      "newly_lodged": 3146973,
+      "cases_closed": 3076118,
+      "pending_cases": 273998,
+      "avg_days_to_close": 33.95,
+      "avg_cases_per_judge": 29.54,
+      "avg_cases_per_judge_nonlit": 35.28,
+      "appeal_affirmed_rate": 85.61,
+      "ruling_affirmed_rate": 84.86
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "cases_lodged": 3686225,
+      "previously_lodged": 273998,
+      "newly_lodged": 3412227,
+      "cases_closed": 3281527,
+      "pending_cases": 404698,
+      "avg_days_to_close": 42.15,
+      "avg_cases_per_judge": 27.44,
+      "avg_cases_per_judge_nonlit": 32.53,
+      "appeal_affirmed_rate": 85.56,
+      "ruling_affirmed_rate": 85.15
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "cases_lodged": 3803753,
+      "previously_lodged": 404698,
+      "newly_lodged": 3399055,
+      "cases_closed": 3449013,
+      "pending_cases": 354740,
+      "avg_days_to_close": 53.77,
+      "avg_cases_per_judge": 27.78,
+      "avg_cases_per_judge_nonlit": 30.78,
+      "appeal_affirmed_rate": 85.84,
+      "ruling_affirmed_rate": 84.98
+    }
+  ],
+  "district_criminal_by_year": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "cases_lodged": 514896,
+      "previously_lodged": 49367,
+      "newly_lodged": 465529,
+      "cases_closed": 460261,
+      "pending_cases": 54635,
+      "avg_days_to_close": 66.52,
+      "avg_cases_per_judge": 60.35,
+      "appeal_affirmed_rate": 77.02,
+      "ruling_affirmed_rate": 87.75
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "cases_lodged": 527386,
+      "previously_lodged": 54635,
+      "newly_lodged": 472751,
+      "cases_closed": 466444,
+      "pending_cases": 60942,
+      "avg_days_to_close": 71.72,
+      "avg_cases_per_judge": 60.87,
+      "appeal_affirmed_rate": 75.76,
+      "ruling_affirmed_rate": 87.05
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "cases_lodged": 543059,
+      "previously_lodged": 60942,
+      "newly_lodged": 482117,
+      "cases_closed": 478703,
+      "pending_cases": 64356,
+      "avg_days_to_close": 77.53,
+      "avg_cases_per_judge": 63.15,
+      "appeal_affirmed_rate": 74.84,
+      "ruling_affirmed_rate": 85.57
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "cases_lodged": 541839,
+      "previously_lodged": 64356,
+      "newly_lodged": 477483,
+      "cases_closed": 477624,
+      "pending_cases": 64215,
+      "avg_days_to_close": 80.89,
+      "avg_cases_per_judge": 63.04,
+      "appeal_affirmed_rate": 75.11,
+      "ruling_affirmed_rate": 85.56
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "cases_lodged": 526175,
+      "previously_lodged": 64215,
+      "newly_lodged": 461960,
+      "cases_closed": 461041,
+      "pending_cases": 65134,
+      "avg_days_to_close": 83.76,
+      "avg_cases_per_judge": 60.36,
+      "appeal_affirmed_rate": 74.7,
+      "ruling_affirmed_rate": 86.0
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "cases_lodged": 514580,
+      "previously_lodged": 65134,
+      "newly_lodged": 449446,
+      "cases_closed": 450595,
+      "pending_cases": 63985,
+      "avg_days_to_close": 85.46,
+      "avg_cases_per_judge": 58.92,
+      "appeal_affirmed_rate": 71.66,
+      "ruling_affirmed_rate": 85.22
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "cases_lodged": 471411,
+      "previously_lodged": 63985,
+      "newly_lodged": 407426,
+      "cases_closed": 399019,
+      "pending_cases": 72392,
+      "avg_days_to_close": 100.36,
+      "avg_cases_per_judge": 53.09,
+      "appeal_affirmed_rate": 70.11,
+      "ruling_affirmed_rate": 87.54
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "cases_lodged": 527986,
+      "previously_lodged": 72392,
+      "newly_lodged": 455594,
+      "cases_closed": 446326,
+      "pending_cases": 81660,
+      "avg_days_to_close": 99.78,
+      "avg_cases_per_judge": 59.67,
+      "appeal_affirmed_rate": 72.7,
+      "ruling_affirmed_rate": 87.5
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "cases_lodged": 564796,
+      "previously_lodged": 81660,
+      "newly_lodged": 483136,
+      "cases_closed": 471623,
+      "pending_cases": 93173,
+      "avg_days_to_close": 100.92,
+      "avg_cases_per_judge": 62.59,
+      "appeal_affirmed_rate": 75.81,
+      "ruling_affirmed_rate": 84.98
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "cases_lodged": 607624,
+      "previously_lodged": 93173,
+      "newly_lodged": 514451,
+      "cases_closed": 503000,
+      "pending_cases": 104624,
+      "avg_days_to_close": 106.87,
+      "avg_cases_per_judge": 65.38,
+      "appeal_affirmed_rate": 76.78,
+      "ruling_affirmed_rate": 84.75
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "cases_lodged": 659682,
+      "previously_lodged": 104624,
+      "newly_lodged": 555058,
+      "cases_closed": 538125,
+      "pending_cases": 121557,
+      "avg_days_to_close": 112.39,
+      "avg_cases_per_judge": 68.65,
+      "appeal_affirmed_rate": 75.52,
+      "ruling_affirmed_rate": 84.74
+    }
+  ],
+  "district_civil_by_organ": [
+    {
+      "organ": "合計",
+      "is_subtotal": true,
+      "cases_lodged": 404698,
+      "newly_lodged": 3449013,
+      "cases_closed": 354740,
+      "pending_cases": 53,
+      "avg_days_to_close": 27.78
+    },
+    {
+      "organ": "臺灣各地方法院計",
+      "is_subtotal": true,
+      "cases_lodged": 403349,
+      "newly_lodged": 3436099,
+      "cases_closed": 353079,
+      "pending_cases": 53,
+      "avg_days_to_close": 27.85
+    },
+    {
+      "organ": "臺灣臺北地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 118080,
+      "newly_lodged": 472371,
+      "cases_closed": 61069,
+      "pending_cases": 96,
+      "avg_days_to_close": 33.42
+    },
+    {
+      "organ": "臺灣士林地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 37758,
+      "newly_lodged": 252539,
+      "cases_closed": 25385,
+      "pending_cases": 63,
+      "avg_days_to_close": 31.71
+    },
+    {
+      "organ": "臺灣新北地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 37856,
+      "newly_lodged": 370659,
+      "cases_closed": 42663,
+      "pending_cases": 48,
+      "avg_days_to_close": 33.25
+    },
+    {
+      "organ": "臺灣桃園地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 28937,
+      "newly_lodged": 285458,
+      "cases_closed": 28404,
+      "pending_cases": 45,
+      "avg_days_to_close": 31.95
+    },
+    {
+      "organ": "臺灣新竹地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 12217,
+      "newly_lodged": 119948,
+      "cases_closed": 11296,
+      "pending_cases": 43,
+      "avg_days_to_close": 31.21
+    },
+    {
+      "organ": "臺灣苗栗地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5954,
+      "newly_lodged": 68705,
+      "cases_closed": 5903,
+      "pending_cases": 38,
+      "avg_days_to_close": 19.97
+    },
+    {
+      "organ": "臺灣臺中地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 34862,
+      "newly_lodged": 381231,
+      "cases_closed": 39224,
+      "pending_cases": 46,
+      "avg_days_to_close": 31.48
+    },
+    {
+      "organ": "臺灣南投地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5510,
+      "newly_lodged": 68665,
+      "cases_closed": 6673,
+      "pending_cases": 44,
+      "avg_days_to_close": 19.18
+    },
+    {
+      "organ": "臺灣彰化地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 10386,
+      "newly_lodged": 142052,
+      "cases_closed": 10000,
+      "pending_cases": 36,
+      "avg_days_to_close": 20.3
+    },
+    {
+      "organ": "臺灣雲林地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 9425,
+      "newly_lodged": 87047,
+      "cases_closed": 11665,
+      "pending_cases": 57,
+      "avg_days_to_close": 19.23
+    },
+    {
+      "organ": "臺灣嘉義地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 8181,
+      "newly_lodged": 107642,
+      "cases_closed": 8524,
+      "pending_cases": 38,
+      "avg_days_to_close": 18.43
+    },
+    {
+      "organ": "臺灣臺南地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 21943,
+      "newly_lodged": 278167,
+      "cases_closed": 21506,
+      "pending_cases": 39,
+      "avg_days_to_close": 25.45
+    },
+    {
+      "organ": "臺灣高雄地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 22344,
+      "newly_lodged": 264626,
+      "cases_closed": 25643,
+      "pending_cases": 44,
+      "avg_days_to_close": 27.2
+    },
+    {
+      "organ": "臺灣橋頭地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 12994,
+      "newly_lodged": 148772,
+      "cases_closed": 14246,
+      "pending_cases": 47,
+      "avg_days_to_close": 30.81
+    },
+    {
+      "organ": "臺灣高雄少家法院",
+      "is_subtotal": false,
+      "cases_lodged": 3637,
+      "newly_lodged": 24167,
+      "cases_closed": 3992,
+      "pending_cases": 215,
+      "avg_days_to_close": 7.06
+    },
+    {
+      "organ": "臺灣屏東地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 10523,
+      "newly_lodged": 132019,
+      "cases_closed": 10329,
+      "pending_cases": 38,
+      "avg_days_to_close": 19.96
+    },
+    {
+      "organ": "臺灣臺東地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 4791,
+      "newly_lodged": 39179,
+      "cases_closed": 4801,
+      "pending_cases": 53,
+      "avg_days_to_close": 9.54
+    },
+    {
+      "organ": "臺灣花蓮地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5593,
+      "newly_lodged": 54082,
+      "cases_closed": 6207,
+      "pending_cases": 49,
+      "avg_days_to_close": 23.81
+    },
+    {
+      "organ": "臺灣宜蘭地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5792,
+      "newly_lodged": 53300,
+      "cases_closed": 8644,
+      "pending_cases": 74,
+      "avg_days_to_close": 26.58
+    },
+    {
+      "organ": "臺灣基隆地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5334,
+      "newly_lodged": 73268,
+      "cases_closed": 5767,
+      "pending_cases": 43,
+      "avg_days_to_close": 35.95
+    },
+    {
+      "organ": "臺灣澎湖地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1232,
+      "newly_lodged": 12202,
+      "cases_closed": 1138,
+      "pending_cases": 49,
+      "avg_days_to_close": 19.65
+    },
+    {
+      "organ": "福建金門地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1148,
+      "newly_lodged": 11511,
+      "cases_closed": 1542,
+      "pending_cases": 48,
+      "avg_days_to_close": 11.98
+    },
+    {
+      "organ": "福建連江地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 201,
+      "newly_lodged": 1403,
+      "cases_closed": 119,
+      "pending_cases": 49,
+      "avg_days_to_close": 14.94
+    }
+  ],
+  "district_criminal_by_organ": [
+    {
+      "organ": "合計",
+      "is_subtotal": true,
+      "cases_lodged": 104624,
+      "newly_lodged": 538125,
+      "cases_closed": 121557,
+      "pending_cases": 112,
+      "avg_days_to_close": 68.65
+    },
+    {
+      "organ": "臺灣各地方法院計",
+      "is_subtotal": true,
+      "cases_lodged": 104338,
+      "newly_lodged": 536231,
+      "cases_closed": 121365,
+      "pending_cases": 112,
+      "avg_days_to_close": 68.84
+    },
+    {
+      "organ": "臺灣臺北地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 9419,
+      "newly_lodged": 49466,
+      "cases_closed": 10586,
+      "pending_cases": 108,
+      "avg_days_to_close": 57.43
+    },
+    {
+      "organ": "臺灣士林地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 4770,
+      "newly_lodged": 26434,
+      "cases_closed": 5409,
+      "pending_cases": 101,
+      "avg_days_to_close": 62.83
+    },
+    {
+      "organ": "臺灣新北地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 15903,
+      "newly_lodged": 64597,
+      "cases_closed": 18178,
+      "pending_cases": 132,
+      "avg_days_to_close": 71.26
+    },
+    {
+      "organ": "臺灣桃園地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 14268,
+      "newly_lodged": 62822,
+      "cases_closed": 17530,
+      "pending_cases": 137,
+      "avg_days_to_close": 80.32
+    },
+    {
+      "organ": "臺灣新竹地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 4216,
+      "newly_lodged": 20571,
+      "cases_closed": 4631,
+      "pending_cases": 127,
+      "avg_days_to_close": 67.93
+    },
+    {
+      "organ": "臺灣苗栗地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 2596,
+      "newly_lodged": 13914,
+      "cases_closed": 2458,
+      "pending_cases": 106,
+      "avg_days_to_close": 80.06
+    },
+    {
+      "organ": "臺灣臺中地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 12957,
+      "newly_lodged": 61277,
+      "cases_closed": 15729,
+      "pending_cases": 118,
+      "avg_days_to_close": 70.68
+    },
+    {
+      "organ": "臺灣南投地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1559,
+      "newly_lodged": 10137,
+      "cases_closed": 1867,
+      "pending_cases": 86,
+      "avg_days_to_close": 64.48
+    },
+    {
+      "organ": "臺灣彰化地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 3327,
+      "newly_lodged": 24863,
+      "cases_closed": 4546,
+      "pending_cases": 77,
+      "avg_days_to_close": 71.49
+    },
+    {
+      "organ": "臺灣雲林地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 2717,
+      "newly_lodged": 13847,
+      "cases_closed": 3520,
+      "pending_cases": 122,
+      "avg_days_to_close": 61.32
+    },
+    {
+      "organ": "臺灣嘉義地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1941,
+      "newly_lodged": 16504,
+      "cases_closed": 2680,
+      "pending_cases": 73,
+      "avg_days_to_close": 66.08
+    },
+    {
+      "organ": "臺灣臺南地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 4672,
+      "newly_lodged": 40346,
+      "cases_closed": 5429,
+      "pending_cases": 63,
+      "avg_days_to_close": 80.37
+    },
+    {
+      "organ": "臺灣高雄地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 8718,
+      "newly_lodged": 38814,
+      "cases_closed": 8825,
+      "pending_cases": 121,
+      "avg_days_to_close": 58.73
+    },
+    {
+      "organ": "臺灣橋頭地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 5348,
+      "newly_lodged": 23241,
+      "cases_closed": 6911,
+      "pending_cases": 129,
+      "avg_days_to_close": 77.38
+    },
+    {
+      "organ": "臺灣高雄少家法院",
+      "is_subtotal": false,
+      "cases_lodged": 975,
+      "newly_lodged": 7906,
+      "cases_closed": 839,
+      "pending_cases": 174,
+      "avg_days_to_close": 149.73
+    },
+    {
+      "organ": "臺灣屏東地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 4061,
+      "newly_lodged": 19212,
+      "cases_closed": 5441,
+      "pending_cases": 138,
+      "avg_days_to_close": 67.92
+    },
+    {
+      "organ": "臺灣臺東地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 930,
+      "newly_lodged": 6924,
+      "cases_closed": 880,
+      "pending_cases": 78,
+      "avg_days_to_close": 52.76
+    },
+    {
+      "organ": "臺灣花蓮地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 2252,
+      "newly_lodged": 8841,
+      "cases_closed": 2538,
+      "pending_cases": 152,
+      "avg_days_to_close": 51.6
+    },
+    {
+      "organ": "臺灣宜蘭地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1694,
+      "newly_lodged": 10457,
+      "cases_closed": 1479,
+      "pending_cases": 88,
+      "avg_days_to_close": 61.25
+    },
+    {
+      "organ": "臺灣基隆地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 1757,
+      "newly_lodged": 14003,
+      "cases_closed": 1643,
+      "pending_cases": 91,
+      "avg_days_to_close": 74.03
+    },
+    {
+      "organ": "臺灣澎湖地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 258,
+      "newly_lodged": 2055,
+      "cases_closed": 246,
+      "pending_cases": 64,
+      "avg_days_to_close": 62.05
+    },
+    {
+      "organ": "福建金門地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 218,
+      "newly_lodged": 1552,
+      "cases_closed": 151,
+      "pending_cases": 62,
+      "avg_days_to_close": 34.66
+    },
+    {
+      "organ": "福建連江地方法院",
+      "is_subtotal": false,
+      "cases_lodged": 68,
+      "newly_lodged": 342,
+      "cases_closed": 41,
+      "pending_cases": 127,
+      "avg_days_to_close": 85.07
+    }
+  ],
+  "enforcement_by_year": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "cases_lodged": 1362760,
+      "previously_lodged": 66686,
+      "newly_lodged": 1296074,
+      "cases_closed": 1299123,
+      "pending_cases": 63637,
+      "avg_days_to_close": 23.11
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "cases_lodged": 1428321,
+      "previously_lodged": 63637,
+      "newly_lodged": 1364684,
+      "cases_closed": 1364218,
+      "pending_cases": 64103,
+      "avg_days_to_close": 22.12
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "cases_lodged": 1389353,
+      "previously_lodged": 64103,
+      "newly_lodged": 1325250,
+      "cases_closed": 1321438,
+      "pending_cases": 67915,
+      "avg_days_to_close": 23.23
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "cases_lodged": 1387300,
+      "previously_lodged": 67915,
+      "newly_lodged": 1319385,
+      "cases_closed": 1318649,
+      "pending_cases": 68651,
+      "avg_days_to_close": 23.9
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "cases_lodged": 1453501,
+      "previously_lodged": 68651,
+      "newly_lodged": 1384850,
+      "cases_closed": 1382211,
+      "pending_cases": 71290,
+      "avg_days_to_close": 23.6
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "cases_lodged": 1514331,
+      "previously_lodged": 71290,
+      "newly_lodged": 1443041,
+      "cases_closed": 1443678,
+      "pending_cases": 70653,
+      "avg_days_to_close": 22.67
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "cases_lodged": 1509035,
+      "previously_lodged": 70653,
+      "newly_lodged": 1438382,
+      "cases_closed": 1435445,
+      "pending_cases": 73590,
+      "avg_days_to_close": 22.31
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "cases_lodged": 1706725,
+      "previously_lodged": 73590,
+      "newly_lodged": 1633135,
+      "cases_closed": 1620237,
+      "pending_cases": 86488,
+      "avg_days_to_close": 21.65
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "cases_lodged": 1891455,
+      "previously_lodged": 86488,
+      "newly_lodged": 1804967,
+      "cases_closed": 1744375,
+      "pending_cases": 147080,
+      "avg_days_to_close": 23.67
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "cases_lodged": 2170839,
+      "previously_lodged": 147080,
+      "newly_lodged": 2023759,
+      "cases_closed": 1919927,
+      "pending_cases": 250912,
+      "avg_days_to_close": 33.61
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "cases_lodged": 2297112,
+      "previously_lodged": 250912,
+      "newly_lodged": 2046200,
+      "cases_closed": 2089613,
+      "pending_cases": 207499,
+      "avg_days_to_close": 46.41
+    }
+  ],
+  "supreme_civil_appeal": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "total": 2676,
+      "appeal_rejected": 1835,
+      "judgment_voided": 529,
+      "third_instance_maintain_rate": 75.49
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "total": 2526,
+      "appeal_rejected": 1840,
+      "judgment_voided": 446,
+      "third_instance_maintain_rate": 78.62
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "total": 2631,
+      "appeal_rejected": 1883,
+      "judgment_voided": 485,
+      "third_instance_maintain_rate": 77.92
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "total": 2504,
+      "appeal_rejected": 1773,
+      "judgment_voided": 519,
+      "third_instance_maintain_rate": 75.93
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "total": 2673,
+      "appeal_rejected": 1767,
+      "judgment_voided": 605,
+      "third_instance_maintain_rate": 72.73
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 3505,
+      "appeal_rejected": 2229,
+      "judgment_voided": 892,
+      "third_instance_maintain_rate": 69.86
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 3337,
+      "appeal_rejected": 2119,
+      "judgment_voided": 841,
+      "third_instance_maintain_rate": 70.07
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 3104,
+      "appeal_rejected": 1931,
+      "judgment_voided": 797,
+      "third_instance_maintain_rate": 69.39
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 2951,
+      "appeal_rejected": 1890,
+      "judgment_voided": 703,
+      "third_instance_maintain_rate": 71.32
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 3188,
+      "appeal_rejected": 2331,
+      "judgment_voided": 546,
+      "third_instance_maintain_rate": 79.18
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "total": 2456,
+      "appeal_rejected": 1829,
+      "judgment_voided": 426,
+      "third_instance_maintain_rate": 79.46
+    }
+  ],
+  "supreme_criminal_appeal": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "total": 4034,
+      "appeal_rejected": 3503,
+      "judgment_voided": 302,
+      "third_instance_maintain_rate": 89.97
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "total": 3519,
+      "appeal_rejected": 3063,
+      "judgment_voided": 251,
+      "third_instance_maintain_rate": 90.31
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "total": 3937,
+      "appeal_rejected": 3423,
+      "judgment_voided": 279,
+      "third_instance_maintain_rate": 90.37
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "total": 4879,
+      "appeal_rejected": 4285,
+      "judgment_voided": 344,
+      "third_instance_maintain_rate": 90.68
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "total": 4424,
+      "appeal_rejected": 3776,
+      "judgment_voided": 366,
+      "third_instance_maintain_rate": 89.12
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 6134,
+      "appeal_rejected": 4935,
+      "judgment_voided": 687,
+      "third_instance_maintain_rate": 84.79
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 6064,
+      "appeal_rejected": 4926,
+      "judgment_voided": 557,
+      "third_instance_maintain_rate": 85.16
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 5467,
+      "appeal_rejected": 4801,
+      "judgment_voided": 378,
+      "third_instance_maintain_rate": 90.55
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 5528,
+      "appeal_rejected": 4985,
+      "judgment_voided": 346,
+      "third_instance_maintain_rate": 92.06
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 5527,
+      "appeal_rejected": 4988,
+      "judgment_voided": 320,
+      "third_instance_maintain_rate": 92.38
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "total": 6416,
+      "appeal_rejected": 5821,
+      "judgment_voided": 341,
+      "third_instance_maintain_rate": 92.92
+    }
+  ],
+  "family_by_year": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "cases_lodged": 153862,
+      "previously_lodged": 16956,
+      "newly_lodged": 136906,
+      "cases_closed": 135920,
+      "pending_cases": 17942,
+      "avg_days_to_close": 154.28,
+      "appeal_affirmed_rate": 85.48,
+      "ruling_affirmed_rate": 88.75,
+      "mediation_rate_1": 53.33,
+      "mediation_rate_2": 29.05
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "cases_lodged": 161680,
+      "previously_lodged": 17942,
+      "newly_lodged": 143738,
+      "cases_closed": 142739,
+      "pending_cases": 18941,
+      "avg_days_to_close": 144.3,
+      "appeal_affirmed_rate": 84.03,
+      "ruling_affirmed_rate": 89.96,
+      "mediation_rate_1": 54.89,
+      "mediation_rate_2": 30.52
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "cases_lodged": 166589,
+      "previously_lodged": 18941,
+      "newly_lodged": 147648,
+      "cases_closed": 146195,
+      "pending_cases": 20394,
+      "avg_days_to_close": 147.88,
+      "appeal_affirmed_rate": 83.69,
+      "ruling_affirmed_rate": 88.23,
+      "mediation_rate_1": 55.78,
+      "mediation_rate_2": 31.68
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "cases_lodged": 169544,
+      "previously_lodged": 20394,
+      "newly_lodged": 149150,
+      "cases_closed": 148362,
+      "pending_cases": 21182,
+      "avg_days_to_close": 151.46,
+      "appeal_affirmed_rate": 82.54,
+      "ruling_affirmed_rate": 88.49,
+      "mediation_rate_1": 50.9,
+      "mediation_rate_2": 29.89
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "cases_lodged": 173441,
+      "previously_lodged": 21182,
+      "newly_lodged": 152259,
+      "cases_closed": 151200,
+      "pending_cases": 22241,
+      "avg_days_to_close": 162.58,
+      "appeal_affirmed_rate": 82.75,
+      "ruling_affirmed_rate": 86.85,
+      "mediation_rate_1": 53.5,
+      "mediation_rate_2": 31.6
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "cases_lodged": 177836,
+      "previously_lodged": 22241,
+      "newly_lodged": 155595,
+      "cases_closed": 155704,
+      "pending_cases": 22132,
+      "avg_days_to_close": 172.56,
+      "appeal_affirmed_rate": 83.13,
+      "ruling_affirmed_rate": 87.36,
+      "mediation_rate_1": 60.54,
+      "mediation_rate_2": 36.27
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "cases_lodged": 174889,
+      "previously_lodged": 22132,
+      "newly_lodged": 152757,
+      "cases_closed": 149386,
+      "pending_cases": 25503,
+      "avg_days_to_close": 184.58,
+      "appeal_affirmed_rate": 80.53,
+      "ruling_affirmed_rate": 86.29,
+      "mediation_rate_1": 62.18,
+      "mediation_rate_2": 35.67
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "cases_lodged": 196946,
+      "previously_lodged": 25503,
+      "newly_lodged": 171443,
+      "cases_closed": 169679,
+      "pending_cases": 27267,
+      "avg_days_to_close": 191.73,
+      "appeal_affirmed_rate": 81.96,
+      "ruling_affirmed_rate": 87.56,
+      "mediation_rate_1": 65.05,
+      "mediation_rate_2": 38.96
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "cases_lodged": 210360,
+      "previously_lodged": 27267,
+      "newly_lodged": 183093,
+      "cases_closed": 181557,
+      "pending_cases": 28803,
+      "avg_days_to_close": 192.23,
+      "appeal_affirmed_rate": 81.48,
+      "ruling_affirmed_rate": 86.55,
+      "mediation_rate_1": 65.3,
+      "mediation_rate_2": 39.13
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "cases_lodged": 209235,
+      "previously_lodged": 28803,
+      "newly_lodged": 180432,
+      "cases_closed": 179737,
+      "pending_cases": 29498,
+      "avg_days_to_close": 197.12,
+      "appeal_affirmed_rate": 81.9,
+      "ruling_affirmed_rate": 85.73,
+      "mediation_rate_1": 66.68,
+      "mediation_rate_2": 40.35
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "cases_lodged": 212526,
+      "previously_lodged": 29498,
+      "newly_lodged": 183028,
+      "cases_closed": 181522,
+      "pending_cases": 31004,
+      "avg_days_to_close": 210.37,
+      "appeal_affirmed_rate": 81.11,
+      "ruling_affirmed_rate": 86.3,
+      "mediation_rate_1": 66.2,
+      "mediation_rate_2": 40.94
+    }
+  ],
+  "family_by_procedure": [
+    {
+      "year_tw": 103,
+      "year_ad": 2014,
+      "合計": 133446,
+      "第一審訴訟": 9643,
+      "第二審訴訟": 26,
+      "抗告": 3055,
+      "調解程序": 25330,
+      "家事非訟事件": 59166,
+      "保護令聲請": 23410,
+      "公示催告": 2634,
+      "其他事件": 8723
+    },
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "合計": 136906,
+      "第一審訴訟": 9352,
+      "第二審訴訟": 30,
+      "抗告": 3300,
+      "調解程序": 24365,
+      "家事非訟事件": 61982,
+      "保護令聲請": 24589,
+      "公示催告": 2355,
+      "其他事件": 9316
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "合計": 143738,
+      "第一審訴訟": 9808,
+      "第二審訴訟": 38,
+      "抗告": 3514,
+      "調解程序": 24828,
+      "家事非訟事件": 66174,
+      "保護令聲請": 26113,
+      "公示催告": 2246,
+      "其他事件": 9340
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "合計": 147648,
+      "第一審訴訟": 9960,
+      "第二審訴訟": 38,
+      "抗告": 3661,
+      "調解程序": 26780,
+      "家事非訟事件": 67828,
+      "保護令聲請": 26386,
+      "公示催告": 1776,
+      "其他事件": 9504
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "合計": 149150,
+      "第一審訴訟": 9824,
+      "第二審訴訟": 28,
+      "抗告": 3715,
+      "調解程序": 27467,
+      "家事非訟事件": 68785,
+      "保護令聲請": 25954,
+      "公示催告": 1897,
+      "其他事件": 9510
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "合計": 152259,
+      "第一審訴訟": 9635,
+      "第二審訴訟": 43,
+      "抗告": 3755,
+      "調解程序": 28181,
+      "家事非訟事件": 70489,
+      "保護令聲請": 26914,
+      "公示催告": 1629,
+      "其他事件": 9503
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "合計": 155595,
+      "第一審訴訟": 9031,
+      "第二審訴訟": 37,
+      "抗告": 4005,
+      "調解程序": 29110,
+      "家事非訟事件": 72165,
+      "保護令聲請": 28814,
+      "公示催告": 1692,
+      "其他事件": 8644
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "合計": 152757,
+      "第一審訴訟": 8357,
+      "第二審訴訟": 51,
+      "抗告": 3740,
+      "調解程序": 26587,
+      "家事非訟事件": 72869,
+      "保護令聲請": 29572,
+      "公示催告": 1549,
+      "其他事件": 7852
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "合計": 171443,
+      "第一審訴訟": 9735,
+      "第二審訴訟": 50,
+      "抗告": 3870,
+      "調解程序": 29764,
+      "家事非訟事件": 83623,
+      "保護令聲請": 32217,
+      "公示催告": 1996,
+      "其他事件": 7929
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "合計": 183093,
+      "第一審訴訟": 9876,
+      "第二審訴訟": 35,
+      "抗告": 4269,
+      "調解程序": 30831,
+      "家事非訟事件": 91126,
+      "保護令聲請": 34818,
+      "公示催告": 1636,
+      "其他事件": 8274
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "合計": 180432,
+      "第一審訴訟": 10035,
+      "第二審訴訟": 70,
+      "抗告": 4072,
+      "調解程序": 30465,
+      "家事非訟事件": 89817,
+      "保護令聲請": 34109,
+      "公示催告": 1634,
+      "其他事件": 8025
+    }
+  ],
+  "divorce_reasons": [
+    {
+      "year_tw": 103,
+      "year_ad": 2014,
+      "合計": 3575,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 15,
+      "受他方為不堪同居之虐待": 134,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 785,
+      "意圖殺害他方": 1,
+      "有不治之惡疾或精神病": 6,
+      "生死不明已逾三年": 2,
+      "因故意犯罪判刑逾六個月": 26,
+      "其他重大事由難以維持婚姻": 2606
+    },
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "合計": 3517,
+      "重婚或成立748施行法第2條關係": 1,
+      "與配偶以外之人合意性交": 21,
+      "受他方為不堪同居之虐待": 121,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 785,
+      "意圖殺害他方": 1,
+      "有不治之惡疾或精神病": 3,
+      "生死不明已逾三年": 1,
+      "因故意犯罪判刑逾六個月": 34,
+      "其他重大事由難以維持婚姻": 2550
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "合計": 3334,
+      "重婚或成立748施行法第2條關係": 1,
+      "與配偶以外之人合意性交": 22,
+      "受他方為不堪同居之虐待": 96,
+      "對他方直系親屬虐待": 1,
+      "一方惡意遺棄他方": 682,
+      "意圖殺害他方": 0,
+      "有不治之惡疾或精神病": 2,
+      "生死不明已逾三年": 7,
+      "因故意犯罪判刑逾六個月": 29,
+      "其他重大事由難以維持婚姻": 2494
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "合計": 3354,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 9,
+      "受他方為不堪同居之虐待": 117,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 589,
+      "意圖殺害他方": 1,
+      "有不治之惡疾或精神病": 5,
+      "生死不明已逾三年": 8,
+      "因故意犯罪判刑逾六個月": 26,
+      "其他重大事由難以維持婚姻": 2599
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "合計": 3270,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 14,
+      "受他方為不堪同居之虐待": 88,
+      "對他方直系親屬虐待": 1,
+      "一方惡意遺棄他方": 522,
+      "意圖殺害他方": 2,
+      "有不治之惡疾或精神病": 7,
+      "生死不明已逾三年": 2,
+      "因故意犯罪判刑逾六個月": 37,
+      "其他重大事由難以維持婚姻": 2597
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "合計": 2944,
+      "重婚或成立748施行法第2條關係": 1,
+      "與配偶以外之人合意性交": 12,
+      "受他方為不堪同居之虐待": 65,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 452,
+      "意圖殺害他方": 3,
+      "有不治之惡疾或精神病": 3,
+      "生死不明已逾三年": 5,
+      "因故意犯罪判刑逾六個月": 27,
+      "其他重大事由難以維持婚姻": 2376
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "合計": 2924,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 12,
+      "受他方為不堪同居之虐待": 71,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 389,
+      "意圖殺害他方": 0,
+      "有不治之惡疾或精神病": 2,
+      "生死不明已逾三年": 3,
+      "因故意犯罪判刑逾六個月": 25,
+      "其他重大事由難以維持婚姻": 2422
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "合計": 2437,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 11,
+      "受他方為不堪同居之虐待": 44,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 323,
+      "意圖殺害他方": 0,
+      "有不治之惡疾或精神病": 4,
+      "生死不明已逾三年": 1,
+      "因故意犯罪判刑逾六個月": 18,
+      "其他重大事由難以維持婚姻": 2036
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "合計": 2532,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 10,
+      "受他方為不堪同居之虐待": 41,
+      "對他方直系親屬虐待": 1,
+      "一方惡意遺棄他方": 229,
+      "意圖殺害他方": 1,
+      "有不治之惡疾或精神病": 4,
+      "生死不明已逾三年": 3,
+      "因故意犯罪判刑逾六個月": 24,
+      "其他重大事由難以維持婚姻": 2219
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "合計": 2535,
+      "重婚或成立748施行法第2條關係": 1,
+      "與配偶以外之人合意性交": 7,
+      "受他方為不堪同居之虐待": 46,
+      "對他方直系親屬虐待": 3,
+      "一方惡意遺棄他方": 189,
+      "意圖殺害他方": 0,
+      "有不治之惡疾或精神病": 1,
+      "生死不明已逾三年": 2,
+      "因故意犯罪判刑逾六個月": 26,
+      "其他重大事由難以維持婚姻": 2260
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "合計": 2412,
+      "重婚或成立748施行法第2條關係": 0,
+      "與配偶以外之人合意性交": 9,
+      "受他方為不堪同居之虐待": 42,
+      "對他方直系親屬虐待": 0,
+      "一方惡意遺棄他方": 180,
+      "意圖殺害他方": 0,
+      "有不治之惡疾或精神病": 3,
+      "生死不明已逾三年": 2,
+      "因故意犯罪判刑逾六個月": 20,
+      "其他重大事由難以維持婚姻": 2156
+    }
+  ],
+  "family_non_litigation": [
+    {
+      "name": "繼承非訟",
+      "cases": 51686
+    },
+    {
+      "name": "保護令聲請事件",
+      "cases": 34109
+    },
+    {
+      "name": "監護及輔助宣告",
+      "cases": 14877
+    },
+    {
+      "name": "其他事件",
+      "cases": 8025
+    },
+    {
+      "name": "親子非訟",
+      "cases": 7145
+    },
+    {
+      "name": "保護安置",
+      "cases": 6432
+    },
+    {
+      "name": "其他家事非訟",
+      "cases": 4545
+    },
+    {
+      "name": "收養",
+      "cases": 2951
+    },
+    {
+      "name": "夫妻財產制契約登記事項",
+      "cases": 2082
+    },
+    {
+      "name": "分別財產制",
+      "cases": 2000
+    },
+    {
+      "name": "暫時處分",
+      "cases": 1679
+    },
+    {
+      "name": "公示催告",
+      "cases": 1634
+    },
+    {
+      "name": "調解裁定",
+      "cases": 942
+    },
+    {
+      "name": "宣告死亡",
+      "cases": 846
+    },
+    {
+      "name": "保全程序",
+      "cases": 362
+    },
+    {
+      "name": "婚姻非訟",
+      "cases": 207
+    },
+    {
+      "name": "履行勸告事件",
+      "cases": 100
+    },
+    {
+      "name": "精神衛生法聲請事件",
+      "cases": 95
+    },
+    {
+      "name": "失蹤人財產管理",
+      "cases": 91
+    },
+    {
+      "name": "共同財產制",
+      "cases": 82
+    }
+  ],
+  "family_non_lit_yearly": [
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 115328,
+      "categories": {
+        "繼承非訟": 37909,
+        "保護令聲請事件": 28814,
+        "監護及輔助宣告": 11280,
+        "其他事件": 8561,
+        "親子非訟": 7558,
+        "保護安置": 5292,
+        "其他家事非訟": 5082,
+        "收養": 2731,
+        "夫妻財產制契約登記事項": 1994,
+        "公示催告": 1692,
+        "暫時處分": 1608,
+        "宣告死亡": 922,
+        "調解裁定": 992,
+        "保全程序": 323,
+        "婚姻非訟": 317,
+        "失蹤人財產管理": 102,
+        "履行勸告事件": 88,
+        "精神衛生法聲請事件": 63
+      }
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 115809,
+      "categories": {
+        "繼承非訟": 39760,
+        "保護令聲請事件": 29572,
+        "監護及輔助宣告": 11001,
+        "其他事件": 7852,
+        "親子非訟": 6957,
+        "保護安置": 5591,
+        "其他家事非訟": 4776,
+        "收養": 2447,
+        "夫妻財產制契約登記事項": 1856,
+        "暫時處分": 1676,
+        "公示催告": 1549,
+        "宣告死亡": 1000,
+        "調解裁定": 909,
+        "保全程序": 355,
+        "婚姻非訟": 241,
+        "失蹤人財產管理": 116,
+        "履行勸告事件": 80,
+        "精神衛生法聲請事件": 71
+      }
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 129975,
+      "categories": {
+        "繼承非訟": 46540,
+        "保護令聲請事件": 32217,
+        "監護及輔助宣告": 12717,
+        "其他事件": 7929,
+        "親子非訟": 7577,
+        "其他家事非訟": 5865,
+        "保護安置": 5832,
+        "收養": 2664,
+        "夫妻財產制契約登記事項": 2006,
+        "公示催告": 1996,
+        "暫時處分": 1732,
+        "調解裁定": 1062,
+        "宣告死亡": 892,
+        "保全程序": 362,
+        "婚姻非訟": 277,
+        "失蹤人財產管理": 142,
+        "履行勸告事件": 110,
+        "精神衛生法聲請事件": 55
+      }
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 140041,
+      "categories": {
+        "繼承非訟": 51656,
+        "保護令聲請事件": 34818,
+        "監護及輔助宣告": 14165,
+        "其他事件": 8274,
+        "親子非訟": 7289,
+        "其他家事非訟": 6452,
+        "保護安置": 6161,
+        "收養": 3033,
+        "夫妻財產制契約登記事項": 2019,
+        "暫時處分": 1688,
+        "公示催告": 1636,
+        "調解裁定": 1102,
+        "宣告死亡": 837,
+        "保全程序": 393,
+        "婚姻非訟": 239,
+        "失蹤人財產管理": 121,
+        "履行勸告事件": 87,
+        "精神衛生法聲請事件": 71
+      }
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 137808,
+      "categories": {
+        "繼承非訟": 51686,
+        "保護令聲請事件": 34109,
+        "監護及輔助宣告": 14877,
+        "其他事件": 8025,
+        "親子非訟": 7145,
+        "保護安置": 6432,
+        "其他家事非訟": 4545,
+        "收養": 2951,
+        "夫妻財產制契約登記事項": 2082,
+        "暫時處分": 1679,
+        "公示催告": 1634,
+        "調解裁定": 942,
+        "宣告死亡": 846,
+        "保全程序": 362,
+        "婚姻非訟": 207,
+        "失蹤人財產管理": 91,
+        "履行勸告事件": 0,
+        "精神衛生法聲請事件": 0
+      }
+    }
+  ],
+  "full_crime_types": [
+    {
+      "name": "普通刑法計",
+      "cases": 133074
+    },
+    {
+      "name": "特別刑事法令計",
+      "cases": 50664
+    },
+    {
+      "name": "公共危險罪",
+      "cases": 31472
+    },
+    {
+      "name": "傷害罪",
+      "cases": 27243
+    },
+    {
+      "name": "竊盜罪",
+      "cases": 26577
+    },
+    {
+      "name": "洗錢防制法",
+      "cases": 20062
+    },
+    {
+      "name": "違反毒品危害防制條例",
+      "cases": 19953
+    },
+    {
+      "name": "詐欺罪",
+      "cases": 19773
+    },
+    {
+      "name": "妨害自由罪",
+      "cases": 4486
+    },
+    {
+      "name": "其他",
+      "cases": 3662
+    },
+    {
+      "name": "侵占罪",
+      "cases": 3513
+    },
+    {
+      "name": "偽造文書印文罪",
+      "cases": 3194
+    },
+    {
+      "name": "毀棄損壞罪",
+      "cases": 3186
+    },
+    {
+      "name": "妨害名譽及信用罪",
+      "cases": 2519
+    },
+    {
+      "name": "違反家庭暴力防治法",
+      "cases": 2358
+    },
+    {
+      "name": "賭博罪",
+      "cases": 2342
+    },
+    {
+      "name": "妨害性自主罪",
+      "cases": 1594
+    },
+    {
+      "name": "殺人罪",
+      "cases": 1570
+    },
+    {
+      "name": "妨害秩序罪",
+      "cases": 1100
+    },
+    {
+      "name": "違反槍砲彈藥刀械",
+      "cases": 1100
+    },
+    {
+      "name": "妨害公務罪",
+      "cases": 1081
+    },
+    {
+      "name": "違反商標法",
+      "cases": 512
+    },
+    {
+      "name": "妨害風化罪",
+      "cases": 505
+    },
+    {
+      "name": "違反兒童及少年性剝削防制條例",
+      "cases": 482
+    },
+    {
+      "name": "違反藥事法",
+      "cases": 449
+    },
+    {
+      "name": "妨害性隱私及不實性影像罪",
+      "cases": 355
+    },
+    {
+      "name": "誣告罪",
+      "cases": 340
+    },
+    {
+      "name": "偽造有價證券罪",
+      "cases": 336
+    },
+    {
+      "name": "恐嚇取財罪",
+      "cases": 328
+    },
+    {
+      "name": "違反跟蹤騷擾防制法",
+      "cases": 277
+    },
+    {
+      "name": "違反著作權法",
+      "cases": 272
+    },
+    {
+      "name": "妨害秘密罪",
+      "cases": 243
+    },
+    {
+      "name": "妨害兵役治罪條例",
+      "cases": 236
+    },
+    {
+      "name": "強盜罪",
+      "cases": 199
+    },
+    {
+      "name": "違反銀行法",
+      "cases": 175
+    },
+    {
+      "name": "贓物罪",
+      "cases": 162
+    },
+    {
+      "name": "偽證罪",
+      "cases": 151
+    },
+    {
+      "name": "藏匿人犯及湮滅證據罪",
+      "cases": 143
+    },
+    {
+      "name": "貪污治罪條例",
+      "cases": 143
+    },
+    {
+      "name": "背信罪",
+      "cases": 135
+    },
+    {
+      "name": "違反公司法",
+      "cases": 131
+    },
+    {
+      "name": "違反選舉罷免法",
+      "cases": 126
+    },
+    {
+      "name": "搶奪及海盜罪",
+      "cases": 121
+    },
+    {
+      "name": "陸海空軍刑法",
+      "cases": 117
+    },
+    {
+      "name": "妨害電腦使用罪",
+      "cases": 116
+    },
+    {
+      "name": "重利罪",
+      "cases": 114
+    },
+    {
+      "name": "違反就業服務法",
+      "cases": 111
+    },
+    {
+      "name": "違反兩岸關係條例",
+      "cases": 87
+    },
+    {
+      "name": "違反森林法",
+      "cases": 74
+    },
+    {
+      "name": "違反建築法",
+      "cases": 64
+    },
+    {
+      "name": "違反醫師法",
+      "cases": 52
+    },
+    {
+      "name": "違反各種稅法",
+      "cases": 51
+    },
+    {
+      "name": "妨害農工商罪",
+      "cases": 50
+    },
+    {
+      "name": "違反野生動物保育法",
+      "cases": 42
+    },
+    {
+      "name": "妨害投票罪",
+      "cases": 40
+    },
+    {
+      "name": "瀆職罪",
+      "cases": 24
+    },
+    {
+      "name": "違反菸酒管理法",
+      "cases": 22
+    },
+    {
+      "name": "違反水污染防治法",
+      "cases": 20
+    },
+    {
+      "name": "妨害婚姻及家庭罪",
+      "cases": 18
+    },
+    {
+      "name": "脫逃罪",
+      "cases": 15
+    },
+    {
+      "name": "違反電信法",
+      "cases": 15
+    },
+    {
+      "name": "懲治走私條例",
+      "cases": 12
+    },
+    {
+      "name": "違反勞工安全衛生法",
+      "cases": 12
+    },
+    {
+      "name": "偽造貨幣罪",
+      "cases": 11
+    },
+    {
+      "name": "違反食品衛生管理法",
+      "cases": 10
+    },
+    {
+      "name": "遺棄罪",
+      "cases": 8
+    },
+    {
+      "name": "違反山坡地保育利用",
+      "cases": 7
+    },
+    {
+      "name": "國家安全法",
+      "cases": 7
+    },
+    {
+      "name": "違反詐欺犯罪危害防制條例",
+      "cases": 7
+    },
+    {
+      "name": "褻瀆祀典及侵害",
+      "cases": 6
+    },
+    {
+      "name": "擄人勒贖罪",
+      "cases": 4
+    },
+    {
+      "name": "懲治盜匪條例",
+      "cases": 3
+    },
+    {
+      "name": "違反漁業法",
+      "cases": 3
+    },
+    {
+      "name": "妨害國幣懲治條例",
+      "cases": 3
+    },
+    {
+      "name": "違反電業法",
+      "cases": 2
+    },
+    {
+      "name": "違反勞動基準法",
+      "cases": 2
+    },
+    {
+      "name": "違反公平交易法",
+      "cases": 2
+    },
+    {
+      "name": "違反水利法",
+      "cases": 1
+    },
+    {
+      "name": "偽造度量衡罪",
+      "cases": 0
+    },
+    {
+      "name": "墮胎罪",
+      "cases": 0
+    },
+    {
+      "name": "違反糧食管理法",
+      "cases": 0
+    },
+    {
+      "name": "違反國家總動員法",
+      "cases": 0
+    },
+    {
+      "name": "違反海商法",
+      "cases": 0
+    },
+    {
+      "name": "違反能源管理法",
+      "cases": 0
+    },
+    {
+      "name": "違反動產擔保交易法",
+      "cases": 0
+    },
+    {
+      "name": "違反商業登記法",
+      "cases": 0
+    },
+    {
+      "name": "違反麻醉藥品管理條例",
+      "cases": 0
+    },
+    {
+      "name": "違反專利法",
+      "cases": 0
+    },
+    {
+      "name": "集會遊行法",
+      "cases": 0
+    },
+    {
+      "name": "違反兒童及少年福利與權益保障法",
+      "cases": 0
+    },
+    {
+      "name": "違反資恐防制法",
+      "cases": 0
+    }
+  ],
+  "crime_yearly": [
+    {
+      "year_tw": 103,
+      "year_ad": 2014,
+      "合計": 176823,
+      "普通刑法計": 135384,
+      "妨害公務罪": 1203,
+      "妨害秩序罪": 49,
+      "公共危險罪-不能安全駕駛": 66820,
+      "公共危險罪-肇事逃逸": 2156,
+      "殺人罪-既遂": 110,
+      "殺人罪-未遂": 154,
+      "傷害罪-交通過失": 3788,
+      "傷害罪-普通傷害": 59,
+      "妨害自由-剝奪行動自由": 798,
+      "妨害自由-強制罪": 830,
+      "妨害自由-恐嚇危害安全": 1823,
+      "竊盜罪-普通竊盜": 13041,
+      "竊盜罪-加重竊盜": 5078,
+      "侵占罪-業務侵占": 860,
+      "詐欺罪-一般詐欺": 7046,
+      "毀棄損壞罪": 881,
+      "特別刑事法計": 41439,
+      "貪污治罪條例": 405,
+      "妨害兵役治罪條例": 215,
+      "毒品-製造運輸販賣": 3933,
+      "毒品-施用": 24036,
+      "毒品-其他": 2503,
+      "違反著作權法": 293,
+      "違反商標法": 935,
+      "違反槍砲彈藥刀械": 1057,
+      "違反銀行法": 237,
+      "違反兒少性剝削": 426,
+      "違反洗錢防制法": 9,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1438
+    },
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "合計": 176495,
+      "普通刑法計": 132319,
+      "妨害公務罪": 1266,
+      "妨害秩序罪": 42,
+      "公共危險罪-不能安全駕駛": 63453,
+      "公共危險罪-肇事逃逸": 2206,
+      "殺人罪-既遂": 127,
+      "殺人罪-未遂": 172,
+      "傷害罪-交通過失": 4308,
+      "傷害罪-普通傷害": 66,
+      "妨害自由-剝奪行動自由": 755,
+      "妨害自由-強制罪": 933,
+      "妨害自由-恐嚇危害安全": 1801,
+      "竊盜罪-普通竊盜": 13317,
+      "竊盜罪-加重竊盜": 5118,
+      "侵占罪-業務侵占": 834,
+      "詐欺罪-一般詐欺": 7166,
+      "毀棄損壞罪": 975,
+      "特別刑事法計": 44176,
+      "貪污治罪條例": 390,
+      "妨害兵役治罪條例": 213,
+      "毒品-製造運輸販賣": 3372,
+      "毒品-施用": 26787,
+      "毒品-其他": 2615,
+      "違反著作權法": 262,
+      "違反商標法": 849,
+      "違反槍砲彈藥刀械": 1140,
+      "違反銀行法": 161,
+      "違反兒少性剝削": 310,
+      "違反洗錢防制法": 9,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1546
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "合計": 177954,
+      "普通刑法計": 129488,
+      "妨害公務罪": 1545,
+      "妨害秩序罪": 59,
+      "公共危險罪-不能安全駕駛": 58533,
+      "公共危險罪-肇事逃逸": 2203,
+      "殺人罪-既遂": 115,
+      "殺人罪-未遂": 153,
+      "傷害罪-交通過失": 4587,
+      "傷害罪-普通傷害": 77,
+      "妨害自由-剝奪行動自由": 849,
+      "妨害自由-強制罪": 930,
+      "妨害自由-恐嚇危害安全": 2039,
+      "竊盜罪-普通竊盜": 13226,
+      "竊盜罪-加重竊盜": 4821,
+      "侵占罪-業務侵占": 770,
+      "詐欺罪-一般詐欺": 9375,
+      "毀棄損壞罪": 1126,
+      "特別刑事法計": 48466,
+      "貪污治罪條例": 326,
+      "妨害兵役治罪條例": 253,
+      "毒品-製造運輸販賣": 3467,
+      "毒品-施用": 31475,
+      "毒品-其他": 3043,
+      "違反著作權法": 230,
+      "違反商標法": 716,
+      "違反槍砲彈藥刀械": 1234,
+      "違反銀行法": 210,
+      "違反兒少性剝削": 268,
+      "違反洗錢防制法": 14,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1672
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "合計": 186368,
+      "普通刑法計": 135370,
+      "妨害公務罪": 1812,
+      "妨害秩序罪": 50,
+      "公共危險罪-不能安全駕駛": 57855,
+      "公共危險罪-肇事逃逸": 2271,
+      "殺人罪-既遂": 77,
+      "殺人罪-未遂": 189,
+      "傷害罪-交通過失": 4910,
+      "傷害罪-普通傷害": 82,
+      "妨害自由-剝奪行動自由": 889,
+      "妨害自由-強制罪": 1043,
+      "妨害自由-恐嚇危害安全": 2213,
+      "竊盜罪-普通竊盜": 15313,
+      "竊盜罪-加重竊盜": 5048,
+      "侵占罪-業務侵占": 830,
+      "詐欺罪-一般詐欺": 12888,
+      "毀棄損壞罪": 1319,
+      "特別刑事法計": 50998,
+      "貪污治罪條例": 249,
+      "妨害兵役治罪條例": 262,
+      "毒品-製造運輸販賣": 3674,
+      "毒品-施用": 33523,
+      "毒品-其他": 2761,
+      "違反著作權法": 208,
+      "違反商標法": 702,
+      "違反槍砲彈藥刀械": 1553,
+      "違反銀行法": 253,
+      "違反兒少性剝削": 343,
+      "違反洗錢防制法": 15,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1846
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "合計": 183457,
+      "普通刑法計": 131523,
+      "妨害公務罪": 1786,
+      "妨害秩序罪": 46,
+      "公共危險罪-不能安全駕駛": 54561,
+      "公共危險罪-肇事逃逸": 2172,
+      "殺人罪-既遂": 120,
+      "殺人罪-未遂": 143,
+      "傷害罪-交通過失": 5098,
+      "傷害罪-普通傷害": 60,
+      "妨害自由-剝奪行動自由": 942,
+      "妨害自由-強制罪": 880,
+      "妨害自由-恐嚇危害安全": 2094,
+      "竊盜罪-普通竊盜": 15583,
+      "竊盜罪-加重竊盜": 4666,
+      "侵占罪-業務侵占": 915,
+      "詐欺罪-一般詐欺": 14178,
+      "毀棄損壞罪": 1579,
+      "特別刑事法計": 51934,
+      "貪污治罪條例": 204,
+      "妨害兵役治罪條例": 234,
+      "毒品-製造運輸販賣": 4609,
+      "毒品-施用": 33084,
+      "毒品-其他": 2812,
+      "違反著作權法": 193,
+      "違反商標法": 577,
+      "違反槍砲彈藥刀械": 1618,
+      "違反銀行法": 328,
+      "違反兒少性剝削": 296,
+      "違反洗錢防制法": 256,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1657
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "合計": 175899,
+      "普通刑法計": 126361,
+      "妨害公務罪": 1717,
+      "妨害秩序罪": 65,
+      "公共危險罪-不能安全駕駛": 48950,
+      "公共危險罪-肇事逃逸": 2042,
+      "殺人罪-既遂": 108,
+      "殺人罪-未遂": 162,
+      "傷害罪-交通過失": 5852,
+      "傷害罪-普通傷害": 53,
+      "妨害自由-剝奪行動自由": 1114,
+      "妨害自由-強制罪": 1026,
+      "妨害自由-恐嚇危害安全": 2202,
+      "竊盜罪-普通竊盜": 15754,
+      "竊盜罪-加重竊盜": 4504,
+      "侵占罪-業務侵占": 864,
+      "詐欺罪-一般詐欺": 14007,
+      "毀棄損壞罪": 1736,
+      "特別刑事法計": 49538,
+      "貪污治罪條例": 255,
+      "妨害兵役治罪條例": 235,
+      "毒品-製造運輸販賣": 4840,
+      "毒品-施用": 30157,
+      "毒品-其他": 2499,
+      "違反著作權法": 197,
+      "違反商標法": 648,
+      "違反槍砲彈藥刀械": 1475,
+      "違反銀行法": 298,
+      "違反兒少性剝削": 283,
+      "違反洗錢防制法": 345,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1734
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "合計": 167244,
+      "普通刑法計": 129020,
+      "妨害公務罪": 1848,
+      "妨害秩序罪": 187,
+      "公共危險罪-不能安全駕駛": 47436,
+      "公共危險罪-肇事逃逸": 1883,
+      "殺人罪-既遂": 87,
+      "殺人罪-未遂": 142,
+      "傷害罪-交通過失": 6359,
+      "傷害罪-普通傷害": 60,
+      "妨害自由-剝奪行動自由": 1035,
+      "妨害自由-強制罪": 1015,
+      "妨害自由-恐嚇危害安全": 2242,
+      "竊盜罪-普通竊盜": 16857,
+      "竊盜罪-加重竊盜": 4253,
+      "侵占罪-業務侵占": 893,
+      "詐欺罪-一般詐欺": 15479,
+      "毀棄損壞罪": 1868,
+      "特別刑事法計": 38224,
+      "貪污治罪條例": 240,
+      "妨害兵役治罪條例": 184,
+      "毒品-製造運輸販賣": 5135,
+      "毒品-施用": 19492,
+      "毒品-其他": 2081,
+      "違反著作權法": 151,
+      "違反商標法": 920,
+      "違反槍砲彈藥刀械": 1243,
+      "違反銀行法": 564,
+      "違反兒少性剝削": 355,
+      "違反洗錢防制法": 441,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1720
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "合計": 132148,
+      "普通刑法計": 107171,
+      "妨害公務罪": 1426,
+      "妨害秩序罪": 947,
+      "公共危險罪-不能安全駕駛": 34853,
+      "公共危險罪-肇事逃逸": 1652,
+      "殺人罪-既遂": 69,
+      "殺人罪-未遂": 121,
+      "傷害罪-交通過失": 6174,
+      "傷害罪-普通傷害": 73,
+      "妨害自由-剝奪行動自由": 755,
+      "妨害自由-強制罪": 950,
+      "妨害自由-恐嚇危害安全": 2117,
+      "竊盜罪-普通竊盜": 15916,
+      "竊盜罪-加重竊盜": 3757,
+      "侵占罪-業務侵占": 767,
+      "詐欺罪-一般詐欺": 13061,
+      "毀棄損壞罪": 1793,
+      "特別刑事法計": 24977,
+      "貪污治罪條例": 333,
+      "妨害兵役治罪條例": 133,
+      "毒品-製造運輸販賣": 4528,
+      "毒品-施用": 3942,
+      "毒品-其他": 2069,
+      "違反著作權法": 161,
+      "違反商標法": 806,
+      "違反槍砲彈藥刀械": 1115,
+      "違反銀行法": 371,
+      "違反兒少性剝削": 363,
+      "違反洗錢防制法": 3932,
+      "違反跟蹤騷擾防制法": 0,
+      "違反家庭暴力防治法": 1753
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "合計": 159508,
+      "普通刑法計": 123252,
+      "妨害公務罪": 1468,
+      "妨害秩序罪": 2466,
+      "公共危險罪-不能安全駕駛": 36505,
+      "公共危險罪-肇事逃逸": 2001,
+      "殺人罪-既遂": 133,
+      "殺人罪-未遂": 137,
+      "傷害罪-交通過失": 7660,
+      "傷害罪-普通傷害": 79,
+      "妨害自由-剝奪行動自由": 1032,
+      "妨害自由-強制罪": 1258,
+      "妨害自由-恐嚇危害安全": 2842,
+      "竊盜罪-普通竊盜": 18304,
+      "竊盜罪-加重竊盜": 4576,
+      "侵占罪-業務侵占": 854,
+      "詐欺罪-一般詐欺": 15186,
+      "毀棄損壞罪": 2243,
+      "特別刑事法計": 36256,
+      "貪污治罪條例": 263,
+      "妨害兵役治罪條例": 144,
+      "毒品-製造運輸販賣": 5427,
+      "毒品-施用": 6486,
+      "毒品-其他": 2290,
+      "違反著作權法": 186,
+      "違反商標法": 761,
+      "違反槍砲彈藥刀械": 1194,
+      "違反銀行法": 480,
+      "違反兒少性剝削": 348,
+      "違反洗錢防制法": 10456,
+      "違反跟蹤騷擾防制法": 21,
+      "違反家庭暴力防治法": 2135
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "合計": 170172,
+      "普通刑法計": 123308,
+      "妨害公務罪": 1339,
+      "妨害秩序罪": 3184,
+      "公共危險罪-不能安全駕駛": 33190,
+      "公共危險罪-肇事逃逸": 2083,
+      "殺人罪-既遂": 75,
+      "殺人罪-未遂": 125,
+      "傷害罪-交通過失": 8021,
+      "傷害罪-普通傷害": 54,
+      "妨害自由-剝奪行動自由": 933,
+      "妨害自由-強制罪": 1224,
+      "妨害自由-恐嚇危害安全": 2735,
+      "竊盜罪-普通竊盜": 19750,
+      "竊盜罪-加重竊盜": 4926,
+      "侵占罪-業務侵占": 821,
+      "詐欺罪-一般詐欺": 16475,
+      "毀棄損壞罪": 2399,
+      "特別刑事法計": 46864,
+      "貪污治罪條例": 284,
+      "妨害兵役治罪條例": 199,
+      "毒品-製造運輸販賣": 4954,
+      "毒品-施用": 11018,
+      "毒品-其他": 2421,
+      "違反著作權法": 170,
+      "違反商標法": 606,
+      "違反槍砲彈藥刀械": 1094,
+      "違反銀行法": 468,
+      "違反兒少性剝削": 436,
+      "違反洗錢防制法": 15986,
+      "違反跟蹤騷擾防制法": 157,
+      "違反家庭暴力防治法": 2084
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "合計": 180103,
+      "普通刑法計": 128099,
+      "妨害公務罪": 1024,
+      "妨害秩序罪": 3108,
+      "公共危險罪-不能安全駕駛": 28298,
+      "公共危險罪-肇事逃逸": 2069,
+      "殺人罪-既遂": 54,
+      "殺人罪-未遂": 116,
+      "傷害罪-交通過失": 8463,
+      "傷害罪-普通傷害": 71,
+      "妨害自由-剝奪行動自由": 932,
+      "妨害自由-強制罪": 1213,
+      "妨害自由-恐嚇危害安全": 2672,
+      "竊盜罪-普通竊盜": 21811,
+      "竊盜罪-加重竊盜": 4817,
+      "侵占罪-業務侵占": 958,
+      "詐欺罪-一般詐欺": 22579,
+      "毀棄損壞罪": 2502,
+      "特別刑事法計": 52004,
+      "貪污治罪條例": 279,
+      "妨害兵役治罪條例": 222,
+      "毒品-製造運輸販賣": 4869,
+      "毒品-施用": 12556,
+      "毒品-其他": 2756,
+      "違反著作權法": 161,
+      "違反商標法": 526,
+      "違反槍砲彈藥刀械": 1093,
+      "違反銀行法": 462,
+      "違反兒少性剝削": 509,
+      "違反洗錢防制法": 19096,
+      "違反跟蹤騷擾防制法": 215,
+      "違反家庭暴力防治法": 2289
+    }
+  ],
+  "civil_case_types": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "total": 140208,
+      "types": {
+        "不當得利": 2187,
+        "損害賠償": 24261,
+        "買賣": 5670,
+        "贈與": 394,
+        "租賃": 2260,
+        "借貸": 51231,
+        "僱傭": 366,
+        "承攬": 2877,
+        "旅遊": 47,
+        "委任": 1077,
+        "合夥": 243,
+        "其他民法": 25989,
+        "特別法": 23606
+      }
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "total": 144989,
+      "types": {
+        "不當得利": 2312,
+        "損害賠償": 27326,
+        "買賣": 5452,
+        "贈與": 299,
+        "租賃": 2478,
+        "借貸": 54016,
+        "僱傭": 418,
+        "承攬": 2838,
+        "旅遊": 40,
+        "委任": 1098,
+        "合夥": 271,
+        "其他民法": 25611,
+        "特別法": 22830
+      }
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "total": 151879,
+      "types": {
+        "不當得利": 2600,
+        "損害賠償": 30475,
+        "買賣": 5477,
+        "贈與": 255,
+        "租賃": 2670,
+        "借貸": 55517,
+        "僱傭": 449,
+        "承攬": 2898,
+        "旅遊": 36,
+        "委任": 1246,
+        "合夥": 344,
+        "其他民法": 25658,
+        "特別法": 24254
+      }
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "total": 163252,
+      "types": {
+        "不當得利": 2740,
+        "損害賠償": 34220,
+        "買賣": 5622,
+        "贈與": 301,
+        "租賃": 2998,
+        "借貸": 61980,
+        "僱傭": 436,
+        "承攬": 3001,
+        "旅遊": 43,
+        "委任": 1245,
+        "合夥": 281,
+        "其他民法": 26231,
+        "特別法": 24154
+      }
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "total": 185230,
+      "types": {
+        "不當得利": 2625,
+        "損害賠償": 34975,
+        "買賣": 6093,
+        "贈與": 263,
+        "租賃": 3286,
+        "借貸": 85036,
+        "僱傭": 357,
+        "承攬": 2874,
+        "旅遊": 37,
+        "委任": 1440,
+        "合夥": 319,
+        "其他民法": 25546,
+        "特別法": 22379
+      }
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 188796,
+      "types": {
+        "不當得利": 2930,
+        "損害賠償": 39455,
+        "買賣": 7467,
+        "贈與": 206,
+        "租賃": 3557,
+        "借貸": 81470,
+        "僱傭": 321,
+        "承攬": 2907,
+        "旅遊": 75,
+        "委任": 1323,
+        "合夥": 381,
+        "其他民法": 26771,
+        "特別法": 21933
+      }
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 171328,
+      "types": {
+        "不當得利": 2672,
+        "損害賠償": 36260,
+        "買賣": 8808,
+        "贈與": 213,
+        "租賃": 3046,
+        "借貸": 73489,
+        "僱傭": 213,
+        "承攬": 2292,
+        "旅遊": 83,
+        "委任": 1144,
+        "合夥": 308,
+        "其他民法": 22517,
+        "特別法": 20283
+      }
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 183505,
+      "types": {
+        "不當得利": 3203,
+        "損害賠償": 46413,
+        "買賣": 12044,
+        "贈與": 282,
+        "租賃": 3729,
+        "借貸": 63906,
+        "僱傭": 270,
+        "承攬": 2677,
+        "旅遊": 35,
+        "委任": 1217,
+        "合夥": 371,
+        "其他民法": 25890,
+        "特別法": 23468
+      }
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 181121,
+      "types": {
+        "不當得利": 3452,
+        "損害賠償": 55233,
+        "買賣": 12990,
+        "贈與": 280,
+        "租賃": 3628,
+        "借貸": 51987,
+        "僱傭": 248,
+        "承攬": 2674,
+        "旅遊": 13,
+        "委任": 1277,
+        "合夥": 362,
+        "其他民法": 26049,
+        "特別法": 22928
+      }
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 177230,
+      "types": {
+        "不當得利": 3489,
+        "損害賠償": 64329,
+        "買賣": 8250,
+        "贈與": 303,
+        "租賃": 4190,
+        "借貸": 44260,
+        "僱傭": 392,
+        "承攬": 2637,
+        "旅遊": 16,
+        "委任": 1431,
+        "合夥": 384,
+        "其他民法": 25184,
+        "特別法": 22365
+      }
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "total": 181986,
+      "types": {
+        "不當得利": 3477,
+        "損害賠償": 71784,
+        "買賣": 8370,
+        "贈與": 294,
+        "租賃": 4360,
+        "借貸": 39508,
+        "僱傭": 327,
+        "承攬": 2860,
+        "旅遊": 19,
+        "委任": 1392,
+        "合夥": 373,
+        "其他民法": 25679,
+        "特別法": 23543
+      }
+    }
+  ],
+  "criminal_crime_types": [
+    {
+      "year_tw": 104,
+      "year_ad": 2015,
+      "total": 179172,
+      "types": {
+        "瀆職罪": 87,
+        "妨害公務罪": 1221,
+        "妨害投票罪": 108,
+        "妨害秩序罪": 43,
+        "藏匿犯人及湮滅證據罪": 96,
+        "偽證罪": 287,
+        "誣告罪": 397,
+        "公共危險罪": 66631,
+        "偽造有價證券罪": 407,
+        "其他普通刑法": 65987,
+        "特別刑法": 43908
+      }
+    },
+    {
+      "year_tw": 105,
+      "year_ad": 2016,
+      "total": 181994,
+      "types": {
+        "瀆職罪": 128,
+        "妨害公務罪": 1497,
+        "妨害投票罪": 61,
+        "妨害秩序罪": 53,
+        "藏匿犯人及湮滅證據罪": 97,
+        "偽證罪": 248,
+        "誣告罪": 361,
+        "公共危險罪": 61686,
+        "偽造有價證券罪": 403,
+        "其他普通刑法": 68039,
+        "特別刑法": 49421
+      }
+    },
+    {
+      "year_tw": 106,
+      "year_ad": 2017,
+      "total": 192458,
+      "types": {
+        "瀆職罪": 117,
+        "妨害公務罪": 1752,
+        "妨害投票罪": 13,
+        "妨害秩序罪": 44,
+        "藏匿犯人及湮滅證據罪": 99,
+        "偽證罪": 278,
+        "誣告罪": 379,
+        "公共危險罪": 61129,
+        "偽造有價證券罪": 404,
+        "其他普通刑法": 76126,
+        "特別刑法": 52117
+      }
+    },
+    {
+      "year_tw": 107,
+      "year_ad": 2018,
+      "total": 189725,
+      "types": {
+        "瀆職罪": 76,
+        "妨害公務罪": 1736,
+        "妨害投票罪": 2,
+        "妨害秩序罪": 47,
+        "藏匿犯人及湮滅證據罪": 115,
+        "偽證罪": 257,
+        "誣告罪": 409,
+        "公共危險罪": 57731,
+        "偽造有價證券罪": 393,
+        "其他普通刑法": 75945,
+        "特別刑法": 53014
+      }
+    },
+    {
+      "year_tw": 108,
+      "year_ad": 2019,
+      "total": 182249,
+      "types": {
+        "瀆職罪": 67,
+        "妨害公務罪": 1664,
+        "妨害投票罪": 90,
+        "妨害秩序罪": 62,
+        "藏匿犯人及湮滅證據罪": 130,
+        "偽證罪": 251,
+        "誣告罪": 408,
+        "公共危險罪": 51952,
+        "偽造有價證券罪": 365,
+        "其他普通刑法": 76445,
+        "特別刑法": 50815
+      }
+    },
+    {
+      "year_tw": 109,
+      "year_ad": 2020,
+      "total": 176087,
+      "types": {
+        "瀆職罪": 32,
+        "妨害公務罪": 1783,
+        "妨害投票罪": 48,
+        "妨害秩序罪": 100,
+        "藏匿犯人及湮滅證據罪": 105,
+        "偽證罪": 232,
+        "誣告罪": 371,
+        "公共危險罪": 50318,
+        "偽造有價證券罪": 390,
+        "其他普通刑法": 80497,
+        "特別刑法": 42211
+      }
+    },
+    {
+      "year_tw": 110,
+      "year_ad": 2021,
+      "total": 139441,
+      "types": {
+        "瀆職罪": 23,
+        "妨害公務罪": 1378,
+        "妨害投票罪": 8,
+        "妨害秩序罪": 328,
+        "藏匿犯人及湮滅證據罪": 128,
+        "偽證罪": 163,
+        "誣告罪": 265,
+        "公共危險罪": 37380,
+        "偽造有價證券罪": 290,
+        "其他普通刑法": 71729,
+        "特別刑法": 27749
+      }
+    },
+    {
+      "year_tw": 111,
+      "year_ad": 2022,
+      "total": 165844,
+      "types": {
+        "瀆職罪": 26,
+        "妨害公務罪": 1441,
+        "妨害投票罪": 3,
+        "妨害秩序罪": 807,
+        "藏匿犯人及湮滅證據罪": 137,
+        "偽證罪": 166,
+        "誣告罪": 370,
+        "公共危險罪": 39582,
+        "偽造有價證券罪": 334,
+        "其他普通刑法": 85875,
+        "特別刑法": 37103
+      }
+    },
+    {
+      "year_tw": 112,
+      "year_ad": 2023,
+      "total": 176667,
+      "types": {
+        "瀆職罪": 33,
+        "妨害公務罪": 1337,
+        "妨害投票罪": 81,
+        "妨害秩序罪": 1085,
+        "藏匿犯人及湮滅證據罪": 104,
+        "偽證罪": 137,
+        "誣告罪": 309,
+        "公共危險罪": 36346,
+        "偽造有價證券罪": 333,
+        "其他普通刑法": 88140,
+        "特別刑法": 48762
+      }
+    },
+    {
+      "year_tw": 113,
+      "year_ad": 2024,
+      "total": 187417,
+      "types": {
+        "瀆職罪": 24,
+        "妨害公務罪": 1081,
+        "妨害投票罪": 40,
+        "妨害秩序罪": 1100,
+        "藏匿犯人及湮滅證據罪": 143,
+        "偽證罪": 151,
+        "誣告罪": 340,
+        "公共危險罪": 31472,
+        "偽造有價證券罪": 336,
+        "其他普通刑法": 98387,
+        "特別刑法": 54343
+      }
+    },
+    {
+      "year_tw": 114,
+      "year_ad": 2025,
+      "total": 204967,
+      "types": {
+        "瀆職罪": 27,
+        "妨害公務罪": 846,
+        "妨害投票罪": 11,
+        "妨害秩序罪": 934,
+        "藏匿犯人及湮滅證據罪": 133,
+        "偽證罪": 140,
+        "誣告罪": 380,
+        "公共危險罪": 33639,
+        "偽造有價證券罪": 312,
+        "其他普通刑法": 111023,
+        "特別刑法": 57522
+      }
+    }
+  ]
+}

@@ -439,6 +439,67 @@
       .modal-content { max-width: 100%; border-radius: 0; max-height: 100vh; }
       .modal-overlay { padding: 0; }
     }
+
+    /* ===================== 司法統計（jstat） ===================== */
+    .jstat .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px; margin-bottom: 24px; }
+    .jstat .chart-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .jstat .chart-card.full { grid-column: 1 / -1; }
+    .jstat .chart-title { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+    .jstat .chart-container { position: relative; height: 350px; }
+    .jstat .chart-container.tall { height: 500px; }
+    @media (max-width: 768px) { .jstat .chart-grid { grid-template-columns: 1fr; } .jstat .chart-container { height: 280px; } }
+
+    .jstat .kpi-card { border-left: 4px solid var(--blue); }
+    .jstat .kpi-card.accent { border-left-color: var(--red); }
+    .jstat .kpi-card.green { border-left-color: var(--green); }
+    .jstat .kpi-card.orange { border-left-color: var(--orange); }
+    .jstat .kpi-card.purple { border-left-color: var(--purple); }
+    .jstat .kpi-change { font-size: 0.8rem; margin-top: 6px; }
+    .jstat .kpi-change.up { color: var(--red); }
+    .jstat .kpi-change.down { color: var(--green); }
+
+    .jstat .sub-tab-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); transition: all 0.15s; font-family: inherit; }
+    .jstat .sub-tab-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .jstat .sub-tab-btn.active { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--tab-active-color); }
+
+    .jstat .desc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+    .jstat .desc-item { background: var(--bg-row); border-left: 3px solid var(--blue); border-radius: 6px; padding: 12px 14px; }
+    .jstat .desc-item.top-1 { border-left-color: var(--purple); }
+    .jstat .desc-item.top-2 { border-left-color: var(--red); }
+    .jstat .desc-item.top-3 { border-left-color: var(--orange); }
+    .jstat .desc-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+    .jstat .desc-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .jstat .desc-stats { font-size: 12px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .jstat .desc-stats .change-up { color: var(--red); font-weight: 600; }
+    .jstat .desc-stats .change-down { color: var(--green); font-weight: 600; }
+    .jstat .desc-text { font-size: 12px; color: var(--text); opacity: 0.85; line-height: 1.5; }
+
+    /* 深度分析文章：固定亮色「紙張」樣式，深淺主題皆以白底呈現 */
+    .jstat .analysis-article { grid-column: 1 / -1; background: linear-gradient(135deg, #fefefe 0%, #f8fafc 100%); border-radius: 12px; padding: 32px 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); line-height: 1.9; color: #2d3748; font-size: 15px; }
+    .jstat .analysis-article .article-header { border-bottom: 3px solid #1a365d; padding-bottom: 16px; margin-bottom: 24px; }
+    .jstat .analysis-article .article-title { font-size: 24px; font-weight: 700; color: #1a365d; margin-bottom: 6px; }
+    .jstat .analysis-article .article-subtitle { font-size: 13px; color: #718096; }
+    .jstat .analysis-article h2 { font-size: 19px; font-weight: 700; color: #1a365d; margin-top: 32px; margin-bottom: 12px; padding-left: 12px; border-left: 5px solid #e53e3e; }
+    .jstat .analysis-article h3 { font-size: 16px; font-weight: 600; color: #2a4a7f; margin-top: 20px; margin-bottom: 8px; }
+    .jstat .analysis-article p { margin-bottom: 14px; text-align: justify; }
+    .jstat .analysis-article .highlight { background: linear-gradient(180deg, transparent 60%, #fef3c7 60%); padding: 0 2px; font-weight: 600; }
+    .jstat .analysis-article .stat-inline { font-weight: 600; color: #e53e3e; font-variant-numeric: tabular-nums; }
+    .jstat .analysis-article .stat-down { font-weight: 600; color: #38a169; font-variant-numeric: tabular-nums; }
+    .jstat .analysis-article .insight-box { background: #f0f9ff; border-left: 4px solid #3182ce; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 14px; }
+    .jstat .analysis-article .insight-box strong { color: #3182ce; }
+    .jstat .analysis-article .warning-box { background: #fef2f2; border-left: 4px solid #e53e3e; border-radius: 6px; padding: 14px 18px; margin: 16px 0; font-size: 14px; }
+    .jstat .analysis-article .warning-box strong { color: #e53e3e; }
+    .jstat .analysis-article ul, .jstat .analysis-article ol { margin: 12px 0 14px 24px; }
+    .jstat .analysis-article li { margin-bottom: 6px; }
+    .jstat .analysis-article table.article-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    .jstat .analysis-article table.article-table th { background: #1a365d; color: #fff; padding: 8px 12px; text-align: left; font-weight: 500; border-bottom: none; text-transform: none; letter-spacing: normal; }
+    .jstat .analysis-article table.article-table td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .jstat .analysis-article table.article-table tr:hover td { background: #f0f4ff; }
+    .jstat .analysis-article .takeaway { background: linear-gradient(135deg, #1a365d 0%, #2a4a7f 100%); color: #fff; padding: 20px 24px; border-radius: 10px; margin-top: 24px; }
+    .jstat .analysis-article .takeaway h3 { color: #ffd700; margin-top: 0; font-size: 17px; }
+    .jstat .analysis-article .takeaway p { color: #e8eef7; }
+    .jstat .analysis-article .ai-badge { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+
   </style>
 </head>
 <body>
@@ -488,6 +549,7 @@
     <button class="nav-btn active" id="navBtn_lawyer" onclick="showSection('lawyer')">&#9878;&#65039; 律師</button>
     <button class="nav-btn" id="navBtn_judge" onclick="showSection('judge')">&#127963;&#65039; 法官</button>
     <button class="nav-btn" id="navBtn_prosecutor" onclick="showSection('prosecutor')">&#9876;&#65039; 檢察官</button>
+    <button class="nav-btn" id="navBtn_jstat" onclick="showSection('jstat')">&#128202; 司法統計</button>
     <button class="nav-btn" id="navBtn_sources" onclick="showSection('sources')">資料來源</button>
     <button class="nav-btn" id="navBtn_admin" onclick="showSection('admin')" style="display:none;">帳號管理</button>
   </div>
@@ -1097,7 +1159,7 @@
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">&#127963;&#65039; 檢察署層級分布</div>
+          <div class="card-title">&#127963;&#65039; 檢察署層級分布（官方編制・114 年底）</div>
           <div class="chart-container"><canvas id="chartProsLevel"></canvas></div>
         </div>
         <div class="card">
@@ -1190,11 +1252,714 @@
       </div>
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
-          「現職檢察官（估）」＝最新資料月在裁判書具名的不重複檢察官數（同一人跨署以案件量最多的署為主要歸屬）。全國合計與法務統計官方數（114 年底 1,460 人）誤差 &lt;1%，但單署數字受具名率與歸屬推定影響，僅供參考。「近一年具名」為近 12 個資料月的累計不重複人數，含期間內調動/離退者，會高於現職數。
+          「現職檢察官（估）」＝最新資料月在裁判書具名的不重複檢察官數（同一人跨署以案件量最多的署為主要歸屬）。全國合計與法務統計官方數（114 年底 1,460 人）誤差 &lt;1%，但單署數字受具名率與歸屬推定影響，僅供參考。「近一年具名」為近 12 個資料月的累計不重複人數，含期間內調動/離退者，會高於現職數。<br>
+          <strong>†</strong> 高檢及分署/最高檢察署的檢察官極少在裁判書具名（上訴審由地檢起訴檢察官具名、三審多為書面裁定），估計值嚴重低估——官方編制：高等檢察署及其分署 <strong>161</strong> 人、最高檢察署 <strong>13</strong> 人（法務統計 114 年底）。
         </div>
       </div>
     </div>
 
+
+    <!-- ==================== TABS: JSTAT (司法統計，7 個分頁) ==================== -->
+        <!-- Tab: 總覽 -->
+        <div class="tab-content jstat" id="tab-jstat-overview">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">資料來源：<a href="https://www.judicial.gov.tw/tw/lp-1789-1.html" target="_blank" style="color:var(--blue);">司法院統計處</a>統計月報（民國 104–114 年）｜最後更新：114 年 12 月</div>
+      <div class="kpi-grid" id="jstat_kpiGrid"></div>
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">歷年各類案件新收總數趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartTotalTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">114 年案件類型分布</div>
+                    <div class="chart-container"><canvas id="jstat_chartTypeDistribution"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">歷年案件量年增率</div>
+                    <div class="sub-tabs" id="jstat_growthRateTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="sub-tab-btn active" data-category="total">總量</button>
+                        <button class="sub-tab-btn" data-category="civil_only">民事（不含家事）</button>
+                        <button class="sub-tab-btn" data-category="family">家事</button>
+                        <button class="sub-tab-btn" data-category="criminal">刑事</button>
+                        <button class="sub-tab-btn" data-category="enforcement">強制執行</button>
+                        <button class="sub-tab-btn" data-category="administrative">行政訴訟</button>
+                    </div>
+                    <div class="chart-container"><canvas id="jstat_chartGrowthRate"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 民事 -->
+        <div class="tab-content jstat" id="tab-jstat-civil">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">地方法院民事案件收結趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartCivilTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">民事案件未結積壓趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartCivilPending"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">民事案件平均結案天數</div>
+                    <div class="chart-container"><canvas id="jstat_chartCivilDays"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">民事三級審維持率（一審→二審 vs 二審→三審）</div>
+                    <div class="chart-container"><canvas id="jstat_chartCivilInstanceRate"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">民事第一審訴訟種類歷年趨勢（2015-2025）</div>
+                    <div class="chart-container"><canvas id="jstat_chartCivilTypeTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">民事訴訟種類分類說明（114 年件數）</div>
+                    <div id="jstat_civilTypesDesc" class="desc-grid"></div>
+                </div>
+
+                <!-- 民事案件深度分析文章 -->
+                <div class="analysis-article">
+                    <div class="article-header">
+                        <div class="article-title">民事案件深度分析：十年來的社會訊號 <span class="ai-badge">AI 洞察</span></div>
+                        <div class="article-subtitle">資料期間：2015-2025 年｜資料來源：司法院統計月報 + 年報｜分析範圍：地方法院民事第一審及訴訟種類</div>
+                    </div>
+
+                    <h2>一、十年總覽：量能失衡的警訊</h2>
+                    <p>從 2015 到 2025 年，地方法院民事案件的新收量從 <span class="stat-inline">232.7 萬件</span> 成長到 <span class="stat-inline">339.9 萬件</span>，十年累計 <span class="highlight">+46.1%</span>。乍看之下只是穩定成長，但把「結案速度」和「未結庫存」一起看，真相就不一樣了：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>新收</th><th>結案</th><th>未結庫存</th><th>平均結案天數</th></tr>
+                        <tr><td>2015</td><td>2,327,093</td><td>2,325,681</td><td>139,680</td><td>32.6 天</td></tr>
+                        <tr><td>2019</td><td>2,570,608</td><td>2,562,005</td><td>171,787</td><td>34.3 天</td></tr>
+                        <tr><td>2022</td><td>2,894,372</td><td>2,876,460</td><td>203,143</td><td>32.5 天</td></tr>
+                        <tr><td>2023</td><td>3,146,973</td><td>3,076,118</td><td><strong>273,998</strong></td><td>34.0 天</td></tr>
+                        <tr><td>2024</td><td>3,412,227</td><td>3,281,527</td><td><strong>404,698</strong></td><td><strong>42.2 天</strong></td></tr>
+                        <tr><td>2025</td><td>3,399,055</td><td>3,449,013</td><td>354,740</td><td><strong>53.8 天</strong></td></tr>
+                    </table>
+
+                    <div class="warning-box">
+                        <strong>⚠ 2024 年是明顯的拐點。</strong>未結庫存從 2022 年的 20 萬件一路跳到 2024 年的 <span class="stat-inline">40.5 萬件（+99%）</span>，平均結案天數從長年穩定的 32-34 天暴衝到 <span class="stat-inline">53.8 天（2025）</span>。也就是說，**短短兩年內司法系統處理民事案件的速度變慢了 60%**，這不是漸進變化，是結構性失速。
+                    </div>
+
+                    <p>法官的工作負擔也出現矛盾：每位法官月均結案件數從 2015 年的 25.1 件上升到 2019-2020 的 30.5 件高點後，2024-2025 又回落到 27-28 件。換句話說，<span class="highlight">法官不是「不願結案」，而是「結不動了」</span>——案件複雜度、文書量、和當事人協商時間都在增加，單位時間內能處理的案件自然變少。</p>
+
+                    <h2>二、訴訟種類的結構性翻轉</h2>
+                    <p>十年來最劇烈的變化不在總量，而在「人們為什麼上法院」的根本轉變。2015 年時，借貸糾紛是民事第一審的最大宗（5.1 萬件），損害賠償只有 2.4 萬件。但到了 2025 年，局勢完全逆轉：</p>
+
+                    <table class="article-table">
+                        <tr><th>訴訟種類</th><th>2015</th><th>2019（借貸峰值）</th><th>2025</th><th>十年變化</th></tr>
+                        <tr><td><strong>損害賠償</strong></td><td>24,261</td><td>34,975</td><td><strong>71,784</strong></td><td class="stat-inline">+195.9%</td></tr>
+                        <tr><td><strong>借貸</strong></td><td>51,231</td><td><strong>85,036</strong></td><td>39,508</td><td class="stat-down">−22.9%</td></tr>
+                        <tr><td>買賣</td><td>5,670</td><td>6,093</td><td>8,370</td><td>+47.6%</td></tr>
+                        <tr><td>不當得利</td><td>2,187</td><td>2,625</td><td>3,477</td><td>+59.0%</td></tr>
+                        <tr><td>承攬</td><td>2,877</td><td>2,874</td><td>2,860</td><td>持平</td></tr>
+                        <tr><td>特別法</td><td>23,606</td><td>22,379</td><td>23,543</td><td>持平</td></tr>
+                    </table>
+
+                    <h3>2.1　借貸案件為何「先升後跌」？</h3>
+                    <p>借貸訴訟在 2019 年衝上 8.5 萬件的歷史高點，之後連續六年下滑到 3.95 萬件，十年淨減 1.2 萬件。幾個可能的結構性因素：</p>
+                    <ul>
+                        <li><strong>消費金融環境改變</strong>：銀行消費信貸、信用卡、P2P 平台、行動支付興起，取代傳統民間借貸。正式管道借錢不需要上法院要債。</li>
+                        <li><strong>2019 高峰可能是 2008 金融海嘯後卡債族的尾聲</strong>：2015-2019 剛好是個人再生、消債條例相關案件集中清算的期間。</li>
+                        <li><strong>本票裁定改走「非訟」程序</strong>：許多小額借貸糾紛先走支付命令或本票裁定，能直接取得執行名義，不必進入訴訟程序。</li>
+                    </ul>
+
+                    <h3>2.2　損害賠償為何「直線上升」？</h3>
+                    <p>損害賠償從 2015 年的 2.4 萬件一路長到 2025 年的 <span class="stat-inline">7.2 萬件</span>，幾乎是三倍，而且沒有任何一年下跌。這是最具社會意義的信號：</p>
+                    <div class="insight-box">
+                        <strong>💡 社會觀察：</strong>損害賠償的成長反映三個並行的現象——<br>
+                        ① <strong>交通事故訴訟化</strong>：車禍民事請求從過去的調解、和解為主，越來越多當事人直接走訴訟。刑事追訴門檻提高（過失傷害需告訴）之後，民事損賠成為主要的求償管道。<br>
+                        ② <strong>工程糾紛爆量</strong>：2019 年後台灣公共工程、都更、住宅建案激增，工程瑕疵、逾期罰款、工程款爭議進入法院。<br>
+                        ③ <strong>網路名譽權、隱私權訴訟興起</strong>：社群媒體時代，個人名譽/隱私被侵害的民事賠償請求越來越多。
+                    </div>
+
+                    <h3>2.3　關鍵交叉點：2023 年</h3>
+                    <p>2023 年是歷史性的一年：<span class="highlight">損害賠償首次超越借貸</span>（55,233 vs 51,987），成為民事第一審最大宗的訴訟類型。這象徵台灣民事糾紛的性質從「債權債務」轉向「權利意識型糾紛」，人們更願意為「不合理的損害」走上法庭。</p>
+
+                    <h2>三、三級審維持率：「九死一生」的迷思與真相</h2>
+                    <p>律師圈流傳一句話：「三審九死一生」，暗示上訴到最高法院幾乎沒有翻盤機會。讓我們用資料來驗證這個說法，並比較民事的「二審維持率」與「三審維持率」：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>二審維持率（地院→高院）</th><th>三審維持率（高院→最高法院）</th></tr>
+                        <tr><td>2015</td><td>86.07%</td><td>75.49%</td></tr>
+                        <tr><td>2018</td><td>84.96%</td><td>75.93%</td></tr>
+                        <tr><td>2020</td><td>85.36%</td><td>69.86%</td></tr>
+                        <tr><td>2022</td><td>84.90%</td><td>69.39%</td></tr>
+                        <tr><td>2024</td><td>85.56%</td><td>79.18%</td></tr>
+                        <tr><td>2025</td><td><strong>85.84%</strong></td><td><strong>79.46%</strong></td></tr>
+                    </table>
+
+                    <div class="insight-box">
+                        <strong>💡 民事的「九死一生」並不成立。</strong>民事三審維持率只有 70-79%，換句話說有 <strong>20-30% 的民事案件到最高法院後會被廢棄發回</strong>。這比傳說中的「九死一生」（90% 被駁回）寬鬆得多。<br><br>
+                        相對的，<strong>民事二審維持率高達 85-86%，十年幾乎不變</strong>。也就是說：<br>
+                        ① <strong>第一審判決非常穩定</strong>：只有 14-15% 會在二審被改。第一審的攻防仍然是最重要的主戰場。<br>
+                        ② <strong>三審反而是比較有機會翻盤的地方</strong>：有 20-30% 的機率在最高法院被廢棄發回更審。<br>
+                        ③ <strong>對比刑事三審維持率 90-93%</strong>：刑事的「九死一生」傳說倒是更接近事實（見刑事分頁分析）。
+                    </div>
+
+                    <p>二審維持率十年穩定在 85% 左右，說明台灣民事法官在第一審的裁判品質是「世代穩定」的——不會因為案件量暴增或結案壓力上升而顯著影響判決結果。這是很正面的訊號。</p>
+
+                    <h2>四、區域差距：城鄉「訴訟時間」的 2 倍落差</h2>
+                    <p>114 年各地方法院的民事案件新收量與結案速度呈現明顯的城鄉差距：</p>
+
+                    <table class="article-table">
+                        <tr><th>類型</th><th>法院</th><th>114 年新收件數</th><th>平均結案天數</th></tr>
+                        <tr><td rowspan="6">六大都會</td><td>臺北地院</td><td>472,371</td><td>33.4 天</td></tr>
+                        <tr><td>臺中地院</td><td>381,231</td><td>31.5 天</td></tr>
+                        <tr><td>新北地院</td><td>370,659</td><td>33.3 天</td></tr>
+                        <tr><td>桃園地院</td><td>285,458</td><td>32.0 天</td></tr>
+                        <tr><td>臺南地院</td><td>278,167</td><td>25.5 天</td></tr>
+                        <tr><td>高雄地院</td><td>264,626</td><td>27.2 天</td></tr>
+                        <tr><td rowspan="4">中小型</td><td>嘉義地院</td><td>107,642</td><td><strong>18.4 天</strong></td></tr>
+                        <tr><td>雲林地院</td><td>87,047</td><td><strong>19.2 天</strong></td></tr>
+                        <tr><td>屏東地院</td><td>132,019</td><td><strong>20.0 天</strong></td></tr>
+                        <tr><td>苗栗地院</td><td>68,705</td><td><strong>20.0 天</strong></td></tr>
+                    </table>
+
+                    <p>六大都會法院的平均結案天數集中在 <span class="stat-inline">25-34 天</span>，而嘉義、雲林、屏東、苗栗等中小型法院只要 <span class="stat-inline">18-20 天</span>。<span class="highlight">同樣一件民事訴訟，在臺北打和在嘉義打，可能相差 2 倍的時間成本</span>。這不只是法官多寡的問題——都會案件的複雜度、當事人律師配置、專家證人需求都更高。</p>
+
+                    <p>此外，單就臺北地院一院，114 年的新收量就達 47.2 萬件，占全國地方法院民事案件的 <span class="stat-inline">13.9%</span>，是名符其實的「全國民事第一大院」。若加上新北、士林（位於臺北都會圈），光是大臺北地區就消化了全國約 31% 的民事案件。</p>
+
+                    <h2>五、關鍵洞察總結</h2>
+
+                    <div class="takeaway">
+                        <h3>📊 十年民事案件的五大發現</h3>
+                        <p><strong>1. 系統壓力臨界點已到：</strong>2024 年是結構性失速的拐點，結案天數暴增 60%、未結庫存倍增。民事案件量能的擴張速度，已超越司法系統的消化能力。</p>
+                        <p><strong>2. 糾紛本質從「還錢」轉向「求償」：</strong>損害賠償 10 年成長 196%，借貸下降 23%。台灣民事訴訟正從債權回收為主的時代，進入權利意識型糾紛的新階段。</p>
+                        <p><strong>3. 第一審裁判「世代穩定」，但三審翻盤率比想像中高：</strong>二審維持率穩定在 85-86%，顯示一審判決品質可靠。但三審維持率只有 70-79%（民事），打破「三審九死一生」的迷思——實際上有 20-30% 的翻盤機會。</p>
+                        <p><strong>4. 司法資源分配極不平均：</strong>臺北地院一院承擔全國 14% 的民事案件；大臺北地區承擔 31%。六大都會與偏鄉的結案速度相差 2 倍。</p>
+                        <p><strong>5. 2019 年是民間借貸的分水嶺：</strong>之前是成長期、之後是下降期。這很可能和消費金融管道多元化、卡債集中清算結束有關，是一個值得律師和金融業持續關注的結構性信號。</p>
+                    </div>
+
+                    <p style="margin-top: 20px; font-size: 12px; color: var(--text-muted); text-align: center;">
+                        本分析由 Claude AI 根據司法院公開統計資料自動生成，僅供參考。如有法律決策需求，請諮詢執業律師。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 家事 -->
+        <div class="tab-content jstat" id="tab-jstat-family">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">地方法院家事案件收結趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">家事案件未結積壓趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyPending"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">家事案件平均結案天數</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyDays"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">家事案件調解成立率</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyMediation"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">家事案件上訴維持率</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyAppeal"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">① 家事事件訴訟程序歷年趨勢（2014-2024）</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyProcTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">家事事件訴訟程序分類說明（113 年件數）</div>
+                    <div id="jstat_familyProcedureDesc" class="desc-grid"></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">② 家事非訟事件細項歷年趨勢（2020-2024）</div>
+                    <div class="chart-container"><canvas id="jstat_chartFamilyNonLitTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">家事非訟細項分類說明（113 年件數）</div>
+                    <div id="jstat_familyNonLitDesc" class="desc-grid"></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">③ 離婚原因歷年趨勢（2014-2024）</div>
+                    <div class="chart-container"><canvas id="jstat_chartDivorceTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">離婚原因分類說明（113 年件數，法定事由 + 其他）</div>
+                    <div id="jstat_divorceReasonsDesc" class="desc-grid"></div>
+                </div>
+
+                <!-- 家事案件深度分析文章 -->
+                <div class="analysis-article">
+                    <div class="article-header">
+                        <div class="article-title">家事案件深度分析：高齡化浪潮與家庭關係的轉變 <span class="ai-badge">AI 洞察</span></div>
+                        <div class="article-subtitle">資料期間：2014-2025 年｜資料來源：司法院統計月報 + 年報表 22/29 + 108-113 年年報 PDF｜分析範圍：地方法院家事事件</div>
+                    </div>
+
+                    <h2>一、總量穩定成長：十年 +34%</h2>
+                    <p>家事案件的成長幅度比民事（+46%）溫和，但比刑事（+19%）顯著。新收件數從 2015 年的 <span class="stat-inline">13.7 萬件</span> 成長到 2025 年的 <span class="stat-inline">18.3 萬件</span>。真正值得關注的不是總量，而是「結案速度」的惡化與「處理內容」的變化：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>新收</th><th>未結</th><th>平均結案天數</th><th>調解成立率①</th><th>調解成立率②</th></tr>
+                        <tr><td>2015</td><td>136,906</td><td>17,942</td><td>154.3 天</td><td>53.3%</td><td>29.1%</td></tr>
+                        <tr><td>2018</td><td>149,150</td><td>21,182</td><td>151.5 天</td><td>50.9%</td><td>29.9%</td></tr>
+                        <tr><td>2020</td><td>155,595</td><td>22,132</td><td>172.6 天</td><td>60.5%</td><td>36.3%</td></tr>
+                        <tr><td>2022</td><td>171,443</td><td>27,267</td><td>191.7 天</td><td>65.1%</td><td>39.0%</td></tr>
+                        <tr><td>2024</td><td>180,432</td><td>29,498</td><td>197.1 天</td><td>66.7%</td><td>40.4%</td></tr>
+                        <tr><td>2025</td><td>183,028</td><td><strong>31,004</strong></td><td><strong>210.4 天</strong></td><td><strong>66.2%</strong></td><td><strong>40.9%</strong></td></tr>
+                    </table>
+
+                    <div class="warning-box">
+                        <strong>⚠ 家事案件是司法系統中最「慢」的案件類別。</strong>2025 年平均結案 <span class="stat-inline">210 天（約 7 個月）</span>，遠遠高於民事的 53.8 天、刑事的 112.4 天。原因是家事事件涉及情感糾葛、多次調解、子女探視協議、財產評估等程序，每一步都需要時間沉澱。<br><br>
+                        十年間結案天數從 154 天增加到 210 天（<strong>多了 2 個月</strong>），未結庫存從 1.8 萬件增加到 3.1 萬件（+73%）。家事法官的處理量能已經接近臨界點。
+                    </div>
+
+                    <h2>二、非訟事件的爆量成長：家事實務的核心戰場</h2>
+                    <p>許多人以為「家事案件 = 離婚」，但**事實上家事第一審訴訟（含離婚）只佔 2024 年所有家事事件的 5.6%**。真正的主力是「家事非訟事件」，佔 <span class="stat-inline">49.8%</span>；其次是「保護令聲請」（18.9%）與「調解程序」（16.9%）。</p>
+
+                    <table class="article-table">
+                        <tr><th>程序類別</th><th>2014</th><th>2024</th><th>十年變化</th><th>佔比（2024）</th></tr>
+                        <tr><td><strong>家事非訟事件</strong></td><td>59,166</td><td><strong>89,817</strong></td><td class="stat-inline">+51.8%</td><td>49.8%</td></tr>
+                        <tr><td>保護令聲請</td><td>23,410</td><td>34,109</td><td class="stat-inline">+45.7%</td><td>18.9%</td></tr>
+                        <tr><td>調解程序</td><td>25,330</td><td>30,465</td><td>+20.3%</td><td>16.9%</td></tr>
+                        <tr><td>第一審訴訟</td><td>9,643</td><td>10,035</td><td>+4.1%</td><td>5.6%</td></tr>
+                        <tr><td>抗告</td><td>3,055</td><td>4,072</td><td>+33.3%</td><td>2.3%</td></tr>
+                    </table>
+
+                    <p>非訟事件從 5.9 萬件長到 9 萬件，是家事案件總量增長的主要驅動力。那麼「非訟事件」裡面到底是什麼？讓我們把它再拆開來看：</p>
+
+                    <h2>三、繼承非訟的驚人增長：高齡化的直接寫照</h2>
+                    <p>家事非訟事件中，最大的類別是「繼承非訟」（遺產分割、拋棄繼承、限定繼承、遺囑提示等）。從 2020 年到 2024 年的 5 年間：</p>
+
+                    <table class="article-table">
+                        <tr><th>家事非訟細項</th><th>2020</th><th>2024</th><th>5 年變化</th><th>驅動因素</th></tr>
+                        <tr><td><strong>繼承非訟</strong></td><td>37,909</td><td><strong>51,686</strong></td><td class="stat-inline">+36.3%</td><td>戰後嬰兒潮世代離世</td></tr>
+                        <tr><td>監護及輔助宣告</td><td>11,280</td><td>14,877</td><td class="stat-inline">+31.9%</td><td>失智症人口快速增加</td></tr>
+                        <tr><td>保護安置</td><td>5,292</td><td>6,432</td><td>+21.5%</td><td>兒少保護通報機制</td></tr>
+                        <tr><td>親子非訟</td><td>7,558</td><td>7,145</td><td>-5.5%</td><td>生育率下降</td></tr>
+                        <tr><td>收養</td><td>2,731</td><td>2,951</td><td>+8.1%</td><td>大致穩定</td></tr>
+                    </table>
+
+                    <div class="insight-box">
+                        <strong>💡 這是台灣高齡化的法律切片：</strong>繼承非訟與監護宣告兩項合計，2020 年 4.9 萬件，2024 年 6.7 萬件，**5 年增加 1.7 萬件**。這些都是**人口老化直接產生的法律需求**：<br>
+                        ① <strong>繼承非訟 +36.3%</strong>：戰後嬰兒潮世代（1946-1964 出生）目前 61-79 歲，已進入遺產規劃與開啟的密集時期。許多案件涉及傳統家族企業股權、祖厝、共有土地的清算分配。<br>
+                        ② <strong>監護及輔助宣告 +31.9%</strong>：失智症人口快速增加，家屬必須聲請法院認定行為能力、選任監護人以管理長者的財產與醫療決定。<br><br>
+                        這是「台灣人口金字塔倒反」在司法系統上最直接的表現——**家事法院正在變成老年法律事務中心**。
+                    </div>
+
+                    <p>相對之下，「親子非訟」（酌定親權、會面交往、扶養費等）反而**小幅下降** 5.5%。這可能反映台灣生育率急速下降（2014 年約 21 萬新生兒，2024 年約 13.5 萬，降幅 36%），導致親子相關糾紛的基數縮小。</p>
+
+                    <h2>四、離婚訴訟的弔詭下降</h2>
+                    <p>這是一個出乎意料的數據：**走訴訟路徑離婚的案件逐年下降**。</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>離婚終結件數</th><th>惡意遺棄</th><th>不堪同居虐待</th><th>其他重大事由</th></tr>
+                        <tr><td>2014</td><td>3,575</td><td>785 (22%)</td><td>134</td><td>2,606 (73%)</td></tr>
+                        <tr><td>2018</td><td>3,270</td><td>522</td><td>88</td><td>2,597</td></tr>
+                        <tr><td>2021</td><td>2,437</td><td>323</td><td>44</td><td>2,036</td></tr>
+                        <tr><td>2023</td><td>2,535</td><td>189</td><td>46</td><td>2,260</td></tr>
+                        <tr><td>2024</td><td><strong>2,412</strong></td><td><strong>180 (7.5%)</strong></td><td>42</td><td><strong>2,156 (89.4%)</strong></td></tr>
+                    </table>
+
+                    <p>離婚訴訟從 2014 年 3,575 件降到 2024 年 <span class="stat-inline">2,412 件</span>（-32.5%）。但這**並不表示離婚變少了**——台灣每年實際離婚對數大約 5-5.5 萬對，其中**絕大多數走「兩願離婚」**（夫妻雙方合意到戶政機關辦理登記），只有少數無法達成協議才會走到法院。</p>
+
+                    <p>更值得玩味的是**法定事由的分布**：</p>
+                    <ul>
+                        <li><strong>惡意遺棄從 785 件 → 180 件（-77%）</strong>：傳統「一方不履行同居」的案件大幅減少。</li>
+                        <li><strong>不堪同居虐待 134 → 42（-69%）</strong>：家暴轉向走保護令與刑事程序（見上方），較少作為離婚事由主張。</li>
+                        <li><strong>其他重大事由 2,606 → 2,156（-17%），佔比從 73% 升到 89.4%</strong>：這個「概括條款」成為現代離婚訴訟幾乎唯一的依據。</li>
+                    </ul>
+
+                    <div class="insight-box">
+                        <strong>💡 民法 1052 條第 2 項的實務獨占：</strong>現代離婚訴訟幾乎都以「有前項以外之重大事由，難以維持婚姻者」作為請求依據。法官透過此概括條款，綜合考量性格不合、價值觀差異、長期分居、經濟支援缺乏等各種因素。這實際上是**台灣離婚法實務的「自由化」**——只要婚姻真的破裂，法院通常會准許離婚，不再糾結於民法條文列舉的特定事由。
+                    </div>
+
+                    <h2>五、調解成立率：家事事件法的長期成果</h2>
+                    <p>2012 年家事事件法施行後，強制調解成為家事訴訟（特別是離婚、親權）的必經程序。十年下來，調解成立率穩定上升：</p>
+
+                    <p><strong>調解成立率 ①</strong>（所有調解事件）：53.3%（2015）→ <span class="stat-inline">66.2%</span>（2025），上升 13 個百分點。</p>
+                    <p><strong>調解成立率 ②</strong>（排除移付鄉鎮市調解）：29.1%（2015）→ <span class="stat-inline">40.9%</span>（2025），上升 12 個百分點。</p>
+
+                    <div class="insight-box">
+                        <strong>💡 為什麼調解率持續上升？</strong><br>
+                        ① <strong>家事調解官制度成熟化</strong>：專職家事調解官具備心理、社工、法律專業，調解品質比過去一般調解委員高。<br>
+                        ② <strong>律師介入調解常態化</strong>：越來越多當事人在調解階段就聘請律師，協助達成具體可執行的協議，減少日後爭議。<br>
+                        ③ <strong>法院主動引導</strong>：法官會在案件進入訴訟前主動評估是否適合調解，避免非必要的審判。<br><br>
+                        **這 13 個百分點的提升，大幅減輕了家事法庭的審判負擔，也讓當事人避免長達 7 個月的訴訟拖磨**。
+                    </div>
+
+                    <h2>六、保護令聲請的穩定擴大</h2>
+                    <p>家庭暴力保護令聲請從 2014 年的 23,410 件成長到 2024 年的 <span class="stat-inline">34,109 件</span>（+45.7%）。配合前面「違反家暴防治法刑事案件 +59.2%」的資料（見刑事分頁），可以看出台灣家暴防治體系的雙軌運作：</p>
+                    <ul>
+                        <li><strong>民事保護令</strong>（家事法院）：事前預防、隔離、遠離命令</li>
+                        <li><strong>刑事處罰</strong>（地方法院刑事庭）：違反保護令的刑事追訴</li>
+                    </ul>
+                    <p>兩者同步增長，顯示**受害者通報意識提升**、**保護機制越來越被有效運用**。但也提醒我們：家暴並未減少，只是更多被納入法律處理管道。</p>
+
+                    <h2>七、關鍵洞察總結</h2>
+
+                    <div class="takeaway">
+                        <h3>🔍 十年家事案件的六大發現</h3>
+                        <p><strong>1. 家事案件的主戰場不是離婚，是非訟事件：</strong>第一審訴訟只佔 5.6%，家事非訟佔 49.8%。人們上家事法院的主要理由是處理繼承、監護、保護令等程序事項，而非激烈對抗性糾紛。</p>
+                        <p><strong>2. 高齡化直接推高繼承與監護案件：</strong>繼承非訟 5 年 +36.3%、監護宣告 +31.9%。家事法院正轉型成為「老年法律事務中心」，處理遺產分割與失智照護的法律需求。</p>
+                        <p><strong>3. 離婚訴訟反而逐年下降，且 89% 以「其他重大事由」為依據：</strong>傳統法定離婚事由幾乎消失，法院實務採寬鬆解釋，當事人可透過概括條款請求離婚。真正的離婚主流是戶政登記的兩願離婚，不進入司法統計。</p>
+                        <p><strong>4. 調解成立率 13 個百分點的進步：</strong>家事調解官制度、律師協助、法院引導三重推力，讓調解成為家事糾紛的主要解決方式。這是十年來家事司法改革的最大成果。</p>
+                        <p><strong>5. 結案速度從 154 天惡化到 210 天：</strong>家事案件是所有司法類型中最慢的（民事 54 天、刑事 112 天），未來隨著人口老化仍會持續增加壓力，家事法官人力規劃需前瞻性調整。</p>
+                        <p><strong>6. 家暴防治體系雙軌運作、持續擴大：</strong>保護令聲請 +46%，違反保護令刑事案件 +59%。這不是家暴惡化的指標，而是保護網擴大的證據——更多受害者願意、也能夠使用法律工具保護自己。</p>
+                    </div>
+
+                    <p style="margin-top: 20px; font-size: 12px; color: var(--text-muted); text-align: center;">
+                        本分析由 Claude AI 根據司法院統計月報與 108-113 年年報自動生成，僅供參考。家事非訟細項歷年資料來自人工提取的 5 年 PDF 數據。如有法律決策需求，請諮詢執業律師或家事律師。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 刑事 -->
+        <div class="tab-content jstat" id="tab-jstat-criminal">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">地方法院刑事案件收結趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartCriminalTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">刑事案件未結積壓趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartCriminalPending"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">刑事三級審維持率（一審→二審 vs 二審→三審：九死一生？）</div>
+                    <div class="chart-container"><canvas id="jstat_chartCriminalAppeal"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">① 普通刑法 vs 特別刑法 科刑人數歷年趨勢（2014-2024）</div>
+                    <div class="chart-container"><canvas id="jstat_chartCrimeCategoryTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">② 普通刑法重點罪名歷年趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartGeneralCrimeTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">普通刑法罪名分類說明（113 年科刑人數）</div>
+                    <div id="jstat_generalCrimeDesc" class="desc-grid"></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">③ 特別刑法重點罪名歷年趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartSpecialCrimeTrend"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">特別刑法罪名分類說明（113 年科刑人數）</div>
+                    <div id="jstat_specialCrimeDesc" class="desc-grid"></div>
+                </div>
+
+                <!-- 刑事案件深度分析文章 -->
+                <div class="analysis-article">
+                    <div class="article-header">
+                        <div class="article-title">刑事案件深度分析：台灣犯罪型態的世代交替 <span class="ai-badge">AI 洞察</span></div>
+                        <div class="article-subtitle">資料期間：2015-2025 年｜資料來源：司法院統計月報 + 年報表 73｜分析範圍：地方法院刑事第一審</div>
+                    </div>
+
+                    <h2>一、總量長期平穩，2024 後突破天花板</h2>
+                    <p>若只看案件總量，過去十年台灣地方法院刑事案件新收量相對穩定，2015-2023 年幾乎都維持在 <span class="stat-inline">40-48 萬件</span> 的區間。但 2024 與 2025 年出現了結構性的突破：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>新收</th><th>結案</th><th>未結</th><th>平均結案天數</th><th>每法官月結</th></tr>
+                        <tr><td>2015</td><td>465,529</td><td>460,261</td><td>54,635</td><td>66.5 天</td><td>60.4 件</td></tr>
+                        <tr><td>2020</td><td>449,446</td><td>450,595</td><td>63,985</td><td>85.5 天</td><td>58.9 件</td></tr>
+                        <tr><td>2021</td><td>407,426</td><td>399,019</td><td>72,392</td><td><strong>100.4 天</strong></td><td>53.1 件</td></tr>
+                        <tr><td>2023</td><td>483,136</td><td>471,623</td><td>93,173</td><td>100.9 天</td><td>62.6 件</td></tr>
+                        <tr><td>2024</td><td>514,451</td><td>503,000</td><td>104,624</td><td>106.9 天</td><td>65.4 件</td></tr>
+                        <tr><td>2025</td><td><strong>555,058</strong></td><td>538,125</td><td><strong>121,557</strong></td><td><strong>112.4 天</strong></td><td>68.7 件</td></tr>
+                    </table>
+
+                    <div class="warning-box">
+                        <strong>⚠ 結案速度十年「減半」：</strong>2015 年一件刑事案件平均只要 <span class="stat-inline">66.5 天</span>可以結案，到 2025 年已經要 <span class="stat-inline">112.4 天（+69%）</span>。未結庫存從 5.5 萬件倍增到 <span class="stat-inline">12.2 萬件</span>。刑事法官雖然月結案件數（68.7 件）遠高於民事法官（27.8 件），但面對案件複雜度上升，時間成本大幅拉長。
+                    </div>
+
+                    <p>刑事案件的積壓問題其實從 2021 年就出現第一波警訊（結案天數從 85 天跳到 100 天），但當時新收量反而下降至 40.7 萬件的十年低點。這個「結案變慢但案件變少」的矛盾現象，是 2020-2021 年毒品條例修法與疫情限制的短暫影響，並非結構性改善。2022 年之後案件量回升，積壓就全面爆發。</p>
+
+                    <h2>二、酒駕零容忍：公共政策史上的明星案例</h2>
+                    <p>若要選一個「法律嚇阻最成功」的案例，「不能安全駕駛罪」（俗稱酒駕罪）絕對是十年來最戲劇性的變化：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>酒駕科刑人數</th><th>年變化</th><th>說明</th></tr>
+                        <tr><td>2015</td><td>66,820</td><td>—</td><td>歷史高點，獨占刑事科刑第一大宗</td></tr>
+                        <tr><td>2018</td><td>54,561</td><td>-18%</td><td>刑度加重、加強取締</td></tr>
+                        <tr><td>2020</td><td>47,436</td><td>-29%</td><td>零容忍政策開始發酵</td></tr>
+                        <tr><td>2021</td><td>34,853</td><td>-48%</td><td>疫情+新法生效雙重影響</td></tr>
+                        <tr><td>2023</td><td>33,190</td><td>-50%</td><td>水位穩定下降</td></tr>
+                        <tr><td>2025</td><td><strong>28,298</strong></td><td><strong>-58%</strong></td><td>十年累計降幅近六成</td></tr>
+                    </table>
+
+                    <div class="insight-box">
+                        <strong>💡 這告訴我們什麼？</strong>酒駕是「**民眾行為可以被法律有效改變**」的真實證明。2013 年以來數次修法加重刑度、加重罰鍰，再加上交通部的零容忍政策與科技執法（酒測器普及、民間檢舉機制），成功把酒駕從年科刑 6.7 萬人壓到 2.8 萬人。<br><br>
+                        <strong>但不能樂觀：</strong>肇事逃逸案件十年幾乎持平（2,156 → 2,069 人），暗示酒駕下降可能有一部分是「酒駕後更小心不逃逸」變成「酒駕後逃逸再被抓」的移轉。整體交通安全仍需持續監控。
+                    </div>
+
+                    <h2>三、詐欺集團的「新興犯罪產業」：詐欺 + 洗錢</h2>
+                    <p>與酒駕下降形成強烈對比的，是詐欺罪與洗錢防制法案件的爆炸性增長。這兩類案件實際上屬於同一個犯罪生態系的不同環節：</p>
+
+                    <h3>3.1　詐欺罪：從 7 千成長到 2.3 萬（+220%）</h3>
+                    <p>詐欺罪科刑人數十年走勢：<span class="stat-inline">7,046 → 22,579</span>。成長幅度驚人，而且**沒有任何一年下降**。最劇烈的變化發生在 2025 年，從 16,475 人一口氣跳到 22,579 人（<span class="stat-inline">+37%</span>）。</p>
+
+                    <h3>3.2　洗錢防制法：從 9 人成長到 1.9 萬（+21 萬%）</h3>
+                    <p>洗錢防制法的數字增長速度堪稱「破表」：</p>
+                    <ul>
+                        <li>2015-2017：每年只有 9-14 人被判刑</li>
+                        <li>2018：256 人（105 年洗錢法大修後首次顯著成長）</li>
+                        <li>2021：3,932 人（110 年再修法擴大適用範圍）</li>
+                        <li>2023：10,456 人（突破萬人）</li>
+                        <li>2025：<strong>19,096 人</strong>（十年成長 21 萬 %）</li>
+                    </ul>
+
+                    <div class="insight-box">
+                        <strong>💡 為什麼是同一個生態系？</strong>這兩種犯罪的爆增其實是同一批人、同一個犯罪鏈：<br>
+                        ① <strong>詐欺集團主嫌</strong>成立人頭公司、話術機房、假投資網站 → 詐欺罪<br>
+                        ② <strong>車手</strong>（領款的小弟）幫集團提領贓款、轉匯至海外 → 洗錢罪<br>
+                        ③ 過去車手只能用詐欺幫助犯論處，刑度較低；105 年與 110 年兩次洗錢法大修後，車手可直接用洗錢罪論處，**從「輕罪」變「重罪」**。<br>
+                        這也解釋了為什麼 2018 年是轉折點——105 年洗錢法修正在 2018 年進入司法實務消化期。
+                    </div>
+
+                    <p>對社會來說這是警訊：**台灣每年有超過 4 萬人因為詐騙集團相關犯罪被判刑**，這個數字還在持續增加。對政策制定者來說，修法加重刑度顯然沒有有效嚇阻，必須從跨國金流追蹤、電信詐騙攔截、網路監控等源頭切斷生態系。</p>
+
+                    <h2>四、毒品政策的「V 型」反轉</h2>
+                    <p>毒品施用案件的走勢是另一個值得關注的政策實驗：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>毒品施用科刑人數</th><th>毒品製造運輸販賣</th></tr>
+                        <tr><td>2015</td><td>24,036</td><td>3,933</td></tr>
+                        <tr><td>2017</td><td>31,475</td><td>3,467</td></tr>
+                        <tr><td>2018</td><td>33,523（峰值）</td><td>3,674</td></tr>
+                        <tr><td>2020</td><td>19,492</td><td>5,135</td></tr>
+                        <tr><td><strong>2021</strong></td><td><strong>3,942（暴跌 80%）</strong></td><td>4,528</td></tr>
+                        <tr><td>2022</td><td>6,486</td><td>5,427</td></tr>
+                        <tr><td>2025</td><td>12,556</td><td>4,869</td></tr>
+                    </table>
+
+                    <div class="insight-box">
+                        <strong>💡 2021 的大跌從哪裡來？</strong>2020 年 7 月毒品危害防制條例大幅修正並於 2021 年起全面實施，將施用一、二級毒品（一般稱「施用毒品」）從刑事追訴為主，改為以**觀察、勒戒、戒治**為原則。也就是說，施用毒品者被導向醫療戒治而非刑事科刑。<br><br>
+                        <strong>但為什麼 2022 年之後又回升？</strong>因為觀察勒戒之後若再犯，仍會進入刑事程序。現在每年 1.2-1.3 萬人的水位，是「再犯、慣犯、戒治失敗」的那一群。政策**沒有真正解決毒品問題，只是把人從監獄導向戒治，成效仍有待長期追蹤**。<br><br>
+                        值得注意的是，<strong>毒品製造運輸販賣的人數並沒有下降</strong>（2015: 3,933 → 2025: 4,869），顯示**供給端沒有減少**。這點與菸酒、賭博等「需求端管理」的治理思維有明顯區別。
+                    </div>
+
+                    <h2>五、竊盜與交通過失傷害的穩定成長</h2>
+                    <h3>5.1　普通竊盜 +67%：日常犯罪的警訊</h3>
+                    <p>普通竊盜從 13,041 人（2015）穩定線性成長到 <span class="stat-inline">21,811 人</span>（2025），十年 <span class="stat-inline">+67.2%</span>。值得注意的是，**加重竊盜**（攜帶兇器、結夥、侵入住居）反而維持在 4,500-5,100 人區間沒有成長。這表示：</p>
+                    <ul>
+                        <li>成長主要來自「個人、小額、日常」的竊盜案件</li>
+                        <li>可能跟經濟壓力、街友問題、商家監視器普及導致起訴率上升有關</li>
+                        <li>組織性、嚴重情節的竊盜集團沒有增加，顯示治安仍在可控範圍</li>
+                    </ul>
+
+                    <h3>5.2　交通過失傷害 +124%：肇事責任明確化</h3>
+                    <p>交通過失傷害科刑人數從 3,788 人（2015）倍增到 <span class="stat-inline">8,463 人</span>（2025）。這個成長與交通事故總量成長不完全成正比，真正驅動因素可能是：</p>
+                    <ul>
+                        <li>行車記錄器、路口監視器普及，肇事責任更容易被認定</li>
+                        <li>過失傷害屬告訴乃論罪，當事人和解失敗後的訴訟比例上升</li>
+                        <li>車禍民事損害賠償訴訟同步增加（見民事分頁分析），反映「交通事故法律化」的整體趨勢</li>
+                    </ul>
+
+                    <h2>六、新興與消退的罪名</h2>
+                    <h3>6.1　跟蹤騷擾防制法：新法上路</h3>
+                    <p>跟騷法於 111 年 6 月施行，2022 年僅有 21 人科刑，2023 年躍升至 157 人，2024 年 215 人。這個新法正在建立實務判斷標準與執法能量。</p>
+
+                    <h3>6.2　家庭暴力防治法：穩定上升</h3>
+                    <p>違反家暴防治法（主要是違反保護令罪）從 1,438 人成長到 2,289 人（<span class="stat-inline">+59%</span>），顯示民眾通報意識提升、保護令核發後的追蹤執行也更有力。</p>
+
+                    <h3>6.3　殺人既遂減半</h3>
+                    <p>故意殺人既遂科刑人數從 110 人降至 54 人（-51%），雖然樣本數小、年度波動大，但長期趨勢確實是下降。這與整體治安改善、衝突解決機制多元化有關。</p>
+
+                    <h3>6.4　貪污治罪條例：案件稀少但穩定</h3>
+                    <p>貪污治罪條例每年科刑人數在 200-400 人之間擺動，沒有明顯趨勢。這個數字相對於全國公務員總數約 34 萬人來說，實際上是非常低的比例（每年萬分之一以下）。</p>
+
+                    <h2>七、關鍵洞察總結</h2>
+
+                    <div class="takeaway">
+                        <h3>🔍 十年刑事案件的六大發現</h3>
+                        <p><strong>1. 案件量的結構性突破發生在 2024-2025：</strong>從十年 40-48 萬的穩定區間，一口氣跳到 51-55 萬。結案天數從 66 天拉長到 112 天。刑事司法系統面對新型態犯罪的處理能力正在透支。</p>
+                        <p><strong>2. 酒駕 -58% 是嚇阻政策的標竿成功案例：</strong>證明「修法 + 執法 + 教育」三位一體可以改變民眾行為。但肇事逃逸沒有同步下降，提醒我們政策效應有其極限。</p>
+                        <p><strong>3. 詐欺 +220% 與洗錢 +212,000% 是台灣刑事犯罪的「新主旋律」：</strong>詐騙集團 + 車手 + 跨境金流已成為年科刑逾 4 萬人的現代犯罪產業，遠超過酒駕等傳統案件。未來十年治安議題將以此為核心。</p>
+                        <p><strong>4. 毒品政策成「V 型」反轉：</strong>110 年改行觀察勒戒後，施用毒品科刑人數從 3.3 萬一度降到 0.4 萬，但 2022 年之後穩定反彈到 1.25 萬。政策方向需要中長期效果驗證。同時毒品製造販賣沒有下降，供給端管控仍待加強。</p>
+                        <p><strong>5. 普通竊盜 +67%、交通過失傷害 +124% 是「日常犯罪法律化」的縮影：</strong>人們的日常糾紛、小型事故正越來越多進入刑事司法體系。這既是訴訟資源的壓力，也是社會風險管理的新議題。</p>
+                        <p><strong>6. 跟騷法、兒少性剝削等新興保護法規的擴張：</strong>反映台灣刑事政策越來越關注「弱勢者保護」與「身體自主權」議題，但也同時讓刑事法網越織越密。</p>
+                    </div>
+
+                    <p style="margin-top: 20px; font-size: 12px; color: var(--text-muted); text-align: center;">
+                        本分析由 Claude AI 根據司法院年報表 73「科刑人數─按罪名及年別分」自動生成，僅供參考。部分數字為「科刑人數」而非「案件件數」，反映的是實際被判刑之被告數。如有法律決策需求，請諮詢執業律師。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 強制執行 -->
+        <div class="tab-content jstat" id="tab-jstat-enforcement">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">強制執行案件收結趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartEnforcementTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">強制執行未結積壓趨勢</div>
+                    <div class="chart-container"><canvas id="jstat_chartEnforcementPending"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">強制執行平均結案天數</div>
+                    <div class="chart-container"><canvas id="jstat_chartEnforcementDays"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">強制執行案件積壓率（未結/新收）</div>
+                    <div class="chart-container"><canvas id="jstat_chartEnforcementBacklog"></canvas></div>
+                </div>
+
+                <!-- 強制執行深度分析文章 -->
+                <div class="analysis-article">
+                    <div class="article-header">
+                        <div class="article-title">強制執行深度分析：社會信用體系的最後防線 <span class="ai-badge">AI 洞察</span></div>
+                        <div class="article-subtitle">資料期間：2015-2025 年｜資料來源：司法院統計月報｜分析範圍：地方法院民事強制執行事件</div>
+                    </div>
+
+                    <h2>一、被忽視的司法巨獸：十年成長 +58%</h2>
+                    <p>當我們談到司法統計時，大家的目光通常集中在民事、刑事、家事這些「有劇情」的案件類型。但實際上，**強制執行才是全台灣法院每年處理量最大的程序**。2025 年強制執行新收 <span class="stat-inline">204.6 萬件</span>，相當於：</p>
+                    <ul>
+                        <li>刑事案件（55.5 萬件）的 <strong>3.7 倍</strong></li>
+                        <li>家事案件（18.3 萬件）的 <strong>11.2 倍</strong></li>
+                        <li>民事第一審案件（339.9 萬件）的 <strong>60.2%</strong></li>
+                    </ul>
+
+                    <p>成長幅度更是驚人——十年累計 <span class="stat-inline">+57.9%</span>，是所有案件類型中最高的（民事 +46%、刑事 +19%、家事 +34%）：</p>
+
+                    <table class="article-table">
+                        <tr><th>年度</th><th>新收</th><th>未結</th><th>積壓率</th><th>平均結案天數</th></tr>
+                        <tr><td>2015</td><td>1,296,074</td><td>63,637</td><td>4.9%</td><td>23.1 天</td></tr>
+                        <tr><td>2019</td><td>1,384,850</td><td>71,290</td><td>5.1%</td><td>23.6 天</td></tr>
+                        <tr><td>2021</td><td>1,438,382</td><td>73,590</td><td>5.1%</td><td>22.3 天</td></tr>
+                        <tr><td>2022</td><td>1,633,135</td><td>86,488</td><td>5.3%</td><td><strong>21.7 天</strong></td></tr>
+                        <tr><td>2023</td><td>1,804,967</td><td>147,080</td><td>8.1%</td><td>23.7 天</td></tr>
+                        <tr><td>2024</td><td>2,023,759</td><td><strong>250,912</strong></td><td><strong>12.4%</strong></td><td><strong>33.6 天</strong></td></tr>
+                        <tr><td>2025</td><td>2,046,200</td><td>207,499</td><td>10.1%</td><td><strong>46.4 天</strong></td></tr>
+                    </table>
+
+                    <div class="warning-box">
+                        <strong>⚠ 2022-2024：兩年內結案時間翻倍、未結量四倍。</strong>2022 年平均結案天數 21.7 天（史上最快）、未結 8.6 萬件（穩定）。2024 年結案天數跳到 33.6 天，未結 25.1 萬件。2025 年結案天數繼續惡化到 <span class="stat-inline">46.4 天</span>——**短短 3 年內，強制執行從原本的「快速簡易程序」變成與民事第一審案件差不多慢的冗長流程**。
+                    </div>
+
+                    <h2>二、強制執行為什麼重要？</h2>
+                    <p>一般人對強制執行的印象可能停留在「法官判完錢，債務人不還，就去法院聲請強制執行」的簡單畫面。但實務上，強制執行程序涵蓋的「執行名義」種類非常多：</p>
+                    <ul>
+                        <li><strong>民事確定判決</strong>（如違約金、借款、損害賠償、離婚贍養費）</li>
+                        <li><strong>支付命令</strong>（核發後一定期間未異議即具執行力）</li>
+                        <li><strong>本票裁定</strong>（民間借貸最常用）</li>
+                        <li><strong>鄉鎮市調解成立</strong>、<strong>和解筆錄</strong>、<strong>公證書</strong></li>
+                        <li><strong>行政處分</strong>（稅捐、罰鍰）</li>
+                        <li><strong>仲裁判斷</strong>、<strong>拍賣抵押物裁定</strong>等</li>
+                    </ul>
+
+                    <p>這些執行名義進入法院民事執行處後，會啟動各種執行行為：查封不動產、扣押薪資、凍結存款、拍賣動產、分配款項等。**這是整個台灣社會信用體系運作的最後一道防線**——當契約、判決、調解都無法讓債務人履行義務時，強制執行就是國家權力介入的最終手段。</p>
+
+                    <div class="insight-box">
+                        <strong>💡 強制執行 / 民事第一審 = 0.60 這個比例的意義：</strong>每 10 件民事第一審案件（+ 支付命令 + 本票裁定 + 其他執行名義），就會產生約 6 件強制執行聲請。這個比例十年來穩定在 0.54-0.60 之間，顯示**強制執行與民事訴訟是連動的雙生系統**：只要上游的民事糾紛增加，下游的執行案件就會等比例增加。
+                    </div>
+
+                    <h2>三、2023-2025 的結構性拐點：為什麼突然加速？</h2>
+                    <p>2015-2022 年，強制執行每年新收維持在 130-160 萬件之間溫和成長，積壓率穩定在 5% 左右、結案天數 21-24 天。這是一個運作順暢的「快速執行」系統。</p>
+
+                    <p>但從 2023 年開始，三個結構性變化同時發生：</p>
+
+                    <h3>3.1　新收案件量急速爬升</h3>
+                    <p>2022 → 2025 三年間，新收從 163.3 萬件一路增加到 204.6 萬件，累計 <span class="stat-inline">+25.3%</span>。這個成長速度遠超過過去十年的平均值。最可能的驅動因素：</p>
+                    <ul>
+                        <li><strong>詐欺案件爆增的連鎖效應</strong>：詐欺罪十年 +220%，每一件詐欺案都可能產生多件執行名義（受害人對加害人、加害人內部清算、洗錢案件的民事附帶求償等）。</li>
+                        <li><strong>民事損害賠償的激增</strong>：民事第一審的損害賠償從 2.4 萬件長到 7.2 萬件（+196%），每一筆都將產生執行需求。</li>
+                        <li><strong>支付命令與本票裁定的高周轉</strong>：數位化讓這些非訟程序更容易取得，進而更容易進入執行。</li>
+                    </ul>
+
+                    <h3>3.2　未結案件的雪球效應</h3>
+                    <p>未結案件從 2022 年的 8.6 萬件，一口氣長到 2024 年的 <span class="stat-inline">25.1 萬件</span>（兩年 <strong>+190%</strong>）。這不是單純的「新收太多」，而是<strong>舊案清不掉 + 新案持續進入</strong>的複合效應。</p>
+
+                    <h3>3.3　平均結案天數倍增</h3>
+                    <p>從 21.7 天（2022）→ 46.4 天（2025），整整 <span class="stat-inline">+114%</span>。這個幅度在所有司法案件類型中是**最戲劇性的惡化**。</p>
+
+                    <div class="warning-box">
+                        <strong>⚠ 為什麼強制執行突然變慢？可能的原因：</strong><br>
+                        ① <strong>「查無財產」比例提高</strong>：現代債務人越來越擅長把資產藏匿在人頭帳戶、虛擬貨幣、境外公司、保單、信託等難以追查的工具中。法院書記官與執行員花大量時間查詢資料，最後發現債務人名下沒有財產可執行。<br>
+                        ② <strong>執行複雜度提升</strong>：不動產查封涉及共有人、抵押權人協議；薪資扣押涉及與其他債權人的分配順位；存款凍結涉及銀行回應速度。<br>
+                        ③ <strong>詐欺衍生案件的複雜結構</strong>：涉及跨境資金流、多層級人頭、洗錢防制法的連動調查，單一件執行可能拖數月。<br>
+                        ④ <strong>人力未增加</strong>：法院執行人員（法官、書記官、執行員）沒有隨案件量同步增加，單位時間處理量能達到上限。
+                    </div>
+
+                    <h2>四、對各方當事人的實務啟示</h2>
+
+                    <h3>4.1　對債權人與律師</h3>
+                    <p>過去「拿到勝訴判決後，平均三週可以透過強制執行拿到錢」的預期已經不成立。現在的實務標準應該是：</p>
+                    <ul>
+                        <li><strong>平均 6-8 週</strong>才能完成第一階段執行流程（即便順利）</li>
+                        <li><strong>複雜案件</strong>（不動產拍賣、跨國追償、多債權人分配）可能拖到 6 個月以上</li>
+                        <li><strong>「查無財產」</strong>是常態，債權人應在訴訟開始前就評估債務人的資產結構，必要時同步聲請假扣押以保全財產</li>
+                    </ul>
+
+                    <h3>4.2　對債務人</h3>
+                    <p>強制執行結案時間拉長，意味著債務人面臨的不確定性期間更長。每一筆未了結的執行事件都會影響：</p>
+                    <ul>
+                        <li>金融往來（聯徵中心紀錄、貸款申請）</li>
+                        <li>職業生涯（律師、會計師等專業職的懲戒）</li>
+                        <li>日常生活（薪資被扣押、不動產無法處分）</li>
+                    </ul>
+                    <p>主動和解、清算協商的重要性比過去更高。</p>
+
+                    <h3>4.3　對司法政策</h3>
+                    <p>強制執行程序的雪球化，已經是司法系統面臨的最迫切議題之一：</p>
+                    <ul>
+                        <li><strong>人力擴編</strong>：執行處書記官、執行員的員額需重新檢討</li>
+                        <li><strong>數位化強化</strong>：查詢稅捐、勞保、健保、金融帳戶等資料的系統整合還有很大空間</li>
+                        <li><strong>虛擬資產查封法制</strong>：目前對加密貨幣、NFT 等新型資產的執行規範尚未完備</li>
+                        <li><strong>跨境執行合作</strong>：詐欺集團洗錢路徑複雜，需要與其他司法管轄區建立更有效的執行互助機制</li>
+                    </ul>
+
+                    <h2>五、關鍵洞察總結</h2>
+
+                    <div class="takeaway">
+                        <h3>🔍 十年強制執行的六大發現</h3>
+                        <p><strong>1. 被忽視的司法最大量程序：</strong>全國每年 204 萬件強制執行，是刑事的 3.7 倍、家事的 11 倍。但一般輿論鮮少關注，成為「看不見的司法基礎建設」。</p>
+                        <p><strong>2. 十年 +58% 的成長冠軍：</strong>強制執行是所有案件類型中成長最快的。顯示台灣民間債權債務的糾紛總量持續擴大，且**每一件民事糾紛產生執行需求的比例穩定**。</p>
+                        <p><strong>3. 2022-2025 是結構性拐點：</strong>結案天數從 21.7 天→ 46.4 天（+114%）、未結量 8.6 萬件 → 25.1 萬件（+190%）。這是**司法系統運作效率最劇烈的單一惡化案例**，遠超過民事與刑事分頁提到的拐點。</p>
+                        <p><strong>4. 詐欺生態系的下游連動：</strong>上游詐欺罪 +220%、洗錢罪 +21 萬%，下游的強制執行必然同步爆增。許多受害者即使打贏民事判決，也無法真正追回被騙款項，凸顯<strong>「贏了官司、輸了錢」</strong>的現代司法困境。</p>
+                        <p><strong>5. 債權人與律師的新現實：</strong>強執不再是「快速程序」。執行策略必須前置化到訴訟階段（假扣押、假處分、財產調查），取得勝訴判決只是成功的一半。</p>
+                        <p><strong>6. 政策與人力的失衡警訊：</strong>當強制執行從「社會信用體系的最後防線」變成「債權追償的障礙」時，司法系統的制度信任將被侵蝕。擴編執行人力、強化數位追查能量、完善虛擬資產法制，是無法再拖延的議題。</p>
+                    </div>
+
+                    <p style="margin-top: 20px; font-size: 12px; color: var(--text-muted); text-align: center;">
+                        本分析由 Claude AI 根據司法院統計月報表 38「地方法院民事強制執行事件收結概況」自動生成，僅供參考。如有債權追償或強制執行的實務需求，請諮詢專業律師。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 效率 -->
+        <div class="tab-content jstat" id="tab-jstat-efficiency">
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <div class="chart-title">平均結案天數比較（民事 vs 刑事）</div>
+                    <div class="chart-container"><canvas id="jstat_chartAvgDaysCompare"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">每位法官月均結案件數</div>
+                    <div class="chart-container"><canvas id="jstat_chartJudgeCaseload"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">案件積壓率（未結/新收）</div>
+                    <div class="chart-container"><canvas id="jstat_chartBacklogRate"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: 各法院 -->
+        <div class="tab-content jstat" id="tab-jstat-organs">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">各地方法院民事案件新收件數（114 年）</div>
+                    <div class="chart-container tall"><canvas id="jstat_chartOrganCivil"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">各地方法院刑事案件新收件數（114 年）</div>
+                    <div class="chart-container tall"><canvas id="jstat_chartOrganCriminal"></canvas></div>
+                </div>
+            </div>
+        </div>
 
     <!-- ==================== TAB: SOURCES ==================== -->
     <div id="tab-sources" class="tab-content">
@@ -1502,6 +2267,15 @@ const SECTIONS = {
     { tab: 'prosecutors', label: '檢察官' },
     { tab: 'pros-offices', label: '檢察署' },
   ],
+  jstat: [
+    { tab: 'jstat-overview', label: '總覽' },
+    { tab: 'jstat-civil', label: '民事案件' },
+    { tab: 'jstat-family', label: '家事案件' },
+    { tab: 'jstat-criminal', label: '刑事案件' },
+    { tab: 'jstat-enforcement', label: '強制執行' },
+    { tab: 'jstat-efficiency', label: '法院效率' },
+    { tab: 'jstat-organs', label: '各法院比較' },
+  ],
   sources: [],
   admin: [],
 };
@@ -1550,6 +2324,7 @@ function showTab(tab) {
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
+  if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
 
 // ============================================================
@@ -4543,14 +5318,20 @@ function renderPofTable() {
     const cmp = (typeof va === 'number') ? va - vb : String(va || '').localeCompare(String(vb || ''), 'zh-Hant');
     return pofSortAsc ? cmp : -cmp;
   });
-  document.getElementById('pofTableBody').innerHTML = rows.map(o => `<tr>
+  document.getElementById('pofTableBody').innerHTML = rows.map(o => {
+    // 高檢/最高檢在裁判書極少具名 → 具名估計嚴重低估，灰字加 † 標示
+    const isHigh = o.office_type !== '地方檢察署';
+    const estStyle = isHigh ? 'color:var(--text-muted);' : 'font-weight:600;color:var(--gold);';
+    const mark = isHigh ? '&nbsp;†' : '';
+    return `<tr>
     <td><strong>${escHtml(o.name)}</strong></td>
     <td>${escHtml(o.office_type)}</td>
     <td>${escHtml(o.region || '-')}</td>
-    <td style="text-align:center;font-weight:600;color:var(--gold);">${o.active_latest ? o.active_latest.toLocaleString() : '-'}</td>
-    <td style="text-align:center;">${o.active_12m ? o.active_12m.toLocaleString() : '-'}</td>
+    <td style="text-align:center;${estStyle}">${o.active_latest ? o.active_latest.toLocaleString() + mark : '-'}</td>
+    <td style="text-align:center;${isHigh ? 'color:var(--text-muted);' : ''}">${o.active_12m ? o.active_12m.toLocaleString() + mark : '-'}</td>
     <td style="text-align:center;">${o.cases_total ? o.cases_total.toLocaleString() : '-'}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 
 function sortPof(col) {
@@ -4608,17 +5389,9 @@ async function loadProsecutorOverview() {
       el('ovProsMonthsSub').textContent = `${yearly[0].year} ~ ${yearly[yearly.length - 1].year} 年`;
     }
 
-    // 檢察署層級分布（doughnut，現職估計）
-    const levelOf = n => n.includes('最高') ? '最高檢察署'
-      : n.includes('分署') ? '高檢分署'
-      : n.includes('高等') ? '高等檢察署'
-      : n.includes('地方') ? '地方檢察署' : '其他';
-    const levelAgg = {};
-    offices.forEach(o => {
-      const lv = levelOf(o.office_name || '');
-      levelAgg[lv] = (levelAgg[lv] || 0) + Number(o.active_latest || 0);
-    });
-    const levels = Object.entries(levelAgg).sort((a, b) => b[1] - a[1]);
+    // 檢察署層級分布（官方編制數，法務統計 114 年底）
+    // 不用具名估計：高檢/最高檢檢察官在裁判書極少具名（估計僅個位數 vs 官方 161/13），會嚴重失真
+    const levels = [['地方檢察署', 1286], ['高等檢察署及分署', 161], ['最高檢察署', 13]];
     if (chartInstances.prosLevel) chartInstances.prosLevel.destroy();
     chartInstances.prosLevel = new Chart(document.getElementById('chartProsLevel').getContext('2d'), {
       type: 'doughnut',
@@ -4704,6 +5477,1164 @@ async function loadProsecutorOverview() {
     showDashboard();
   }
 })();
+
+// ============================================================
+// 司法統計（司法院統計月報聚合，靜態 JSON；見 CLAUDE.md 司法統計章節）
+// ============================================================
+(() => {
+
+    const COLORS = {
+        blue: '#3182ce',
+        red: '#e53e3e',
+        green: '#38a169',
+        orange: '#dd6b20',
+        purple: '#805ad5',
+        teal: '#319795',
+        pink: '#d53f8c',
+        yellow: '#d69e2e',
+        gray: '#718096',
+        indigo: '#5a67d8',
+    };
+
+    const COLORS_ALPHA = (color, alpha) => {
+        const hex = color.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    function formatNumber(num) {
+        return new Intl.NumberFormat('zh-TW').format(num);
+    }
+
+
+    const tabBuilders = {
+        overview: buildOverviewCharts,
+        civil: buildCivilCharts,
+        family: buildFamilyCharts,
+        criminal: buildCriminalCharts,
+        enforcement: buildEnforcementCharts,
+        efficiency: buildEfficiencyCharts,
+        organs: buildOrganCharts,
+    };
+
+
+    function buildKPIs(data) {
+        const latest = data.cases_by_year[data.cases_by_year.length - 1];
+        const prev = data.cases_by_year[data.cases_by_year.length - 2];
+        const growthPct = ((latest.total - prev.total) / prev.total * 100).toFixed(1);
+        const crimGrowth = ((latest.criminal - prev.criminal) / prev.criminal * 100).toFixed(1);
+
+        const latestCriminal = data.district_criminal_by_year[data.district_criminal_by_year.length - 1];
+        const latestCivil = data.district_civil_by_year[data.district_civil_by_year.length - 1];
+        const latestEnf = data.enforcement_by_year[data.enforcement_by_year.length - 1];
+        const prevEnf = data.enforcement_by_year[data.enforcement_by_year.length - 2];
+        const enfGrowth = ((latestEnf.newly_lodged - prevEnf.newly_lodged) / prevEnf.newly_lodged * 100).toFixed(1);
+        const latestFam = data.family_by_year[data.family_by_year.length - 1];
+        const prevFam = data.family_by_year[data.family_by_year.length - 2];
+        const famGrowth = ((latestFam.newly_lodged - prevFam.newly_lodged) / prevFam.newly_lodged * 100).toFixed(1);
+
+        const html = `
+            <div class="kpi-card">
+                <div class="kpi-label">${latest.year_ad} 年案件總數</div>
+                <div class="kpi-value">${formatNumber(latest.total)}</div>
+                <div class="kpi-change ${parseFloat(growthPct) > 0 ? 'up' : 'down'}">
+                    較前年 ${parseFloat(growthPct) > 0 ? '↑' : '↓'} ${Math.abs(growthPct)}%
+                </div>
+            </div>
+            <div class="kpi-card accent">
+                <div class="kpi-label">民事案件新收</div>
+                <div class="kpi-value">${formatNumber(latest.civil)}</div>
+                <div class="kpi-change ${latest.civil > prev.civil ? 'up' : 'down'}">
+                    較前年 ${latest.civil > prev.civil ? '↑' : '↓'} ${Math.abs(((latest.civil - prev.civil) / prev.civil * 100)).toFixed(1)}%
+                </div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-label">家事案件新收</div>
+                <div class="kpi-value">${formatNumber(latestFam.newly_lodged)}</div>
+                <div class="kpi-change ${parseFloat(famGrowth) > 0 ? 'up' : 'down'}">
+                    較前年 ${parseFloat(famGrowth) > 0 ? '↑' : '↓'} ${Math.abs(famGrowth)}%
+                </div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-label">刑事案件新收</div>
+                <div class="kpi-value">${formatNumber(latest.criminal)}</div>
+                <div class="kpi-change ${parseFloat(crimGrowth) > 0 ? 'up' : 'down'}">
+                    較前年 ${parseFloat(crimGrowth) > 0 ? '↑' : '↓'} ${Math.abs(crimGrowth)}%
+                </div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-label">強制執行新收</div>
+                <div class="kpi-value">${formatNumber(latestEnf.newly_lodged)}</div>
+                <div class="kpi-change ${parseFloat(enfGrowth) > 0 ? 'up' : 'down'}">
+                    較前年 ${parseFloat(enfGrowth) > 0 ? '↑' : '↓'} ${Math.abs(enfGrowth)}%
+                </div>
+            </div>
+        `;
+        document.getElementById('jstat_kpiGrid').innerHTML = html;
+    }
+
+    function buildOverviewCharts(data) {
+        const years = data.cases_by_year.map(d => d.year_ad);
+
+        // Total trend - stacked bar (split civil into pure civil + family)
+        const familyByYear = {};
+        if (data.family_by_year) data.family_by_year.forEach(f => { familyByYear[f.year_ad] = f.newly_lodged; });
+
+        new Chart(document.getElementById('jstat_chartTotalTrend'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '民事（不含家事）', data: data.cases_by_year.map(d => d.civil - (familyByYear[d.year_ad] || 0)), backgroundColor: COLORS.blue, stack: 'stack' },
+                    { label: '家事', data: data.cases_by_year.map(d => familyByYear[d.year_ad] || 0), backgroundColor: COLORS.purple, stack: 'stack' },
+                    { label: '刑事', data: data.cases_by_year.map(d => d.criminal), backgroundColor: COLORS.red, stack: 'stack' },
+                    { label: '強制執行', data: data.cases_by_year.map(d => d.enforcement), backgroundColor: COLORS.orange, stack: 'stack' },
+                    { label: '行政訴訟', data: data.cases_by_year.map(d => d.administrative), backgroundColor: COLORS.teal, stack: 'stack' },
+                    { label: '其他', data: data.cases_by_year.map(d => d.total - d.civil - d.criminal - d.enforcement - d.administrative), backgroundColor: COLORS.gray, stack: 'stack' },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => (v / 1000000).toFixed(1) + 'M' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } }
+                }
+            }
+        });
+
+        // Type distribution - doughnut (split civil into pure civil + family)
+        const latest = data.cases_by_year[data.cases_by_year.length - 1];
+        const latestFamily = familyByYear[latest.year_ad] || 0;
+        const civilOnly = latest.civil - latestFamily;
+        new Chart(document.getElementById('jstat_chartTypeDistribution'), {
+            type: 'doughnut',
+            data: {
+                labels: ['民事（不含家事）', '家事', '刑事', '強制執行', '行政訴訟', '公證', '提存', '其他'],
+                datasets: [{
+                    data: [
+                        civilOnly, latestFamily, latest.criminal, latest.enforcement, latest.administrative,
+                        latest.notarization, latest.lodgment,
+                        latest.total - latest.civil - latest.criminal - latest.enforcement - latest.administrative - latest.notarization - latest.lodgment
+                    ],
+                    backgroundColor: [COLORS.blue, COLORS.purple, COLORS.red, COLORS.orange, COLORS.teal, COLORS.pink, COLORS.yellow, COLORS.gray]
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    tooltip: { callbacks: { label: ctx => ctx.label + ': ' + formatNumber(ctx.raw) + ' 件 (' + (ctx.raw / latest.total * 100).toFixed(1) + '%)' } },
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // Growth rate — with category switch
+        const GROWTH_CATEGORIES = {
+            'total': { label: '總量', getVal: d => d.total },
+            'civil_only': { label: '民事（不含家事）', getVal: (d, i) => d.civil - (familyByYear[d.year_ad] || 0) },
+            'family': { label: '家事', getVal: d => familyByYear[d.year_ad] || 0 },
+            'criminal': { label: '刑事', getVal: d => d.criminal },
+            'enforcement': { label: '強制執行', getVal: d => d.enforcement },
+            'administrative': { label: '行政訴訟', getVal: d => d.administrative },
+        };
+
+        const computeGrowthRates = (category) => {
+            const getVal = GROWTH_CATEGORIES[category].getVal;
+            return years.slice(1).map((y, i) => {
+                const curr = getVal(data.cases_by_year[i + 1], i + 1);
+                const prev = getVal(data.cases_by_year[i], i);
+                if (!prev) return 0;
+                return ((curr - prev) / prev * 100).toFixed(2);
+            });
+        };
+
+        let currentCategory = 'total';
+        const growthChart = new Chart(document.getElementById('jstat_chartGrowthRate'), {
+            type: 'bar',
+            data: {
+                labels: years.slice(1),
+                datasets: [{
+                    label: '年增率 (%)',
+                    data: computeGrowthRates(currentCategory),
+                    backgroundColor: [],
+                    borderColor: [],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    y: { ticks: { callback: v => v + '%' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    tooltip: { callbacks: { label: ctx => GROWTH_CATEGORIES[currentCategory].label + ' 年增率: ' + ctx.raw + '%' } }
+                }
+            }
+        });
+
+        const updateGrowthChart = (category) => {
+            currentCategory = category;
+            const rates = computeGrowthRates(category);
+            growthChart.data.datasets[0].data = rates;
+            growthChart.data.datasets[0].backgroundColor = rates.map(v => parseFloat(v) >= 0 ? COLORS_ALPHA(COLORS.red, 0.7) : COLORS_ALPHA(COLORS.green, 0.7));
+            growthChart.data.datasets[0].borderColor = rates.map(v => parseFloat(v) >= 0 ? COLORS.red : COLORS.green);
+            growthChart.update();
+        };
+        updateGrowthChart('total');
+
+        // Hook up sub-tab buttons
+        document.querySelectorAll('#jstat_growthRateTabs .sub-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#jstat_growthRateTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                updateGrowthChart(btn.dataset.category);
+            });
+        });
+    }
+
+    function buildCivilCharts(data) {
+        const years = data.district_civil_by_year.map(d => d.year_ad);
+        const civil = data.district_civil_by_year;
+
+        // Civil trend
+        new Chart(document.getElementById('jstat_chartCivilTrend'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '新收', data: civil.map(d => d.newly_lodged), borderColor: COLORS.blue, backgroundColor: COLORS_ALPHA(COLORS.blue, 0.1), fill: true, tension: 0.3 },
+                    { label: '終結', data: civil.map(d => d.cases_closed), borderColor: COLORS.green, backgroundColor: COLORS_ALPHA(COLORS.green, 0.1), fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Civil pending
+        new Chart(document.getElementById('jstat_chartCivilPending'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '未結件數',
+                    data: civil.map(d => d.pending_cases),
+                    backgroundColor: COLORS_ALPHA(COLORS.orange, 0.7),
+                    borderColor: COLORS.orange,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '未結: ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Civil avg days
+        new Chart(document.getElementById('jstat_chartCivilDays'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '平均結案天數',
+                    data: civil.map(d => d.avg_days_to_close),
+                    borderColor: COLORS.red,
+                    backgroundColor: COLORS_ALPHA(COLORS.red, 0.1),
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: '天' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '平均 ' + ctx.raw + ' 天' } } }
+            }
+        });
+
+        // ===== 民事三級審維持率 =====
+        if (data.supreme_civil_appeal && data.supreme_civil_appeal.length > 0) {
+            const civilYrs = data.district_civil_by_year.map(d => d.year_ad);
+            new Chart(document.getElementById('jstat_chartCivilInstanceRate'), {
+                type: 'line',
+                data: {
+                    labels: civilYrs,
+                    datasets: [
+                        {
+                            label: '二審維持率（地院→高院）',
+                            data: data.district_civil_by_year.map(d => d.appeal_affirmed_rate),
+                            borderColor: COLORS.blue, backgroundColor: COLORS_ALPHA(COLORS.blue, 0.1),
+                            tension: 0.3, pointRadius: 4, fill: true,
+                        },
+                        {
+                            label: '三審維持率（高院→最高法院）',
+                            data: civilYrs.map(yr => {
+                                const s = data.supreme_civil_appeal.find(d => d.year_ad === yr);
+                                return s ? s.third_instance_maintain_rate : null;
+                            }),
+                            borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1),
+                            tension: 0.3, pointRadius: 4, fill: true,
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { min: 60, max: 100, ticks: { callback: v => v + '%' } } },
+                    plugins: {
+                        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } },
+                        subtitle: { display: true, text: '二審維持率 ≈ 85%（穩定）| 三審維持率 ≈ 70-80%（波動）', font: { size: 12 }, color: '#718096' }
+                    }
+                }
+            });
+        }
+
+        // ===== 民事訴訟種類歷年趨勢 + 說明卡片 =====
+        const CIVIL_TYPE_DESCRIPTIONS = {
+            '損害賠償': '因他人侵權行為或違約請求損害賠償（最大宗，常見於車禍、工程、商業糾紛）',
+            '借貸': '消費借貸返還請求（民間借貸、公司借款等）',
+            '其他民法': '其他民法債權債務關係，例如不當得利、無因管理、保證等',
+            '特別法': '不屬於民法的特別法案件（如消保法、公寓大廈管理條例、勞基法等）',
+            '買賣': '買賣契約相關糾紛，例如瑕疵擔保、價金請求、交付標的物等',
+            '租賃': '租賃契約相關糾紛，例如租金、遷讓房屋、押金返還等',
+            '不當得利': '無法律上原因而受利益致他人受損害的返還請求',
+            '承攬': '承攬契約糾紛（工程承攬、修繕、製造物件等）',
+            '委任': '委任契約糾紛（律師費、代辦服務、報酬請求等）',
+            '僱傭': '僱傭契約糾紛（薪資、解僱等，部分屬勞基法案件則列特別法）',
+            '贈與': '贈與契約及撤銷贈與等',
+            '合夥': '合夥契約糾紛（出資、利益分配、退夥等）',
+            '旅遊': '旅遊契約糾紛',
+        };
+
+        if (data.civil_case_types && data.civil_case_types.length > 0) {
+            const cct = data.civil_case_types;
+            const firstCct = cct[0];
+            const lastCct = cct[cct.length - 1];
+            const sorted = Object.entries(lastCct.types).sort((a, b) => b[1] - a[1]);
+            const totalCivil = lastCct.total;
+
+            // Trend chart (top 5 categories)
+            const topTypes = sorted.slice(0, 5).map(([k]) => k);
+            const trendColors = [COLORS.blue, COLORS.red, COLORS.orange, COLORS.green, COLORS.purple];
+            new Chart(document.getElementById('jstat_chartCivilTypeTrend'), {
+                type: 'line',
+                data: {
+                    labels: cct.map(d => d.year_ad),
+                    datasets: topTypes.map((type, i) => ({
+                        label: type,
+                        data: cct.map(d => d.types[type] || 0),
+                        borderColor: trendColors[i],
+                        backgroundColor: COLORS_ALPHA(trendColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 3,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => (v / 10000).toFixed(1) + '萬' } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+                }
+            });
+
+            // Description cards with 114 data + 11-year change
+            const civilHtml = sorted.map(([name, value], i) => {
+                const firstValue = firstCct.types[name] || 0;
+                const change = firstValue ? ((value - firstValue) / firstValue * 100) : 0;
+                const pct = (value / totalCivil * 100).toFixed(1);
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const changeSign = change >= 0 ? '+' : '';
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = CIVIL_TYPE_DESCRIPTIONS[name] || '';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${name}</span>
+                        <span class="desc-stats">${formatNumber(value)} 件 (${pct}%) <span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span></span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_civilTypesDesc').innerHTML = civilHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 ${firstCct.year_ad} 年 → ${lastCct.year_ad} 年的 11 年累計變化。資料來源：司法院月報表 25 地方法院民事第一審終結事件訴訟種類</div>`;
+        }
+    }
+
+    function buildFamilyCharts(data) {
+        const fam = data.family_by_year;
+        const years = fam.map(d => d.year_ad);
+
+        // Family trend
+        new Chart(document.getElementById('jstat_chartFamilyTrend'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '新收', data: fam.map(d => d.newly_lodged), borderColor: COLORS.purple, backgroundColor: COLORS_ALPHA(COLORS.purple, 0.1), fill: true, tension: 0.3 },
+                    { label: '終結', data: fam.map(d => d.cases_closed), borderColor: COLORS.green, backgroundColor: COLORS_ALPHA(COLORS.green, 0.1), fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Family pending
+        new Chart(document.getElementById('jstat_chartFamilyPending'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [{ label: '未結件數', data: fam.map(d => d.pending_cases), backgroundColor: COLORS_ALPHA(COLORS.purple, 0.7), borderColor: COLORS.purple, borderWidth: 1 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { tooltip: { callbacks: { label: ctx => '未結: ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Family avg days
+        new Chart(document.getElementById('jstat_chartFamilyDays'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [{ label: '平均結案天數', data: fam.map(d => d.avg_days_to_close), borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1), fill: true, tension: 0.3, pointRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: '天' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '平均 ' + ctx.raw + ' 天' } } }
+            }
+        });
+
+        // Family mediation rate
+        new Chart(document.getElementById('jstat_chartFamilyMediation'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '調解成立率①', data: fam.map(d => d.mediation_rate_1), borderColor: COLORS.green, tension: 0.3, pointRadius: 4 },
+                    { label: '調解成立率②', data: fam.map(d => d.mediation_rate_2), borderColor: COLORS.teal, tension: 0.3, pointRadius: 4 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { min: 20, max: 80, ticks: { callback: v => v + '%' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } } }
+            }
+        });
+
+        // Family appeal rate
+        new Chart(document.getElementById('jstat_chartFamilyAppeal'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '上訴維持率', data: fam.map(d => d.appeal_affirmed_rate), borderColor: COLORS.blue, tension: 0.3, pointRadius: 4 },
+                    { label: '抗告維持率', data: fam.map(d => d.ruling_affirmed_rate), borderColor: COLORS.purple, tension: 0.3, pointRadius: 4 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { min: 70, max: 100, ticks: { callback: v => v + '%' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } } }
+            }
+        });
+
+        // ===== 家事事件訴訟程序歷年趨勢 =====
+        const PROC_DESCRIPTIONS = {
+            '家事非訟事件': '不採訴訟程序的家事案件，如繼承拋棄、監護宣告、收養認可、親權酌定等',
+            '保護令聲請': '依《家庭暴力防治法》聲請的通常／暫時／緊急保護令',
+            '調解程序': '家事事件的強制或任意調解，常見於離婚、子女監護、扶養費協議',
+            '第一審訴訟': '婚姻、親子、繼承等家事訴訟的第一審案件',
+            '其他事件': '其他家事相關事件',
+            '抗告': '對家事裁定不服而提起的抗告案件',
+            '公示催告': '宣告死亡等公示催告程序',
+            '第二審訴訟': '家事訴訟第二審上訴案件',
+        };
+
+        if (data.family_by_procedure && data.family_by_procedure.length > 0) {
+            const latestProc = data.family_by_procedure[data.family_by_procedure.length - 1];
+            const firstProc = data.family_by_procedure[0];
+            const procEntries = Object.entries(latestProc)
+                .filter(([k]) => !['year_tw', 'year_ad', '合計'].includes(k))
+                .sort((a, b) => b[1] - a[1]);
+            const procColors = [COLORS.purple, COLORS.red, COLORS.blue, COLORS.green, COLORS.orange, COLORS.teal, COLORS.pink, COLORS.yellow, COLORS.gray];
+
+            // Trend line chart (top 5)
+            const topProcs = procEntries.slice(0, 5).map(([k]) => k);
+            new Chart(document.getElementById('jstat_chartFamilyProcTrend'), {
+                type: 'line',
+                data: {
+                    labels: data.family_by_procedure.map(d => d.year_ad),
+                    datasets: topProcs.map((name, i) => ({
+                        label: name,
+                        data: data.family_by_procedure.map(d => d[name] || 0),
+                        borderColor: procColors[i],
+                        backgroundColor: COLORS_ALPHA(procColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 3,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+                }
+            });
+
+            // Description cards with 113 data
+            const total113 = latestProc['合計'];
+            const descHtml = procEntries.map(([name, value], i) => {
+                const firstValue = firstProc[name] || 0;
+                const change = firstValue ? ((value - firstValue) / firstValue * 100) : 0;
+                const pct = (value / total113 * 100).toFixed(1);
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const changeSign = change >= 0 ? '+' : '';
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = PROC_DESCRIPTIONS[name] || '';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${name}</span>
+                        <span class="desc-stats">${formatNumber(value)} 件 (${pct}%) <span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span></span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_familyProcedureDesc').innerHTML = descHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 2014 年 → 2024 年的 11 年累計變化</div>`;
+        }
+
+        // ===== 家事非訟事件細項歷年趨勢 =====
+        const NONLIT_DESCRIPTIONS = {
+            '繼承非訟': '遺產分割、拋棄繼承、限定繼承、遺囑提示等',
+            '監護及輔助宣告': '為心智障礙、失智長者聲請監護或輔助宣告',
+            '親子非訟': '酌定親權、改定親權、會面交往、扶養費等子女事件',
+            '收養': '收養認可、終止收養等',
+            '保護安置': '兒少保護安置裁定',
+            '暫時處分': '家事事件進行中的暫時處分',
+            '其他家事非訟': '上述以外的家事非訟事件',
+            '婚姻非訟': '夫妻同居、履行同居、扶養等',
+            '宣告死亡': '失蹤人宣告死亡事件',
+            '失蹤人財產管理': '失蹤人財產管理事件',
+            '精神衛生法聲請事件': '強制住院、強制社區治療等',
+        };
+
+        if (data.family_non_lit_yearly && data.family_non_lit_yearly.length > 0) {
+            const topCats = ['繼承非訟', '監護及輔助宣告', '親子非訟', '保護安置', '其他家事非訟', '收養'];
+            const trendColors = [COLORS.purple, COLORS.blue, COLORS.green, COLORS.orange, COLORS.pink, COLORS.teal];
+
+            new Chart(document.getElementById('jstat_chartFamilyNonLitTrend'), {
+                type: 'line',
+                data: {
+                    labels: data.family_non_lit_yearly.map(d => d.year_ad),
+                    datasets: topCats.map((cat, i) => ({
+                        label: cat,
+                        data: data.family_non_lit_yearly.map(d => d.categories[cat] || 0),
+                        borderColor: trendColors[i],
+                        backgroundColor: COLORS_ALPHA(trendColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 4,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+                }
+            });
+
+            // Description cards
+            const EXCLUDED = ['保護令聲請事件', '公示催告', '其他事件', '夫妻財產制契約登記事項', '分別財產制', '共同財產制', '履行勸告事件', '保全程序', '調解裁定'];
+            const firstYear = data.family_non_lit_yearly[0];
+            const lastYear = data.family_non_lit_yearly[data.family_non_lit_yearly.length - 1];
+            const narrowEntries = Object.entries(lastYear.categories)
+                .filter(([k]) => !EXCLUDED.includes(k))
+                .sort((a, b) => b[1] - a[1]);
+            const narrowTotal = narrowEntries.reduce((s, [, v]) => s + v, 0);
+
+            const nonLitHtml = narrowEntries.map(([name, value], i) => {
+                const firstValue = firstYear.categories[name] || 0;
+                const change = firstValue ? ((value - firstValue) / firstValue * 100) : 0;
+                const pct = (value / narrowTotal * 100).toFixed(1);
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const changeSign = change >= 0 ? '+' : '';
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = NONLIT_DESCRIPTIONS[name] || '';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${name}</span>
+                        <span class="desc-stats">${formatNumber(value)} 件 (${pct}%) <span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span></span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_familyNonLitDesc').innerHTML = nonLitHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 ${firstYear.year_ad} 年 → ${lastYear.year_ad} 年的累計變化。佔比為狹義家事非訟小計</div>`;
+        }
+
+        // ===== 離婚原因歷年趨勢 =====
+        const DIVORCE_DESCRIPTIONS = {
+            '其他重大事由難以維持婚姻': '民法 1052 條第 2 項概括條款，實務上最常引用',
+            '一方惡意遺棄他方': '一方長期不履行同居義務、離家不歸',
+            '受他方為不堪同居之虐待': '身體、精神虐待達到不堪同居程度',
+            '與配偶以外之人合意性交': '通姦（原刑法通姦罪 109 年除罪）',
+            '因故意犯罪判刑逾六個月': '故意犯罪經判處逾六個月徒刑確定',
+            '對他方直系親屬虐待': '虐待他方父母等直系尊親屬',
+            '有不治之惡疾或精神病': '不治之惡疾或重大精神病',
+            '意圖殺害他方': '以殺害配偶為目的',
+            '生死不明已逾三年': '配偶失蹤逾三年',
+            '重婚或成立748施行法第2條關係': '重婚或同性婚姻重複',
+        };
+
+        if (data.divorce_reasons && data.divorce_reasons.length > 0) {
+            const firstDiv = data.divorce_reasons[0];
+            const lastDiv = data.divorce_reasons[data.divorce_reasons.length - 1];
+            const reasons = Object.entries(lastDiv)
+                .filter(([k]) => !['year_tw', 'year_ad', '合計'].includes(k))
+                .sort((a, b) => b[1] - a[1]);
+
+            // Trend chart - only show top 4 non-zero reasons (others are too small)
+            const topReasons = reasons.filter(([, v]) => v > 10).slice(0, 4).map(([k]) => k);
+            const trendColors = [COLORS.red, COLORS.orange, COLORS.blue, COLORS.purple];
+            new Chart(document.getElementById('jstat_chartDivorceTrend'), {
+                type: 'line',
+                data: {
+                    labels: data.divorce_reasons.map(d => d.year_ad),
+                    datasets: topReasons.map((name, i) => ({
+                        label: name.length > 16 ? name.substring(0, 16) + '…' : name,
+                        data: data.divorce_reasons.map(d => d[name] || 0),
+                        borderColor: trendColors[i],
+                        backgroundColor: COLORS_ALPHA(trendColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 3,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+                }
+            });
+
+            // Description cards
+            const divHtml = reasons.map(([name, value], i) => {
+                const firstValue = firstDiv[name] || 0;
+                const change = firstValue ? ((value - firstValue) / firstValue * 100) : (value > 0 ? 0 : 0);
+                const pct = (value / lastDiv['合計'] * 100).toFixed(1);
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const changeSign = change >= 0 ? '+' : '';
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = DIVORCE_DESCRIPTIONS[name] || '';
+                const changeText = firstValue > 0
+                    ? `<span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span>`
+                    : '—';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${name}</span>
+                        <span class="desc-stats">${formatNumber(value)} 件 (${pct}%) ${changeText}</span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_divorceReasonsDesc').innerHTML = divHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 ${firstDiv.year_ad} 年 → ${lastDiv.year_ad} 年的 11 年累計變化</div>`;
+        }
+    }
+
+    function buildCriminalCharts(data) {
+        const years = data.district_criminal_by_year.map(d => d.year_ad);
+        const crim = data.district_criminal_by_year;
+
+        // Criminal trend
+        new Chart(document.getElementById('jstat_chartCriminalTrend'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '新收', data: crim.map(d => d.newly_lodged), borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1), fill: true, tension: 0.3 },
+                    { label: '終結', data: crim.map(d => d.cases_closed), borderColor: COLORS.green, backgroundColor: COLORS_ALPHA(COLORS.green, 0.1), fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Criminal pending
+        new Chart(document.getElementById('jstat_chartCriminalPending'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '未結件數',
+                    data: crim.map(d => d.pending_cases),
+                    backgroundColor: COLORS_ALPHA(COLORS.red, 0.7),
+                    borderColor: COLORS.red,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '未結: ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Criminal appeal affirmed rate - three instance comparison
+        new Chart(document.getElementById('jstat_chartCriminalAppeal'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '二審維持率（地院→高院）', data: crim.map(d => d.appeal_affirmed_rate), borderColor: COLORS.blue, backgroundColor: COLORS_ALPHA(COLORS.blue, 0.1), tension: 0.3, pointRadius: 4, fill: true },
+                    {
+                        label: '三審維持率（高院→最高法院）',
+                        data: years.map(yr => {
+                            const s = data.supreme_criminal_appeal?.find(d => d.year_ad === yr);
+                            return s ? s.third_instance_maintain_rate : null;
+                        }),
+                        borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1), tension: 0.3, pointRadius: 4, fill: true,
+                    },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { min: 60, max: 100, ticks: { callback: v => v + '%' } } },
+                plugins: {
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } },
+                    subtitle: { display: true, text: '刑事三審維持率 90-93%（「九死一生」傳說基本成立）', font: { size: 12 }, color: '#718096' }
+                }
+            }
+        });
+
+        // ===== 歷年罪名科刑人數（年報表73）=====
+        if (data.crime_yearly && data.crime_yearly.length > 0) {
+            const cy = data.crime_yearly;
+            const cyYears = cy.map(d => d.year_ad);
+            const firstCy = cy[0];
+            const lastCy = cy[cy.length - 1];
+
+            // Chart 1: 普通刑法 vs 特別刑法 總量
+            new Chart(document.getElementById('jstat_chartCrimeCategoryTrend'), {
+                type: 'line',
+                data: {
+                    labels: cyYears,
+                    datasets: [
+                        { label: '合計', data: cy.map(d => d['合計']), borderColor: COLORS.gray, backgroundColor: COLORS_ALPHA(COLORS.gray, 0.1), tension: 0.3, pointRadius: 3 },
+                        { label: '普通刑法計', data: cy.map(d => d['普通刑法計']), borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1), tension: 0.3, pointRadius: 3 },
+                        { label: '特別刑事法計', data: cy.map(d => d['特別刑事法計']), borderColor: COLORS.orange, backgroundColor: COLORS_ALPHA(COLORS.orange, 0.1), tension: 0.3, pointRadius: 3 },
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) }, title: { display: true, text: '科刑人數（人）' } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 人' } } }
+                }
+            });
+
+            // ===== 普通刑法趨勢 =====
+            const GENERAL_DESCRIPTIONS = {
+                '公共危險罪-不能安全駕駛': '俗稱酒駕罪，近年「酒駕零容忍」政策與刑度加重後人數大幅下降',
+                '竊盜罪-普通竊盜': '一般竊盜（未加重情節）',
+                '竊盜罪-加重竊盜': '攜帶兇器、結夥、夜間侵入住居等加重情節的竊盜',
+                '詐欺罪-一般詐欺': '一般詐欺取財、詐欺得利；近年受詐騙集團案件爆增影響',
+                '殺人罪-既遂': '故意殺人既遂',
+                '殺人罪-未遂': '故意殺人未遂',
+                '傷害罪-交通過失': '車禍肇事致人受傷的過失傷害（最大宗）',
+                '傷害罪-普通傷害': '故意傷害他人身體或健康',
+                '妨害自由-剝奪行動自由': '剝奪他人行動自由（妨害自由罪中最重）',
+                '妨害自由-強制罪': '以強暴脅迫使人行無義務之事',
+                '妨害自由-恐嚇危害安全': '恐嚇他人致生危害於安全',
+                '侵占罪-業務侵占': '因執行業務而持有他人之物予以侵占',
+                '毀棄損壞罪': '毀棄損壞他人物品',
+                '妨害公務罪': '對公務員依法執行職務施以強暴脅迫等',
+                '妨害秩序罪': '聚眾鬥毆、在公共場所聚眾施強暴等',
+            };
+
+            const generalCats = [
+                '公共危險罪-不能安全駕駛',
+                '竊盜罪-普通竊盜',
+                '詐欺罪-一般詐欺',
+                '傷害罪-交通過失',
+                '妨害自由-恐嚇危害安全',
+                '竊盜罪-加重竊盜',
+            ];
+            const generalColors = [COLORS.red, COLORS.blue, COLORS.orange, COLORS.green, COLORS.purple, COLORS.teal];
+            new Chart(document.getElementById('jstat_chartGeneralCrimeTrend'), {
+                type: 'line',
+                data: {
+                    labels: cyYears,
+                    datasets: generalCats.map((cat, i) => ({
+                        label: cat,
+                        data: cy.map(d => d[cat] || 0),
+                        borderColor: generalColors[i],
+                        backgroundColor: COLORS_ALPHA(generalColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 3,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) }, title: { display: true, text: '科刑人數（人）' } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 人' } } }
+                }
+            });
+
+            // Description cards for 普通刑法
+            const genCatKeys = [
+                '公共危險罪-不能安全駕駛', '竊盜罪-普通竊盜', '詐欺罪-一般詐欺',
+                '傷害罪-交通過失', '竊盜罪-加重竊盜', '妨害自由-恐嚇危害安全',
+                '妨害自由-剝奪行動自由', '傷害罪-普通傷害', '公共危險罪-肇事逃逸',
+                '侵占罪-業務侵占', '毀棄損壞罪', '妨害公務罪', '妨害秩序罪',
+                '殺人罪-既遂', '殺人罪-未遂', '妨害自由-強制罪',
+            ];
+            const genEntries = genCatKeys
+                .map(k => ({ name: k, value: lastCy[k] || 0, firstValue: firstCy[k] || 0 }))
+                .filter(e => e.value > 0 || e.firstValue > 0)
+                .sort((a, b) => b.value - a.value);
+
+            const genTotal = genEntries.reduce((s, e) => s + e.value, 0);
+            const genHtml = genEntries.map((e, i) => {
+                const change = e.firstValue ? ((e.value - e.firstValue) / e.firstValue * 100) : 0;
+                const pct = (e.value / genTotal * 100).toFixed(1);
+                const changeClass = change >= 0 ? 'change-up' : 'change-down';
+                const changeSign = change >= 0 ? '+' : '';
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = GENERAL_DESCRIPTIONS[e.name] || '';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${e.name}</span>
+                        <span class="desc-stats">${formatNumber(e.value)} 人 (${pct}%) <span class="${changeClass}">${changeSign}${change.toFixed(1)}%</span></span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_generalCrimeDesc').innerHTML = genHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 ${firstCy.year_ad} 年 → ${lastCy.year_ad} 年的 11 年累計變化（科刑人數）</div>`;
+
+            // ===== 特別刑法趨勢 =====
+            const SPECIAL_DESCRIPTIONS = {
+                '毒品-施用': '施用第一、二級毒品；110 年毒品條例修正後施用者多改行觀察勒戒，科刑人數大降',
+                '毒品-製造運輸販賣': '製造、運輸、販賣毒品（重罪）',
+                '毒品-其他': '其他毒品罪，如持有、轉讓等',
+                '違反洗錢防制法': '近年洗錢法大幅修正並擴及「車手」，人數從個位數暴增到萬人以上',
+                '違反家庭暴力防治法': '違反保護令罪為主',
+                '違反槍砲彈藥刀械': '非法持有、製造、販賣槍砲、刀械',
+                '違反兒少性剝削': '兒童及少年性剝削防制條例',
+                '違反商標法': '仿冒商標、販售仿冒品',
+                '違反著作權法': '盜版、重製、散布',
+                '違反銀行法': '非法吸金、地下金融',
+                '違反跟蹤騷擾防制法': '111 年 6 月施行的跟騷法，104 條為跟蹤騷擾行為罪',
+                '貪污治罪條例': '公務員貪污、收賄、圖利',
+                '妨害兵役治罪條例': '逃避兵役、妨害徵集等',
+            };
+
+            const specialCats = [
+                '毒品-施用',
+                '違反洗錢防制法',
+                '毒品-製造運輸販賣',
+                '違反家庭暴力防治法',
+                '違反槍砲彈藥刀械',
+                '違反兒少性剝削',
+            ];
+            const specialColors = [COLORS.red, COLORS.orange, COLORS.purple, COLORS.blue, COLORS.green, COLORS.teal];
+            new Chart(document.getElementById('jstat_chartSpecialCrimeTrend'), {
+                type: 'line',
+                data: {
+                    labels: cyYears,
+                    datasets: specialCats.map((cat, i) => ({
+                        label: cat,
+                        data: cy.map(d => d[cat] || 0),
+                        borderColor: specialColors[i],
+                        backgroundColor: COLORS_ALPHA(specialColors[i], 0.1),
+                        tension: 0.3,
+                        pointRadius: 3,
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { ticks: { callback: v => formatNumber(v) }, title: { display: true, text: '科刑人數（人）' } } },
+                    plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 人' } } }
+                }
+            });
+
+            // Description cards for 特別刑法
+            const specCatKeys = [
+                '毒品-施用', '違反洗錢防制法', '毒品-製造運輸販賣', '毒品-其他',
+                '違反家庭暴力防治法', '違反槍砲彈藥刀械', '違反兒少性剝削',
+                '違反商標法', '違反著作權法', '違反銀行法',
+                '違反跟蹤騷擾防制法', '貪污治罪條例', '妨害兵役治罪條例',
+            ];
+            const specEntries = specCatKeys
+                .map(k => ({ name: k, value: lastCy[k] || 0, firstValue: firstCy[k] || 0 }))
+                .filter(e => e.value > 0 || e.firstValue > 0)
+                .sort((a, b) => b.value - a.value);
+
+            const specTotal = specEntries.reduce((s, e) => s + e.value, 0);
+            const specHtml = specEntries.map((e, i) => {
+                const change = e.firstValue > 0 ? ((e.value - e.firstValue) / e.firstValue * 100) : null;
+                const pct = (e.value / specTotal * 100).toFixed(1);
+                const changeClass = change !== null && change >= 0 ? 'change-up' : 'change-down';
+                const changeText = change !== null
+                    ? `<span class="${changeClass}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`
+                    : `<span class="change-up">新法</span>`;
+                const topClass = i < 3 ? `top-${i + 1}` : '';
+                const desc = SPECIAL_DESCRIPTIONS[e.name] || '';
+                return `<div class="desc-item ${topClass}">
+                    <div class="desc-header">
+                        <span class="desc-name">${e.name}</span>
+                        <span class="desc-stats">${formatNumber(e.value)} 人 (${pct}%) ${changeText}</span>
+                    </div>
+                    <div class="desc-text">${desc}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('jstat_specialCrimeDesc').innerHTML = specHtml +
+                `<div style="grid-column: 1/-1; font-size: 11px; color: var(--text-muted); margin-top: 4px;">變化率為 ${firstCy.year_ad} 年 → ${lastCy.year_ad} 年的 11 年累計變化。「新法」表示該法律在統計期間內才生效（如跟騷法 111 年施行）</div>`;
+        }
+    }
+
+    function buildEnforcementCharts(data) {
+        const enf = data.enforcement_by_year;
+        const years = enf.map(d => d.year_ad);
+
+        // Enforcement trend
+        new Chart(document.getElementById('jstat_chartEnforcementTrend'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '新收', data: enf.map(d => d.newly_lodged), borderColor: COLORS.orange, backgroundColor: COLORS_ALPHA(COLORS.orange, 0.1), fill: true, tension: 0.3 },
+                    { label: '終結', data: enf.map(d => d.cases_closed), borderColor: COLORS.green, backgroundColor: COLORS_ALPHA(COLORS.green, 0.1), fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Enforcement pending
+        new Chart(document.getElementById('jstat_chartEnforcementPending'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '未結件數',
+                    data: enf.map(d => d.pending_cases),
+                    backgroundColor: COLORS_ALPHA(COLORS.orange, 0.7),
+                    borderColor: COLORS.orange,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '未結: ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // Enforcement avg days
+        new Chart(document.getElementById('jstat_chartEnforcementDays'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '平均結案天數',
+                    data: enf.map(d => d.avg_days_to_close),
+                    borderColor: COLORS.red,
+                    backgroundColor: COLORS_ALPHA(COLORS.red, 0.1),
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: '天' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '平均 ' + ctx.raw + ' 天' } } }
+            }
+        });
+
+        // Enforcement backlog rate
+        const backlogRate = enf.map(d => d.newly_lodged ? (d.pending_cases / d.newly_lodged * 100).toFixed(1) : 0);
+        new Chart(document.getElementById('jstat_chartEnforcementBacklog'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [{
+                    label: '積壓率 (%)',
+                    data: backlogRate,
+                    backgroundColor: backlogRate.map(v => parseFloat(v) > 10 ? COLORS_ALPHA(COLORS.red, 0.7) : COLORS_ALPHA(COLORS.orange, 0.7)),
+                    borderColor: backlogRate.map(v => parseFloat(v) > 10 ? COLORS.red : COLORS.orange),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v + '%' }, title: { display: true, text: '未結/新收 (%)' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => '積壓率: ' + ctx.raw + '%' } } }
+            }
+        });
+    }
+
+    function buildEfficiencyCharts(data) {
+        const years = data.district_civil_by_year.map(d => d.year_ad);
+        const civil = data.district_civil_by_year;
+        const crim = data.district_criminal_by_year;
+
+        // Avg days comparison
+        new Chart(document.getElementById('jstat_chartAvgDaysCompare'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '民事平均結案天數', data: civil.map(d => d.avg_days_to_close), borderColor: COLORS.blue, tension: 0.3, pointRadius: 4 },
+                    { label: '刑事平均結案天數', data: crim.map(d => d.avg_days_to_close), borderColor: COLORS.red, tension: 0.3, pointRadius: 4 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: '天' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + ' 天' } } }
+            }
+        });
+
+        // Judge caseload
+        new Chart(document.getElementById('jstat_chartJudgeCaseload'), {
+            type: 'bar',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '民事', data: civil.map(d => d.avg_cases_per_judge), backgroundColor: COLORS_ALPHA(COLORS.blue, 0.7) },
+                    { label: '刑事', data: crim.map(d => d.avg_cases_per_judge), backgroundColor: COLORS_ALPHA(COLORS.red, 0.7) },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { title: { display: true, text: '件/月' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + ' 件/月' } } }
+            }
+        });
+
+        // Backlog rate
+        const civilBacklog = civil.map(d => d.pending_cases && d.newly_lodged ? (d.pending_cases / d.newly_lodged * 100).toFixed(1) : 0);
+        const crimBacklog = crim.map(d => d.pending_cases && d.newly_lodged ? (d.pending_cases / d.newly_lodged * 100).toFixed(1) : 0);
+
+        new Chart(document.getElementById('jstat_chartBacklogRate'), {
+            type: 'line',
+            data: {
+                labels: years,
+                datasets: [
+                    { label: '民事積壓率', data: civilBacklog, borderColor: COLORS.blue, backgroundColor: COLORS_ALPHA(COLORS.blue, 0.1), fill: true, tension: 0.3 },
+                    { label: '刑事積壓率', data: crimBacklog, borderColor: COLORS.red, backgroundColor: COLORS_ALPHA(COLORS.red, 0.1), fill: true, tension: 0.3 },
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v + '%' }, title: { display: true, text: '未結/新收 (%)' } } },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } } }
+            }
+        });
+    }
+
+    function buildOrganCharts(data) {
+        // Civil by organ - only individual courts, not subtotals
+        const civilOrgans = data.district_civil_by_organ
+            .filter(d => !d.is_subtotal && d.organ !== '總計')
+            .sort((a, b) => b.newly_lodged - a.newly_lodged);
+
+        new Chart(document.getElementById('jstat_chartOrganCivil'), {
+            type: 'bar',
+            data: {
+                labels: civilOrgans.map(d => d.organ.replace('臺灣', '').replace('地方法院', '').replace('地方', '')),
+                datasets: [{
+                    label: '新收件數',
+                    data: civilOrgans.map(d => d.newly_lodged),
+                    backgroundColor: COLORS_ALPHA(COLORS.blue, 0.7),
+                    borderColor: COLORS.blue,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => formatNumber(ctx.raw) + ' 件' } }
+                }
+            }
+        });
+
+        // Criminal by organ
+        const crimOrgans = data.district_criminal_by_organ
+            .filter(d => !d.is_subtotal && d.organ !== '總計')
+            .sort((a, b) => b.newly_lodged - a.newly_lodged);
+
+        new Chart(document.getElementById('jstat_chartOrganCriminal'), {
+            type: 'bar',
+            data: {
+                labels: crimOrgans.map(d => d.organ.replace('臺灣', '').replace('地方法院', '').replace('地方', '')),
+                datasets: [{
+                    label: '新收件數',
+                    data: crimOrgans.map(d => d.newly_lodged),
+                    backgroundColor: COLORS_ALPHA(COLORS.red, 0.7),
+                    borderColor: COLORS.red,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { ticks: { callback: v => (v / 10000).toFixed(0) + '萬' } } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => formatNumber(ctx.raw) + ' 件' } }
+                }
+            }
+        });
+    }
+
+    let jstatData = null;
+    let jstatFetch = null;
+    const jstatInited = new Set();
+
+    window.loadJstatTab = function(tab) {
+        const key = tab.replace(/^jstat-/, '');
+        if (!jstatFetch) {
+            jstatFetch = fetch('data/judicial_stats.json')
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(d => {
+                    jstatData = d;
+                    const cs = getComputedStyle(document.body);
+                    Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#8899aa';
+                    Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || '#1e3050';
+                    buildKPIs(d);
+                })
+                .catch(err => {
+                    console.error('司法統計資料載入失敗', err);
+                    const grid = document.getElementById('jstat_kpiGrid');
+                    if (grid) grid.innerHTML = '<p style="color:var(--red);padding:20px;">司法統計資料載入失敗</p>';
+                });
+        }
+        jstatFetch.then(() => {
+            if (!jstatData || jstatInited.has(key)) return;
+            jstatInited.add(key);
+            if (tabBuilders[key]) tabBuilders[key](jstatData);
+        });
+    };
+})();
+
 </script>
 
 <!-- 修改密碼 Modal -->
