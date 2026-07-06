@@ -66,6 +66,13 @@
 
 - 產出三張月統計表：`judge_month_stats` / `lawyer_month_stats` / `prosecutor_month_stats`
   （法官署名、訴訟代理人/辯護人、檢察官，均含 cats 案類 jsonb）
+- **律師抽取地雷**：一個「訴訟代理人/辯護人」標籤常帶多位律師（同行或續行縮排），
+  舊 regex 只抓標籤後第一個 → 受僱律師全漏（喆律版圖只剩掛首位的主持律師）；
+  現版 `extract_lawyers()` 用 block parser 抓續行＋`RE_BAD_NAME` 濾「法扶/義務辯護」等
+  假名。**判別是否已用新邏輯跑過**：查 `lawyer_month_stats` 有無「法扶」等假名（有=舊）
+- **全區重跑狀態（2026-07 完成）**：1996-01 ~ 2025-04 全 352 月律師抽取已用最新邏輯
+  重跑，全區「法扶」假名 = 0、律師 mention 431 萬；早年（~2001）法院名 OCR 雜質由
+  `normalize_court()` 正規化（與 migration 038 `fix_court_name()` 同構，改一邊要同步）
 - **分類地雷**：家事裁判全文開頭一律寫「民事判決/裁定」（含少家法院），案類必須靠
   字別 JCASE 辨識（婚/家/繼/親/監宣…見 `FAM_JCASE_KEYS`）；改分類邏輯後要用
   `python judgment_stats.py reclassify <起> <迄>` 強制重跑（會刪 agg 快取、覆蓋上傳）
