@@ -2109,11 +2109,12 @@
                     <div class="chart-container tall"><canvas id="jstat_chartOrganCriminal"></canvas></div>
                 </div>
                 <div class="chart-card full">
-                    <div class="chart-title">各地區律師供需比 — 每位律師平均分到幾件民事訴訟（114 年）</div>
+                    <div class="chart-title">各地區律師供需比 — 每位律師平均分到幾件訴訟（民事 vs 刑事，114 年）</div>
                     <div class="chart-container tall"><canvas id="jstat_chartSupplyDemand"></canvas></div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-                        地院民事「訴訟程序」新收（官方案件統計）÷ 該地區執業律師數（三源合併名冊的公會地區）。
-                        比值越高代表該地區每位律師的潛在案源越多（市場越不飽和）。僅含地院本院訴訟案件，不含簡易庭、非訟、執行。
+                        地院<strong>民事訴訟</strong>新收（藍）與<strong>刑事第一審</strong>新收（紅）÷ 該地區執業律師數（三源合併名冊的公會地區）。
+                        比值越高代表該地區每位律師的潛在案源越多（市場越不飽和）。依民事訴訟供需比排序。
+                        僅計地院本院訴訟案件：民事不含簡易庭／非訟／執行，刑事僅第一審（不含附帶民訴、偵查聲請、簡易處刑）。
                     </div>
                 </div>
             </div>
@@ -7287,12 +7288,19 @@ async function showCourtDetail(name) {
     let supplyDemandBuilt = false;
     async function buildSupplyDemandChart() {
         if (supplyDemandBuilt || typeof db === 'undefined') return;
-        supplyDemandBuilt = true;
+        const el = document.getElementById('jstat_chartSupplyDemand');
+        if (!el) return;  // canvas 尚未進 DOM，先不鎖，下次進本分頁再重試
         try {
-            const [casesRes, regionRes, courtsRes] = await Promise.all([
+            const [civilRes, crimRes, regionRes, courtsRes] = await Promise.all([
+                // 民事訴訟新收（單一明細值，不含簡易/非訟/執行）
                 db.from('court_case_stats')
                   .select('court_name,new_cases')
                   .eq('year_tw', 114).eq('case_category', '民事').eq('proc_l2', '民事訴訟')
+                  .eq('court_level', '地方法院').limit(2000),
+                // 刑事第一審新收（律師刑事辯護主要案源，排除附帶民訴/偵查聲請）
+                db.from('court_case_stats')
+                  .select('court_name,new_cases')
+                  .eq('year_tw', 114).eq('case_category', '刑事').eq('proc_l1', '訴訟').eq('proc_l2', '第一審')
                   .eq('court_level', '地方法院').limit(2000),
                 db.rpc('region_distribution'),
                 db.from('courts').select('name,region').eq('court_type', '地方法院'),
@@ -7304,45 +7312,64 @@ async function showCourtDetail(name) {
             // 新北公會律師若極少（多數掛台北公會），把新北法院案件併入台北一起看
             const mergeMap = {};
             if ((lawyerCnt['新北'] || 0) < 100) mergeMap['新北'] = '台北';
-            const regionCases = {};
-            (casesRes.data || []).forEach(r => {
-                let reg = courtRegion[r.court_name];
-                if (!reg) return;
-                reg = mergeMap[reg] || reg;
-                regionCases[reg] = (regionCases[reg] || 0) + r.new_cases;
-            });
-            const rows = Object.entries(regionCases)
-                .filter(([reg]) => (lawyerCnt[reg] || 0) >= 10)
-                .map(([reg, cases]) => ({
+            const aggByRegion = (data) => {
+                const m = {};
+                (data || []).forEach(r => {
+                    let reg = courtRegion[r.court_name];
+                    if (!reg) return;
+                    reg = mergeMap[reg] || reg;
+                    m[reg] = (m[reg] || 0) + (r.new_cases || 0);
+                });
+                return m;
+            };
+            const civilCases = aggByRegion(civilRes.data);
+            const crimCases = aggByRegion(crimRes.data);
+            const rows = [...new Set([...Object.keys(civilCases), ...Object.keys(crimCases)])]
+                .filter(reg => (lawyerCnt[reg] || 0) >= 10)
+                .map(reg => ({
                     reg: mergeMap['新北'] === '台北' && reg === '台北' ? '台北（含新北）' : reg,
-                    cases, lawyers: lawyerCnt[reg],
-                    ratio: +(cases / lawyerCnt[reg]).toFixed(1),
+                    lawyers: lawyerCnt[reg],
+                    civil: civilCases[reg] || 0,
+                    crim: crimCases[reg] || 0,
+                    civilRatio: +((civilCases[reg] || 0) / lawyerCnt[reg]).toFixed(1),
+                    crimRatio: +((crimCases[reg] || 0) / lawyerCnt[reg]).toFixed(1),
                 }))
-                .sort((a, b) => b.ratio - a.ratio);
+                .sort((a, b) => b.civilRatio - a.civilRatio);
             if (!rows.length) return;
-            new Chart(document.getElementById('jstat_chartSupplyDemand'), {
+            new Chart(el, {
                 type: 'bar',
                 data: {
                     labels: rows.map(r => r.reg),
-                    datasets: [{
-                        label: '件/律師',
-                        data: rows.map(r => r.ratio),
-                        backgroundColor: rows.map(r => r.ratio >= 10 ? COLORS_ALPHA(COLORS.green, 0.7) : r.ratio >= 5 ? COLORS_ALPHA(COLORS.orange, 0.7) : COLORS_ALPHA(COLORS.red, 0.7)),
-                        borderWidth: 1,
-                    }],
+                    datasets: [
+                        {
+                            label: '民事訴訟 件/律師',
+                            data: rows.map(r => r.civilRatio),
+                            backgroundColor: COLORS_ALPHA(COLORS.blue, 0.7),
+                            borderColor: COLORS.blue, borderWidth: 1,
+                        },
+                        {
+                            label: '刑事第一審 件/律師',
+                            data: rows.map(r => r.crimRatio),
+                            backgroundColor: COLORS_ALPHA(COLORS.red, 0.7),
+                            borderColor: COLORS.red, borderWidth: 1,
+                        },
+                    ],
                 },
                 options: {
                     indexAxis: 'y',
                     responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: { display: true },
                         tooltip: { callbacks: { label: ctx => {
                             const r = rows[ctx.dataIndex];
-                            return `${r.ratio} 件/律師（新收 ${formatNumber(r.cases)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`;
+                            return ctx.datasetIndex === 0
+                                ? `民事訴訟 ${r.civilRatio} 件/律師（新收 ${formatNumber(r.civil)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`
+                                : `刑事第一審 ${r.crimRatio} 件/律師（新收 ${formatNumber(r.crim)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`;
                         } } },
                     },
                 },
             });
+            supplyDemandBuilt = true;  // 畫成功才鎖，避免初次失敗後永久不再重試
         } catch (err) {
             console.error('供需比圖載入失敗', err);
         }
