@@ -1131,6 +1131,63 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: JUDGE-CHANGES (法官異動追蹤) ==================== -->
+    <div id="tab-judge-changes" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          &#9888;&#65039; 本頁依<strong>裁判書署名</strong>逐月反推法官在各法院的<strong>進場／退場</strong>，非官方人事令。
+          「名冊確認」＝已比對司法院現任名冊；「疑似」＝可能為久未掛名或同名，未必為真異動。
+          法官無律師證號那種唯一鍵，故不做跨院轉調連連看。資料涵蓋至 2025-04（裁判書開放資料晚兩月發布）；官方名冊月快照已自本月起累積，未來提供權威 diff。
+        </div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">進場</div><div class="kpi-value" id="kpiJchgAppear" style="color:var(--green);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">退場</div><div class="kpi-value" id="kpiJchgLeave" style="color:var(--red);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">淨變動</div><div class="kpi-value" id="kpiJchgNet" style="color:var(--gold);">-</div><div class="kpi-sub">進場 − 退場</div></div>
+        <div class="kpi-card"><div class="kpi-label">最新資料月</div><div class="kpi-value" id="kpiJchgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">裁判書涵蓋至</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="jchgSearch" placeholder="搜尋法官姓名或法院..." oninput="renderJudgeChanges()">
+        <select id="jchgWindow" onchange="renderJudgeChanges()">
+          <option value="24">近 24 個月</option>
+          <option value="12">近 12 個月</option>
+          <option value="60">近 5 年</option>
+          <option value="0">全部</option>
+        </select>
+        <select id="jchgType" onchange="renderJudgeChanges()">
+          <option value="">所有類型</option>
+          <option value="appear">進場</option>
+          <option value="leave">退場</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card"><div class="card-title">&#128200; 法官流入排行（進場）</div><div id="jchgInflow" class="loading">載入中</div></div>
+        <div class="card"><div class="card-title">&#128201; 法官流出排行（退場）</div><div id="jchgOutflow" class="loading">載入中</div></div>
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>&#9878;&#65039; 淨變動排行</span>
+            <select id="jchgNetOrder" onchange="renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="in">淨流入優先</option>
+              <option value="out">淨流出優先</option>
+            </select>
+          </div>
+          <div id="jchgNet" class="loading">載入中</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128260; 異動明細</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>資料月</th><th>法官</th><th>法院</th><th>類型</th><th>信心</th></tr>
+            </thead>
+            <tbody id="jchgTableBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="jchgPagination"></div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGES (法官) ==================== -->
     <div id="tab-judges" class="tab-content">
       <div class="kpi-grid" id="judgeKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -2361,6 +2418,7 @@ const SECTIONS = {
     { tab: 'judge-overview', label: '總覽' },
     { tab: 'judges', label: '法官' },
     { tab: 'courts', label: '法院' },
+    { tab: 'judge-changes', label: '異動追蹤' },
   ],
   prosecutor: [
     { tab: 'prosecutor-overview', label: '總覽' },
@@ -2427,6 +2485,7 @@ function showTab(tab) {
   if (tab === 'changes') loadChanges();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
+  if (tab === 'judge-changes') loadJudgeChanges();
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
@@ -3225,10 +3284,44 @@ const FIRM_LEADERS = {
   '吳明蒼': '誠澈法律事務所｜合夥律師（前法官）',
   '陳建州': '鼎禎國際律師事務所｜主持律師',
   '謝秉錡': '謝秉錡律師事務所｜主持律師',
+  '易帥君': '三民聯合法律事務所｜主持律師（創辦人）',
+  '徐崧博': '趨勢法律事務所｜所長',
+  '張簡勵如': '大尹法律事務所｜所長',
+  '呂秋𧽚': '宇達經貿法律事務所｜主持律師（呂秋遠）',
+  '李文健': '德臻法律事務所｜共同創辦人',
+  '莊喬汝': '德臻法律事務所｜共同創辦人',
+  '郭怡青': '德臻法律事務所｜共同創辦人',
+  '石宜琳': '宏仁法律事務所｜共同主持律師',
+  '陳清進': '宏仁法律事務所｜共同主持律師',
+  '張志全': '兆宇國際法律事務所｜共同主持律師（前台北地院法官、前北檢檢察官）',
+  '林冠佑': '兆宇國際法律事務所｜共同主持律師（前台北地檢署檢察官）',
+  '薛智友': '文尹國際法律事務所｜共同主持律師（前士林/花蓮地檢主任檢察官）',
+  '陳世錚': '文尹國際法律事務所｜共同主持律師',
+  '陳偉仁': '唯心法律事務所｜主持律師',
+  '鄭猷耀': '安恆國際法律事務所｜台南所主持律師（創辦人）',
+  '孫櫻倩': '西村朝日台灣法律事務所｜主持律師',
+  '張勝傑': '西村朝日台灣法律事務所｜主持律師',
+  '李世章': '連邦法律事務所｜主持律師（連邦IP集團）',
+  '何宗翰': '脩誠法律事務所｜主要律師（案量最高，所長未明示）',
+  '陳塘偉': '品和法律事務所｜主要律師（所長未明示）',
 };
 
 // 已分析事務所的一句話描述
 const FIRM_TAGLINES = {
+  '脩誠法律事務所': '家事訴訟見長的中小型訴訟所',
+  '三民聯合法律事務所': '智財勞工訴訟＋企業法律顧問',
+  '趨勢法律事務所': '日文律師×台日跨國商務（延攬前法官）',
+  '大尹法律事務所': '證券金融犯罪與商務訴訟專門',
+  '宇達經貿法律事務所': '名律師呂秋遠領軍的綜合型所',
+  '德臻法律事務所': '家事性別平權專業所',
+  '宏仁法律事務所': '資深雙主持，刑民訴訟並重',
+  '兆宇國際法律事務所': '前法官檢察官領軍的刑事團隊',
+  '文尹國際法律事務所': '前主任檢察官出身，刑事辯護見長',
+  '唯心法律事務所': '嘉義最大所，訴訟與冤獄救援',
+  '安恆國際法律事務所': '公法／行政救濟見長',
+  '品和法律事務所': '公司證券爭議精品所',
+  '西村朝日台灣法律事務所': '日本最大所 Nishimura 台北據點',
+  '連邦法律事務所': '連邦 IP 集團的法律專業部門',
   '理律法律事務所': '規模化法律專業服務機構，智財非訟王牌',
   '萬國法律事務所': '政治人脈訴訟大所，不動產 44%',
   '喆律法律事務所': '法律科技公司，全台最大家事所',
@@ -4491,6 +4584,128 @@ function renderChanges() {
     document.getElementById('chgPagination').insertAdjacentHTML('beforeend',
       '<span class="page-info">（已達載入上限 3000 筆，請縮短期間）</span>');
   }
+}
+
+// ============================================================
+// JUDGE-CHANGES (法官異動追蹤)
+// ============================================================
+let _jchgRows = null;
+let jchgPage = 0;
+
+async function loadJudgeChanges(force) {
+  if (_jchgRows && !force) { renderJudgeChanges(); return; }
+  jchgPage = 0;
+  ['jchgInflow', 'jchgOutflow', 'jchgNet'].forEach(id => { document.getElementById(id).className = 'loading'; });
+  const { data, error } = await db.from('judge_changes')
+    .select('name,court_name,change_type,event_month,case_count,in_current_roster,confidence')
+    .order('event_month', { ascending: false }).limit(20000);
+  if (error) {
+    document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="5" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
+    return;
+  }
+  _jchgRows = data || [];
+  renderJudgeChanges();
+}
+
+const JCHG_TYPE_META = {
+  appear: { label: '進場', cls: 'badge-green' },
+  leave: { label: '退場', cls: 'badge-red' },
+};
+
+// yyyymm 往前推 n 個月（回傳 yyyymm 字串）
+function jchgMonthMinus(yyyymm, n) {
+  const y = parseInt(yyyymm.slice(0, 4), 10), m = parseInt(yyyymm.slice(4, 6), 10);
+  const tot = y * 12 + (m - 1) - n;
+  return `${Math.floor(tot / 12)}${String((tot % 12) + 1).padStart(2, '0')}`;
+}
+
+function renderJudgeChanges() {
+  if (!_jchgRows) return;
+  const kw = (document.getElementById('jchgSearch').value || '').trim();
+  const type = document.getElementById('jchgType').value;
+  const months = parseInt(document.getElementById('jchgWindow').value, 10);
+
+  // 期間相對「資料末端月」而非今天（裁判書晚兩月且僅到 2025-04）
+  const maxMonth = _jchgRows.length ? _jchgRows[0].event_month : null;
+  document.getElementById('kpiJchgLast').textContent =
+    maxMonth ? `${maxMonth.slice(0, 4)}-${maxMonth.slice(4, 6)}` : '尚無資料';
+  const cutoff = (months > 0 && maxMonth) ? jchgMonthMinus(maxMonth, months) : null;
+
+  let win = _jchgRows;
+  if (cutoff) win = win.filter(r => r.event_month >= cutoff);
+
+  // KPI（期間內，不受搜尋/類型影響）
+  const appearN = win.filter(r => r.change_type === 'appear').length;
+  const leaveN = win.filter(r => r.change_type === 'leave').length;
+  const net = appearN - leaveN;
+  document.getElementById('kpiJchgAppear').textContent = appearN.toLocaleString();
+  document.getElementById('kpiJchgLeave').textContent = leaveN.toLocaleString();
+  document.getElementById('kpiJchgNet').textContent = (net > 0 ? '+' : '') + net.toLocaleString();
+
+  // 排行（按法院聚合，期間內）
+  const inflow = {}, outflow = {};
+  win.forEach(r => {
+    if (r.change_type === 'appear') inflow[r.court_name] = (inflow[r.court_name] || 0) + 1;
+    else if (r.change_type === 'leave') outflow[r.court_name] = (outflow[r.court_name] || 0) + 1;
+  });
+  const courtLink = c =>
+    `<a href="#" onclick="document.getElementById('jchgSearch').value='${escHtml(c).replace(/'/g, "\\'")}';renderJudgeChanges();return false;" style="color:var(--blue);text-decoration:none;">${escHtml(c)}</a>`;
+  const rankHtml = obj => {
+    const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    if (!all.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
+    return all.slice(0, 15).map(([court, n], i) =>
+      `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <span>${i + 1}. ${courtLink(court)}</span><span style="font-weight:600;">${n} 人</span>
+      </div>`).join('');
+  };
+  document.getElementById('jchgInflow').className = '';
+  document.getElementById('jchgOutflow').className = '';
+  document.getElementById('jchgInflow').innerHTML = rankHtml(inflow);
+  document.getElementById('jchgOutflow').innerHTML = rankHtml(outflow);
+
+  // 淨變動
+  const netObj = {};
+  Object.entries(inflow).forEach(([c, n]) => { netObj[c] = (netObj[c] || 0) + n; });
+  Object.entries(outflow).forEach(([c, n]) => { netObj[c] = (netObj[c] || 0) - n; });
+  const netOrder = document.getElementById('jchgNetOrder').value;
+  const netAll = Object.entries(netObj).sort((a, b) => netOrder === 'out' ? a[1] - b[1] : b[1] - a[1]);
+  const netEl = document.getElementById('jchgNet');
+  netEl.className = '';
+  netEl.innerHTML = !netAll.length
+    ? '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>'
+    : netAll.slice(0, 15).map(([court, n], i) => {
+      const color = n > 0 ? 'var(--green)' : n < 0 ? 'var(--red)' : 'var(--text-muted)';
+      return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <span>${i + 1}. ${courtLink(court)}</span><span style="font-weight:600;color:${color};">${n > 0 ? '+' : ''}${n} 人</span>
+      </div>`;
+    }).join('');
+
+  // 明細（期間內 + 搜尋 + 類型）
+  let rows = win;
+  if (type) rows = rows.filter(r => r.change_type === type);
+  if (kw) rows = rows.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
+
+  const body = document.getElementById('jchgTableBody');
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (jchgPage >= totalPages) jchgPage = totalPages - 1;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無異動紀錄</td></tr>';
+  } else {
+    body.innerHTML = rows.slice(jchgPage * PAGE_SIZE, (jchgPage + 1) * PAGE_SIZE).map(r => {
+      const meta = JCHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
+      const conf = r.confidence === 'confirmed'
+        ? '<span class="badge badge-blue" title="已比對司法院現任名冊">名冊確認</span>'
+        : '<span class="badge badge-orange" title="裁判書反推，可能久未掛名或同名，未必為真異動">疑似</span>';
+      return `<tr>
+        <td style="white-space:nowrap;">${r.event_month.slice(0, 4)}-${r.event_month.slice(4, 6)}</td>
+        <td style="font-weight:600;">${escHtml(r.name || '-')}</td>
+        <td>${escHtml(r.court_name || '-')}</td>
+        <td><span class="badge ${meta.cls}">${meta.label}</span></td>
+        <td>${conf}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderPagination('jchgPagination', jchgPage, rows.length, p => { jchgPage = p; renderJudgeChanges(); });
 }
 
 function escHtml(str) {
