@@ -4877,12 +4877,15 @@ async function loadJudgeOverview() {
       .order('case_count_total', { ascending: false })
       .limit(100);
     const top10 = (jjsTop || []).filter(j => rosterNames.has(j.name)).slice(0, 10);
-    let jRangeNote = '資料期間 2020-01 起';
+    let jRangeNote = '資料期間依回填進度';
     try {
-      const { data: mrow } = await db.from('judge_month_stats')
-        .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
-      if (mrow?.[0]?.yyyymm) jRangeNote = `資料期間 2020-01 ~ ${mrow[0].yyyymm.slice(0, 4)}-${mrow[0].yyyymm.slice(4)}`;
-    } catch (e) { /* 標註取不到最新月就顯示起始年 */ }
+      const fmt = ym => `${ym.slice(0, 4)}-${ym.slice(4)}`;
+      const [{ data: lo }, { data: hi }] = await Promise.all([
+        db.from('judge_month_stats').select('yyyymm').order('yyyymm', { ascending: true }).limit(1),
+        db.from('judge_month_stats').select('yyyymm').order('yyyymm', { ascending: false }).limit(1),
+      ]);
+      if (lo?.[0] && hi?.[0]) jRangeNote = `資料期間 ${fmt(lo[0].yyyymm)} ~ ${fmt(hi[0].yyyymm)}（歷史回填中，中間年份未必完整）`;
+    } catch (e) { /* 取不到範圍就顯示預設文字 */ }
     el('topJudgesList').innerHTML = top10?.length ? `<div style="margin-top:8px;">
       ${top10.map((j, i) => {
         const barW = Math.round(j.case_count_total / top10[0].case_count_total * 100);
@@ -7147,26 +7150,29 @@ async function showCourtDetail(name) {
     window.loadJstatTab = function(tab) {
         const key = tab.replace(/^jstat-/, '');
         if (!jstatFetch) {
-            jstatFetch = fetch('data/judicial_stats.json')
+            // cache-buster：避免 CDN/瀏覽器快取到部署中的 404 或舊檔
+            jstatFetch = fetch('data/judicial_stats.json?v=' + Date.now())
                 .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
                 .then(d => {
                     jstatData = d;
+                    buildKPIs(d);  // KPI 先渲染（不依賴 Chart.js）
                     const cs = getComputedStyle(document.body);
                     Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#8899aa';
                     Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || '#1e3050';
-                    buildKPIs(d);
                 })
                 .catch(err => {
                     console.error('司法統計資料載入失敗', err);
+                    jstatFetch = null;  // 重設，下次點分頁自動重試（否則失敗會被永久快取）
                     const grid = document.getElementById('jstat_kpiGrid');
-                    if (grid) grid.innerHTML = '<p style="color:var(--red);padding:20px;">司法統計資料載入失敗</p>';
+                    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:14px 18px;border:1px solid var(--red);border-radius:8px;">⚠️ 司法統計資料載入失敗（' + (err.message || err) + '）— 再點一次分頁即可重試</div>';
+                    throw err;
                 });
         }
         jstatFetch.then(() => {
             if (!jstatData || jstatInited.has(key)) return;
             jstatInited.add(key);
             if (tabBuilders[key]) tabBuilders[key](jstatData);
-        });
+        }).catch(() => {});  // 錯誤已在上面呈現，避免 unhandled rejection
     };
 })();
 
