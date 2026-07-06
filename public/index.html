@@ -4867,40 +4867,58 @@ async function loadJudgeOverview() {
         plugins: { legend: { display: false } } }
     });
 
-    // 案件量 TOP 10 法官 — 抓自家裁判書管線（judge_judgment_stats），
-    // 不用 judges_combined.case_count_total（無官方統計時 fallback 到 Lawsnote 歷年總數，會膨脹數倍）
+    // 案件量 TOP 10 法官 — RPC top_judges_by_period 聚合自家裁判書管線（judge_month_stats），
+    // 預設近五年，可按年度切換。不用 judges_combined.case_count_total（無官方統計時
+    // fallback 到 Lawsnote 歷年總數，會膨脹數倍）。
     // 只列司法院名冊上的法官：署名解析偶有司法事務官/已離職人員混入（如大量本票裁定的極端值）
     const rosterNames = new Set(judges.filter(j => (j.data_source || '').includes('司法院')).map(j => j.name));
-    const { data: jjsTop } = await db.from('judge_judgment_stats')
-      .select('name,court_name,case_count_total')
-      .not('case_count_total', 'is', null)
-      .order('case_count_total', { ascending: false })
-      .limit(100);
-    const top10 = (jjsTop || []).filter(j => rosterNames.has(j.name)).slice(0, 10);
-    let jRangeNote = '資料期間依回填進度';
+    let tjLatestYm = '202504';
     try {
-      const fmt = ym => `${ym.slice(0, 4)}-${ym.slice(4)}`;
-      const [{ data: lo }, { data: hi }] = await Promise.all([
-        db.from('judge_month_stats').select('yyyymm').order('yyyymm', { ascending: true }).limit(1),
-        db.from('judge_month_stats').select('yyyymm').order('yyyymm', { ascending: false }).limit(1),
-      ]);
-      if (lo?.[0] && hi?.[0]) jRangeNote = `資料期間 ${fmt(lo[0].yyyymm)} ~ ${fmt(hi[0].yyyymm)}（歷史回填中，中間年份未必完整）`;
-    } catch (e) { /* 取不到範圍就顯示預設文字 */ }
-    el('topJudgesList').innerHTML = top10?.length ? `<div style="margin-top:8px;">
-      ${top10.map((j, i) => {
-        const barW = Math.round(j.case_count_total / top10[0].case_count_total * 100);
+      const { data: hi } = await db.from('judge_month_stats')
+        .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
+      if (hi?.[0]?.yyyymm) tjLatestYm = hi[0].yyyymm;
+    } catch (e) { /* 用預設值 */ }
+    const tjLatestYear = parseInt(tjLatestYm.slice(0, 4), 10);
+    const tjPeriods = [
+      { key: '5yr', label: '近五年', from: `${tjLatestYear - 4}01`, to: `${tjLatestYear}12` },
+      ...Array.from({ length: 5 }, (_, i) => tjLatestYear - i)
+        .map(y => ({ key: String(y), label: `${y} 年`, from: `${y}01`, to: `${y}12` })),
+    ];
+    window._tjRender = async key => {
+      const p = tjPeriods.find(x => x.key === key) || tjPeriods[0];
+      document.querySelectorAll('#topJudgesYears button').forEach(b => {
+        const on = b.dataset.k === p.key;
+        b.style.background = on ? 'rgba(201,168,76,0.15)' : 'transparent';
+        b.style.borderColor = on ? 'var(--gold)' : 'var(--border)';
+        b.style.color = on ? 'var(--gold)' : 'var(--text-muted)';
+      });
+      const inner = document.getElementById('topJudgesInner');
+      inner.innerHTML = '<div class="loading">載入中</div>';
+      const { data: rows, error } = await db.rpc('top_judges_by_period',
+        { p_from: p.from, p_to: p.to, p_limit: 60 });
+      if (error) { inner.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">載入失敗</div>'; return; }
+      const top10 = (rows || []).filter(j => rosterNames.has(j.name)).slice(0, 10);
+      inner.innerHTML = top10.length ? top10.map((j, i) => {
+        const barW = Math.round(j.case_count / top10[0].case_count * 100);
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
           <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
           <span style="min-width:64px;font-weight:600;">${escHtml(j.name)}</span>
           <span style="flex:1;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(j.court_name || '')}</span>
           <span style="width:${Math.max(barW, 4) * 0.5}%;max-width:30%;height:8px;background:rgba(201,168,76,0.5);border-radius:4px;"></span>
-          <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${j.case_count_total.toLocaleString()}</span>
+          <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${Number(j.case_count).toLocaleString()}</span>
         </div>`;
-      }).join('')}
-      <div style="margin-top:8px;color:var(--text-muted);font-size:0.72rem;line-height:1.5;">
-        &#128196; 裁判書開放資料署名統計｜${jRangeNote}｜含判決與裁定，合議庭每位署名法官各計 1 件（高院/最高院偏高）｜僅列司法院名冊法官
+      }).join('') : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">此期間尚無資料</div>';
+    };
+    el('topJudgesList').innerHTML = `
+      <div id="topJudgesYears" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px;">
+        ${tjPeriods.map(p => `<button data-k="${p.key}" onclick="_tjRender('${p.key}')"
+          style="padding:3px 10px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--text-muted);font-size:0.78rem;cursor:pointer;">${p.label}</button>`).join('')}
       </div>
-    </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無案件統計資料</div>';
+      <div id="topJudgesInner"></div>
+      <div style="margin-top:8px;color:var(--text-muted);font-size:0.72rem;line-height:1.5;">
+        &#128196; 裁判書開放資料署名統計（統計至 ${tjLatestYm.slice(0, 4)}-${tjLatestYm.slice(4)}）｜含判決與裁定，合議庭每位署名法官各計 1 件（高院/最高院偏高）｜僅列司法院名冊法官
+      </div>`;
+    window._tjRender('5yr');
 
     // 年度平均結案天數趨勢（judge_month_stats 逐月回填，months<12 標 *）
     try {
