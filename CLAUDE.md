@@ -86,6 +86,11 @@
   前端律師列表/詳情 modal 改讀 `lawyers_with_stats` view（= lawyers_combined LEFT JOIN
   彙總表，含 `name_ambiguous` 同名旗標，同名官方數字是合併值、前端以 * 標註）。
   **Lawsnote `case_count_5yr` 已從 UI 下架**（欄位仍在 DB/view；expertise_areas 等照用）
+- **事務所版圖（migration 047）**：`firm_court_ranking(p_cat, p_court)`（案類×法院→事務所
+  近 5 年出庭排名，firm_name 截到第一個「事務所」合併分所、排除「未提供」、同名律師不計）＋
+  `lms_court_list()` 法院下拉；前端「產業分析＞事務所版圖」tab（喆律綠色 highlight）；
+  事務所 modal 另有「官方訴訟戰力」區塊（案類覆蓋/明星依賴度/法院版圖，client-side 讀
+  lawyers_with_stats）。加了 `idx_lms_court` 索引
 
 ## 前端導覽結構
 

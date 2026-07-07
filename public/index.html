@@ -720,6 +720,66 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: FIRM MAP (事務所版圖) ==================== -->
+    <div id="tab-firm-map" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127963;&#65039; 事務所版圖 — 案類 × 法院競爭位置</div>
+        <div class="search-bar">
+          <select id="fmCatSel" onchange="loadFirmMap()">
+            <option value="">全部案類</option>
+            <option value="民事">民事</option>
+            <option value="刑事">刑事</option>
+            <option value="家事">家事</option>
+            <option value="行政">行政</option>
+            <option value="懲戒">懲戒</option>
+            <option value="其他">其他</option>
+          </select>
+          <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
+            <option value="">全部法院</option>
+          </select>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
+          <div class="kpi-card">
+            <div class="kpi-label">喆律排名</div>
+            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluRank">-</div>
+            <div class="kpi-sub">此案類×法院</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">喆律出庭數</div>
+            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluCases">-</div>
+            <div class="kpi-sub">近 5 年</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">第一名</div>
+            <div class="kpi-value" style="font-size:1.05rem;padding-top:8px;" id="fmKpiTop1">-</div>
+            <div class="kpi-sub" id="fmKpiTop1Sub">-</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">上榜事務所</div>
+            <div class="kpi-value" id="fmKpiFirms">-</div>
+            <div class="kpi-sub">此條件有出庭</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">TOP 20 事務所</div>
+        <div class="chart-container" style="height:480px;"><canvas id="fmChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">排行榜（前 100）</div>
+        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">出庭數(近5年)</th><th style="text-align:right;">出庭律師數</th></tr></thead>
+            <tbody id="fmTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
+        ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
+        事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGE OVERVIEW (法官總覽) ==================== -->
     <div id="tab-judge-overview" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
@@ -2444,6 +2504,7 @@ const SECTIONS = {
   industry: [
     { tab: 'family', label: '家事法官' },
     { tab: 'fam-lawyers', label: '家事律師' },
+    { tab: 'firm-map', label: '事務所版圖' },
   ],
   sources: [],
   admin: [],
@@ -2485,6 +2546,7 @@ function showTab(tab) {
   if (tab === 'pros-offices') loadProsOffices();
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'fam-lawyers') loadFamLawyersOnce();
+  if (tab === 'firm-map') loadFirmMapOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
@@ -3914,6 +3976,30 @@ async function showFirmDetail(firmName) {
     return;
   }
 
+  // 官方訴訟戰力（lawyers_with_stats：官方彙總 + 同名旗標；同名律師不計入，口徑與版圖頁一致）
+  let firmStats = [];
+  try {
+    for (let sFrom = 0; ; sFrom += 1000) {
+      const { data: fs } = await db.from('lawyers_with_stats')
+        .select('name, official_cases_5yr, official_cats_5yr, official_top_court, name_ambiguous')
+        .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
+        .range(sFrom, sFrom + 999);
+      if (fs?.length) firmStats = firmStats.concat(fs);
+      if (!fs || fs.length < 1000) break;
+    }
+  } catch (e) { console.log('firm official stats error:', e); }
+  const litLawyers = firmStats.filter(s => !s.name_ambiguous && s.official_cases_5yr > 0)
+    .sort((a, b) => b.official_cases_5yr - a.official_cases_5yr);
+  const litTotal = litLawyers.reduce((a, s) => a + s.official_cases_5yr, 0);
+  const litCats = {}, litCourts = {};
+  litLawyers.forEach(s => {
+    Object.entries(s.official_cats_5yr || {}).forEach(([k, v]) => { litCats[k] = (litCats[k] || 0) + v; });
+    if (s.official_top_court) litCourts[s.official_top_court] = (litCourts[s.official_top_court] || 0) + s.official_cases_5yr;
+  });
+  const top1Share = litTotal && litLawyers[0] ? Math.round(litLawyers[0].official_cases_5yr * 100 / litTotal) : 0;
+  const top3Share = litTotal ? Math.round(litLawyers.slice(0, 3).reduce((a, s) => a + s.official_cases_5yr, 0) * 100 / litTotal) : 0;
+  const topCourtList = Object.entries(litCourts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
   // 統計
   const total = allLawyers.length;
   const male = allLawyers.filter(l => l.sex === '男').length;
@@ -4016,6 +4102,44 @@ async function showFirmDetail(firmName) {
       <div class="chart-container" style="height:160px;"><canvas id="firmSeniorityChart"></canvas></div>
     </div>
 
+    ${litTotal ? `
+    <!-- 官方訴訟戰力 -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9878; 官方訴訟戰力（近 5 年）<span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">公開裁判書下限估計；同名律師不計入</span></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">合計出庭</div>
+          <div style="font-size:1.6rem;font-weight:700;color:var(--gold);">${litTotal.toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">有出庭律師</div>
+          <div style="font-size:1.6rem;font-weight:700;">${litLawyers.length}<span style="font-size:0.85rem;color:var(--text-muted);"> / ${total}</span></div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" title="第一名律師佔全所出庭量比例，越高越依賴明星律師">Top 1 依賴度</div>
+          <div style="font-size:1.6rem;font-weight:700;color:${top1Share >= 40 ? 'var(--orange)' : 'var(--green)'};">${top1Share}%</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" title="前三名律師佔全所出庭量比例">Top 3 依賴度</div>
+          <div style="font-size:1.6rem;font-weight:700;color:${top3Share >= 70 ? 'var(--orange)' : 'var(--green)'};">${top3Share}%</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:10px;">
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">案類覆蓋</div>
+          <div class="chart-container" style="height:200px;"><canvas id="firmCatsChart"></canvas></div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">明星律師 TOP 10（出庭數）</div>
+          <div class="chart-container" style="height:200px;"><canvas id="firmTopLawyersChart"></canvas></div>
+        </div>
+      </div>
+      ${topCourtList.length ? `
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">法院版圖 TOP 5（按律師主場法院彙總）</div>
+      <div>${topCourtList.map(([c, v]) => `<span class="badge" style="margin:2px;">${escHtml(c)} ${v.toLocaleString()}</span>`).join('')}</div>` : ''}
+    </div>
+    ` : ''}
+
     <!-- 律師列表 -->
     <div class="card">
       <div class="card-title">律師清單（${total} 位）</div>
@@ -4105,6 +4229,41 @@ async function showFirmDetail(firmName) {
           y: { ticks: { color: '#8899aa', stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.05)' } }
         },
         plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  // 官方戰力：案類覆蓋 doughnut
+  if (chartInstances['firmCats']) chartInstances['firmCats'].destroy();
+  const fcCtx = document.getElementById('firmCatsChart')?.getContext('2d');
+  const fcEntries = Object.entries(litCats).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (fcCtx && fcEntries.length) {
+    const CAT_COLORS = { '民事': '#4f8ef7', '刑事': '#e05c5c', '家事': '#4caf82', '行政': '#c9a84c', '懲戒': '#a06cd5', '少年': '#45b7d1', '其他': '#8899aa' };
+    chartInstances['firmCats'] = new Chart(fcCtx, {
+      type: 'doughnut',
+      data: {
+        labels: fcEntries.map(e => e[0]),
+        datasets: [{ data: fcEntries.map(e => e[1]), backgroundColor: fcEntries.map(e => CAT_COLORS[e[0]] || '#8899aa'), borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#8899aa', boxWidth: 12 } } } }
+    });
+  }
+
+  // 官方戰力：明星律師 TOP 10 bar
+  if (chartInstances['firmTopLawyers']) chartInstances['firmTopLawyers'].destroy();
+  const ftCtx = document.getElementById('firmTopLawyersChart')?.getContext('2d');
+  const ftTop = litLawyers.slice(0, 10);
+  if (ftCtx && ftTop.length) {
+    chartInstances['firmTopLawyers'] = new Chart(ftCtx, {
+      type: 'bar',
+      data: {
+        labels: ftTop.map(s => s.name),
+        datasets: [{ data: ftTop.map(s => s.official_cases_5yr), backgroundColor: 'rgba(201,168,76,0.65)', borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
       }
     });
   }
@@ -4254,6 +4413,8 @@ function closeFirmModal() {
   if (chartInstances['firmGender']) { chartInstances['firmGender'].destroy(); delete chartInstances['firmGender']; }
   if (chartInstances['firmAge']) { chartInstances['firmAge'].destroy(); delete chartInstances['firmAge']; }
   if (chartInstances['firmSeniority']) { chartInstances['firmSeniority'].destroy(); delete chartInstances['firmSeniority']; }
+  if (chartInstances['firmCats']) { chartInstances['firmCats'].destroy(); delete chartInstances['firmCats']; }
+  if (chartInstances['firmTopLawyers']) { chartInstances['firmTopLawyers'].destroy(); delete chartInstances['firmTopLawyers']; }
 }
 
 // ESC 關閉 modal
@@ -5483,6 +5644,83 @@ async function fetchAllRpc(fn) {
 }
 
 const isZheluFirm = f => !!f && f.includes('喆律');
+
+// ===== 事務所版圖（案類 × 法院 → 事務所排名，RPC firm_court_ranking）=====
+let _fmLoaded = false;
+function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMap(); }
+
+async function initFirmMap() {
+  try {
+    const { data: courts } = await db.rpc('lms_court_list').range(0, 199);
+    const sel = document.getElementById('fmCourtSel');
+    if (courts?.length) {
+      sel.innerHTML = '<option value="">全部法院</option>' +
+        courts.map(c => `<option value="${escHtml(c.court_name)}">${escHtml(c.court_name)} (${Number(c.cases).toLocaleString()})</option>`).join('');
+    }
+  } catch (e) { console.log('lms_court_list error:', e); }
+  loadFirmMap();
+}
+
+async function loadFirmMap() {
+  const cat = document.getElementById('fmCatSel').value || null;
+  const court = document.getElementById('fmCourtSel').value || null;
+  const body = document.getElementById('fmTableBody');
+  body.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
+
+  const { data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court }).range(0, 999);
+  if (error || !rows?.length) {
+    console.log('firm_court_ranking error:', error);
+    body.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    ['fmKpiZheluRank', 'fmKpiZheluCases', 'fmKpiTop1', 'fmKpiFirms'].forEach(id => document.getElementById(id).textContent = '-');
+    return;
+  }
+
+  // KPI：喆律競爭位置
+  const zhelu = rows.find(r => isZheluFirm(r.firm_name));
+  document.getElementById('fmKpiZheluRank').textContent = zhelu ? '#' + zhelu.rank : '未上榜';
+  document.getElementById('fmKpiZheluCases').textContent = zhelu ? Number(zhelu.cases).toLocaleString() : '0';
+  document.getElementById('fmKpiTop1').textContent = rows[0].firm_name;
+  document.getElementById('fmKpiTop1Sub').textContent = Number(rows[0].cases).toLocaleString() + ' 件';
+  document.getElementById('fmKpiFirms').textContent = rows.length >= 1000 ? '1,000+' : rows.length.toLocaleString();
+
+  // TOP 20 橫條圖（喆律綠色）
+  const top = rows.slice(0, 20);
+  if (chartInstances['fmChart']) chartInstances['fmChart'].destroy();
+  const ctx = document.getElementById('fmChart')?.getContext('2d');
+  if (ctx) {
+    chartInstances['fmChart'] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: top.map(r => r.firm_name),
+        datasets: [{
+          data: top.map(r => r.cases),
+          backgroundColor: top.map(r => isZheluFirm(r.firm_name) ? 'rgba(76,175,130,0.75)' : 'rgba(69,183,209,0.55)'),
+        }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8899aa' }, beginAtZero: true },
+          y: { ticks: { color: '#8899aa', font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  // 排行榜前 100（喆律在 100 名外時補列）
+  const listed = rows.slice(0, 100);
+  if (zhelu && zhelu.rank > 100) listed.push(zhelu);
+  body.innerHTML = listed.map(r => {
+    const z = isZheluFirm(r.firm_name);
+    return `<tr${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
+      <td>${r.rank}</td>
+      <td>${z ? '<strong>' : ''}${escHtml(r.firm_name)}${z ? '</strong>' : ''}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;">${r.lawyer_count}</td>
+    </tr>`;
+  }).join('');
+}
 
 async function loadFamLawyers() {
   try {
