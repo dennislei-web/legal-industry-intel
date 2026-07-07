@@ -5659,11 +5659,27 @@ function loadFamLawyersOnce() {
 }
 
 // RPC 回傳受 max-rows=1000 限制，用 range 分批抓完
+// 注意：PostgREST 對 RPC 的 range 分頁是每頁重跑整個函數，只適合小結果集
 async function fetchAllRpc(fn) {
   let all = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.rpc(fn).range(from, from + 999);
     if (error) { console.log(fn + ' error:', error); break; }
+    if (!data?.length) break;
+    all = all.concat(data);
+    if (data.length < 1000) break;
+  }
+  return all;
+}
+
+// 讀表版分批抓完（走索引分頁；orders 需含唯一鍵確保分頁穩定）
+async function fetchAllTable(table, orders) {
+  let all = [];
+  for (let from = 0; ; from += 1000) {
+    let q = db.from(table).select('*');
+    orders.forEach(o => { q = q.order(o.col, { ascending: !!o.asc }); });
+    const { data, error } = await q.range(from, from + 999);
+    if (error) { console.log(table + ' error:', error); break; }
     if (!data?.length) break;
     all = all.concat(data);
     if (data.length < 1000) break;
@@ -5753,9 +5769,10 @@ async function loadFirmMap() {
 async function loadFamLawyers() {
   try {
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+    // 讀 cache 表（migration 049，refresh_family_lawyer_stats() 月更）
     const [rows, byCourt] = await Promise.all([
-      fetchAllRpc('family_lawyer_stats'),
-      fetchAllRpc('family_lawyer_by_court'),
+      fetchAllTable('family_lawyer_stats_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }]),
+      fetchAllTable('family_lawyer_by_court_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }, { col: 'court_name', asc: true }]),
     ]);
     _flRows = rows;
     _flByCourt = byCourt;
