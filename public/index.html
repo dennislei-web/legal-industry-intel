@@ -120,15 +120,6 @@
     .form-group input::placeholder, .form-group textarea::placeholder { color: var(--text-muted); }
     .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(79,142,247,0.15); }
     .form-group textarea { resize: vertical; min-height: 100px; }
-    /* 隱藏瀏覽器原生的清除鈕 / 自動填入圖示（email、password 欄位右側疊加的小圖示） */
-    .form-group input::-ms-clear,
-    .form-group input::-ms-reveal { display: none; width: 0; height: 0; }
-    .form-group input::-webkit-search-cancel-button,
-    .form-group input::-webkit-contacts-auto-fill-button,
-    .form-group input::-webkit-credentials-auto-fill-button,
-    .form-group input::-webkit-caps-lock-indicator {
-      visibility: hidden; display: none !important; pointer-events: none; position: absolute; right: 0;
-    }
 
     .login-error { color: var(--red); font-size: 0.85rem; margin-bottom: 12px; display: none; }
 
@@ -8031,7 +8022,7 @@ async function showCourtDetail(name) {
 </div>
 
 <!-- 法院詳細 Modal（官方統計 × 裁判書 × 終結案件微資料） -->
-    <div id="judgeCareerModal" class="modal-overlay" onclick="closeJudgeCareerModal(event)">
+    <div id="judgeCareerModal" class="modal-overlay" style="display:none;" onclick="closeJudgeCareerModal(event)">
       <div class="modal-box" onclick="event.stopPropagation()">
         <button class="modal-close" onclick="closeJudgeCareerModal()">&times;</button>
         <h2 id="judgeCareerTitle" class="modal-title"></h2>
