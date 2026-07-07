@@ -4884,6 +4884,54 @@ function renderChanges() {
 let _jchgRows = null;
 let jchgPage = 0;
 
+function judgeMonthGap(a, b) {
+  return (+b.slice(0,4)*12 + +b.slice(4,6)) - (+a.slice(0,4)*12 + +a.slice(4,6));
+}
+function closeJudgeCareerModal(event) {
+  if (event && event.target.id !== 'judgeCareerModal') return;
+  document.getElementById('judgeCareerModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+async function showJudgeCareer(name, court, lastMonth) {
+  document.getElementById('judgeCareerTitle').textContent = name + '　·　' + court;
+  document.getElementById('judgeCareerBody').innerHTML = '<div class="loading">載入中</div>';
+  document.getElementById('judgeCareerModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  const fmtM = m => m ? m.slice(0,4) + '-' + m.slice(4,6) : '-';
+  const [histR, afterR] = await Promise.all([
+    db.from('judge_month_stats').select('yyyymm,case_count,cats').eq('name', name).eq('court_name', court),
+    db.from('judge_month_stats').select('court_name,yyyymm,case_count').eq('name', name).gt('yyyymm', lastMonth).order('yyyymm'),
+  ]);
+  const hist = histR.data || [], after = afterR.data || [];
+  const cats = {}; let total = 0;
+  const months = hist.map(h => h.yyyymm).sort();
+  hist.forEach(h => { total += h.case_count || 0; if (h.cats) Object.entries(h.cats).forEach(kv => { cats[kv[0]] = (cats[kv[0]] || 0) + kv[1]; }); });
+  const catRows = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const catSum = catRows.reduce((s, kv) => s + kv[1], 0) || 1;
+  const catHtml = catRows.length
+    ? catRows.map(kv => '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.86rem;border-bottom:1px solid var(--border);"><span>' + escHtml(kv[0]) + '</span><span style="font-variant-numeric:tabular-nums;">' + kv[1].toLocaleString() + ' 件（' + Math.round(kv[1]/catSum*100) + '%）</span></div>').join('')
+    : '<div style="color:var(--text-muted);font-size:0.85rem;">無案類資料</div>';
+  const dest = {};
+  after.forEach(a => { const c = a.court_name; if (!dest[c]) dest[c] = { first: a.yyyymm, last: a.yyyymm, cases: 0 }; dest[c].last = a.yyyymm; dest[c].cases += a.case_count || 0; });
+  const destRows = Object.entries(dest).sort((a, b) => b[1].cases - a[1].cases);
+  let destHtml;
+  if (!destRows.length) {
+    destHtml = '<div style="color:var(--text-muted);font-size:0.86rem;">無後續署名紀錄（可能退休／離職／轉任非審判職）</div>';
+  } else {
+    destHtml = destRows.map(dr => {
+      const c = dr[0], d = dr[1], gap = judgeMonthGap(lastMonth, d.first);
+      const tag = gap <= 2 ? '<span style="color:var(--green);">時間銜接，可信度較高</span>'
+                : gap <= 6 ? '<span style="color:var(--orange);">間隔數月，可能轉調</span>'
+                : '<span style="color:var(--text-muted);">間隔較久，同名混入風險高</span>';
+      return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.86rem;"><div style="display:flex;justify-content:space-between;"><span style="font-weight:600;color:var(--blue);">' + escHtml(c) + '</span><span style="font-variant-numeric:tabular-nums;">' + d.cases.toLocaleString() + ' 件</span></div><div style="color:var(--text-muted);font-size:0.8rem;">' + fmtM(d.first) + ' 起　' + tag + '</div></div>';
+    }).join('');
+    if (destRows.length > 1) destHtml += '<div style="color:var(--orange);font-size:0.78rem;margin-top:6px;">&#9888; 出現多個去向，可能為同名不同人，請人工核對。</div>';
+  }
+  document.getElementById('judgeCareerBody').innerHTML =
+    '<div style="margin-bottom:18px;"><div style="color:var(--gold);font-weight:600;font-size:0.8rem;margin-bottom:6px;">退場前案件概況</div><div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">原院活躍 ' + fmtM(months[0]) + ' ~ ' + fmtM(months[months.length-1]) + '　·　累計掛名 ' + total.toLocaleString() + ' 件</div>' + catHtml + '</div>' +
+    '<div><div style="color:var(--gold);font-weight:600;font-size:0.8rem;margin-bottom:4px;">疑似去向</div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">依「同名＋時間」推測，非官方人事令；法官無唯一識別碼，僅供參考。</div>' + destHtml + '</div>';
+}
+
 async function loadJudgeChanges(force) {
   if (_jchgRows && !force) { renderJudgeChanges(); return; }
   jchgPage = 0;
@@ -7924,7 +7972,14 @@ async function showCourtDetail(name) {
 </div>
 
 <!-- 法院詳細 Modal（官方統計 × 裁判書 × 終結案件微資料） -->
-<div id="courtModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCourtModal();">
+    <div id="judgeCareerModal" class="modal-overlay" onclick="closeJudgeCareerModal(event)">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeJudgeCareerModal()">&times;</button>
+        <h2 id="judgeCareerTitle" class="modal-title"></h2>
+        <div id="judgeCareerBody"></div>
+      </div>
+    </div>
+    <div id="courtModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCourtModal();">
   <div class="modal-content" style="max-width:860px;">
     <div class="modal-header">
       <h2 id="courtModalTitle">載入中...</h2>
