@@ -490,11 +490,12 @@ def upload(yyyymm):
 
 
 def refresh_stats():
-    for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats'):
+    for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
+                'refresh_lawyer_judgment_stats'):
         print(f'  呼叫 {rpc}() ...')
         r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
-                          timeout=300, verify=False)
+                          timeout=600, verify=False)
         print(f'  HTTP {r.status_code}')
 
 
