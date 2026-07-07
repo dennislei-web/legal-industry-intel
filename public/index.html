@@ -2110,11 +2110,16 @@
                 </div>
                 <div class="chart-card full">
                     <div class="chart-title">各地區律師供需比 — 每位律師平均分到幾件訴訟（民事 vs 刑事，114 年）</div>
+                    <div class="sub-tabs" id="jstat_sdModeTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="sub-tab-btn active" data-mode="all">所有案件</button>
+                        <button class="sub-tab-btn" data-mode="repped">有委任律師的案件</button>
+                    </div>
                     <div class="chart-container tall"><canvas id="jstat_chartSupplyDemand"></canvas></div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
                         地院<strong>民事訴訟</strong>新收（藍）與<strong>刑事第一審</strong>新收（紅）÷ 該地區執業律師數（三源合併名冊的公會地區）。
                         比值越高代表該地區每位律師的潛在案源越多（市場越不飽和）。依民事訴訟供需比排序。
                         僅計地院本院訴訟案件：民事不含簡易庭／非訟／執行，刑事僅第一審（不含附帶民訴、偵查聲請、簡易處刑）。
+                        <span id="jstat_sdModeNote" style="display:none;">「有委任律師」= 官方新收 × 該地區終結案件微資料的委任率（民事：任一造有律師代理；刑事：任一被告選任律師辯護，含法扶，不含公設辯護人／義務律師），反映實際流向律師市場的案源。</span>
                     </div>
                 </div>
             </div>
@@ -7412,13 +7417,15 @@ async function showCourtDetail(name) {
     }
 
     // 律師供需比：官方民事訴訟新收 ÷ 地區律師數（跨 court_case_stats × lawyers_combined）
+    // 「有委任律師」模式：官方新收 × 地區委任率（closed_case_month_stats 終結案件微資料）
     let supplyDemandBuilt = false;
+    let sdChart = null, sdRows = { all: [], repped: [] }, sdMode = 'all';
     async function buildSupplyDemandChart() {
         if (supplyDemandBuilt || typeof db === 'undefined') return;
         const el = document.getElementById('jstat_chartSupplyDemand');
         if (!el) return;  // canvas 尚未進 DOM，先不鎖，下次進本分頁再重試
         try {
-            const [civilRes, crimRes, regionRes, courtsRes] = await Promise.all([
+            const [civilRes, crimRes, regionRes, courtsRes, repRes] = await Promise.all([
                 // 民事訴訟新收（單一明細值，不含簡易/非訟/執行）
                 db.from('court_case_stats')
                   .select('court_name,new_cases')
@@ -7431,6 +7438,12 @@ async function showCourtDetail(name) {
                   .eq('court_level', '地方法院').limit(2000),
                 db.rpc('region_distribution'),
                 db.from('courts').select('name,region').eq('court_type', '地方法院'),
+                // 終結案件微資料：114 年地院委任數（民事=任一造有律師，刑事=任一被告選任律師）
+                db.from('closed_case_month_stats')
+                  .select('court_name,file_type,total_cases,plaintiff_rep,defendant_rep,both_rep')
+                  .in('file_type', ['民事訴訟', '刑事訴訟'])
+                  .gte('yyyymm', '202501').lte('yyyymm', '202512')
+                  .like('court_name', '%地方法院%').limit(3000),
             ]);
             const courtRegion = {};
             (courtsRes.data || []).forEach(c => { if (c.region) courtRegion[c.name] = c.region; });
@@ -7451,32 +7464,58 @@ async function showCourtDetail(name) {
             };
             const civilCases = aggByRegion(civilRes.data);
             const crimCases = aggByRegion(crimRes.data);
-            const rows = [...new Set([...Object.keys(civilCases), ...Object.keys(crimCases)])]
-                .filter(reg => (lawyerCnt[reg] || 0) >= 10)
-                .map(reg => ({
+            // 地區委任率：Σ有律師件 / Σ終結件（月加總，缺資料地區 fallback 全國率）
+            const rep = {};  // reg -> {cRep,cTot,kRep,kTot}；'*' = 全國
+            (repRes.data || []).forEach(r => {
+                let reg = courtRegion[r.court_name];
+                if (!reg) return;
+                reg = mergeMap[reg] || reg;
+                const n = r.file_type === '民事訴訟'
+                    ? (r.plaintiff_rep + r.defendant_rep - r.both_rep)
+                    : r.defendant_rep;
+                for (const k of [reg, '*']) {
+                    const o = rep[k] || (rep[k] = { cRep: 0, cTot: 0, kRep: 0, kTot: 0 });
+                    if (r.file_type === '民事訴訟') { o.cRep += n; o.cTot += r.total_cases; }
+                    else { o.kRep += n; o.kTot += r.total_cases; }
+                }
+            });
+            const repRate = (reg, kind) => {
+                const o = (rep[reg] && rep[reg][kind + 'Tot'] > 0) ? rep[reg] : rep['*'];
+                if (!o || !o[kind + 'Tot']) return 0;
+                return o[kind + 'Rep'] / o[kind + 'Tot'];
+            };
+            const regs = [...new Set([...Object.keys(civilCases), ...Object.keys(crimCases)])]
+                .filter(reg => (lawyerCnt[reg] || 0) >= 10);
+            const makeRows = (mode) => regs.map(reg => {
+                const cr = mode === 'repped' ? repRate(reg, 'c') : 1;
+                const kr = mode === 'repped' ? repRate(reg, 'k') : 1;
+                const civil = Math.round((civilCases[reg] || 0) * cr);
+                const crim = Math.round((crimCases[reg] || 0) * kr);
+                return {
                     reg: mergeMap['新北'] === '台北' && reg === '台北' ? '台北（含新北）' : reg,
-                    lawyers: lawyerCnt[reg],
-                    civil: civilCases[reg] || 0,
-                    crim: crimCases[reg] || 0,
-                    civilRatio: +((civilCases[reg] || 0) / lawyerCnt[reg]).toFixed(1),
-                    crimRatio: +((crimCases[reg] || 0) / lawyerCnt[reg]).toFixed(1),
-                }))
-                .sort((a, b) => b.civilRatio - a.civilRatio);
-            if (!rows.length) return;
-            new Chart(el, {
+                    lawyers: lawyerCnt[reg], civil, crim,
+                    civilRate: cr, crimRate: kr,
+                    civilRatio: +(civil / lawyerCnt[reg]).toFixed(1),
+                    crimRatio: +(crim / lawyerCnt[reg]).toFixed(1),
+                };
+            }).sort((a, b) => b.civilRatio - a.civilRatio);
+            sdRows = { all: makeRows('all'), repped: makeRows('repped') };
+            if (!sdRows.all.length) return;
+            const rows0 = sdRows[sdMode];
+            sdChart = new Chart(el, {
                 type: 'bar',
                 data: {
-                    labels: rows.map(r => r.reg),
+                    labels: rows0.map(r => r.reg),
                     datasets: [
                         {
                             label: '民事訴訟 件/律師',
-                            data: rows.map(r => r.civilRatio),
+                            data: rows0.map(r => r.civilRatio),
                             backgroundColor: COLORS_ALPHA(COLORS.blue, 0.7),
                             borderColor: COLORS.blue, borderWidth: 1,
                         },
                         {
                             label: '刑事第一審 件/律師',
-                            data: rows.map(r => r.crimRatio),
+                            data: rows0.map(r => r.crimRatio),
                             backgroundColor: COLORS_ALPHA(COLORS.red, 0.7),
                             borderColor: COLORS.red, borderWidth: 1,
                         },
@@ -7488,13 +7527,33 @@ async function showCourtDetail(name) {
                     plugins: {
                         legend: { display: true },
                         tooltip: { callbacks: { label: ctx => {
-                            const r = rows[ctx.dataIndex];
-                            return ctx.datasetIndex === 0
-                                ? `民事訴訟 ${r.civilRatio} 件/律師（新收 ${formatNumber(r.civil)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`
-                                : `刑事第一審 ${r.crimRatio} 件/律師（新收 ${formatNumber(r.crim)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`;
+                            const r = sdRows[sdMode][ctx.dataIndex];
+                            const base = ctx.datasetIndex === 0
+                                ? `民事訴訟 ${r.civilRatio} 件/律師（${formatNumber(r.civil)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`
+                                : `刑事第一審 ${r.crimRatio} 件/律師（${formatNumber(r.crim)} 件 ÷ ${formatNumber(r.lawyers)} 位律師）`;
+                            if (sdMode !== 'repped') return base;
+                            const rate = ctx.datasetIndex === 0 ? r.civilRate : r.crimRate;
+                            return `${base}，委任率 ${(rate * 100).toFixed(1)}%`;
                         } } },
                     },
                 },
+            });
+            // 切換「所有案件 / 有委任律師」
+            document.querySelectorAll('#jstat_sdModeTabs .sub-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    sdMode = btn.dataset.mode;
+                    document.querySelectorAll('#jstat_sdModeTabs .sub-tab-btn').forEach(b =>
+                        b.classList.toggle('active', b === btn));
+                    const rows = sdRows[sdMode];
+                    sdChart.data.labels = rows.map(r => r.reg);
+                    sdChart.data.datasets[0].data = rows.map(r => r.civilRatio);
+                    sdChart.data.datasets[1].data = rows.map(r => r.crimRatio);
+                    sdChart.data.datasets[0].label = sdMode === 'repped' ? '民事訴訟（有律師）件/律師' : '民事訴訟 件/律師';
+                    sdChart.data.datasets[1].label = sdMode === 'repped' ? '刑事第一審（有律師）件/律師' : '刑事第一審 件/律師';
+                    sdChart.update();
+                    const note = document.getElementById('jstat_sdModeNote');
+                    if (note) note.style.display = sdMode === 'repped' ? 'inline' : 'none';
+                });
             });
             supplyDemandBuilt = true;  // 畫成功才鎖，避免初次失敗後永久不再重試
         } catch (err) {
