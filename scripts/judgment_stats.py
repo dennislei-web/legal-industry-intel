@@ -14,6 +14,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py upload 202504            # 聚合 JSON → Supabase
   python judgment_stats.py run 202504               # download + parse + upload 一條龍
   python judgment_stats.py backfill 202001 202504   # 依序跑一段區間（跳過已上傳的月份）
+  python judgment_stats.py pairfill 202005 202504   # Phase 2 配對回填（強制重解、跳過已上傳 pair 的月）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full p7zip-rar）。
 """
@@ -253,6 +254,87 @@ def extract_lawyers(jfull):
     return names
 
 
+# ── 當事人方歸屬（協同/對造律師用，Phase 2）──
+# 追蹤每個律師 block 之前最近的「當事人標籤」行，把律師歸到攻方 P / 守方 D / 無法歸類 X。
+# 只影響協同/對造 pair；lawyer_month_stats 與律師×法官 pair 仍走上面的 extract_lawyers（不動）。
+# 長標籤在前（startswith 比對）；「上訴人即被告」等複合標籤無法單純歸營 → X。
+PARTY_TOKENS = (
+    '被上訴人即', '上訴人即', '抗告人即', '再抗告人', '聲請人即', '相對人即',
+    '反訴原告', '反訴被告', '被上訴人兼', '上訴人兼', '被上訴人', '再審原告',
+    '再審被告', '聲明異議人', '被付懲戒人', '移送機關',
+    '上訴人', '抗告人', '被告', '原告', '聲請人', '相對人', '自訴人',
+    '債權人', '債務人', '參加人', '告訴人', '被害人', '受刑人', '異議人',
+    '公訴人', '被繼承人',
+)
+# 攻方 P（原告/上訴/聲請一方）、守方 D（被告/被上訴/相對一方）、X 不歸營
+PARTY_CAMP = {
+    '原告': 'P', '反訴被告': 'P', '上訴人': 'P', '抗告人': 'P', '再抗告人': 'P',
+    '聲請人': 'P', '債權人': 'P', '自訴人': 'P', '再審原告': 'P', '異議人': 'P',
+    '聲明異議人': 'P', '移送機關': 'P', '公訴人': 'P', '告訴人': 'P',
+    '被告': 'D', '反訴原告': 'D', '被上訴人': 'D', '相對人': 'D', '債務人': 'D',
+    '再審被告': 'D', '受刑人': 'D', '被付懲戒人': 'D',
+    '被害人': 'X', '參加人': 'X', '被繼承人': 'X',
+}
+
+
+def _party_label(flat):
+    for t in PARTY_TOKENS:
+        if flat.startswith(t):
+            if t.endswith('即') or t.endswith('兼'):
+                return t.rstrip('即兼'), 'X'  # 複合身分無法單純歸營
+            return t, PARTY_CAMP.get(t, 'X')
+    return None, None
+
+
+def extract_lawyers_sided(jfull):
+    """回傳 {name: camp}，camp ∈ P/D/X（同案同人保留第一次出現的營）。
+    邏輯貼齊 extract_lawyers 的 block parser，另追蹤最近一個當事人標籤。"""
+    seen = {}
+    cur_camp = None
+    in_block = False
+
+    def add(seg, camp):
+        for m in RE_NAME_LAWYER.finditer(seg):
+            n = re.sub(r'[\s　]', '', m.group(1))
+            if 2 <= len(n) <= 4 and not RE_BAD_NAME.search(n) and n not in seen:
+                seen[n] = camp or 'X'
+
+    for line in jfull[:4000].splitlines():
+        flat = re.sub(r'[\s　]', '', line)
+        if not flat:
+            continue
+        has_role = any(k in flat for k in LAWYER_ROLES)
+        lbl, camp = _party_label(flat)
+        if lbl and not has_role:
+            cur_camp = camp
+            in_block = False
+            continue
+        bare_agent = (not has_role and '代理人' in flat
+                      and '法定代理人' not in flat and '送達代收' not in flat)
+        if has_role or bare_agent:
+            # 純辯護人欄（刑事）無前置當事人標籤時，歸被告方 D
+            camp_here = 'D' if ('辯護人' in flat and cur_camp is None) else cur_camp
+            last = None
+            for m in RE_ROLE_TOKEN.finditer(line):
+                last = m
+            add(line[last.end():] if last else line, camp_here)
+            in_block = True
+        elif in_block:
+            stripped = re.sub(r'[（(][^）)]*[）)]?', '', line)
+            leftover = re.sub(r'[\s　]', '', RE_NAME_LAWYER.sub('', stripped))
+            if RE_NAME_LAWYER.search(stripped) and not leftover:
+                add(stripped, 'D' if cur_camp is None else cur_camp)
+            else:
+                in_block = False
+    return seen
+
+
+# 協同/對造 pair：單造律師數超過此上限即跳過該案該造，防大案兩兩組合平方爆炸
+PAIR_MAX_PER_SIDE = 10
+# 對造只在有原被告方的案類產生（刑事辯護人無對造方）
+OPP_CATS = ('民事', '家事', '行政')
+
+
 # ── 檢察官（刑事裁判書）──
 # 檢察署名稱；2018-05 改制前叫「地方法院檢察署」，一併相容（normalize_office 正規化為新名）
 RE_PROS_OFFICE = re.compile(
@@ -374,6 +456,10 @@ def parse(yyyymm):
     lagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
     # 檢察官聚合：(name, office) → {n, cats{}}
     pagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
+    # Phase 2 配對聚合
+    ljagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})  # (律師,法官,法院)
+    coagg = defaultdict(int)   # (律師A,律師B,法院) 協同（canonical A<B）
+    opagg = defaultdict(int)   # (律師A,律師B,法院) 對造（canonical A<B）
     n_files = 0
     n_no_judge = 0
     t0 = time.time()
@@ -394,10 +480,30 @@ def parse(yyyymm):
             mc = RE_COURT.search(head.strip())
             court = normalize_court(mc.group(1)) if mc else '未知法院'
             cat = classify(head, doc.get('JCASE') or '')
-            for lname in extract_lawyers(jfull):
+            lawyers = extract_lawyers(jfull)
+            for lname in lawyers:
                 la = lagg[(lname, court)]
                 la['n'] += 1
                 la['cats'][cat] += 1
+            # ── 協同/對造 pair（不需法官，judge-less 案件也要算）──
+            if lawyers:
+                sided = extract_lawyers_sided(jfull)
+                camp_p = sorted({n for n, c in sided.items() if c == 'P'})
+                camp_d = sorted({n for n, c in sided.items() if c == 'D'})
+                # 協同：同營兩兩（單造超過上限跳過防爆）
+                for side in (camp_p, camp_d):
+                    if len(side) > PAIR_MAX_PER_SIDE:
+                        continue
+                    for i in range(len(side)):
+                        for j in range(i + 1, len(side)):
+                            coagg[(side[i], side[j], court)] += 1
+                # 對造：僅民/家/行政，攻方 × 守方
+                if cat in OPP_CATS and camp_p and camp_d \
+                        and len(camp_p) <= PAIR_MAX_PER_SIDE and len(camp_d) <= PAIR_MAX_PER_SIDE:
+                    for a in camp_p:
+                        for b in camp_d:
+                            key = (a, b, court) if a <= b else (b, a, court)
+                            opagg[key] += 1
             if cat in ('刑事', '少年') or '檢察署' in jfull[:1500]:
                 office, pnames = extract_prosecutors(jfull, court)
                 for pname in pnames:
@@ -405,6 +511,12 @@ def parse(yyyymm):
                     pa['n'] += 1
                     pa['cats'][cat] += 1
             judges = extract_judges(jfull)
+            # ── 律師×法官 pair（律師來源＝上面同一份 extract_lawyers）──
+            for lname in lawyers:
+                for jname in judges:
+                    lj = ljagg[(lname, jname, court)]
+                    lj['n'] += 1
+                    lj['cats'][cat] += 1
             if not judges:
                 n_no_judge += 1
                 continue
@@ -438,10 +550,20 @@ def parse(yyyymm):
               'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in lagg.items()]
     prows = [{'name': k[0], 'office_name': k[1], 'yyyymm': yyyymm,
               'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in pagg.items()]
+    ljrows = [{'lawyer_name': k[0], 'judge_name': k[1], 'court_name': k[2],
+               'yyyymm': yyyymm, 'case_count': v['n'], 'cats': dict(v['cats'])}
+              for k, v in ljagg.items()]
+    corows = [{'lawyer_a': k[0], 'lawyer_b': k[1], 'court_name': k[2],
+               'yyyymm': yyyymm, 'case_count': v} for k, v in coagg.items()]
+    oprows = [{'lawyer_a': k[0], 'lawyer_b': k[1], 'court_name': k[2],
+               'yyyymm': yyyymm, 'case_count': v} for k, v in opagg.items()]
     with open(out_path, 'w', encoding='utf-8') as f:
-        json.dump({'judges': rows, 'lawyers': lrows, 'prosecutors': prows}, f, ensure_ascii=False)
+        json.dump({'judges': rows, 'lawyers': lrows, 'prosecutors': prows,
+                   'lawyer_judge': ljrows, 'cocounsel': corows, 'opposing': oprows},
+                  f, ensure_ascii=False)
     print(f'  解析完成：{n_files} 份裁判書，{len(rows)} 個 (法官,法院) 組合，'
           f'{len(lrows)} 個 (律師,法院) 組合，{len(prows)} 個 (檢察官,檢察署) 組合，'
+          f'{len(ljrows)} 律師×法官／{len(corows)} 協同／{len(oprows)} 對造 pair，'
           f'{n_no_judge} 份未抽到法官，{(time.time()-t0)/60:.1f} 分鐘')
     return out_path
 
@@ -459,10 +581,19 @@ def month_uploaded(yyyymm):
 
 def _upload_rows(table, yyyymm, rows):
     print(f'  上傳 {len(rows)} 列到 {table} ...')
-    # 先刪同月舊資料（冪等重跑）
-    requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
-                    params={'yyyymm': f'eq.{yyyymm}'},
-                    headers=HEADERS_SB, timeout=120, verify=False)
+    # 先刪同月舊資料（冪等重跑）。必須確認刪成功才 INSERT，否則殘留列會撞 unique
+    # 約束（judge/lawyer/prosecutor 月表都有 (name,court,yyyymm) 唯一鍵）→ 整月半殘。
+    # DELETE 偶發逾時/連線失敗時重試，仍失敗就 raise（讓該月標記失敗、可重跑）。
+    for attempt in range(3):
+        dr = requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
+                             params={'yyyymm': f'eq.{yyyymm}'},
+                             headers=HEADERS_SB, timeout=120, verify=False)
+        if dr.status_code in (200, 204):
+            break
+        print(f'  刪除 {table} {yyyymm} 失敗 {dr.status_code}（第 {attempt+1} 次），重試')
+        time.sleep(3)
+    else:
+        raise RuntimeError(f'刪除 {table} {yyyymm} 連續失敗，中止上傳以免半殘')
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
         r = requests.post(f'{SUPABASE_URL}/rest/v1/{table}',
@@ -486,7 +617,44 @@ def upload(yyyymm):
         _upload_rows('lawyer_month_stats', yyyymm, data['lawyers'])
     if data.get('prosecutors'):
         _upload_rows('prosecutor_month_stats', yyyymm, data['prosecutors'])
+    # Phase 2 配對表（舊 agg.json 無此三 key 時略過）
+    if data.get('lawyer_judge'):
+        _upload_rows('lawyer_judge_pairs', yyyymm, data['lawyer_judge'])
+    if data.get('cocounsel'):
+        _upload_rows('lawyer_cocounsel_pairs', yyyymm, data['cocounsel'])
+    if data.get('opposing'):
+        _upload_rows('lawyer_opposing_pairs', yyyymm, data['opposing'])
     print('  上傳完成')
+
+
+def pairs_uploaded(yyyymm):
+    """該月律師×法官 pair 是否已上傳（pairfill 冪等跳過用）"""
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
+                     params={'yyyymm': f'eq.{yyyymm}', 'select': 'yyyymm', 'limit': 1},
+                     headers=HEADERS_SB, timeout=30, verify=False)
+    return r.status_code == 200 and len(r.json()) > 0
+
+
+def prune_pairs():
+    """滾動視窗維護：刪掉配對三表中早於 (資料最新月 − 59 月) 的列。
+    月更 run 後呼叫，讓配對表恆為近 60 月。"""
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
+                     params={'select': 'yyyymm', 'order': 'yyyymm.desc', 'limit': 1},
+                     headers=HEADERS_SB, timeout=30, verify=False)
+    if r.status_code != 200 or not r.json():
+        return
+    maxym = r.json()[0]['yyyymm']
+    y, m = int(maxym[:4]), int(maxym[4:])
+    m -= 59
+    while m <= 0:
+        y -= 1
+        m += 12
+    cutoff = f'{y}{m:02d}'
+    for table in ('lawyer_judge_pairs', 'lawyer_cocounsel_pairs', 'lawyer_opposing_pairs'):
+        resp = requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
+                               params={'yyyymm': f'lt.{cutoff}'},
+                               headers=HEADERS_SB, timeout=300, verify=False)
+        print(f'  prune {table} < {cutoff}: HTTP {resp.status_code}')
 
 
 def refresh_stats():
@@ -546,6 +714,21 @@ if __name__ == '__main__':
     elif cmd == 'run':
         run_month(sys.argv[2])
         refresh_stats()
+        prune_pairs()  # 月更後維護配對表滾動視窗
+    elif cmd == 'pairfill':
+        # Phase 2 配對回填：強制重解（刪 agg 快取以帶出新 pair key），冪等跳過已上傳 pair 的月份。
+        # 會一併冪等重傳 judge/lawyer/prosecutor 月表（內容不變），故不呼叫 refresh_stats。
+        for ym in month_range(sys.argv[2], sys.argv[3]):
+            try:
+                if pairs_uploaded(ym):
+                    print(f'{ym}: pairs 已上傳，跳過')
+                    continue
+                old_agg = os.path.join(WORK_DIR, f'{ym}_agg.json')
+                if os.path.exists(old_agg):
+                    os.remove(old_agg)
+                run_month(ym, skip_uploaded=False, purge_rar=True)
+            except Exception as e:
+                print(f'{ym}: 失敗 — {e}')
     elif cmd == 'backfill':
         for ym in month_range(sys.argv[2], sys.argv[3]):
             try:

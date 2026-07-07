@@ -1,0 +1,61 @@
+{
+ "yyyymm": "202006",
+ "stats": {
+  "files": 98041,
+  "cases_with_lawyers": 10897,
+  "cwl_民事": 6017,
+  "mentions": 20989,
+  "sided_ok_民事": 5937,
+  "both_sides_民事": 1936,
+  "sided_amb_民事": 78,
+  "cwl_其他": 158,
+  "sided_ok_其他": 153,
+  "cwl_刑事": 3767,
+  "sided_amb_刑事": 26,
+  "cwl_懲戒": 5,
+  "sided_ok_懲戒": 5,
+  "sided_ok_刑事": 3741,
+  "cwl_行政": 436,
+  "sided_amb_行政": 25,
+  "sided_ok_行政": 411,
+  "sided_amb_其他": 5,
+  "sided_miss_民事": 2,
+  "cwl_家事": 514,
+  "sided_ok_家事": 503,
+  "both_sides_行政": 74,
+  "both_sides_家事": 133,
+  "sided_amb_家事": 10,
+  "sided_miss_家事": 1
+ },
+ "judges_per_case": {
+  "1": 5160,
+  "0": 1509,
+  "5": 618,
+  "3": 3576,
+  "4": 5,
+  "2": 29
+ },
+ "lawyers_per_case": {
+  "1": 6214,
+  "3": 1232,
+  "2": 2345,
+  "5": 288,
+  "4": 542,
+  "6": 116,
+  "7": 52,
+  "8": 37,
+  "9": 71
+ },
+ "events": {
+  "lj": 38851,
+  "co": 31585,
+  "op": 6144
+ },
+ "distinct": {
+  "lawyer_judge_court": 33807,
+  "lawyer_judge": 33799,
+  "co_pair_court": 10892,
+  "op_pair_court": 5899
+ },
+ "parse_minutes": 0.8
+}

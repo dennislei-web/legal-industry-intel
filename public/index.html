@@ -4442,12 +4442,14 @@ async function showLawyerDetail(name, certNumber) {
   }
   const l = combined[0];
 
-  // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）
-  let moj = null, stat = null;
+  // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
+  let moj = null, stat = null, pairs = null;
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.rpc('lawyer_pair_summary', { p_name: name, p_limit: 12 })
+      .then(r => { pairs = r.data; }),
     (async () => {
       for (let from = 0; ; from += 1000) {
         const { data: cr } = await db.from('lawyer_month_stats')
@@ -4588,6 +4590,8 @@ async function showLawyerDetail(name, certNumber) {
     </div>
     `}
 
+    ${renderPairCard(pairs)}
+
     ${l.expertise_areas?.length || catShareLine ? `
     <div class="card" style="margin-bottom:16px;">
       <div class="card-title">&#128203; 自報專長 vs 實際案類</div>
@@ -4608,6 +4612,52 @@ async function showLawyerDetail(name, certNumber) {
   `;
 
   if (stat?.cases_total) renderLawyerCharts(stat, courtRows);
+}
+
+// 律師配對關係卡：對到的法官 / 協同律師 / 對造律師（近 5 年 rolling，lawyer_pair_summary RPC）
+function renderPairCard(pairs) {
+  if (!pairs) return '';
+  const judges = pairs.judges || [], co = pairs.cocounsel || [], op = pairs.opposing || [];
+  if (!judges.length && !co.length && !op.length) return '';
+
+  const shortCourt = c => (c || '').replace('臺灣', '').replace('地方法院', '地院')
+    .replace('高等法院', '高院').replace('分院', '分院');
+
+  // 排名條列（附 mini bar）
+  const list = (items, labelFn, color, emptyMsg) => {
+    if (!items || !items.length)
+      return `<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">${emptyMsg}</div>`;
+    const max = items[0].cases || 1;
+    return items.map(it => {
+      const w = Math.max(4, Math.round(it.cases / max * 100));
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.85rem;">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${labelFn(it)}</span>
+        <span style="width:72px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:${color};"></span></span>
+        <span style="width:34px;text-align:right;color:var(--text-muted);flex-shrink:0;">${it.cases}</span>
+      </div>`;
+    }).join('');
+  };
+
+  const col = (title, hint, body) => `
+    <div>
+      <div style="font-size:0.82rem;font-weight:600;margin-bottom:2px;">${title}</div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;">${hint}</div>
+      ${body}
+    </div>`;
+
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9876; 對到的法官與律師 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 5 年公開裁判書，姓名比對（同名合併），案量為下限</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;">
+        ${col('常對到的法官', '出現在其承辦案的合議庭/獨任法官',
+          list(judges, j => `${escHtml(j.judge)} <span style="color:var(--text-muted);font-size:0.75rem;">${escHtml(shortCourt(j.court))}</span>`,
+               'rgba(79,142,247,0.7)', '無資料'))}
+        ${col('常協同律師', '同案同造（含同所同僚、共同代理）',
+          list(co, c => escHtml(c.peer), 'rgba(76,175,130,0.7)', '無協同紀錄'))}
+        ${col('常對造律師', '民/家/行政、兩造皆委任時',
+          list(op, o => escHtml(o.peer), 'rgba(224,92,92,0.7)', '無對造紀錄（多數案件對造未委任律師）'))}
+      </div>
+    </div>`;
 }
 
 // 律師畫像三圖：歷年趨勢 / 案類組合 / 常出沒法院
