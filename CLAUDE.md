@@ -78,6 +78,10 @@
   `python judgment_stats.py reclassify <起> <迄>` 強制重跑（會刪 agg 快取、覆蓋上傳）
 - 家事分析 RPC：`family_judge_stats()`、`family_cases_by_year()`（含 ok_months 回填偵測，
   月家事 >= 300 視為新分類已回填），法官年度趨勢：`judge_days_by_year()`
+- **家事律師版圖走 cache 表**（migration 049）：前端讀 `family_lawyer_stats_cache` /
+  `family_lawyer_by_court_cache`，勿再直呼 `family_lawyer_stats()`/`family_lawyer_by_court()`
+  RPC 分頁（PostgREST 對 RPC 的 `.range()` 是每頁重跑整個函數，曾造成 tab 載入 30s+）；
+  `refresh_family_lawyer_stats()` 由 `refresh_stats()` 月更一併呼叫
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
 - 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
 - **律師官方統計（migration 046）**：`lawyer_judgment_stats`（按律師名彙總：cases_5yr
