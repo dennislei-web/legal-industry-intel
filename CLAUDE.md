@@ -52,8 +52,8 @@
 - **前端**：第一層導覽「司法統計」7 分頁（總覽/民事/家事/刑事/強制執行/法院效率/各法院比較），從獨立站 judicial-stats 移植進 `public/index.html`。所有 id 加 `jstat_` / `tab-jstat-` 前綴、CSS scope 在 `.jstat` 下、深度分析文章固定白底紙張樣式。資料源是**靜態** `public/data/judicial_stats.json`（統計月報聚合，離婚原因/罪名/家事細項等專題表，年更、半自動——產生 script 不在 repo）
 - **官方案件統計管線**：`scripts/judicial_official_stats.py`（download/parse/upload/run）→ `court_case_stats` 表（migration 034/037）。來源：opendata datasetId 43994「各級法院各案類新收及終結件數統計」，**公開免會員**，單一 ODS（~18MB，content.xml ~600MB 要串流解析），民國 90 年起 月×法院×案類×程序別（保留至第 2 層），50 萬列聚合成 ~43 萬列。`judicial-official-stats.yml` 每月 5 日全量 upsert（冪等）
 - **來源怪癖（查詢必讀）**：最高法院新收件數恆 0（只填終結）；**地院「民事」的 proc_l1 只分 民事/民執**，「民事訴訟 vs 民事非訟（支付命令等）」要看 **proc_l2**（114 年地院：民事訴訟 18.9 萬、民事非訟 83.7 萬、民執執行 204.6 萬=月報強制執行）；刑事訴訟在 l1='訴訟'；114 地院家事新收 183,028 可當解析驗證基準
-- **終結案件微資料管線**：`scripts/closed_case_stats.py`（run/auto/backfill）→ `closed_case_month_stats`（migration 035）。月包每月 ~1MB 7z（搜「終結案件資料」，晚 1.5 個月），`!` 分隔 txt 每案一筆。目前解析**民事訴訟+家事訴訟**檔 →（月×法院×檔型）律師委任率/終結情形分布/標的金額，已回填 2021-01 起。`closed-case-stats-monthly.yml` 每月 20 日 auto 模式。**版式防呆**：欄 15-17 須為合理民國日期，不符跳過（最高法院民訴版式不同、刑事檔是階層式含「選任律師辯護」，均未納入，是未來擴充點）。法官名有值但尚未做 per-judge 聚合（合議庭歸屬待定義）
-- **整合呈現**：法院 tab 法院名可點 → `courtModal`（RPC `court_detail_stats`，migration 036/037：官方年度趨勢＋訴訟終結vs公開裁判書＋委任率＋終結情形）；司法統計>各法院比較有「律師供需比」圖（民事訴訟新收÷公會地區律師數，新北律師少時併台北）
+- **終結案件微資料管線**：`scripts/closed_case_stats.py`（run/auto/backfill/backfill-criminal）→ `closed_case_month_stats`（migration 035/045）。月包每月 ~1MB 7z（搜「終結案件資料」，晚 1.5 個月），`!` 分隔 txt 每案一筆。解析**民事訴訟+家事訴訟**檔（每案一列）＋**地院刑事訴訟**檔（階層式：0!案件 1!被告 1.1!罪名。刑事列：defendant_rep=任一被告「選任律師辯護」含法扶的案件數、plaintiff_rep=自訴人有律師、defense jsonb=被告層辯護分布含公設/義務細分；高院/最高/智財刑事被告層辯護欄位置不同，不解析）→（月×法院×檔型）律師委任率/終結情形分布/標的金額，已回填 2021-01 起。`closed-case-stats-monthly.yml` 每月 20 日 auto 模式。**版式防呆**：民事欄 15-17／刑事欄 13-15 須為合理民國日期，不符跳過（最高法院民訴版式不同未納入）。**court_name 正規化**：202101~202506 月包資料夾名帶「民事/刑事」後綴，script 的 `norm_court()` 去後綴+去空格（migration 045 已清理歷史資料）。**202511 月包被官方重傳成殘缺版**（僅離島+簡易庭，本島地院缺；DB 內民事/家事列是當初完整包跑的，刑事該月缺本島地院）。法官名有值但尚未做 per-judge 聚合（合議庭歸屬待定義）
+- **整合呈現**：法院 tab 法院名可點 → `courtModal`（RPC `court_detail_stats`，migration 036/037：官方年度趨勢＋訴訟終結vs公開裁判書＋委任率＋終結情形）；司法統計>各法院比較有「律師供需比」圖（民事訴訟新收÷公會地區律師數，新北律師少時併台北），可切換「所有案件/有委任律師的案件」——後者=官方新收×地區委任率（closed_case_month_stats：民事任一造有律師、刑事任一被告選任律師含法扶），缺資料地區 fallback 全國率
 
 ## 爬蟲模式（moj-deep-backfill.yml）
 
@@ -80,6 +80,12 @@
   月家事 >= 300 視為新分類已回填），法官年度趨勢：`judge_days_by_year()`
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
 - 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
+- **律師官方統計（migration 046）**：`lawyer_judgment_stats`（按律師名彙總：cases_5yr
+  滾動 60 月錨定資料最新月、cases_total、cats_5yr/cats_all、by_year、top_court_5yr），
+  `refresh_lawyer_judgment_stats()` 全量重建（TRUNCATE+INSERT，`refresh_stats()` 月更一併呼叫）；
+  前端律師列表/詳情 modal 改讀 `lawyers_with_stats` view（= lawyers_combined LEFT JOIN
+  彙總表，含 `name_ambiguous` 同名旗標，同名官方數字是合併值、前端以 * 標註）。
+  **Lawsnote `case_count_5yr` 已從 UI 下架**（欄位仍在 DB/view；expertise_areas 等照用）
 
 ## 前端導覽結構
 

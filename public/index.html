@@ -578,9 +578,9 @@
           <div class="kpi-sub" id="kpiLawsnoteSub">含案件數資料</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">平均案件數</div>
+          <div class="kpi-label">平均出庭數</div>
           <div class="kpi-value" id="kpiAvgCases" style="color:var(--orange);">-</div>
-          <div class="kpi-sub">近 5 年 / 每位律師</div>
+          <div class="kpi-sub">公開裁判書 / 近 5 年</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">法務部統計</div>
@@ -902,7 +902,7 @@
                 <th style="cursor:pointer" onclick="sortLawyers('region')">公會 <span id="sortIcon_region">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('seniority')">年資 <span id="sortIcon_seniority">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('has_practice')">全國執業 <span id="sortIcon_has_practice">↕</span></th>
-                <th style="cursor:pointer" onclick="sortLawyers('case_count_5yr')">案件數(5年) <span id="sortIcon_case_count_5yr">↕</span></th>
+                <th style="cursor:pointer" onclick="sortLawyers('official_cases_5yr')" title="司法院公開裁判書出庭數（近 5 年，下限估計）">案件數(5年) <span id="sortIcon_official_cases_5yr">↕</span></th>
                 <th style="cursor:pointer" onclick="sortLawyers('data_source')">來源 <span id="sortIcon_data_source">↕</span></th>
               </tr>
             </thead>
@@ -2254,10 +2254,10 @@ function sortLawyers(col) {
     lawyerSortAsc = !lawyerSortAsc;
   } else {
     lawyerSortCol = col;
-    lawyerSortAsc = (col === 'case_count_5yr') ? false : true; // 案件數預設降序
+    lawyerSortAsc = (col === 'official_cases_5yr') ? false : true; // 案件數預設降序
   }
   // 更新排序圖示
-  ['name','firm_name','region','seniority','has_practice','case_count_5yr','data_source'].forEach(c => {
+  ['name','firm_name','region','seniority','has_practice','official_cases_5yr','data_source'].forEach(c => {
     const icon = document.getElementById('sortIcon_' + c);
     if (icon) icon.textContent = c === col ? (lawyerSortAsc ? '↑' : '↓') : '↕';
   });
@@ -2542,9 +2542,10 @@ async function loadOverview() {
   // Lawsnote KPIs (from cache)
   document.getElementById('kpiLawsnoteCount').textContent = (stats.lawsnote_raw || 0).toLocaleString();
   try {
-    const { data: avgData } = await db.rpc('lawsnote_avg_cases');
-    if (avgData?.[0]?.avg_cases) {
-      document.getElementById('kpiAvgCases').textContent = avgData[0].avg_cases;
+    // 官方裁判書口徑（lawyer_judgment_stats，僅計近 5 年有出庭紀錄者）
+    const { data: avgOfficial } = await db.rpc('official_avg_cases');
+    if (avgOfficial != null) {
+      document.getElementById('kpiAvgCases').textContent = avgOfficial;
     }
   } catch(e) { console.log('avg_cases error:', e); }
 
@@ -2817,7 +2818,7 @@ async function loadLawyers() {
   const search = document.getElementById('lawyerSearch').value.trim();
   const region = document.getElementById('lawyerRegionFilter').value;
   const source = document.getElementById('lawyerSourceFilter').value;
-  let query = db.from('lawyers_combined').select('*', { count: 'exact' });
+  let query = db.from('lawyers_with_stats').select('*', { count: 'exact' });
   if (search) query = query.or(`name.ilike.%${search}%,firm_name.ilike.%${search}%`);
   if (region) query = query.eq('region', region);
   if (source) query = query.eq('data_source', source);
@@ -2896,7 +2897,7 @@ async function loadLawyers() {
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
       <td style="text-align:center;">${hasPractice ? '<span style="color:var(--green);font-weight:600;">&#10003;</span>' : '<span style="color:var(--text-muted);">-</span>'}</td>
-      <td style="text-align:center;font-weight:600;color:var(--gold);">${l.case_count_5yr != null ? l.case_count_5yr.toLocaleString() : '-'}</td>
+      <td style="text-align:center;font-weight:600;color:var(--gold);">${l.official_cases_5yr != null ? l.official_cases_5yr.toLocaleString() : '-'}${l.name_ambiguous && l.official_cases_5yr ? ' <span title="名冊有同名律師，此為同名合併數" style="color:var(--text-muted);cursor:help;">*</span>' : ''}</td>
       <td>${srcHtml}</td>
     </tr>`;
   }).join('');
@@ -4264,8 +4265,8 @@ async function showLawyerDetail(name, certNumber) {
   titleEl.textContent = name;
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
 
-  // 查 lawyers_combined（含 MOJ + 全聯會 + Lawsnote 整合資料）
-  let query = db.from('lawyers_combined').select('*').eq('name', name);
+  // 查 lawyers_with_stats（MOJ + 全聯會 + Lawsnote + 官方裁判書統計）
+  let query = db.from('lawyers_with_stats').select('*').eq('name', name);
   if (certNumber) query = query.eq('cert_number', certNumber);
   const { data: combined, error } = await query.limit(1);
 
@@ -4275,12 +4276,26 @@ async function showLawyerDetail(name, certNumber) {
   }
   const l = combined[0];
 
-  // 若有 moj_id，額外查 moj_lawyers 取詳細資料
-  let moj = null;
+  // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）
+  let moj = null, stat = null;
+  const courtRows = [];
+  const tasks = [
+    db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
+      .then(r => { stat = r.data; }),
+    (async () => {
+      for (let from = 0; ; from += 1000) {
+        const { data: cr } = await db.from('lawyer_month_stats')
+          .select('court_name,case_count').eq('name', name).range(from, from + 999);
+        if (cr?.length) courtRows.push(...cr);
+        if (!cr || cr.length < 1000) break;
+      }
+    })(),
+  ];
   if (l.moj_id) {
-    const { data: mojData } = await db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle();
-    moj = mojData;
+    tasks.push(db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle()
+      .then(r => { moj = r.data; }));
   }
+  await Promise.all(tasks);
 
   // 年資計算
   const currentRocYear = new Date().getFullYear() - 1911;
@@ -4322,6 +4337,18 @@ async function showLawyerDetail(name, certNumber) {
 
   const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:100px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
 
+  // 官方案類組合（近 5 年優先，無近 5 年紀錄退回全期）
+  const catsObj = (stat?.cases_5yr ? stat.cats_5yr : null) || stat?.cats_all || null;
+  let catShareLine = '';
+  if (catsObj) {
+    const catTot = Object.values(catsObj).reduce((a, b) => a + b, 0);
+    if (catTot > 0) {
+      catShareLine = Object.entries(catsObj).sort((a, b) => b[1] - a[1])
+        .filter(([, v]) => v > 0)
+        .map(([k, v]) => `${escHtml(k)} ${Math.round(v * 100 / catTot)}%`).join('｜');
+    }
+  }
+
   bodyEl.innerHTML = `
     <div style="margin-bottom:16px;">
       ${sources.join(' ')}
@@ -4347,19 +4374,63 @@ async function showLawyerDetail(name, certNumber) {
       </table>
     </div>
 
-    ${l.case_count_5yr != null ? `
+    ${stat?.cases_total ? `
     <div class="card" style="margin-bottom:16px;">
-      <div class="card-title">&#128203; Lawsnote 案件統計</div>
-      <div style="display:flex;gap:20px;align-items:center;">
+      <div class="card-title">&#9878; 官方裁判書出庭統計 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">司法院公開裁判書，下限估計（家事裁定等多不公開）</span></div>
+      ${l.name_ambiguous ? '<div style="font-size:0.75rem;color:var(--orange);margin-bottom:8px;">&#9888; 名冊中有同名律師，以下為同名合併數字</div>' : ''}
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
         <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">近 5 年案件數</div>
-          <div style="font-size:1.8rem;font-weight:700;color:var(--gold);">${l.case_count_5yr.toLocaleString()}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">近 5 年出庭</div>
+          <div style="font-size:1.8rem;font-weight:700;color:var(--gold);">${(stat.cases_5yr || 0).toLocaleString()}</div>
         </div>
-        ${l.expertise_areas?.length ? `<div style="flex:1;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">擅長領域</div>
-          <div>${l.expertise_areas.slice(0, 8).map(e => `<span class="badge" style="margin:2px;">${escHtml(e)}</span>`).join('')}</div>
-        </div>` : ''}
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">歷年總計</div>
+          <div style="font-size:1.8rem;font-weight:700;">${stat.cases_total.toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">活躍法院數(近5年)</div>
+          <div style="font-size:1.8rem;font-weight:700;">${stat.n_courts_5yr || 0}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">主要法院(近5年)</div>
+          <div style="font-size:0.95rem;font-weight:600;padding-top:10px;">${escHtml(stat.top_court_5yr || '-')}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">最近出現</div>
+          <div style="font-size:0.95rem;font-weight:600;padding-top:10px;">${stat.last_yyyymm ? stat.last_yyyymm.slice(0, 4) + '-' + stat.last_yyyymm.slice(4) : '-'}</div>
+        </div>
       </div>
+      <div class="grid-2" style="gap:16px;">
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">歷年案量趨勢</div>
+          <canvas id="lwTrendChart" height="170"></canvas>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">案類組合${stat.cases_5yr ? '（近 5 年）' : '（全期）'}</div>
+          <canvas id="lwCatsChart" height="170"></canvas>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">常出沒法院 TOP 8（全期）</div>
+        <canvas id="lwCourtsChart" height="190"></canvas>
+      </div>
+    </div>
+    ` : `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9878; 官方裁判書出庭統計</div>
+      <div style="color:var(--text-muted);font-size:0.85rem;">查無公開裁判書出庭紀錄（家事裁定、非訟事件等多數不公開，實際案量可能高於此）</div>
+    </div>
+    `}
+
+    ${l.expertise_areas?.length || catShareLine ? `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128203; 自報專長 vs 實際案類</div>
+      ${l.expertise_areas?.length ? `
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">Lawsnote 自報擅長領域</div>
+      <div>${l.expertise_areas.slice(0, 8).map(e => `<span class="badge" style="margin:2px;">${escHtml(e)}</span>`).join('')}</div>` : ''}
+      ${catShareLine ? `
+      <div style="font-size:0.75rem;color:var(--text-muted);margin:10px 0 4px;">官方裁判書實際案類${stat?.cases_5yr ? '（近 5 年）' : '（全期）'}</div>
+      <div style="font-size:0.9rem;font-weight:600;">${catShareLine}</div>` : ''}
     </div>
     ` : ''}
 
@@ -4369,10 +4440,61 @@ async function showLawyerDetail(name, certNumber) {
     </div>
     ` : ''}
   `;
+
+  if (stat?.cases_total) renderLawyerCharts(stat, courtRows);
+}
+
+// 律師畫像三圖：歷年趨勢 / 案類組合 / 常出沒法院
+function renderLawyerCharts(stat, courtRows) {
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const baseOpts = { responsive: true, plugins: { legend: { display: false } } };
+
+  // 歷年案量趨勢（by_year jsonb）
+  if (chartInstances['lwTrend']) chartInstances['lwTrend'].destroy();
+  const tCtx = document.getElementById('lwTrendChart');
+  const years = Object.keys(stat.by_year || {}).sort();
+  if (tCtx && years.length) {
+    chartInstances['lwTrend'] = new Chart(tCtx.getContext('2d'), {
+      type: 'bar',
+      data: { labels: years, datasets: [{ data: years.map(y => stat.by_year[y]), backgroundColor: 'rgba(201,168,76,0.65)' }] },
+      options: { ...baseOpts, scales: { x: { ticks: { color: muted, maxRotation: 60, autoSkip: true, maxTicksLimit: 12 } }, y: { ticks: { color: muted }, beginAtZero: true } } }
+    });
+  }
+
+  // 案類組合（近 5 年優先）
+  if (chartInstances['lwCats']) chartInstances['lwCats'].destroy();
+  const cCtx = document.getElementById('lwCatsChart');
+  const catsObj = (stat.cases_5yr ? stat.cats_5yr : null) || stat.cats_all || {};
+  const catEntries = Object.entries(catsObj).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (cCtx && catEntries.length) {
+    const CAT_COLORS = { '民事': '#4f8ef7', '刑事': '#e05c5c', '家事': '#4caf82', '行政': '#c9a84c', '懲戒': '#a06cd5', '少年': '#45b7d1', '其他': '#8899aa' };
+    chartInstances['lwCats'] = new Chart(cCtx.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: catEntries.map(e => e[0]), datasets: [{ data: catEntries.map(e => e[1]), backgroundColor: catEntries.map(e => CAT_COLORS[e[0]] || '#8899aa') }] },
+      options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: muted, boxWidth: 12 } } } }
+    });
+  }
+
+  // 常出沒法院 TOP 8（全期，courtRows 客戶端聚合）
+  if (chartInstances['lwCourts']) chartInstances['lwCourts'].destroy();
+  const kCtx = document.getElementById('lwCourtsChart');
+  const byCourt = {};
+  courtRows.forEach(r => { byCourt[r.court_name] = (byCourt[r.court_name] || 0) + r.case_count; });
+  const topCourts = Object.entries(byCourt).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (kCtx && topCourts.length) {
+    chartInstances['lwCourts'] = new Chart(kCtx.getContext('2d'), {
+      type: 'bar',
+      data: { labels: topCourts.map(e => e[0]), datasets: [{ data: topCourts.map(e => e[1]), backgroundColor: 'rgba(69,183,209,0.6)' }] },
+      options: { ...baseOpts, indexAxis: 'y', scales: { x: { ticks: { color: muted }, beginAtZero: true }, y: { ticks: { color: muted } } } }
+    });
+  }
 }
 
 function closeLawyerModal() {
   document.getElementById('lawyerModal').style.display = 'none';
+  ['lwTrend', 'lwCats', 'lwCourts'].forEach(k => {
+    if (chartInstances[k]) { chartInstances[k].destroy(); delete chartInstances[k]; }
+  });
 }
 
 // ============================================================
@@ -4635,7 +4757,9 @@ function renderJudgeChanges() {
     maxMonth ? `${maxMonth.slice(0, 4)}-${maxMonth.slice(4, 6)}` : '尚無資料';
   const cutoff = (months > 0 && maxMonth) ? jchgMonthMinus(maxMonth, months) : null;
 
-  let win = _jchgRows;
+  // 畫面層過濾未知法院：不論 API 回傳新舊、DB 是否被覆蓋、CDN 是否快取舊響應，
+  // 渲染時一律排除「未知法院」，是最穩的一層（上游 JID 治本後可移除）。
+  let win = _jchgRows.filter(r => r.court_name !== '未知法院');
   if (cutoff) win = win.filter(r => r.event_month >= cutoff);
 
   // KPI（期間內，不受搜尋/類型影響）
