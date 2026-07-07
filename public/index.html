@@ -1119,7 +1119,7 @@
                 <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
                 <th>主持律師</th>
-                <th style="cursor:pointer" onclick="sortOffices('avg_cases')">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('avg_cases')" title="官方近 5 年出庭數 ÷ 法務部律師人數（公開裁判書，下限估計）">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_age')">平均年齡 <span id="sortIcon_o__avg_age">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_sen')">平均年資 <span id="sortIcon_o__avg_sen">↕</span></th>
                 <th>官網</th>
@@ -5000,6 +5000,34 @@ function renderJudgeChanges() {
     }).join('');
   }
   renderPagination('jchgPagination', jchgPage, rows.length, p => { jchgPage = p; renderJudgeChanges(); });
+
+  // ── 退場法官名冊：期間內的 leave，套搜尋、排序、分頁 ──
+  let roster = win.filter(r => r.change_type === 'leave');
+  if (kw) roster = roster.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
+  roster = roster.slice().sort((a, b) =>
+    jchgRosterSortKey === 'active_months'
+      ? (b.active_months || 0) - (a.active_months || 0)
+      : (b.event_month || '').localeCompare(a.event_month || ''));
+  const rBody = document.getElementById('jchgRosterBody');
+  const rPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
+  if (jchgRosterPage >= rPages) jchgRosterPage = rPages - 1;
+  if (!roster.length) {
+    rBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
+  } else {
+    rBody.innerHTML = roster.slice(jchgRosterPage * PAGE_SIZE, (jchgRosterPage + 1) * PAGE_SIZE).map(r => {
+      const conf = r.confidence === 'confirmed'
+        ? '<span class="badge badge-blue" title="已比對司法院現任名冊">名冊確認</span>'
+        : '<span class="badge badge-orange" title="裁判書反推，可能久未掛名或同名，未必為真異動">疑似</span>';
+      return `<tr>
+        <td style="white-space:nowrap;">${r.event_month.slice(0, 4)}-${r.event_month.slice(4, 6)}</td>
+        <td><a href="#" onclick="showJudgeCareer('${escHtml(r.name||'').replace(/'/g,"\\'")}','${escHtml(r.court_name||'').replace(/'/g,"\\'")}','${r.event_month}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(r.name || '-')}</a></td>
+        <td>${escHtml(r.court_name || '-')}</td>
+        <td style="font-variant-numeric:tabular-nums;">${r.active_months != null ? r.active_months : '-'}</td>
+        <td>${conf}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderPagination('jchgRosterPagination', jchgRosterPage, roster.length, p => { jchgRosterPage = p; renderJudgeChanges(); });
 }
 
 function escHtml(str) {

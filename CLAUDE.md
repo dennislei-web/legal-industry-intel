@@ -91,6 +91,9 @@
   `lms_court_list()` 法院下拉；前端「產業分析＞事務所版圖」tab（喆律綠色 highlight）；
   事務所 modal 另有「官方訴訟戰力」區塊（案類覆蓋/明星依賴度/法院版圖，client-side 讀
   lawyers_with_stats）。加了 `idx_lms_court` 索引
+- **事務所 avg_cases 也已換官方口徑（migration 048）**：`moj_firm_statistics()` 分子改
+  lawyer_judgment_stats.cases_5yr（MOJ 名冊姓名唯一者歸戶）÷ MOJ 人數，Lawsnote 案件數
+  自此完全退出 UI 與統計鏈
 
 ## 前端導覽結構
 
