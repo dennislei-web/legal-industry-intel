@@ -5596,6 +5596,41 @@ function alumniTenure(j, l) {
   return y ? `${y} 年 ${r} 月` : `${r} 月`;
 }
 
+// 校友單人重爬（admin）：Edge Function 驗身分 → dispatch alumni-refresh.yml → 輪詢 updated_at 自動刷新
+const _alumniRefreshing = new Set();
+async function refreshAlumnusOne(id, name) {
+  if (!confirm(`重新查詢「${name}」的 MOJ 現職並更新去向分類？\n（觸發 GitHub Actions，約 1-2 分鐘，完成後頁面自動更新）`)) return;
+  const before = (_alumniRows.find(r => r.id === id) || {}).updated_at || null;
+  _alumniRefreshing.add(id);
+  renderAlumniTable();
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/alumni-refresh`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (await db.auth.getSession()).data.session.access_token,
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ name }),
+    });
+    const out = await res.json();
+    if (!out.success) throw new Error(out.error || `HTTP ${res.status}`);
+    // 輪詢該列 updated_at（最長 4 分鐘）；無變動的重爬不會動 updated_at，逾時就靜靜重載一次
+    for (let k = 0; k < 24; k++) {
+      await new Promise(r => setTimeout(r, 10000));
+      const { data } = await db.from('zhelu_alumni').select('updated_at').eq('id', id).single();
+      if (data && data.updated_at !== before) break;
+    }
+    _alumniRows = null;
+    _alumniRefreshing.delete(id);
+    await loadAlumni();
+  } catch (e) {
+    _alumniRefreshing.delete(id);
+    renderAlumniTable();
+    alert('觸發重爬失敗：' + e.message);
+  }
+}
+
 async function loadAlumni() {
   if (_alumniRows) return;
   const { data, error } = await db.from('zhelu_alumni').select('*');
@@ -5673,8 +5708,11 @@ function renderAlumniTable() {
     const lsn = d.lawsnote_url ? ` <a href="${escHtml(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁" style="color:var(--blue);text-decoration:none;">&#8599;</a>` : '';
     const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e =>
       `<span style="display:inline-block;background:var(--ghost-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;font-size:0.7rem;margin:2px 2px 0 0;">${escHtml(e)}</span>`).join('');
+    const refreshBtn = !isAdmin ? '' : (_alumniRefreshing.has(d.id)
+      ? ' <span title="重爬中…約 1-2 分鐘，完成後自動更新" style="font-size:0.72rem;">⏳</span>'
+      : ` <a href="#" class="leader-mark-btn" onclick="refreshAlumnusOne(${d.id},'${escHtml(d.name).replace(/'/g, "\\'")}');return false;" title="重爬這位的 MOJ 現職並更新去向分類" style="font-size:0.72rem;text-decoration:none;">🔄</a>`);
     return `<tr>
-      <td style="white-space:nowrap;">${d.category === 'not_registered' ? `<strong>${escHtml(d.name)}</strong>` : lawyerLink(d.name, 'font-weight:700;')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
+      <td style="white-space:nowrap;">${d.category === 'not_registered' ? `<strong>${escHtml(d.name)}</strong>` : lawyerLink(d.name, 'font-weight:700;')}${refreshBtn}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
       <td style="white-space:nowrap;">${escHtml(d.join_date || '？')} → ${escHtml(d.leave_date || '？')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.zhelu_office || '')} ${escHtml(d.zhelu_dept || '')}</div></td>
       <td style="white-space:nowrap;">${alumniTenure(d.join_date, d.leave_date) || '<span style="color:var(--text-muted)">—</span>'}</td>
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.74rem;font-weight:600;white-space:nowrap;color:${c.color};background:${c.dim};">${c.label}</span></td>

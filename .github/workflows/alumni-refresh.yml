@@ -13,6 +13,10 @@ on:
         description: '只處理前 N 位（測試用，留空=全部）'
         required: false
         default: ''
+      only_name:
+        description: '只處理這位校友（姓名，留空=全部；前端單人重爬按鈕用）'
+        required: false
+        default: ''
 
 jobs:
   refresh:
@@ -37,6 +41,10 @@ jobs:
           ARGS=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="--dry-run"
+          fi
+          ONLY_NAME="${{ github.event.inputs.only_name }}"
+          if [ -n "$ONLY_NAME" ]; then
+            ARGS="$ARGS --name $ONLY_NAME"
           fi
           LIMIT="${{ github.event.inputs.limit }}"
           python moj_alumni_refresh.py $LIMIT $ARGS
