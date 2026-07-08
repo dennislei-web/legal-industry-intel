@@ -4873,8 +4873,9 @@ const MKT_CATS = [null, '民事', '刑事', '家事', '行政', '少年'];
 function renderRegionTabs() {
   const box = document.getElementById('market_regionTabs');
   if (!box) return;
-  box.innerHTML = _mktRegions.slice(0, 16).map(r =>
-    `<button class="sub-tab-btn" data-region="${escHtml(r.region)}" onclick="selectRegion('${escHtml(r.region).replace(/'/g, "\\'")}')">${escHtml(r.region)}</button>`).join('');
+  box.innerHTML = `<button class="sub-tab-btn" data-region="全部" onclick="selectRegion('全部')">全部</button>`
+    + _mktRegions.slice(0, 16).map(r =>
+      `<button class="sub-tab-btn" data-region="${escHtml(r.region)}" onclick="selectRegion('${escHtml(r.region).replace(/'/g, "\\'")}')">${escHtml(r.region)}</button>`).join('');
 }
 
 function renderCatTabs() {
@@ -4915,10 +4916,10 @@ function selectRegionYear(y) {
 async function renderRegionTopLawyers() {
   if (!_mktRegion) return;
   const t = document.getElementById('market_topTitle');
-  if (t) t.textContent = `${_mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}${_mktRegionCat ? ' · ' + _mktRegionCat : ''}`;
+  if (t) t.textContent = `${_mktRegion === '全部' ? '全國' : _mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}${_mktRegionCat ? ' · ' + _mktRegionCat : ''}`;
   const box = document.getElementById('market_topList');
   if (box) box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">載入中…</div>';
-  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 20 });
+  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion === '全部' ? null : _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 20 });
   const rows = data || [];
   if (!box) return;
   if (!rows.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">此地區／案類無資料</div>'; return; }
@@ -4949,7 +4950,7 @@ async function renderRegionTopLawyers() {
 
 async function renderRegionActive() {
   if (!_mktRegion) return;
-  const { data } = await db.rpc('region_active_counts', { p_region: _mktRegion, p_min: 5, p_cat: _mktRegionCat });
+  const { data } = await db.rpc('region_active_counts', { p_region: _mktRegion === '全部' ? null : _mktRegion, p_min: 5, p_cat: _mktRegionCat });
   const rows = (data || []).filter(r => r.yr >= 2003);
   const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
   if (chartInstances['mktActive']) chartInstances['mktActive'].destroy();
