@@ -784,6 +784,7 @@
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
         ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
+        案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
       </div>
     </div>
 
@@ -4180,7 +4181,9 @@ async function showFirmDetail(firmName) {
         </select>
         <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">公開裁判書下限估計；同名律師不計入</span>
       </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin:-4px 0 10px;line-height:1.5;">※ 按<strong>現任名冊</strong>回溯：轉入律師帶入其過往案量、已離所者不計；年份切得越早，與「當年實際陣容」落差越大。</div>
       <div id="firmLitBody"></div>
+      <div id="firmLitMoves"></div>
     </div>
     ` : ''}
 
@@ -4277,10 +4280,11 @@ async function showFirmDetail(firmName) {
     });
   }
 
-  // 官方戰力：渲染內容（近 5 年）並在背景載入逐年資料填年份下拉
+  // 官方戰力：渲染內容（近 5 年）並在背景載入逐年資料填年份下拉、近期人員異動
   if (litTotal) {
     renderFirmLitBody('5yr');
     loadFirmLitYears(firmName);
+    loadFirmLitMoves(firmName);
   }
 }
 
@@ -4317,6 +4321,53 @@ function firmLitAggFromYearRow(row) {
     top3: total ? Math.round(lawyers.slice(0, 3).reduce((a, r) => a + r.cases, 0) * 100 / total) : 0,
     topCourts: Object.entries(row.courts || {}).sort((a, b) => b[1] - a[1]).slice(0, 5)
   };
+}
+
+// 近期人員異動（moj_lawyer_changes trigger 自 2026-07 起追蹤）：
+// 量化「現任名冊回溯」口徑下，近期轉入帶入 / 轉出帶走的近 5 年案量
+async function loadFirmLitMoves(firmName) {
+  if (!_firmLit) return;
+  try {
+    const { data: chg, error } = await db.from('moj_lawyer_changes')
+      .select('name, old_office, new_office, changed_at')
+      .eq('change_type', 'firm_change')
+      .or(`old_office.eq.${firmName},old_office.like.${firmName}%,new_office.eq.${firmName},new_office.like.${firmName}%`)
+      .order('changed_at', { ascending: false })
+      .limit(200);
+    if (error) { console.log('firm moves error:', error.message); return; }
+    if (firmName !== _currentFirmName) return;  // 使用者已切到別家所
+    const isFirm = o => !!o && (o === firmName || o.startsWith(firmName));
+    // 同一律師多筆只取最新；分所間調動（兩邊都是本所）不算
+    const seen = new Set(), moves = [];
+    (chg || []).forEach(c => {
+      if (!c.name || seen.has(c.name)) return;
+      seen.add(c.name);
+      const fromF = isFirm(c.old_office), toF = isFirm(c.new_office);
+      if (fromF === toF) return;
+      moves.push({ name: c.name, dir: toF ? 'in' : 'out', date: (c.changed_at || '').slice(0, 10) });
+    });
+    const el = document.getElementById('firmLitMoves');
+    if (!el || !moves.length) return;
+    // 補各異動律師的近 5 年案量（同名旗標者不計，口徑同卡片本體）
+    const caseMap = {};
+    try {
+      const { data: st } = await db.from('lawyers_with_stats')
+        .select('name, official_cases_5yr, name_ambiguous')
+        .in('name', moves.map(m => m.name));
+      (st || []).forEach(s => { if (!s.name_ambiguous) caseMap[s.name] = s.official_cases_5yr || 0; });
+    } catch (e) { /* 案量補不到就只列名字 */ }
+    const fmt = m => `${escHtml(m.name)}${caseMap[m.name] != null ? `（${Number(caseMap[m.name]).toLocaleString()} 件）` : ''}<span style="color:var(--text-muted);font-size:0.7rem;"> ${m.date}</span>`;
+    const movesIn = moves.filter(m => m.dir === 'in'), movesOut = moves.filter(m => m.dir === 'out');
+    const inCases = movesIn.reduce((a, m) => a + (caseMap[m.name] || 0), 0);
+    const outCases = movesOut.reduce((a, m) => a + (caseMap[m.name] || 0), 0);
+    const inPct = _firmLit.agg5.total && inCases ? `，佔全所近 5 年案量 ${Math.round(inCases * 100 / _firmLit.agg5.total)}%` : '';
+    el.innerHTML = `
+      <div style="margin-top:12px;padding:10px 12px;background:rgba(201,168,76,0.06);border:1px solid var(--border);border-radius:8px;font-size:0.8rem;line-height:1.7;">
+        <div style="font-weight:600;margin-bottom:2px;">🔀 近期人員異動 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">名冊逐日比對，2026-07 起追蹤（案量為該律師個人近 5 年出庭數）</span></div>
+        ${movesIn.length ? `<div><span style="color:var(--green);">轉入 ${movesIn.length} 位</span>：${movesIn.map(fmt).join('、')}${inCases ? `<span style="color:var(--text-muted);"> — 上方數字含其帶入案量 ${inCases.toLocaleString()} 件${inPct}</span>` : ''}</div>` : ''}
+        ${movesOut.length ? `<div><span style="color:var(--orange);">轉出 ${movesOut.length} 位</span>：${movesOut.map(fmt).join('、')}${outCases ? `<span style="color:var(--text-muted);"> — 其案量 ${outCases.toLocaleString()} 件已不計入上方數字</span>` : ''}</div>` : ''}
+      </div>`;
+  } catch (e) { console.log('firm moves error:', e); }
 }
 
 async function loadFirmLitYears(firmName) {
