@@ -2555,6 +2555,7 @@ async function showDashboard() {
     document.getElementById('navBtn_admin').style.display = isAdmin ? '' : 'none';
   });
   ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
+  ensureLeaderOverrides(); // 前台標註所長對照表（mig 061，同上背景載）
 
   // 初始化導覽（預設律師區）
   showSection('lawyer');
@@ -3678,14 +3679,18 @@ const FIRM_TAGLINES = {
 // 注意：必須用 prefix 而非 substring，否則「公理律師事務所」會被誤配到「理律」（見 commit dc60fa6）
 function getFirmLeaders(firmName) {
   const leaders = [];
-  for (const [name, info] of Object.entries(FIRM_LEADERS)) {
+  const entries = [
+    ...Object.entries(FIRM_LEADERS),
+    ...(LEADER_OVERRIDES ? LEADER_OVERRIDES.entries() : [])
+  ];
+  for (const [name, info] of entries) {
     const leaderFirm = info.split('｜')[0];
     if (
       leaderFirm === firmName ||
       firmName.startsWith(leaderFirm) ||
       leaderFirm.startsWith(firmName)
     ) {
-      leaders.push(name);
+      if (!leaders.includes(name)) leaders.push(name);
     }
   }
   return leaders;
@@ -3741,8 +3746,56 @@ function ensureSoloFirms() {
   }
   return _soloFirmLoading;
 }
+// ============================================================
+// 前台 admin 標註所長（mig 061：firm_leader_overrides 表）
+// 優先序：DB override > FIRM_LEADERS 硬編碼白名單 > 一人所自動推定
+// ============================================================
+let LEADER_OVERRIDES = null;   // 姓名 -> 「事務所｜頭銜」
+let _leaderOvLoading = null;
+function ensureLeaderOverrides() {
+  if (!_leaderOvLoading) {
+    _leaderOvLoading = (async () => {
+      const map = new Map();
+      try {
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await db.from('firm_leader_overrides')
+            .select('lawyer_name, firm_name, title').range(from, from + 999);
+          if (error) throw error;
+          (data || []).forEach(r => map.set(r.lawyer_name, `${r.firm_name}｜${r.title}`));
+          if (!data || data.length < 1000) break;
+        }
+        LEADER_OVERRIDES = map;
+      } catch (e) {
+        console.log('leader overrides load error:', e);
+        _leaderOvLoading = null; // 載入失敗允許下次重試
+      }
+    })();
+  }
+  return _leaderOvLoading;
+}
+
+async function markFirmLeader(name, firmName) {
+  const title = prompt(`標註「${name}」為 ${firmName} 的負責人，頭銜：`, '所長');
+  if (!title || !title.trim()) return;
+  const { error } = await db.from('firm_leader_overrides')
+    .upsert({ lawyer_name: name, firm_name: firmName, title: title.trim() }, { onConflict: 'lawyer_name,firm_name' });
+  if (error) { alert('儲存失敗：' + error.message); return; }
+  (LEADER_OVERRIDES || (LEADER_OVERRIDES = new Map())).set(name, `${firmName}｜${title.trim()}`);
+  showFirmDetail(firmName);
+}
+
+async function unmarkFirmLeader(name, firmName) {
+  if (!confirm(`移除「${name}」的前台所長標註？（不影響程式內建白名單）`)) return;
+  const { error } = await db.from('firm_leader_overrides').delete().eq('lawyer_name', name);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  if (LEADER_OVERRIDES) LEADER_OVERRIDES.delete(name);
+  showFirmDetail(firmName);
+}
+
 // 統一入口：回傳「事務所｜頭銜」或 null；需先 ensureSoloFirms()（未載入時僅回白名單）
 function leaderInfo(name, firmName) {
+  const ov = LEADER_OVERRIDES && LEADER_OVERRIDES.get(name);
+  if (ov) return ov;
   if (FIRM_LEADERS[name]) return FIRM_LEADERS[name];
   if (!SOLO_FIRM_MAP || !name || !firmName || !/事務所/.test(firmName)) return null;
   return SOLO_FIRM_MAP.get(soloFirmKey(firmName)) === name ? `${firmName}｜所長` : null;
@@ -4144,6 +4197,7 @@ async function showFirmDetail(firmName) {
   document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('firmTab_overview')?.classList.add('active');
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
+  await ensureLeaderOverrides(); // 律師清單所長判定需要前台標註對照表
 
   // 查詢該事務所所有律師（含分所：用 LIKE prefix）
   let allLawyers = [];
@@ -4315,16 +4369,24 @@ async function showFirmDetail(firmName) {
           <tbody>${(() => {
             // 一人所：唯一「正常」狀態律師即所長（口徑同 mig 060 view，這裡用手上名單直接判）
             const soloName = (/事務所/.test(firmName) && total === 1 && allLawyers[0].state_desc === '正常') ? allLawyers[0].name : null;
+            // 手動標註（前台 override 優先於硬編碼白名單）
+            const manualLeader = n => (LEADER_OVERRIDES && LEADER_OVERRIDES.get(n)) || FIRM_LEADERS[n] || null;
             return [...allLawyers].sort((a, b) => {
-            const aL = (FIRM_LEADERS[a.name] || a.name === soloName) ? 0 : 1;
-            const bL = (FIRM_LEADERS[b.name] || b.name === soloName) ? 0 : 1;
+            const aL = (manualLeader(a.name) || a.name === soloName) ? 0 : 1;
+            const bL = (manualLeader(b.name) || b.name === soloName) ? 0 : 1;
             return aL - bL;
           }).map(l => {
             const age = l.birth_year && l.birth_year < 200 ? `民${l.birth_year} (${ROC_YEAR - l.birth_year}歲)` : '-';
             const contact = [l.email, l.tel].filter(Boolean).join(' / ') || '-';
-            const isLeader = FIRM_LEADERS[l.name] || (l.name === soloName ? `${firmName}｜所長` : null);
+            const isLeader = manualLeader(l.name) || (l.name === soloName ? `${firmName}｜所長` : null);
+            const fromOverride = !!(LEADER_OVERRIDES && LEADER_OVERRIDES.get(l.name));
+            const jsName = escHtml(l.name).replace(/'/g, "\\'");
+            const jsFirm = escHtml(firmName).replace(/'/g, "\\'");
+            const adminBtn = !isAdmin ? '' : (fromOverride
+              ? ` <a href="#" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
+              : (!isLeader ? ` <a href="#" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
-              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}</td>
+              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${adminBtn}</td>
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
