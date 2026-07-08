@@ -1,0 +1,42 @@
+name: 喆律校友 MOJ 刷新（現職/去向）
+
+on:
+  schedule:
+    - cron: '20 18 * * 0'  # 每週日 UTC 18:20 = 台灣週一凌晨 2:20（全量 52 位約 1 分鐘）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只比對不寫入（true/false）'
+        required: false
+        default: 'false'
+      limit:
+        description: '只處理前 N 位（測試用，留空=全部）'
+        required: false
+        default: ''
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run alumni refresh
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="--dry-run"
+          fi
+          LIMIT="${{ github.event.inputs.limit }}"
+          python moj_alumni_refresh.py $LIMIT $ARGS
