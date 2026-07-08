@@ -94,7 +94,11 @@
   近 5 年出庭排名，firm_name 截到第一個「事務所」合併分所、排除「未提供」、同名律師不計）＋
   `lms_court_list()` 法院下拉；前端「產業分析＞事務所版圖」tab（喆律綠色 highlight）；
   事務所 modal 另有「官方訴訟戰力」區塊（案類覆蓋/明星依賴度/法院版圖，client-side 讀
-  lawyers_with_stats）。加了 `idx_lms_court` 索引
+  lawyers_with_stats）。加了 `idx_lms_court` 索引。
+  戰力區塊可切年份（migration 053 `firm_lawyer_year_stats(p_names)`，每年一列 jsonb 避開
+  PostgREST max-rows），並顯示近期人員異動影響（moj_lawyer_changes，2026-07 起追蹤）；
+  **口徑注意**：全部按「現任名冊」回溯——轉入律師帶入過往案量、已離所者不計，年份越早失真越大
+  （裁判書不署事務所名，無法回溯當年在籍，此為資料天花板）
 - **事務所 avg_cases 也已換官方口徑（migration 048）**：`moj_firm_statistics()` 分子改
   lawyer_judgment_stats.cases_5yr（MOJ 名冊姓名唯一者歸戶）÷ MOJ 人數，Lawsnote 案件數
   自此完全退出 UI 與統計鏈
