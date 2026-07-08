@@ -1236,6 +1236,25 @@
       <div class="search-bar">
         <input type="text" id="alumniSearch" placeholder="搜尋姓名、事務所或部門..." oninput="renderAlumniTable()">
         <select id="alumniCat" onchange="renderAlumniTable()"></select>
+        <button id="alumniAddBtn" onclick="toggleAlumniAddForm()" style="display:none;padding:8px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.85rem;white-space:nowrap;">＋ 新增校友</button>
+      </div>
+      <div class="card" id="alumniAddCard" style="margin-bottom:16px;display:none;">
+        <div class="card-title">＋ 手動新增校友</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;">
+          <label style="font-size:0.72rem;color:var(--text-muted);">姓名 *<input id="alumniAddName" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">喆律職稱<input id="alumniAddTitle" placeholder="律師" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">到職日<input id="alumniAddJoin" type="date" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">離職日<input id="alumniAddLeave" type="date" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">所別<input id="alumniAddOffice" placeholder="台北" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">部門<input id="alumniAddDept" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">去向分類<select id="alumniAddCat" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></select></label>
+          <label style="font-size:0.72rem;color:var(--text-muted);">備註<input id="alumniAddNote" style="width:100%;margin-top:3px;padding:6px 9px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.85rem;"></label>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center;">
+          <button onclick="saveAlumniAdd()" style="padding:7px 18px;background:var(--gold);border:none;border-radius:8px;color:#1a1a1a;cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600;">儲存</button>
+          <button onclick="toggleAlumniAddForm(false)" style="padding:7px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.85rem;">取消</button>
+          <span style="font-size:0.72rem;color:var(--text-muted);">儲存後會詢問是否立刻重爬 MOJ 現職與去向分類（若人不在名冊就維持你選的分類）</span>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">&#128203; 校友名單 <span id="alumniCount" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
@@ -5598,8 +5617,8 @@ function alumniTenure(j, l) {
 
 // 校友單人重爬（admin）：Edge Function 驗身分 → dispatch alumni-refresh.yml → 輪詢 updated_at 自動刷新
 const _alumniRefreshing = new Set();
-async function refreshAlumnusOne(id, name) {
-  if (!confirm(`重新查詢「${name}」的 MOJ 現職並更新去向分類？\n（觸發 GitHub Actions，約 1-2 分鐘，完成後頁面自動更新）`)) return;
+async function refreshAlumnusOne(id, name, skipConfirm) {
+  if (!skipConfirm && !confirm(`重新查詢「${name}」的 MOJ 現職並更新去向分類？\n（觸發 GitHub Actions，約 1-2 分鐘，完成後頁面自動更新）`)) return;
   const before = (_alumniRows.find(r => r.id === id) || {}).updated_at || null;
   _alumniRefreshing.add(id);
   renderAlumniTable();
@@ -5631,8 +5650,61 @@ async function refreshAlumnusOne(id, name) {
   }
 }
 
+// 手動新增校友（admin；mig 062 開 RLS 寫入 + is_manual 欄）
+function toggleAlumniAddForm(show) {
+  const card = document.getElementById('alumniAddCard');
+  const open = show !== undefined ? show : card.style.display === 'none';
+  card.style.display = open ? '' : 'none';
+  if (open) {
+    const sel = document.getElementById('alumniAddCat');
+    sel.innerHTML = Object.entries(ALUMNI_CATS)
+      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+    sel.value = 'recent';
+    document.getElementById('alumniAddName').focus();
+  }
+}
+
+async function saveAlumniAdd() {
+  const val = id => document.getElementById(id).value.trim();
+  const name = val('alumniAddName');
+  if (!name) { alert('姓名必填'); return; }
+  if ((_alumniRows || []).some(r => r.name === name) &&
+      !confirm(`名單已有「${name}」，確定要再新增一列？`)) return;
+  const row = {
+    name,
+    last_title: val('alumniAddTitle') || null,
+    zhelu_office: val('alumniAddOffice') || null,
+    zhelu_dept: val('alumniAddDept') || null,
+    join_date: val('alumniAddJoin') || null,
+    leave_date: val('alumniAddLeave') || null,
+    category: document.getElementById('alumniAddCat').value,
+    note: val('alumniAddNote') || null,
+    is_manual: true,
+  };
+  const { data, error } = await db.from('zhelu_alumni').insert(row).select().single();
+  if (error) { alert('新增失敗：' + error.message); return; }
+  ['alumniAddName','alumniAddTitle','alumniAddOffice','alumniAddDept','alumniAddJoin','alumniAddLeave','alumniAddNote']
+    .forEach(i => document.getElementById(i).value = '');
+  toggleAlumniAddForm(false);
+  _alumniRows = null;
+  await loadAlumni();
+  if (confirm(`已新增「${name}」。要立刻重爬 MOJ 現職與去向分類嗎？（約 1-2 分鐘）`)) {
+    refreshAlumnusOne(data.id, name, true);
+  }
+}
+
+async function deleteAlumnus(id, name) {
+  if (!confirm(`刪除手動新增的校友「${name}」？此動作無法復原。`)) return;
+  const { error } = await db.from('zhelu_alumni').delete().eq('id', id);
+  if (error) { alert('刪除失敗：' + error.message); return; }
+  _alumniRows = null;
+  await loadAlumni();
+}
+
 async function loadAlumni() {
   if (_alumniRows) return;
+  const addBtn = document.getElementById('alumniAddBtn');
+  if (addBtn) addBtn.style.display = isAdmin ? '' : 'none';
   const { data, error } = await db.from('zhelu_alumni').select('*');
   if (error || !data) {
     document.getElementById('alumniTableBody').innerHTML =
@@ -5711,8 +5783,11 @@ function renderAlumniTable() {
     const refreshBtn = !isAdmin ? '' : (_alumniRefreshing.has(d.id)
       ? ' <span title="重爬中…約 1-2 分鐘，完成後自動更新" style="font-size:0.72rem;">⏳</span>'
       : ` <a href="#" class="leader-mark-btn" onclick="refreshAlumnusOne(${d.id},'${escHtml(d.name).replace(/'/g, "\\'")}');return false;" title="重爬這位的 MOJ 現職並更新去向分類" style="font-size:0.72rem;text-decoration:none;">🔄</a>`);
+    const delBtn = (isAdmin && d.is_manual)
+      ? ` <a href="#" class="leader-mark-btn" onclick="deleteAlumnus(${d.id},'${escHtml(d.name).replace(/'/g, "\\'")}');return false;" title="刪除這筆手動新增的校友" style="font-size:0.72rem;color:var(--red);text-decoration:none;">✕</a>`
+      : '';
     return `<tr>
-      <td style="white-space:nowrap;">${d.category === 'not_registered' ? `<strong>${escHtml(d.name)}</strong>` : lawyerLink(d.name, 'font-weight:700;')}${refreshBtn}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
+      <td style="white-space:nowrap;">${d.category === 'not_registered' ? `<strong>${escHtml(d.name)}</strong>` : lawyerLink(d.name, 'font-weight:700;')}${refreshBtn}${delBtn}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
       <td style="white-space:nowrap;">${escHtml(d.join_date || '？')} → ${escHtml(d.leave_date || '？')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.zhelu_office || '')} ${escHtml(d.zhelu_dept || '')}</div></td>
       <td style="white-space:nowrap;">${alumniTenure(d.join_date, d.leave_date) || '<span style="color:var(--text-muted)">—</span>'}</td>
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.74rem;font-weight:600;white-space:nowrap;color:${c.color};background:${c.dim};">${c.label}</span></td>
