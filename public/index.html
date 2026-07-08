@@ -3811,7 +3811,7 @@ async function loadOfficeAgeSeniority() {
   let rows = [];
   let from = 0;
   while (true) {
-    const { data } = await db.from('moj_lawyers').select('birth_year, lic_no, office_normalized').range(from, from + 999);
+    const { data } = await db.from('moj_lawyers').select('name, birth_year, lic_no, office_normalized').range(from, from + 999);
     if (!data || !data.length) break;
     rows = rows.concat(data);
     if (data.length < 1000) break;
@@ -3864,11 +3864,16 @@ async function loadOfficeAgeSeniority() {
   // 個別事務所平均（用 office_normalized 分組，含分所合併）
   const firmAgeMap = {};
   const firmSenMap = {};
+  const firmNamesMap = {};
   const firmKeyRe = /^(.+?(?:法律|律師)事務所)/;
   for (const r of rows) {
     if (!r.office_normalized) continue;
     const km = r.office_normalized.match(firmKeyRe);
     const key = km ? km[1] : r.office_normalized;
+    if (r.name) {
+      if (!firmNamesMap[key]) firmNamesMap[key] = [];
+      firmNamesMap[key].push(r.name);
+    }
     if (r.birth_year && r.birth_year < 200) {
       if (!firmAgeMap[key]) firmAgeMap[key] = [];
       firmAgeMap[key].push(currentYear - (1911 + r.birth_year));
@@ -3887,6 +3892,10 @@ async function loadOfficeAgeSeniority() {
     const senArr = firmSenMap[o.firm_name];
     o._avg_age = ageArr ? +(ageArr.reduce((a, b) => a + b, 0) / ageArr.length).toFixed(1) : null;
     o._avg_sen = senArr ? +(senArr.reduce((a, b) => a + b, 0) / senArr.length).toFixed(1) : null;
+    // 一人所推定所長：僅限「事務所」（排除法人/公司），且 cache 人數與 MOJ 名單皆恰為 1
+    const names = firmNamesMap[o.firm_name];
+    o._solo_name = (/事務所/.test(o.firm_name) && Number(o.lawyer_count) === 1 && names && names.length === 1)
+      ? names[0] : null;
   }
   renderOffices();
 }
@@ -3927,7 +3936,12 @@ function renderOffices() {
       <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="點擊查看 ${o.ex_judicial_officers.length} 位前司法官" style="text-decoration:none;cursor:pointer;color:var(--purple);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--purple);border-radius:10px;background:rgba(155,126,216,0.1);">⚖️${o.ex_judicial_officers.length}</a>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
-      <td style="font-size:0.82rem;">${(() => { const ls = getFirmLeaders(o.firm_name); return ls.length ? ls.map(n => `${renderLeaderBadge(n)} ${escHtml(n)}`).join('<br>') : '<span style="color:var(--text-muted);">-</span>'; })()}</td>
+      <td style="font-size:0.82rem;">${(() => {
+        const ls = getFirmLeaders(o.firm_name);
+        if (ls.length) return ls.map(n => `${renderLeaderBadge(n)} ${escHtml(n)}`).join('<br>');
+        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，推定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${escHtml(o._solo_name)} <span style="color:var(--text-muted);font-size:0.72rem;">一人所</span></span>`;
+        return '<span style="color:var(--text-muted);">-</span>';
+      })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
