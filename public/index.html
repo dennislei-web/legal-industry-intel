@@ -1224,7 +1224,7 @@
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
           &#9888;&#65039; 本頁依<strong>裁判書署名</strong>逐月反推法官在各法院的<strong>進場／退場</strong>，非官方人事令。
           「名冊確認」＝已比對司法院現任名冊；「疑似」＝可能為久未掛名或同名，未必為真異動。
-          法官無律師證號那種唯一鍵，故不做跨院轉調連連看。資料涵蓋至 2025-04（裁判書開放資料晚兩月發布）；官方名冊月快照已自本月起累積，未來提供權威 diff。
+          法官無律師證號那種唯一鍵，故不做跨院轉調連連看。資料涵蓋至 2026-04（裁判書開放資料晚兩月發布）；官方名冊月快照已自本月起累積，未來提供權威 diff。
         </div>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -1568,7 +1568,7 @@
                 </div>
                 <div class="chart-card">
                     <div class="chart-title">每年度活躍律師數（該地區年出庭 ≥ 5 案）</div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">反映該地區活躍訴訟律師人數的年度消長（2025 為半年資料）</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">反映該地區活躍訴訟律師人數的年度消長（最新年度為部分月份資料）</div>
                     <div class="chart-container"><canvas id="market_chartActive"></canvas></div>
                 </div>
             </div>
@@ -4878,7 +4878,7 @@ async function loadMarketTrendOnce() {
   try {
     const [mktRes, grRes, regRes] = await Promise.all([
       db.rpc('market_year_trend'),
-      db.rpc('lawyer_growth', { p_anchor: 2024, p_min: 20, p_limit: 40 }),
+      db.rpc('lawyer_growth', { p_anchor: 2025, p_min: 20, p_limit: 40 }),
       db.rpc('region_list'),
     ]);
     _marketRows = mktRes.data || [];
@@ -4936,7 +4936,7 @@ function selectRegionCat(cat) {
 function renderYearTabs() {
   const box = document.getElementById('market_yearTabs');
   if (!box) return;
-  const years = [null, 2025, 2024, 2023, 2022, 2021, 2020];
+  const years = [null, 2026, 2025, 2024, 2023, 2022, 2021, 2020];
   box.innerHTML = years.map(y =>
     `<button class="sub-tab-btn${y === _mktRegionYear ? ' active' : ''}" onclick="selectRegionYear(${y === null ? 'null' : y})">${y === null ? '全期' : y}</button>`).join('');
 }
@@ -5508,7 +5508,7 @@ function renderJudgeChanges() {
   const type = document.getElementById('jchgType').value;
   const months = parseInt(document.getElementById('jchgWindow').value, 10);
 
-  // 期間相對「資料末端月」而非今天（裁判書晚兩月且僅到 2025-04）
+  // 期間相對「資料末端月」而非今天（裁判書晚兩月發布）
   const maxMonth = _jchgRows.length ? _jchgRows[0].event_month : null;
   document.getElementById('kpiJchgLast').textContent =
     maxMonth ? `${maxMonth.slice(0, 4)}-${maxMonth.slice(4, 6)}` : '尚無資料';
@@ -5989,7 +5989,7 @@ async function loadJudgeOverview() {
     // fallback 到 Lawsnote 歷年總數，會膨脹數倍）。
     // 只列司法院名冊上的法官：署名解析偶有司法事務官/已離職人員混入（如大量本票裁定的極端值）
     const rosterNames = new Set(judges.filter(j => (j.data_source || '').includes('司法院')).map(j => j.name));
-    let tjLatestYm = '202504';
+    let tjLatestYm = '202604';
     try {
       const { data: hi } = await db.from('judge_month_stats')
         .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
