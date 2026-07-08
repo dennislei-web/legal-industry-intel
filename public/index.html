@@ -1042,6 +1042,25 @@
 
     <!-- ==================== TAB: OFFICES (事務所) ==================== -->
     <div id="tab-offices" class="tab-content">
+      <!-- 第零列：律師身分結構（推估） -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">律師身分結構（依名冊推估）</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
+        <div class="kpi-card">
+          <div class="kpi-label">所長人數（推估）</div>
+          <div class="kpi-value" id="kpiLeaderCount" style="color:var(--gold);">-</div>
+          <div class="kpi-sub" id="kpiLeaderCountSub">單人所＋姓名掛所名</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">受雇律師人數（推估）</div>
+          <div class="kpi-value" id="kpiEmployedCount" style="color:var(--green);">-</div>
+          <div class="kpi-sub">多人所且未掛名（含合夥/主持未掛名者，實際受雇數偏高估）</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">企業端律師人數</div>
+          <div class="kpi-value" id="kpiInhouseCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">執業於法人/公司</div>
+        </div>
+      </div>
       <!-- 第一列：事務所 -->
       <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">事務所（法律/律師事務所）</div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
@@ -3883,6 +3902,26 @@ async function loadOfficeAgeSeniority() {
   const isFirmOffice = o => /事務所/.test(o || '');
   const firmRows = rows.filter(r => isFirmOffice(r.office_normalized));
   const corpRows = rows.filter(r => r.office_normalized && !isFirmOffice(r.office_normalized));
+
+  // 律師身分結構（推估）：firm_key 正規化與 moj_firm_statistics() 同構（migration 048）
+  // 所長 = 單人所律師 or 姓名出現在所名；受雇 = 多人所且未掛名（合夥/主持未掛名者會被高估進來）
+  const firmKeyOf = o => /(法律事務所|律師事務所)/.test(o) ? o.replace(/^(.+?(?:法律|律師)事務所).*$/, '$1') : o;
+  const firmSizes = {};
+  for (const r of firmRows) {
+    const k = firmKeyOf(r.office_normalized);
+    firmSizes[k] = (firmSizes[k] || 0) + 1;
+  }
+  let leaderCount = 0, employedCount = 0, soloCount = 0;
+  for (const r of firmRows) {
+    const k = firmKeyOf(r.office_normalized);
+    if (firmSizes[k] === 1) { leaderCount++; soloCount++; }
+    else if (r.name && k.includes(r.name)) leaderCount++;
+    else employedCount++;
+  }
+  document.getElementById('kpiLeaderCount').textContent = leaderCount.toLocaleString();
+  document.getElementById('kpiLeaderCountSub').textContent = `單人所 ${soloCount.toLocaleString()}＋姓名掛所名 ${(leaderCount - soloCount).toLocaleString()}`;
+  document.getElementById('kpiEmployedCount').textContent = employedCount.toLocaleString();
+  document.getElementById('kpiInhouseCount').textContent = corpRows.length.toLocaleString();
 
   const calcAvgAge = (arr) => {
     const ages = arr.filter(r => r.birth_year && r.birth_year < 200).map(r => currentYear - (1911 + r.birth_year));
