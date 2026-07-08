@@ -277,6 +277,8 @@
     .pagination button { padding: 6px 12px; background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-family: inherit; }
     .pagination button:hover { background: var(--ghost-hover-bg); }
     .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination button.page-current { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; cursor: default; }
+    .pagination .page-jump { width: 60px; padding: 6px 8px; background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: inherit; font-size: 0.85rem; }
     .pagination .page-info { font-size: 0.85rem; color: var(--text-muted); }
 
     /* ===================== LOADING ===================== */
@@ -5511,14 +5513,31 @@ function renderPagination(containerId, page, total, onPageChange) {
   const totalPages = Math.ceil(total / PAGE_SIZE);
   if (totalPages <= 1) { el.innerHTML = total > 0 ? `<span class="page-info">共 ${total} 筆</span>` : ''; return; }
 
+  // 頁碼窗：首末頁 + 目前頁 ±2，其餘摺疊成 …
+  const nums = [];
+  for (let p = 0; p < totalPages; p++) {
+    if (p === 0 || p === totalPages - 1 || Math.abs(p - page) <= 2) nums.push(p);
+    else if (nums[nums.length - 1] !== '...') nums.push('...');
+  }
+
   el.innerHTML = `
-    <button ${page === 0 ? 'disabled' : ''} onclick="void(0)">上一頁</button>
-    <span class="page-info">第 ${page + 1} / ${totalPages} 頁 (共 ${total} 筆)</span>
-    <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="void(0)">下一頁</button>
+    <button ${page === 0 ? 'disabled' : ''} data-p="${page - 1}">上一頁</button>
+    ${nums.map(p => p === '...'
+      ? '<span class="page-info">…</span>'
+      : `<button data-p="${p}"${p === page ? ' class="page-current"' : ''}>${p + 1}</button>`).join('')}
+    <button ${page >= totalPages - 1 ? 'disabled' : ''} data-p="${page + 1}">下一頁</button>
+    <span class="page-info">共 ${total} 筆</span>
+    <input type="number" class="page-jump" min="1" max="${totalPages}" placeholder="跳頁" title="輸入頁碼後按 Enter">
   `;
-  const btns = el.querySelectorAll('button');
-  btns[0].onclick = () => onPageChange(page - 1);
-  btns[1].onclick = () => onPageChange(page + 1);
+  el.querySelectorAll('button[data-p]').forEach(b => {
+    if (b.disabled || b.classList.contains('page-current')) return;
+    b.onclick = () => onPageChange(parseInt(b.dataset.p));
+  });
+  el.querySelector('.page-jump').onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    const v = parseInt(e.target.value);
+    if (v >= 1 && v <= totalPages && v - 1 !== page) onPageChange(v - 1);
+  };
 }
 
 // ============================================================
@@ -6109,8 +6128,9 @@ function renderFamTable() {
 // FAM-LAWYERS (家事律師版圖)
 // ============================================================
 let _flLoaded = false;
-let _flRows = [];       // family_lawyer_stats（每位律師）
-let _flByCourt = [];    // family_lawyer_by_court（律師×法院）
+let _flRows = [];       // 目前顯示切片（每位律師）
+let _flByCourt = [];    // 目前顯示切片（律師×法院）
+let _flYearCache = {};  // 年度切片快取（'' = 全部年度）
 let flSortCol = 'family_cases';
 let flSortAsc = false;
 
@@ -6231,27 +6251,73 @@ async function loadFirmMap() {
 
 async function loadFamLawyers() {
   try {
-    const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+    // 年度下拉（家事年 cache 的年度清單，migration 053）
+    db.rpc('family_lawyer_years').then(({ data: yrs, error }) => {
+      if (error) { console.log('family_lawyer_years error:', error); return; }
+      const ysel = document.getElementById('flYearSelect');
+      if (!ysel || !yrs?.length) return;
+      yrs.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.year; opt.textContent = r.year + ' 年';
+        ysel.appendChild(opt);
+      });
+    });
+
     // 讀 cache 表（migration 049，refresh_family_lawyer_stats() 月更）
     const [rows, byCourt] = await Promise.all([
       fetchAllTable('family_lawyer_stats_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }]),
       fetchAllTable('family_lawyer_by_court_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }, { col: 'court_name', asc: true }]),
     ]);
-    _flRows = rows;
-    _flByCourt = byCourt;
-    const el = id => document.getElementById(id);
+    _flYearCache[''] = { rows, byCourt };
+    renderFamAll('', rows, byCourt);
+  } catch (e) { console.log('fam lawyers error:', e); }
+}
+
+// 年度切換：抓該年切片（migration 053 年 cache 表），結果留在記憶體、切回不重抓
+async function flYearChange() {
+  const y = document.getElementById('flYearSelect').value;
+  try {
+    if (!_flYearCache[y]) {
+      const tbody = document.getElementById('flTableBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="loading">載入中</td></tr>';
+      const [rows, byCourt] = await Promise.all([
+        fetchAllTable('family_lawyer_year_cache',
+          [{ col: 'family_cases' }, { col: 'name', asc: true }],
+          [{ col: 'year', val: y }]),
+        fetchAllTable('family_lawyer_by_court_year_cache',
+          [{ col: 'family_cases' }, { col: 'name', asc: true }, { col: 'court_name', asc: true }],
+          [{ col: 'year', val: y }]),
+      ]);
+      _flYearCache[y] = { rows, byCourt };
+    }
+    const s = _flYearCache[y];
+    renderFamAll(y, s.rows, s.byCourt);
+  } catch (e) { console.log('fl year change error:', e); }
+}
+
+function renderFamAll(year, rows, byCourt) {
+  _flRows = rows;
+  _flByCourt = byCourt;
+  const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const el = id => document.getElementById(id);
+  const periodLabel = year ? `${year} 年` : '2020 起合計';
 
     // KPI
     if (rows.length) {
       const top = rows[0];
       el('flKpiTop').textContent = top.name;
-      el('flKpiTopSub').textContent = `${Number(top.family_cases).toLocaleString()} 件・${escHtml(top.firm_name || '')}`;
+      el('flKpiTopSub').textContent = `${Number(top.family_cases).toLocaleString()} 件・${top.firm_name || ''}`;
+    } else {
+      el('flKpiTop').textContent = '-';
+      el('flKpiTopSub').textContent = '-';
     }
     el('flKpiCount').textContent = rows.filter(r => r.family_cases >= 10).length.toLocaleString();
     const zhelu = rows.filter(r => isZheluFirm(r.firm_name));
     el('flKpiZhelu').textContent = zhelu.reduce((s, r) => s + Number(r.family_cases), 0).toLocaleString();
+    el('flKpiZheluSub').textContent = periodLabel;
     el('flKpiZheluN').textContent = zhelu.length;
     el('flKpiAny').textContent = rows.length.toLocaleString();
+    el('flKpiAnySub').textContent = year ? '≥ 1 件' : '≥ 3 件';
 
     // TOP 10 律師
     const top10 = rows.slice(0, 10);
@@ -6290,18 +6356,21 @@ async function loadFamLawyers() {
         plugins: { legend: { display: false } } }
     });
 
-    // 法院下拉（按該院家事總量排序）
+    // 法院下拉（按該院家事總量排序；切年度時重建並保留原選擇）
     const courtTotals = {};
     byCourt.forEach(r => { courtTotals[r.court_name] = (courtTotals[r.court_name] || 0) + Number(r.family_cases); });
     const sel = el('flCourtSelect');
+    const prevCourt = sel.value;
+    sel.innerHTML = '<option value="">選擇法院...</option>';
     Object.entries(courtTotals).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => {
       const opt = document.createElement('option');
       opt.value = c; opt.textContent = `${c}（${n.toLocaleString()} 件）`;
       sel.appendChild(opt);
     });
+    if (prevCourt && courtTotals[prevCourt] != null) sel.value = prevCourt;
+    renderFlCourtTable();
 
     renderFlTable();
-  } catch (e) { console.log('fam lawyers error:', e); }
 }
 
 function renderFlCourtTable() {
