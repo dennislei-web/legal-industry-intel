@@ -1218,6 +1218,40 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: ALUMNI (喆律校友會) ==================== -->
+    <div id="tab-alumni" class="tab-content">
+      <div class="kpi-grid" id="alumniKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;"></div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127891; 去向分布</div>
+        <div id="alumniDistBar" style="display:flex;height:24px;border-radius:8px;overflow:hidden;gap:2px;background:var(--bg-main);margin-bottom:8px;"></div>
+        <div id="alumniDistLegend" style="display:flex;flex-wrap:wrap;gap:8px 18px;font-size:0.78rem;color:var(--text-muted);"></div>
+      </div>
+      <div class="card" id="alumniClusterCard" style="margin-bottom:16px;display:none;">
+        <div class="card-title">&#127970; 校友聚集去向（同一去處 2 人以上）</div>
+        <div id="alumniClusters"></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="alumniSearch" placeholder="搜尋姓名、事務所或部門..." oninput="renderAlumniTable()">
+        <select id="alumniCat" onchange="renderAlumniTable()"></select>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128203; 校友名單 <span id="alumniCount" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>姓名</th><th>喆律任職</th><th>年資</th><th>目前狀態</th><th>現在去向</th><th>地區</th><th>近5年案件</th><th>備註</th></tr>
+            </thead>
+            <tbody id="alumniTableBody"><tr><td colspan="8" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          資料來源：喆律人事資料（離職且職稱含「律師」者，任職兩次者以最近一次計）× 法務部律師登錄 × Lawsnote。「轉合署」比對自合署律師名冊，屬離開受雇體系但仍在喆律體系內；法務部登錄異動有時滯，甫離職者可能仍顯示喆律。資料日期：2026-07-08。
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGE-CHANGES (法官異動追蹤) ==================== -->
     <div id="tab-judge-changes" class="tab-content">
       <div class="card" style="margin-bottom:16px;">
@@ -2555,7 +2589,7 @@ const SECTIONS = {
     { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
     { tab: 'changes', label: '異動追蹤' },
-    { tab: 'alumni', label: '喆律校友會', href: 'alumni.html' },
+    { tab: 'alumni', label: '喆律校友會' },
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
@@ -2600,9 +2634,8 @@ function showSection(sec) {
   const tabs = SECTIONS[sec] || [];
   if (tabs.length) {
     bar.style.display = '';
-    bar.innerHTML = tabs.map(t => t.href
-      ? `<a class="tab-btn" id="tabBtn_${t.tab}" href="${t.href}" style="text-decoration:none;display:inline-block;">${t.label}</a>`
-      : `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
+    bar.innerHTML = tabs.map(t =>
+      `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
     showTab(lastTabBySection[sec] || tabs[0].tab);
   } else {
     // 資料來源 / 帳號管理沒有子頁
@@ -2630,6 +2663,7 @@ function showTab(tab) {
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') loadChanges();
+  if (tab === 'alumni') loadAlumni();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'judge-changes') loadJudgeChanges();
@@ -5419,6 +5453,122 @@ function renderChanges() {
     document.getElementById('chgPagination').insertAdjacentHTML('beforeend',
       '<span class="page-info">（已達載入上限 3000 筆，請縮短期間）</span>');
   }
+}
+
+// ============================================================
+// ALUMNI (喆律校友會)
+// ============================================================
+// 類別固定順序與顏色（顏色皆伴隨文字標籤，非 color-alone）
+const ALUMNI_CATS = {
+  cohort:         { label: '轉合署（仍在喆律）', color: 'var(--gold)',   dim: 'rgba(201,168,76,0.15)' },
+  law_firm:       { label: '他所執業',           color: 'var(--blue)',   dim: 'var(--blue-dim)' },
+  own_firm:       { label: '自行開業',           color: 'var(--green)',  dim: 'var(--green-dim)' },
+  inhouse:        { label: '企業／機構法務',     color: 'var(--purple)', dim: 'var(--purple-dim)' },
+  no_office:      { label: '執業中（所未公開）', color: 'var(--orange)', dim: 'var(--orange-dim)' },
+  recent:         { label: '甫離職（登錄未異動）', color: 'var(--red)',  dim: 'var(--red-dim)' },
+  not_registered: { label: '現無律師登錄',       color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' },
+};
+let _alumniRows = null;
+
+function alumniTenure(j, l) {
+  if (!j || !l) return '';
+  const a = new Date(j), b = new Date(l);
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  if (b.getDate() < a.getDate()) m--;
+  if (m < 0) m = 0;
+  const y = Math.floor(m / 12), r = m % 12;
+  return y ? `${y} 年 ${r} 月` : `${r} 月`;
+}
+
+async function loadAlumni() {
+  if (_alumniRows) return;
+  const { data, error } = await db.from('zhelu_alumni').select('*');
+  if (error || !data) {
+    document.getElementById('alumniTableBody').innerHTML =
+      `<tr><td colspan="8" class="loading">載入失敗：${escHtml(error ? error.message : '無資料')}</td></tr>`;
+    return;
+  }
+  _alumniRows = data;
+  renderAlumniSummary();
+  renderAlumniTable();
+}
+
+function alumniSetCat(c) {
+  document.getElementById('alumniCat').value = c;
+  renderAlumniSummary();
+  renderAlumniTable();
+}
+
+function renderAlumniSummary() {
+  const rows = _alumniRows, total = rows.length;
+  const active = document.getElementById('alumniCat').value || '';
+  const cnt = {};
+  rows.forEach(d => cnt[d.category] = (cnt[d.category] || 0) + 1);
+  const order = Object.keys(ALUMNI_CATS).filter(c => cnt[c]);
+
+  document.getElementById('alumniKpis').innerHTML =
+    `<div class="kpi-card" onclick="alumniSetCat('')" style="cursor:pointer;${active===''?'border-color:var(--gold);':''}">
+      <div class="kpi-label">校友總數</div><div class="kpi-value">${total}</div><div class="kpi-sub">位離職律師（不重複）</div></div>` +
+    order.map(c => `<div class="kpi-card" onclick="alumniSetCat('${c}')" style="cursor:pointer;${active===c?'border-color:var(--gold);':''}">
+      <div class="kpi-label"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${ALUMNI_CATS[c].color};margin-right:5px;"></span>${ALUMNI_CATS[c].label}</div>
+      <div class="kpi-value" style="color:${ALUMNI_CATS[c].color};">${cnt[c]}</div></div>`).join('');
+
+  document.getElementById('alumniDistBar').innerHTML = order.map(c =>
+    `<div style="flex:${cnt[c]};min-width:6px;background:${ALUMNI_CATS[c].color};" title="${ALUMNI_CATS[c].label} ${cnt[c]} 人"></div>`).join('');
+  document.getElementById('alumniDistLegend').innerHTML = order.map(c =>
+    `<span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:3px;background:${ALUMNI_CATS[c].color};display:inline-block;"></span>${ALUMNI_CATS[c].label} ${cnt[c]} 人（${Math.round(cnt[c]/total*100)}%）</span>`).join('');
+
+  const sel = document.getElementById('alumniCat');
+  sel.innerHTML = `<option value="">所有去向</option>` +
+    order.map(c => `<option value="${c}">${ALUMNI_CATS[c].label}（${cnt[c]}）</option>`).join('');
+  sel.value = active;
+
+  const byFirm = {};
+  rows.forEach(d => {
+    if (!d.current_firm || d.category === 'cohort' || d.category === 'recent') return;
+    (byFirm[d.current_firm] = byFirm[d.current_firm] || []).push(d.name);
+  });
+  const clusters = Object.entries(byFirm).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  if (clusters.length) {
+    document.getElementById('alumniClusterCard').style.display = '';
+    document.getElementById('alumniClusters').innerHTML = clusters.map(([f, v]) =>
+      `<div style="padding:5px 0;font-size:0.88rem;"><strong>${escHtml(f)}</strong>
+       <span style="color:var(--text-muted)">— ${v.map(escHtml).join('、')}（${v.length} 人）</span></div>`).join('');
+  }
+}
+
+function renderAlumniTable() {
+  const q = document.getElementById('alumniSearch').value.trim().toLowerCase();
+  const cat = document.getElementById('alumniCat').value;
+  let rows = _alumniRows.slice();
+  if (cat) rows = rows.filter(d => d.category === cat);
+  if (q) rows = rows.filter(d =>
+    (d.name || '').toLowerCase().includes(q) ||
+    (d.current_firm || '').toLowerCase().includes(q) ||
+    (d.zhelu_dept || '').toLowerCase().includes(q));
+  rows.sort((a, b) => (b.leave_date || '0') < (a.leave_date || '0') ? -1 : 1);
+  renderAlumniSummary();
+
+  document.getElementById('alumniTableBody').innerHTML = rows.map(d => {
+    const c = ALUMNI_CATS[d.category] || { label: d.category, color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' };
+    const firm = d.category === 'not_registered'
+      ? '<span style="color:var(--text-muted)">（現行名冊查無登錄）</span>'
+      : (d.current_firm ? escHtml(d.current_firm) : '<span style="color:var(--text-muted)">（登錄未填事務所）</span>');
+    const lsn = d.lawsnote_url ? ` <a href="${escHtml(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁" style="color:var(--blue);text-decoration:none;">&#8599;</a>` : '';
+    const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e =>
+      `<span style="display:inline-block;background:var(--ghost-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;font-size:0.7rem;margin:2px 2px 0 0;">${escHtml(e)}</span>`).join('');
+    return `<tr>
+      <td style="white-space:nowrap;"><strong>${escHtml(d.name)}</strong><div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
+      <td style="white-space:nowrap;">${escHtml(d.join_date || '？')} → ${escHtml(d.leave_date || '？')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.zhelu_office || '')} ${escHtml(d.zhelu_dept || '')}</div></td>
+      <td style="white-space:nowrap;">${alumniTenure(d.join_date, d.leave_date) || '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.74rem;font-weight:600;white-space:nowrap;color:${c.color};background:${c.dim};">${c.label}</span></td>
+      <td>${firm}${lsn}${exp ? '<div>' + exp + '</div>' : ''}</td>
+      <td>${escHtml(d.current_region || '—')}</td>
+      <td>${d.lawsnote_cases != null ? d.lawsnote_cases : '—'}</td>
+      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${escHtml(d.note || '')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="loading">無符合條件的校友</td></tr>';
+  document.getElementById('alumniCount').textContent = `顯示 ${rows.length} / ${_alumniRows.length} 位`;
 }
 
 // ============================================================
