@@ -161,7 +161,9 @@ def main(limit=None, dry_run=False):
             if st == 'gone':
                 # 名冊已移除（註銷/停止登錄）。甫離職(recent)本來就在等這個訊號 → 自動轉；
                 # 其他分類（尤其 cohort）除名是大事，只報告請人工確認
-                if a['category'] == 'recent':
+                if a['category'] == 'not_registered':
+                    pass  # 已是無登錄，moj_lawyers 舊列殘留造成的重複訊號，不再報告
+                elif a['category'] == 'recent':
                     upd = {'category': 'not_registered', 'current_firm': None,
                            'current_region': None,
                            'updated_at': datetime.now(timezone.utc).isoformat()}
