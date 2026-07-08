@@ -2974,7 +2974,7 @@ async function loadFirmSizeChart() {
       return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
         <span style="font-size:0.85rem;font-weight:700;color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'};min-width:20px;text-align:center;">${i + 1}</span>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(f.firm_name)}</div>
+          <div style="font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${firmLink(f.firm_name)}</div>
           <div style="margin-top:3px;height:4px;border-radius:2px;background:var(--border);">
             <div style="height:100%;width:${barW}%;border-radius:2px;background:rgba(79,142,247,0.6);"></div>
           </div>
@@ -3074,7 +3074,7 @@ async function loadLawyers() {
 
     return `<tr>
       <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${FIRM_LEADERS[l.name] ? ' <span title="' + escHtml(FIRM_LEADERS[l.name]) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
-      <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${escHtml(l.firm_name ? l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1') : '-')}</td>
+      <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${l.firm_name ? firmLink(l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1')) : '-'}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
       <td style="text-align:center;">${hasPractice ? '<span style="color:var(--green);font-weight:600;">&#10003;</span>' : '<span style="color:var(--text-muted);">-</span>'}</td>
@@ -4072,8 +4072,8 @@ function renderOffices() {
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="font-size:0.82rem;">${(() => {
         const ls = getFirmLeaders(o.firm_name);
-        if (ls.length) return ls.map(n => `${renderLeaderBadge(n)} ${escHtml(n)}`).join('<br>');
-        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，推定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${escHtml(o._solo_name)} <span style="color:var(--text-muted);font-size:0.72rem;">一人所</span></span>`;
+        if (ls.length) return ls.map(n => `${renderLeaderBadge(n)} ${lawyerLink(n)}`).join('<br>');
+        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，推定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${lawyerLink(o._solo_name)} <span style="color:var(--text-muted);font-size:0.72rem;">一人所</span></span>`;
         return '<span style="color:var(--text-muted);">-</span>';
       })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
@@ -4229,13 +4229,13 @@ async function showFirmDetail(firmName) {
       <ul style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.6;">
         ${exJudicial.map(o => {
           const parts = o.split('｜');
-          return `<li><strong>${escHtml(parts[0] || '')}</strong>${parts[1] ? ` — <span style="color:var(--orange);">${escHtml(parts[1])}</span>` : ''}${parts[2] ? `<span style="color:var(--text-muted);">（${escHtml(parts[2])}）</span>` : ''}</li>`;
+          return `<li><strong>${lawyerLink(parts[0] || '', 'font-weight:700;')}</strong>${parts[1] ? ` — <span style="color:var(--orange);">${escHtml(parts[1])}</span>` : ''}${parts[2] ? `<span style="color:var(--text-muted);">（${escHtml(parts[2])}）</span>` : ''}</li>`;
         }).join('')}
       </ul>
     </div>
     ` : ''}
 
-    ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${n} (${c}人)`).join('、')}</div>` : ''}
+    ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${firmLink(n, 'color:var(--text-muted);')} (${c}人)`).join('、')}</div>` : ''}
 
     <!-- Charts -->
     <div class="grid-2" style="margin-bottom:12px;">
@@ -4279,7 +4279,7 @@ async function showFirmDetail(firmName) {
             const contact = [l.email, l.tel].filter(Boolean).join(' / ') || '-';
             const isLeader = FIRM_LEADERS[l.name];
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
-              <td><strong>${escHtml(l.name)}</strong>${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}</td>
+              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}</td>
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
@@ -4431,7 +4431,7 @@ async function loadFirmLitMoves(firmName) {
         .in('name', moves.map(m => m.name));
       (st || []).forEach(s => { if (!s.name_ambiguous) caseMap[s.name] = s.official_cases_5yr || 0; });
     } catch (e) { /* 案量補不到就只列名字 */ }
-    const fmt = m => `${escHtml(m.name)}${caseMap[m.name] != null ? `（${Number(caseMap[m.name]).toLocaleString()} 件）` : ''}<span style="color:var(--text-muted);font-size:0.7rem;"> ${m.date}</span>`;
+    const fmt = m => `${lawyerLink(m.name)}${caseMap[m.name] != null ? `（${Number(caseMap[m.name]).toLocaleString()} 件）` : ''}<span style="color:var(--text-muted);font-size:0.7rem;"> ${m.date}</span>`;
     const movesIn = moves.filter(m => m.dir === 'in'), movesOut = moves.filter(m => m.dir === 'out');
     const inCases = movesIn.reduce((a, m) => a + (caseMap[m.name] || 0), 0);
     const outCases = movesOut.reduce((a, m) => a + (caseMap[m.name] || 0), 0);
@@ -4538,6 +4538,7 @@ function renderFirmLitBody(mode) {
       },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        ...chartNameClick(n => showLawyerDetail(n, '')),
         plugins: { legend: { display: false } },
         scales: { x: { ticks: { color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
       }
@@ -5012,7 +5013,7 @@ async function renderRegionTopLawyers() {
     const notInMoj = isLeader && typeof FIRM_LEADERS_NOT_IN_MOJ !== 'undefined' && FIRM_LEADERS_NOT_IN_MOJ.has(r.name);
     const crown = isLeader ? `<span title="${escHtml(FIRM_LEADERS[r.name])}" style="cursor:help;">${notInMoj ? '⚠️' : '👑'}</span> ` : '';
     const firm = firmMap[r.name] || (isLeader ? (FIRM_LEADERS[r.name].split('｜')[0] || '') : '');
-    const firmHtml = firm ? `<span style="color:var(--text-muted);font-size:0.72rem;margin-left:5px;">${escHtml(firm)}</span>` : '';
+    const firmHtml = firm ? `<span style="font-size:0.72rem;margin-left:5px;">${firmLink(firm, 'color:var(--text-muted);')}</span>` : '';
     const nm = `<a href="#" onclick="showLawyerDetail('${escHtml(r.name).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;font-weight:${isLeader ? 600 : 400};">${escHtml(r.name)}</a>`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border);">
       <span style="width:18px;color:var(--text-muted);font-size:0.75rem;text-align:right;flex-shrink:0;">${i + 1}</span>
@@ -5434,9 +5435,9 @@ function renderChanges() {
       const meta = CHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
       let detail = '';
       if (r.change_type === 'firm_change') {
-        detail = `${escHtml(r.old_office || '（未登錄）')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_office || '（未登錄）')}`;
+        detail = `${r.old_office ? firmLink(r.old_office) : '（未登錄）'} <span style="color:var(--gold);">→</span> ${r.new_office ? firmLink(r.new_office) : '（未登錄）'}`;
       } else if (r.change_type === 'new_lawyer') {
-        detail = `加入 ${escHtml(r.new_office || '（未登錄事務所）')}`;
+        detail = `加入 ${r.new_office ? firmLink(r.new_office) : '（未登錄事務所）'}`;
       } else {
         detail = `${escHtml(r.old_state || '-')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_state || '-')}`;
       }
@@ -5532,8 +5533,8 @@ function renderAlumniSummary() {
   if (clusters.length) {
     document.getElementById('alumniClusterCard').style.display = '';
     document.getElementById('alumniClusters').innerHTML = clusters.map(([f, v]) =>
-      `<div style="padding:5px 0;font-size:0.88rem;"><strong>${escHtml(f)}</strong>
-       <span style="color:var(--text-muted)">— ${v.map(escHtml).join('、')}（${v.length} 人）</span></div>`).join('');
+      `<div style="padding:5px 0;font-size:0.88rem;"><strong>${firmLink(f, 'font-weight:700;')}</strong>
+       <span style="color:var(--text-muted)">— ${v.map(n => lawyerLink(n, 'color:var(--text-muted);')).join('、')}（${v.length} 人）</span></div>`).join('');
   }
 }
 
@@ -5553,12 +5554,12 @@ function renderAlumniTable() {
     const c = ALUMNI_CATS[d.category] || { label: d.category, color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' };
     const firm = d.category === 'not_registered'
       ? '<span style="color:var(--text-muted)">（現行名冊查無登錄）</span>'
-      : (d.current_firm ? escHtml(d.current_firm) : '<span style="color:var(--text-muted)">（登錄未填事務所）</span>');
+      : (d.current_firm ? firmLink(d.current_firm) : '<span style="color:var(--text-muted)">（登錄未填事務所）</span>');
     const lsn = d.lawsnote_url ? ` <a href="${escHtml(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁" style="color:var(--blue);text-decoration:none;">&#8599;</a>` : '';
     const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e =>
       `<span style="display:inline-block;background:var(--ghost-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;font-size:0.7rem;margin:2px 2px 0 0;">${escHtml(e)}</span>`).join('');
     return `<tr>
-      <td style="white-space:nowrap;"><strong>${escHtml(d.name)}</strong><div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
+      <td style="white-space:nowrap;">${d.category === 'not_registered' ? `<strong>${escHtml(d.name)}</strong>` : lawyerLink(d.name, 'font-weight:700;')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.last_title || '')}</div></td>
       <td style="white-space:nowrap;">${escHtml(d.join_date || '？')} → ${escHtml(d.leave_date || '？')}<div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.zhelu_office || '')} ${escHtml(d.zhelu_dept || '')}</div></td>
       <td style="white-space:nowrap;">${alumniTenure(d.join_date, d.leave_date) || '<span style="color:var(--text-muted)">—</span>'}</td>
       <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.74rem;font-weight:600;white-space:nowrap;color:${c.color};background:${c.dim};">${c.label}</span></td>
@@ -5776,6 +5777,24 @@ function escHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// 共用：律師名/事務所名 → 個人介紹 modal 連結（inner 可自帶已轉義的 HTML）
+function _nameArg(n) { return escHtml(String(n)).replace(/'/g, "\\'"); }
+function lawyerLink(name, style = '', inner = null) {
+  if (!name) return '';
+  return `<a href="#" onclick="showLawyerDetail('${_nameArg(name)}','');return false;" style="color:var(--blue);text-decoration:none;${style}">${inner != null ? inner : escHtml(name)}</a>`;
+}
+function firmLink(name, style = '', inner = null) {
+  if (!name) return '';
+  return `<a href="#" onclick="showFirmDetail('${_nameArg(name)}');return false;" style="color:var(--blue);text-decoration:none;${style}">${inner != null ? inner : escHtml(name)}</a>`;
+}
+// 圖表 y 軸是人名/所名時的點擊行為（Chart.js options 共用）
+function chartNameClick(fn) {
+  return {
+    onClick: (e, els, chart) => { if (els?.length) fn(chart.data.labels[els[0].index]); },
+    onHover: (e, els) => { if (e?.native?.target) e.native.target.style.cursor = els?.length ? 'pointer' : 'default'; },
+  };
 }
 
 function formatDate(dateStr) {
@@ -6503,6 +6522,7 @@ async function loadFirmMap() {
       },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        ...chartNameClick(n => showFirmDetail(n)),
         plugins: { legend: { display: false } },
         scales: {
           x: { ticks: { color: '#8899aa' }, beginAtZero: true },
@@ -6519,7 +6539,7 @@ async function loadFirmMap() {
     const z = isZheluFirm(r.firm_name);
     return `<tr${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
       <td>${r.rank}</td>
-      <td>${z ? '<strong>' : ''}${escHtml(r.firm_name)}${z ? '</strong>' : ''}</td>
+      <td>${firmLink(r.firm_name, z ? 'font-weight:700;' : '')}</td>
       <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
       <td style="text-align:right;">${r.lawyer_count}</td>
     </tr>`;
@@ -6582,8 +6602,8 @@ function renderFamAll(year, rows, byCourt) {
     // KPI
     if (rows.length) {
       const top = rows[0];
-      el('flKpiTop').textContent = top.name;
-      el('flKpiTopSub').textContent = `${Number(top.family_cases).toLocaleString()} 件・${top.firm_name || ''}`;
+      el('flKpiTop').innerHTML = lawyerLink(top.name, 'color:inherit;');
+      el('flKpiTopSub').innerHTML = `${Number(top.family_cases).toLocaleString()} 件・${top.firm_name ? firmLink(top.firm_name, 'color:inherit;') : ''}`;
     } else {
       el('flKpiTop').textContent = '-';
       el('flKpiTopSub').textContent = '-';
@@ -6602,11 +6622,11 @@ function renderFamAll(year, rows, byCourt) {
       ${top10.map((r, i) => {
         const barW = Math.round(r.family_cases / top10[0].family_cases * 100);
         const firm = r.firm_name
-          ? `<span class="badge" style="background:${isZheluFirm(r.firm_name) ? 'var(--green-dim)' : 'var(--ghost-bg)'};color:${isZheluFirm(r.firm_name) ? 'var(--green)' : 'var(--text-muted)'};font-size:0.7rem;">${escHtml(r.firm_name)}</span>`
+          ? firmLink(r.firm_name, '', `<span class="badge" style="background:${isZheluFirm(r.firm_name) ? 'var(--green-dim)' : 'var(--ghost-bg)'};color:${isZheluFirm(r.firm_name) ? 'var(--green)' : 'var(--text-muted)'};font-size:0.7rem;">${escHtml(r.firm_name)}</span>`)
           : (r.firm_ambiguous ? '<span class="badge" style="background:var(--ghost-bg);color:var(--text-muted);font-size:0.7rem;">同名多筆</span>' : '');
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
           <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
-          <span style="min-width:64px;font-weight:600;">${escHtml(r.name)}</span>
+          <span style="min-width:64px;font-weight:600;">${lawyerLink(r.name, 'font-weight:600;')}</span>
           <span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${firm}</span>
           <span style="width:${Math.max(barW, 4) * 0.4}%;max-width:25%;height:8px;background:rgba(201,168,76,0.55);border-radius:4px;"></span>
           <span style="min-width:48px;text-align:right;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</span>
@@ -6628,6 +6648,7 @@ function renderFamAll(year, rows, byCourt) {
           backgroundColor: topFirms.map(r => isZheluFirm(r[0]) ? 'rgba(76,175,130,0.75)' : 'rgba(69,183,209,0.55)'),
           borderRadius: 4 }] },
       options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        ...chartNameClick(n => showFirmDetail(n)),
         scales: { x: { ticks: { color: txtColor }, grid: { color: 'rgba(255,255,255,0.05)' } },
                   y: { ticks: { color: txtColor, font: { size: 10 } }, grid: { display: false } } },
         plugins: { legend: { display: false } } }
@@ -6666,8 +6687,8 @@ function renderFlCourtTable() {
     const zhelu = isZheluFirm(firm);
     return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
       <td style="color:var(--text-muted);">${i + 1}</td>
-      <td><strong>${escHtml(r.name)}</strong>${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
-      <td style="font-size:0.85rem;">${escHtml(firm)}</td>
+      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td style="font-size:0.85rem;">${firm && firm !== '（同名多筆）' ? firmLink(firm) : escHtml(firm)}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="4" class="empty-state"><div class="msg">該法院無資料</div></td></tr>';
@@ -6702,10 +6723,10 @@ function renderFlTable() {
   }
   tbody.innerHTML = shown.map(r => {
     const zhelu = isZheluFirm(r.firm_name);
-    const firm = r.firm_name ? escHtml(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
+    const firm = r.firm_name ? firmLink(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
     const lastYm = r.last_ym ? `${r.last_ym.slice(0, 4)}-${r.last_ym.slice(4)}` : '-';
     return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
-      <td><strong>${escHtml(r.name)}</strong>${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
       <td style="font-size:0.85rem;">${firm}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
       <td style="text-align:center;">${Math.round(r.family_share * 100)}%</td>
