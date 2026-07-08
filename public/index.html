@@ -219,6 +219,9 @@
 
     /* ===================== TABLE ===================== */
     .table-wrap { overflow-x: auto; }
+    /* admin 標所長按鈕：平常隱藏，滑到該列才浮現（避免整份清單看起來都是所長） */
+    .leader-mark-btn { visibility: hidden; }
+    tr:hover .leader-mark-btn { visibility: visible; }
 
     table { width: 100%; border-collapse: collapse; }
     th { padding: 10px 12px; text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); background: var(--bg-row); }
@@ -4383,8 +4386,8 @@ async function showFirmDetail(firmName) {
             const jsName = escHtml(l.name).replace(/'/g, "\\'");
             const jsFirm = escHtml(firmName).replace(/'/g, "\\'");
             const adminBtn = !isAdmin ? '' : (fromOverride
-              ? ` <a href="#" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
-              : (!isLeader ? ` <a href="#" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
+              ? ` <a href="#" class="leader-mark-btn" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
+              : (!isLeader ? ` <a href="#" class="leader-mark-btn" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
               <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${adminBtn}</td>
               <td>${l.sex || '-'}</td>
