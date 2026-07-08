@@ -181,6 +181,13 @@
    ```
    若回傳空陣列 → 要麼刪除該所長，要麼加入 `FIRM_LEADERS_NOT_IN_MOJ`
 
+### 一人所自動認定所長（mig 060，2026-07-08 雷皓明拍板）
+
+- 名稱含「事務所」、分所合併（`firmKeyRe`）後全所僅 1 位、狀態「正常」的律師，**系統自動視同所長**（約 3,700 家）。這是 DB 事實推定，不經人工查證，屬使用者明確決策。
+- 資料源：view `moj_solo_firm_lawyers`（firm_key/name/firm_name）；前端 `ensureSoloFirms()` 載一份 Map，`leaderInfo(name, firmName)` 是所有 👑 顯示點的統一入口（白名單優先）。
+- 顯示上與人工查證的 `FIRM_LEADERS` **不做區別**（同樣 👑＋「所長」，僅 tooltip 註明一人所），涵蓋：律師列表、事務所列表、事務所 modal 律師清單、律師 modal、地區排行。
+- 多人所仍走 `FIRM_LEADERS` 白名單＋上述驗證規則，不受此規則影響。
+
 ## Windows console encoding 注意
 
 - Python print 中文到 stdout 會顯示亂碼（CP950），**不代表 DB 寫入失敗**

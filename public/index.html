@@ -2554,6 +2554,7 @@ async function showDashboard() {
     isAdmin = profile?.role === 'admin';
     document.getElementById('navBtn_admin').style.display = isAdmin ? '' : 'none';
   });
+  ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
 
   // 初始化導覽（預設律師區）
   showSection('lawyer');
@@ -3021,6 +3022,7 @@ async function loadLawyers() {
   lawyerTotal = count || 0;
 
   if (error) { console.error('lawyers_combined error:', error); return; }
+  await ensureSoloFirms(); // 一人所所長判定需要對照表
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
@@ -3072,8 +3074,9 @@ async function loadLawyers() {
     // 全國執業標記
     const hasPractice = l.practice_start_date;
 
+    const linfo = leaderInfo(l.name, l.firm_name);
     return `<tr>
-      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${FIRM_LEADERS[l.name] ? ' <span title="' + escHtml(FIRM_LEADERS[l.name]) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${linfo ? ' <span title="' + escHtml(linfo) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${l.firm_name ? firmLink(l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1')) : '-'}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
@@ -3705,6 +3708,46 @@ function renderLeaderBadge(name, inline = false) {
   return '<span style="color:var(--gold);">👑</span>';
 }
 
+// ============================================================
+// 一人所自動推定所長（migration 060：moj_solo_firm_lawyers view）
+// 口徑：名稱含「事務所」、分所合併（同 firmKeyRe）後全所僅 1 位且狀態「正常」
+// 系統一律視同所長，與人工 FIRM_LEADERS 白名單同等顯示（白名單優先）
+// ============================================================
+const SOLO_FIRM_KEY_RE = /^(.+?(?:法律|律師)事務所)/;
+function soloFirmKey(firmName) {
+  const m = (firmName || '').match(SOLO_FIRM_KEY_RE);
+  return m ? m[1] : (firmName || '');
+}
+let SOLO_FIRM_MAP = null;   // firm_key -> 唯一律師姓名
+let _soloFirmLoading = null;
+function ensureSoloFirms() {
+  if (!_soloFirmLoading) {
+    _soloFirmLoading = (async () => {
+      const map = new Map();
+      try {
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await db.from('moj_solo_firm_lawyers')
+            .select('firm_key,name').range(from, from + 999);
+          if (error) throw error;
+          (data || []).forEach(r => map.set(r.firm_key, r.name));
+          if (!data || data.length < 1000) break;
+        }
+        SOLO_FIRM_MAP = map;
+      } catch (e) {
+        console.log('solo firm map load error:', e);
+        _soloFirmLoading = null; // 載入失敗允許下次重試
+      }
+    })();
+  }
+  return _soloFirmLoading;
+}
+// 統一入口：回傳「事務所｜頭銜」或 null；需先 ensureSoloFirms()（未載入時僅回白名單）
+function leaderInfo(name, firmName) {
+  if (FIRM_LEADERS[name]) return FIRM_LEADERS[name];
+  if (!SOLO_FIRM_MAP || !name || !firmName || !/事務所/.test(firmName)) return null;
+  return SOLO_FIRM_MAP.get(soloFirmKey(firmName)) === name ? `${firmName}｜所長` : null;
+}
+
 // 雷所名單 (2025/11/27 維護)
 const BLACKLIST = {
   '德勤': '合夥律師只會畫餅，案源不足，實習只做簡報，會追回已發加班費',
@@ -4021,15 +4064,14 @@ async function loadOfficeAgeSeniority() {
     }
   }
   // 附加到 allOffices
+  await ensureSoloFirms();
   for (const o of allOffices) {
     const ageArr = firmAgeMap[o.firm_name];
     const senArr = firmSenMap[o.firm_name];
     o._avg_age = ageArr ? +(ageArr.reduce((a, b) => a + b, 0) / ageArr.length).toFixed(1) : null;
     o._avg_sen = senArr ? +(senArr.reduce((a, b) => a + b, 0) / senArr.length).toFixed(1) : null;
-    // 一人所推定所長：僅限「事務所」（排除法人/公司），且 cache 人數與 MOJ 名單皆恰為 1
-    const names = firmNamesMap[o.firm_name];
-    o._solo_name = (/事務所/.test(o.firm_name) && Number(o.lawyer_count) === 1 && names && names.length === 1)
-      ? names[0] : null;
+    // 一人所推定所長：口徑統一走 moj_solo_firm_lawyers view（mig 060）
+    o._solo_name = (SOLO_FIRM_MAP && /事務所/.test(o.firm_name)) ? (SOLO_FIRM_MAP.get(soloFirmKey(o.firm_name)) || null) : null;
   }
   renderOffices();
 }
@@ -4073,7 +4115,7 @@ function renderOffices() {
       <td style="font-size:0.82rem;">${(() => {
         const ls = getFirmLeaders(o.firm_name);
         if (ls.length) return ls.map(n => `${renderLeaderBadge(n)} ${lawyerLink(n)}`).join('<br>');
-        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，推定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${lawyerLink(o._solo_name)} <span style="color:var(--text-muted);font-size:0.72rem;">一人所</span></span>`;
+        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，系統認定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${lawyerLink(o._solo_name)}</span>`;
         return '<span style="color:var(--text-muted);">-</span>';
       })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
@@ -4270,14 +4312,17 @@ async function showFirmDetail(firmName) {
           <thead><tr>
             <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th>地區</th><th>聯繫</th>
           </tr></thead>
-          <tbody>${[...allLawyers].sort((a, b) => {
-            const aL = FIRM_LEADERS[a.name] ? 0 : 1;
-            const bL = FIRM_LEADERS[b.name] ? 0 : 1;
+          <tbody>${(() => {
+            // 一人所：唯一「正常」狀態律師即所長（口徑同 mig 060 view，這裡用手上名單直接判）
+            const soloName = (/事務所/.test(firmName) && total === 1 && allLawyers[0].state_desc === '正常') ? allLawyers[0].name : null;
+            return [...allLawyers].sort((a, b) => {
+            const aL = (FIRM_LEADERS[a.name] || a.name === soloName) ? 0 : 1;
+            const bL = (FIRM_LEADERS[b.name] || b.name === soloName) ? 0 : 1;
             return aL - bL;
           }).map(l => {
             const age = l.birth_year && l.birth_year < 200 ? `民${l.birth_year} (${ROC_YEAR - l.birth_year}歲)` : '-';
             const contact = [l.email, l.tel].filter(Boolean).join(' / ') || '-';
-            const isLeader = FIRM_LEADERS[l.name];
+            const isLeader = FIRM_LEADERS[l.name] || (l.name === soloName ? `${firmName}｜所長` : null);
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
               <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}</td>
               <td>${l.sex || '-'}</td>
@@ -4286,7 +4331,8 @@ async function showFirmDetail(firmName) {
               <td>${escHtml(l.main_region || '-')}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escHtml(contact)}</td>
             </tr>`;
-          }).join('')}</tbody>
+          }).join('');
+          })()}</tbody>
         </table>
       </div>
     </div>
@@ -4742,6 +4788,7 @@ async function showLawyerDetail(name, certNumber) {
     tasks.push(db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle()
       .then(r => { moj = r.data; }));
   }
+  tasks.push(ensureSoloFirms()); // 一人所所長判定
   await Promise.all(tasks);
 
   // 年資計算
@@ -4763,15 +4810,16 @@ async function showLawyerDetail(name, certNumber) {
   if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
 
-  // 負責人標記
-  const leaderBadge = FIRM_LEADERS[name] ? (() => {
-    const notInMOJ = FIRM_LEADERS_NOT_IN_MOJ.has(name);
+  // 負責人標記（人工白名單優先，否則一人所自動認定）
+  const linfo = leaderInfo(name, l.firm_name);
+  const leaderBadge = linfo ? (() => {
+    const notInMOJ = FIRM_LEADERS[name] ? FIRM_LEADERS_NOT_IN_MOJ.has(name) : false;
     const icon = notInMOJ ? '⚠️' : '👑';
     const color = notInMOJ ? 'var(--text-muted)' : 'var(--gold)';
     const tip = notInMOJ
-      ? FIRM_LEADERS[name] + '\n⚠️ 此律師未登錄於 MOJ 現役律師名冊'
-      : FIRM_LEADERS[name];
-    return `<span style="color:${color};font-size:0.85rem;margin-left:8px;" title="${escHtml(tip)}">${icon} ${escHtml(FIRM_LEADERS[name].split('｜')[1] || '負責人')}</span>`;
+      ? linfo + '\n⚠️ 此律師未登錄於 MOJ 現役律師名冊'
+      : linfo;
+    return `<span style="color:${color};font-size:0.85rem;margin-left:8px;" title="${escHtml(tip)}">${icon} ${escHtml(linfo.split('｜')[1] || '負責人')}</span>`;
   })() : '';
 
   // 事務所連結
@@ -4999,20 +5047,22 @@ async function renderRegionTopLawyers() {
   const rows = data || [];
   if (!box) return;
   if (!rows.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">此地區／案類無資料</div>'; return; }
-  // 批次撈事務所（同名可能多所，取第一筆；配 FIRM_LEADERS 標所長）
+  // 批次撈事務所（同名可能多所，取第一筆；配 FIRM_LEADERS + 一人所自動認定標所長）
   const firmMap = {};
   try {
     const { data: fr } = await db.from('lawyers_combined').select('name,firm_name').in('name', rows.map(r => r.name));
     (fr || []).forEach(x => { if (x.firm_name && !firmMap[x.name]) firmMap[x.name] = x.firm_name; });
   } catch (e) { /* 事務所撈失敗不影響排行 */ }
+  await ensureSoloFirms();
   const max = Number(rows[0].cases) || 1;
   box.innerHTML = rows.map((r, i) => {
     const cases = Number(r.cases);
     const w = Math.max(3, Math.round(cases / max * 100));
-    const isLeader = !!(typeof FIRM_LEADERS !== 'undefined' && FIRM_LEADERS[r.name]);
-    const notInMoj = isLeader && typeof FIRM_LEADERS_NOT_IN_MOJ !== 'undefined' && FIRM_LEADERS_NOT_IN_MOJ.has(r.name);
-    const crown = isLeader ? `<span title="${escHtml(FIRM_LEADERS[r.name])}" style="cursor:help;">${notInMoj ? '⚠️' : '👑'}</span> ` : '';
-    const firm = firmMap[r.name] || (isLeader ? (FIRM_LEADERS[r.name].split('｜')[0] || '') : '');
+    const linfo = leaderInfo(r.name, firmMap[r.name]);
+    const isLeader = !!linfo;
+    const notInMoj = !!(FIRM_LEADERS[r.name] && FIRM_LEADERS_NOT_IN_MOJ.has(r.name));
+    const crown = isLeader ? `<span title="${escHtml(linfo)}" style="cursor:help;">${notInMoj ? '⚠️' : '👑'}</span> ` : '';
+    const firm = firmMap[r.name] || (FIRM_LEADERS[r.name] ? (FIRM_LEADERS[r.name].split('｜')[0] || '') : '');
     const firmHtml = firm ? `<span style="font-size:0.72rem;margin-left:5px;">${firmLink(firm, 'color:var(--text-muted);')}</span>` : '';
     const nm = `<a href="#" onclick="showLawyerDetail('${escHtml(r.name).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;font-weight:${isLeader ? 600 : 400};">${escHtml(r.name)}</a>`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border);">
