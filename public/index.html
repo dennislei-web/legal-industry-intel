@@ -2555,6 +2555,7 @@ const SECTIONS = {
     { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
     { tab: 'changes', label: '異動追蹤' },
+    { tab: 'alumni', label: '喆律校友會', href: 'alumni.html' },
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
@@ -2599,8 +2600,9 @@ function showSection(sec) {
   const tabs = SECTIONS[sec] || [];
   if (tabs.length) {
     bar.style.display = '';
-    bar.innerHTML = tabs.map(t =>
-      `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
+    bar.innerHTML = tabs.map(t => t.href
+      ? `<a class="tab-btn" id="tabBtn_${t.tab}" href="${t.href}" style="text-decoration:none;display:inline-block;">${t.label}</a>`
+      : `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
     showTab(lastTabBySection[sec] || tabs[0].tab);
   } else {
     // 資料來源 / 帳號管理沒有子頁

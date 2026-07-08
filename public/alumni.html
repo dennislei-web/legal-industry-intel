@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>喆律校友會｜法律產業情報</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-main:    #020b18;
+      --bg-card:    #0a1628;
+      --bg-row:     #111b2e;
+      --bg-hover:   #16253d;
+      --border:     #1e3050;
+      --border-light: #243a5e;
+      --gold:       #c9a84c;
+      --gold-light: #e8c97a;
+      --text:       #e0e0e0;
+      --text-muted: #8899aa;
+      --blue:       #4f8ef7;
+      --blue-dim:   rgba(79,142,247,0.15);
+      --green:      #4caf82;
+      --green-dim:  rgba(76,175,130,0.15);
+      --red:        #e05c5c;
+      --red-dim:    rgba(224,92,92,0.15);
+      --orange:     #e0954a;
+      --orange-dim: rgba(224,149,74,0.15);
+      --purple:     #9b7ed8;
+      --purple-dim: rgba(155,126,216,0.15);
+      --gold-dim:   rgba(201,168,76,0.15);
+      --gray-dim:   rgba(136,153,170,0.15);
+      --header-bg:  rgba(10,22,40,0.95);
+      --ghost-bg: rgba(255,255,255,0.07);
+      --ghost-hover-bg: rgba(255,255,255,0.12);
+    }
+    [data-theme="light"] {
+      --bg-main:    #f5f6fa;
+      --bg-card:    #ffffff;
+      --bg-row:     #f0f2f5;
+      --bg-hover:   #e8eaf0;
+      --border:     #d0d5dd;
+      --border-light: #e0e4eb;
+      --gold:       #a3842a;
+      --gold-light: #8b6f1e;
+      --text:       #1a1a2e;
+      --text-muted: #6b7280;
+      --blue:       #2563eb;
+      --blue-dim:   rgba(37,99,235,0.1);
+      --green:      #15803d;
+      --green-dim:  rgba(21,128,61,0.12);
+      --red:        #dc2626;
+      --red-dim:    rgba(220,38,38,0.1);
+      --orange:     #d97706;
+      --orange-dim: rgba(217,119,6,0.1);
+      --purple:     #7c3aed;
+      --purple-dim: rgba(124,58,237,0.1);
+      --gold-dim:   rgba(163,132,42,0.12);
+      --gray-dim:   rgba(107,114,128,0.12);
+      --header-bg:  rgba(255,255,255,0.95);
+      --ghost-bg: rgba(0,0,0,0.04);
+      --ghost-hover-bg: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif;
+      background: var(--bg-main); color: var(--text); min-height: 100vh; font-size: 14px;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-main); }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+
+    header {
+      position: sticky; top: 0; z-index: 50; background: var(--header-bg);
+      backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; padding: 12px 24px;
+    }
+    header h1 { font-size: 1.1rem; color: var(--gold-light); font-weight: 700; }
+    header .spacer { flex: 1; }
+    .ghost-btn {
+      background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text);
+      padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; text-decoration: none;
+    }
+    .ghost-btn:hover { background: var(--ghost-hover-bg); }
+
+    main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 60px; }
+
+    #gate { text-align: center; padding: 80px 20px; color: var(--text-muted); display: none; }
+    #gate a { color: var(--blue); }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; cursor: pointer; transition: border-color .15s;
+    }
+    .card:hover, .card.active { border-color: var(--gold); }
+    .card .k { font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+    .card .k .dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex: none; }
+    .card .v { font-size: 1.7rem; font-weight: 700; margin-top: 4px; }
+    .card .s { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+    .distbar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; gap: 2px; margin: 4px 0 6px; background: var(--bg-main); }
+    .distbar .seg { min-width: 6px; position: relative; }
+    .distlegend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 22px; }
+    .distlegend .li { display: flex; align-items: center; gap: 6px; }
+    .distlegend .dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+    .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 20px; }
+    .panel h2 { font-size: 0.95rem; color: var(--gold-light); margin-bottom: 10px; }
+    .panel .hint { font-size: 0.78rem; color: var(--text-muted); }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+    .toolbar input {
+      background: var(--bg-row); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 7px 12px; font-size: 0.85rem; min-width: 200px;
+    }
+    .chip {
+      background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text-muted);
+      border-radius: 20px; padding: 5px 12px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 6px;
+    }
+    .chip .dot { width: 8px; height: 8px; border-radius: 3px; display: inline-block; }
+    .chip.active { color: var(--text); border-color: var(--gold); background: var(--gold-dim); }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 0.75rem; color: var(--text-muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 0.85rem; }
+    tr:hover td { background: var(--bg-hover); }
+    .name { font-weight: 700; white-space: nowrap; }
+    .sub { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 12px; font-size: 0.74rem; font-weight: 600; white-space: nowrap; }
+    .tagx { display: inline-block; background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text-muted); border-radius: 10px; padding: 1px 7px; font-size: 0.7rem; margin: 1px 2px 0 0; }
+    a.ext { color: var(--blue); text-decoration: none; }
+    a.ext:hover { text-decoration: underline; }
+    .tablewrap { overflow-x: auto; }
+    .foot { font-size: 0.75rem; color: var(--text-muted); line-height: 1.7; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎓 喆律校友會</h1>
+    <span class="spacer"></span>
+    <a class="ghost-btn" href="index.html">← 回情報站</a>
+    <button class="ghost-btn" onclick="toggleTheme()">☀/☾</button>
+  </header>
+  <main>
+    <div id="gate">載入中…</div>
+    <div id="app" style="display:none;">
+      <div class="cards" id="cards"></div>
+      <div class="distbar" id="distbar"></div>
+      <div class="distlegend" id="distlegend"></div>
+
+      <div class="panel" id="clusterPanel" style="display:none;">
+        <h2>🏢 校友聚集去向（同一去處 2 人以上）</h2>
+        <div id="clusters"></div>
+      </div>
+
+      <div class="panel">
+        <h2>校友名單</h2>
+        <div class="toolbar">
+          <input id="q" placeholder="搜尋姓名 / 事務所…" oninput="render()">
+          <div id="chips" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr>
+              <th>姓名</th><th>喆律任職</th><th>年資</th><th>目前狀態</th><th>現在去向</th><th>地區</th><th>近5年案件</th><th>備註</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="hint" id="countHint" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="foot">
+        資料來源：喆律人事資料（離職且職稱含「律師」者）× 法務部律師登錄資料 × Lawsnote。<br>
+        「轉合署」比對自合署律師名冊，屬離開受雇體系但仍在喆律體系內。MOJ 登錄異動有時滯，甫離職者可能仍顯示喆律。<br>
+        資料日期：2026-07-08。本頁僅限登入使用者瀏覽。
+      </div>
+    </div>
+  </main>
+
+<script>
+const SUPABASE_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_NvTWZM6IGgc_Jn8iCXFvaA_QnvJsstM';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') ? '' : 'light';
+  if (next) html.setAttribute('data-theme', 'light'); else html.removeAttribute('data-theme');
+  localStorage.setItem('theme', next || 'dark');
+}
+if (localStorage.getItem('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light');
+
+// 類別定義：固定順序、固定顏色（每處顏色皆伴隨文字標籤）
+const CATS = {
+  cohort:         { label: '轉合署（仍在喆律）', color: 'var(--gold)',   dim: 'var(--gold-dim)' },
+  law_firm:       { label: '他所執業',           color: 'var(--blue)',   dim: 'var(--blue-dim)' },
+  own_firm:       { label: '自行開業',           color: 'var(--green)',  dim: 'var(--green-dim)' },
+  inhouse:        { label: '企業／機構法務',     color: 'var(--purple)', dim: 'var(--purple-dim)' },
+  no_office:      { label: '執業中（所未公開）', color: 'var(--orange)', dim: 'var(--orange-dim)' },
+  recent:         { label: '甫離職（登錄未異動）', color: 'var(--red)',  dim: 'var(--red-dim)' },
+  not_registered: { label: '現無律師登錄',       color: 'var(--text-muted)', dim: 'var(--gray-dim)' },
+};
+const CAT_ORDER = Object.keys(CATS);
+
+let DATA = [];
+let activeCat = null;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function tenure(j, l) {
+  if (!j || !l) return '';
+  const a = new Date(j), b = new Date(l);
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  if (b.getDate() < a.getDate()) m--;
+  if (m < 0) m = 0;
+  const y = Math.floor(m / 12), r = m % 12;
+  return y ? `${y} 年 ${r} 月` : `${r} 月`;
+}
+
+function renderSummary() {
+  const cnt = {};
+  DATA.forEach(d => cnt[d.category] = (cnt[d.category] || 0) + 1);
+  const cardsEl = document.getElementById('cards');
+  let html = `<div class="card ${activeCat===null?'active':''}" onclick="setCat(null)">
+    <div class="k">校友總數</div><div class="v">${DATA.length}</div><div class="s">位離職律師（不重複）</div></div>`;
+  CAT_ORDER.forEach(c => {
+    if (!cnt[c]) return;
+    html += `<div class="card ${activeCat===c?'active':''}" onclick="setCat('${c}')">
+      <div class="k"><span class="dot" style="background:${CATS[c].color}"></span>${CATS[c].label}</div>
+      <div class="v">${cnt[c]}</div></div>`;
+  });
+  cardsEl.innerHTML = html;
+
+  const total = DATA.length;
+  document.getElementById('distbar').innerHTML = CAT_ORDER.filter(c => cnt[c]).map(c =>
+    `<div class="seg" style="flex:${cnt[c]};background:${CATS[c].color}" title="${CATS[c].label} ${cnt[c]} 人"></div>`).join('');
+  document.getElementById('distlegend').innerHTML = CAT_ORDER.filter(c => cnt[c]).map(c =>
+    `<span class="li"><span class="dot" style="background:${CATS[c].color}"></span>${CATS[c].label} ${cnt[c]} 人（${Math.round(cnt[c]/total*100)}%）</span>`).join('');
+
+  // 聚集去向
+  const byFirm = {};
+  DATA.forEach(d => {
+    if (!d.current_firm || d.category === 'cohort' || d.category === 'recent') return;
+    (byFirm[d.current_firm] = byFirm[d.current_firm] || []).push(d.name);
+  });
+  const clusters = Object.entries(byFirm).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  if (clusters.length) {
+    document.getElementById('clusterPanel').style.display = '';
+    document.getElementById('clusters').innerHTML = clusters.map(([f, v]) =>
+      `<div style="padding:6px 0;font-size:0.88rem;"><strong>${esc(f)}</strong>
+       <span style="color:var(--text-muted)">— ${v.map(esc).join('、')}（${v.length} 人）</span></div>`).join('');
+  }
+
+  document.getElementById('chips').innerHTML =
+    `<span class="chip ${activeCat===null?'active':''}" onclick="setCat(null)">全部</span>` +
+    CAT_ORDER.filter(c => cnt[c]).map(c =>
+      `<span class="chip ${activeCat===c?'active':''}" onclick="setCat('${c}')"><span class="dot" style="background:${CATS[c].color}"></span>${CATS[c].label}</span>`).join('');
+}
+
+function setCat(c) { activeCat = c; renderSummary(); render(); }
+
+function render() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let rows = DATA.slice();
+  if (activeCat) rows = rows.filter(d => d.category === activeCat);
+  if (q) rows = rows.filter(d =>
+    (d.name || '').toLowerCase().includes(q) ||
+    (d.current_firm || '').toLowerCase().includes(q) ||
+    (d.zhelu_dept || '').toLowerCase().includes(q));
+  rows.sort((a, b) => (b.leave_date || '0') < (a.leave_date || '0') ? -1 : 1);
+
+  document.getElementById('tbody').innerHTML = rows.map(d => {
+    const cat = CATS[d.category] || { label: d.category, color: 'var(--text-muted)', dim: 'var(--gray-dim)' };
+    const firm = d.category === 'not_registered'
+      ? '<span style="color:var(--text-muted)">（現行名冊查無登錄）</span>'
+      : (d.current_firm ? esc(d.current_firm) : '<span style="color:var(--text-muted)">（登錄未填事務所）</span>');
+    const lsn = d.lawsnote_url ? ` <a class="ext" href="${esc(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁">↗</a>` : '';
+    const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e => `<span class="tagx">${esc(e)}</span>`).join('');
+    return `<tr>
+      <td><div class="name">${esc(d.name)}</div><div class="sub">${esc(d.last_title || '')}</div></td>
+      <td><div>${esc(d.join_date || '？')} → ${esc(d.leave_date || '？')}</div><div class="sub">${esc(d.zhelu_office || '')} ${esc(d.zhelu_dept || '')}</div></td>
+      <td>${tenure(d.join_date, d.leave_date) || '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td><span class="badge" style="color:${cat.color};background:${cat.dim}">${cat.label}</span></td>
+      <td>${firm}${lsn}${exp ? '<div style="margin-top:3px;">' + exp + '</div>' : ''}</td>
+      <td>${esc(d.current_region || '—')}</td>
+      <td>${d.lawsnote_cases != null ? d.lawsnote_cases : '—'}</td>
+      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${esc(d.note || '')}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('countHint').textContent = `顯示 ${rows.length} / ${DATA.length} 位`;
+}
+
+async function init() {
+  const gate = document.getElementById('gate');
+  gate.style.display = '';
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) {
+    gate.innerHTML = '此頁僅限登入使用者。請先到 <a href="index.html">法律產業情報</a> 登入後再回到本頁。';
+    return;
+  }
+  const { data, error } = await db.from('zhelu_alumni').select('*');
+  if (error || !data || !data.length) {
+    gate.innerHTML = '資料載入失敗：' + esc(error ? error.message : '無資料');
+    return;
+  }
+  DATA = data;
+  gate.style.display = 'none';
+  document.getElementById('app').style.display = '';
+  renderSummary();
+  render();
+}
+init();
+</script>
+</body>
+</html>
