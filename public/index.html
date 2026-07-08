@@ -5515,7 +5515,7 @@ const ALUMNI_CATS = {
   law_firm:       { label: '他所執業',           color: 'var(--blue)',   dim: 'var(--blue-dim)' },
   own_firm:       { label: '自行開業',           color: 'var(--green)',  dim: 'var(--green-dim)' },
   inhouse:        { label: '企業／機構法務',     color: 'var(--purple)', dim: 'var(--purple-dim)' },
-  no_office:      { label: '執業中（所未公開）', color: 'var(--orange)', dim: 'var(--orange-dim)' },
+  no_office:      { label: '執業中（事務所空白）', color: 'var(--orange)', dim: 'var(--orange-dim)' },
   recent:         { label: '甫離職（登錄未異動）', color: 'var(--red)',  dim: 'var(--red-dim)' },
   not_registered: { label: '現無律師登錄',       color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' },
 };
@@ -5604,7 +5604,7 @@ function renderAlumniTable() {
     const c = ALUMNI_CATS[d.category] || { label: d.category, color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' };
     const firm = d.category === 'not_registered'
       ? '<span style="color:var(--text-muted)">（現行名冊查無登錄）</span>'
-      : (d.current_firm ? firmLink(d.current_firm) : '<span style="color:var(--text-muted)">（登錄未填事務所）</span>');
+      : (d.current_firm ? firmLink(d.current_firm) : '<span style="color:var(--text-muted)">空白</span>');
     const lsn = d.lawsnote_url ? ` <a href="${escHtml(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁" style="color:var(--blue);text-decoration:none;">&#8599;</a>` : '';
     const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e =>
       `<span style="display:inline-block;background:var(--ghost-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;font-size:0.7rem;margin:2px 2px 0 0;">${escHtml(e)}</span>`).join('');
