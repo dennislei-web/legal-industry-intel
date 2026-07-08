@@ -1534,7 +1534,11 @@
             <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
               <div style="font-size:1.05rem;font-weight:600;margin-bottom:2px;">各地區律師活動</div>
               <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">地區＝判決法院所在縣市（court→courts.region，排除最高法院/最高行政）｜公開裁判書出現次數，非唯一案件數、同名合併。點長條可看該律師詳情。</div>
-              <div id="market_regionTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;"></div>
+              <div id="market_regionTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
+                <div id="market_catTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+              </div>
             </div>
             <div class="chart-grid">
                 <div class="chart-card">
@@ -4800,6 +4804,7 @@ async function loadMarketTrendOnce() {
     // 地區律師活動
     _mktRegions = regRes.data || [];
     renderRegionTabs();
+    renderCatTabs();
     renderYearTabs();
     if (_mktRegions.length) selectRegion(_mktRegions[0].region);
   } catch (e) {
@@ -4809,14 +4814,30 @@ async function loadMarketTrendOnce() {
   }
 }
 
-// 各地區律師活動：地區選擇 + 年度選擇 + top 榜(可點) + 活躍律師數趨勢
-let _mktRegion = null, _mktRegionYear = null, _mktRegions = [];
+// 各地區律師活動：地區 + 案類 + 年度選擇 + top 榜(可點) + 活躍律師數趨勢
+let _mktRegion = null, _mktRegionYear = null, _mktRegionCat = null, _mktRegions = [];
+// 案類（判決書原生分類，有實際量的；null=全部。懲戒/其他量極微不列）
+const MKT_CATS = [null, '民事', '刑事', '家事', '行政', '少年'];
 
 function renderRegionTabs() {
   const box = document.getElementById('market_regionTabs');
   if (!box) return;
   box.innerHTML = _mktRegions.slice(0, 16).map(r =>
     `<button class="sub-tab-btn" data-region="${escHtml(r.region)}" onclick="selectRegion('${escHtml(r.region).replace(/'/g, "\\'")}')">${escHtml(r.region)}</button>`).join('');
+}
+
+function renderCatTabs() {
+  const box = document.getElementById('market_catTabs');
+  if (!box) return;
+  box.innerHTML = MKT_CATS.map(c =>
+    `<button class="sub-tab-btn${c === _mktRegionCat ? ' active' : ''}" onclick="selectRegionCat(${c === null ? 'null' : `'${c}'`})">${c === null ? '全部' : c}</button>`).join('');
+}
+
+function selectRegionCat(cat) {
+  _mktRegionCat = cat;
+  renderCatTabs();
+  renderRegionTopLawyers();
+  renderRegionActive();
 }
 
 function renderYearTabs() {
@@ -4843,8 +4864,8 @@ function selectRegionYear(y) {
 async function renderRegionTopLawyers() {
   if (!_mktRegion) return;
   const t = document.getElementById('market_topTitle');
-  if (t) t.textContent = `${_mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}`;
-  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion, p_year: _mktRegionYear, p_limit: 18 });
+  if (t) t.textContent = `${_mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}${_mktRegionCat ? ' · ' + _mktRegionCat : ''}`;
+  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 18 });
   const rows = data || [];
   const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
   if (chartInstances['mktTop']) chartInstances['mktTop'].destroy();
@@ -4864,7 +4885,7 @@ async function renderRegionTopLawyers() {
 
 async function renderRegionActive() {
   if (!_mktRegion) return;
-  const { data } = await db.rpc('region_active_counts', { p_region: _mktRegion, p_min: 5 });
+  const { data } = await db.rpc('region_active_counts', { p_region: _mktRegion, p_min: 5, p_cat: _mktRegionCat });
   const rows = (data || []).filter(r => r.yr >= 2003);
   const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
   if (chartInstances['mktActive']) chartInstances['mktActive'].destroy();
