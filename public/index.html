@@ -1498,6 +1498,33 @@
             </div>
         </div>
 
+        <!-- Tab: 訴訟市場趨勢（DB 動態：court_case_stats 官方新收 + 律師活動變化）-->
+        <div class="tab-content jstat" id="tab-jstat-market">
+            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">
+              官方口徑：<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收件數」（民國 90–114／2001–2025，地院一審新收）｜律師活動口徑：公開裁判書出現次數（下限估計、非唯一案件數、同名合併）。兩者口徑不同，不可直接相比。
+            </div>
+            <div id="market_kpiRow" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px;"></div>
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">各案類「一審新收」年度趨勢（2001–2025）</div>
+                    <div class="sub-tabs" id="market_scaleTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="sub-tab-btn active" data-scale="litigation">訴訟核心（民訴/刑訴/家事/行政）</button>
+                        <button class="sub-tab-btn" data-scale="all">全部（含非訟/執行）</button>
+                    </div>
+                    <div class="chart-container"><canvas id="market_chartTrend"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">訴訟案型結構變化（佔比）</div>
+                    <div class="chart-container"><canvas id="market_chartMix"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">律師活動量變化 · 近 3 年 vs 前 3 年</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">公開裁判書出現次數，非唯一案件數；同名律師為合併值</div>
+                    <div id="market_growthList" style="max-height:360px;overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tab: 民事 -->
         <div class="tab-content jstat" id="tab-jstat-civil">
             <div class="chart-grid">
@@ -2493,6 +2520,7 @@ const SECTIONS = {
   ],
   jstat: [
     { tab: 'jstat-overview', label: '總覽' },
+    { tab: 'jstat-market', label: '訴訟市場趨勢' },
     { tab: 'jstat-civil', label: '民事案件' },
     { tab: 'jstat-family', label: '家事案件' },
     { tab: 'jstat-criminal', label: '刑事案件' },
@@ -2557,6 +2585,7 @@ function showTab(tab) {
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
+  if (tab === 'jstat-market') { loadMarketTrendOnce(); return; }
   if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
 
@@ -4457,13 +4486,15 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null;
+  let moj = null, stat = null, pairs = null, yearTrend = null;
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
     db.rpc('lawyer_pair_summary', { p_name: name, p_limit: 12 })
       .then(r => { pairs = r.data; }),
+    db.rpc('lawyer_year_trend', { p_name: name })
+      .then(r => { yearTrend = r.data; }),
     (async () => {
       for (let from = 0; ; from += 1000) {
         const { data: cr } = await db.from('lawyer_month_stats')
@@ -4584,7 +4615,7 @@ async function showLawyerDetail(name, certNumber) {
       </div>
       <div class="grid-2" style="gap:16px;">
         <div>
-          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">歷年案量趨勢</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">歷年案量趨勢（案型堆疊）</div>
           <canvas id="lwTrendChart" height="170"></canvas>
         </div>
         <div>
@@ -4625,7 +4656,136 @@ async function showLawyerDetail(name, certNumber) {
     ` : ''}
   `;
 
-  if (stat?.cases_total) renderLawyerCharts(stat, courtRows);
+  if (stat?.cases_total) renderLawyerCharts(stat, courtRows, yearTrend);
+}
+
+// ============================================================
+// 訴訟市場趨勢（jstat-market）：官方新收(market_year_trend) + 律師活動變化(lawyer_growth)
+// ============================================================
+let _marketLoaded = false, _marketRows = null;
+const MKT_COLORS = { '民事訴訟': '#4f8ef7', '刑事訴訟': '#e05c5c', '家事': '#4caf82', '行政訴訟': '#c9a84c', '少年': '#45b7d1', '民事非訟': '#a06cd5', '民事執行': '#e0883c' };
+const MKT_LITIGATION = ['民事訴訟', '刑事訴訟', '家事', '行政訴訟', '少年'];
+const MKT_ALL = ['民事訴訟', '民事非訟', '民事執行', '刑事訴訟', '家事', '行政訴訟', '少年'];
+
+function mktPivot(rows) {
+  const p = {}, ys = new Set();
+  rows.forEach(r => { (p[r.segment] = p[r.segment] || {})[r.year_ad] = r.new_cases; ys.add(r.year_ad); });
+  return { p, years: [...ys].sort((a, b) => a - b) };
+}
+
+async function loadMarketTrendOnce() {
+  if (_marketLoaded) return;
+  _marketLoaded = true;
+  try {
+    const [mktRes, grRes] = await Promise.all([
+      db.rpc('market_year_trend'),
+      db.rpc('lawyer_growth', { p_anchor: 2024, p_min: 20, p_limit: 40 }),
+    ]);
+    _marketRows = mktRes.data || [];
+    renderMarketKpis(_marketRows);
+    renderMarketTrend('litigation');
+    renderMarketMix(_marketRows);
+    renderMarketGrowth(grRes.data || []);
+    document.querySelectorAll('#market_scaleTabs .sub-tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('#market_scaleTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderMarketTrend(btn.dataset.scale);
+      };
+    });
+  } catch (e) {
+    _marketLoaded = false;
+    const el = document.getElementById('market_growthList');
+    if (el) el.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+
+function renderMarketKpis(rows) {
+  const { p, years } = mktPivot(rows);
+  const last = years[years.length - 1], prev = years[years.length - 2];
+  const box = document.getElementById('market_kpiRow');
+  if (!box) return;
+  box.innerHTML = MKT_LITIGATION.filter(s => s !== '少年').map(seg => {
+    const cur = p[seg]?.[last] || 0, pv = p[seg]?.[prev] || 0;
+    const yoy = pv ? Math.round((cur - pv) * 100 / pv) : 0;
+    const col = yoy > 0 ? 'var(--green)' : yoy < 0 ? 'var(--red)' : 'var(--text-muted)';
+    const arrow = yoy > 0 ? '▲' : yoy < 0 ? '▼' : '—';
+    return `<div style="min-width:120px;">
+      <div style="font-size:0.75rem;color:var(--text-muted);">${seg}（${last}新收）</div>
+      <div style="font-size:1.5rem;font-weight:700;color:${MKT_COLORS[seg]};">${cur.toLocaleString()}</div>
+      <div style="font-size:0.75rem;color:${col};">${arrow} ${Math.abs(yoy)}% vs ${prev}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderMarketTrend(scale) {
+  if (!_marketRows) return;
+  const { p, years } = mktPivot(_marketRows);
+  const segs = scale === 'all' ? MKT_ALL : MKT_LITIGATION;
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  if (chartInstances['mktTrend']) chartInstances['mktTrend'].destroy();
+  const ctx = document.getElementById('market_chartTrend');
+  if (!ctx) return;
+  chartInstances['mktTrend'] = new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: segs.map(seg => ({
+        label: seg, data: years.map(y => p[seg]?.[y] ?? null),
+        borderColor: MKT_COLORS[seg], backgroundColor: MKT_COLORS[seg],
+        borderWidth: 2, pointRadius: 0, tension: 0.25, fill: false,
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+      scales: { x: { ticks: { color: muted, maxTicksLimit: 13 } }, y: { ticks: { color: muted }, beginAtZero: true } },
+    },
+  });
+}
+
+function renderMarketMix(rows) {
+  const { p, years } = mktPivot(rows);
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  if (chartInstances['mktMix']) chartInstances['mktMix'].destroy();
+  const ctx = document.getElementById('market_chartMix');
+  if (!ctx) return;
+  chartInstances['mktMix'] = new Chart(ctx.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: years,
+      datasets: MKT_LITIGATION.map(seg => ({
+        label: seg, backgroundColor: MKT_COLORS[seg],
+        data: years.map(y => {
+          const tot = MKT_LITIGATION.reduce((a, s) => a + (p[s]?.[y] || 0), 0);
+          return tot ? Math.round((p[seg]?.[y] || 0) * 100 / tot) : 0;
+        }),
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+      scales: { x: { stacked: true, ticks: { color: muted, maxTicksLimit: 13 } }, y: { stacked: true, max: 100, ticks: { color: muted, callback: v => v + '%' } } },
+    },
+  });
+}
+
+function renderMarketGrowth(rows) {
+  const box = document.getElementById('market_growthList');
+  if (!box) return;
+  const up = rows.filter(r => r.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 12);
+  const down = rows.filter(r => r.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 12);
+  const nameLink = n => `<a href="#" onclick="showLawyerDetail('${escHtml(n).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(n)}</a>`;
+  const rowHtml = (r, dir) => `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:0.85rem;border-bottom:1px solid var(--border);">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nameLink(r.name)} <span style="color:var(--text-muted);font-size:0.72rem;">${escHtml(r.top_cat || '')}</span></span>
+      <span style="color:var(--text-muted);font-size:0.75rem;">${r.prior}→${r.recent}</span>
+      <span style="width:52px;text-align:right;color:${dir > 0 ? 'var(--green)' : 'var(--red)'};font-weight:600;">${dir > 0 ? '+' : ''}${r.delta}</span>
+    </div>`;
+  box.innerHTML =
+    `<div style="font-size:0.78rem;font-weight:600;color:var(--green);margin-bottom:4px;">↑ 活動量成長最多</div>` +
+    (up.map(r => rowHtml(r, 1)).join('') || '<div style="color:var(--text-muted);font-size:0.8rem;">無</div>') +
+    `<div style="font-size:0.78rem;font-weight:600;color:var(--red);margin:12px 0 4px;">↓ 活動量衰退最多</div>` +
+    (down.map(r => rowHtml(r, -1)).join('') || '<div style="color:var(--text-muted);font-size:0.8rem;">無</div>');
 }
 
 // 律師配對關係卡：對到的法官 / 協同律師 / 對造律師（近 5 年 rolling，lawyer_pair_summary RPC）
@@ -4675,16 +4835,27 @@ function renderPairCard(pairs) {
 }
 
 // 律師畫像三圖：歷年趨勢 / 案類組合 / 常出沒法院
-function renderLawyerCharts(stat, courtRows) {
+function renderLawyerCharts(stat, courtRows, yearTrend) {
   const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
   const baseOpts = { responsive: true, plugins: { legend: { display: false } } };
+  const CAT_COLORS = { '民事': '#4f8ef7', '刑事': '#e05c5c', '家事': '#4caf82', '行政': '#c9a84c', '懲戒': '#a06cd5', '少年': '#45b7d1', '其他': '#8899aa' };
 
-  // 歷年案量趨勢（by_year jsonb）
+  // 歷年案量趨勢：有 yearTrend(逐年×案型)就堆疊呈現案型位移，否則退回 by_year 總量
   if (chartInstances['lwTrend']) chartInstances['lwTrend'].destroy();
   const tCtx = document.getElementById('lwTrendChart');
-  const years = Object.keys(stat.by_year || {}).sort();
-  if (tCtx && years.length) {
+  const yt = yearTrend && Object.keys(yearTrend).length ? yearTrend : null;
+  if (tCtx && yt) {
+    const years = Object.keys(yt).sort();
+    const cats = [...new Set(years.flatMap(y => Object.keys(yt[y] || {})))]
+      .sort((a, b) => (a === '其他' ? 1 : b === '其他' ? -1 : 0));
     chartInstances['lwTrend'] = new Chart(tCtx.getContext('2d'), {
+      type: 'bar',
+      data: { labels: years, datasets: cats.map(c => ({ label: c, data: years.map(y => (yt[y] || {})[c] || 0), backgroundColor: CAT_COLORS[c] || '#8899aa' })) },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 10, font: { size: 10 } } } }, scales: { x: { stacked: true, ticks: { color: muted, maxRotation: 60, autoSkip: true, maxTicksLimit: 14 } }, y: { stacked: true, ticks: { color: muted }, beginAtZero: true } } }
+    });
+  } else if (tCtx) {
+    const years = Object.keys(stat.by_year || {}).sort();
+    if (years.length) chartInstances['lwTrend'] = new Chart(tCtx.getContext('2d'), {
       type: 'bar',
       data: { labels: years, datasets: [{ data: years.map(y => stat.by_year[y]), backgroundColor: 'rgba(201,168,76,0.65)' }] },
       options: { ...baseOpts, scales: { x: { ticks: { color: muted, maxRotation: 60, autoSkip: true, maxTicksLimit: 12 } }, y: { ticks: { color: muted }, beginAtZero: true } } }
