@@ -1498,8 +1498,8 @@
             </div>
         </div>
 
-        <!-- Tab: 訴訟市場趨勢（DB 動態：court_case_stats 官方新收 + 律師活動變化）-->
-        <div class="tab-content jstat" id="tab-jstat-market">
+        <!-- Tab: 訴訟市場趨勢（產業分析下；用 jstat class 取圖表樣式。DB 動態：court_case_stats 官方新收 + 律師活動變化）-->
+        <div class="tab-content jstat" id="tab-market">
             <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">
               官方口徑：<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收件數」（民國 90–114／2001–2025，地院一審新收）｜律師活動口徑：公開裁判書出現次數（下限估計、非唯一案件數、同名合併）。兩者口徑不同，不可直接相比。
             </div>
@@ -2520,7 +2520,6 @@ const SECTIONS = {
   ],
   jstat: [
     { tab: 'jstat-overview', label: '總覽' },
-    { tab: 'jstat-market', label: '訴訟市場趨勢' },
     { tab: 'jstat-civil', label: '民事案件' },
     { tab: 'jstat-family', label: '家事案件' },
     { tab: 'jstat-criminal', label: '刑事案件' },
@@ -2530,6 +2529,7 @@ const SECTIONS = {
   ],
   // 產業分析：垂直領域深度分析（目前為家事，未來可加刑事/勞動等）
   industry: [
+    { tab: 'market', label: '訴訟市場趨勢' },
     { tab: 'family', label: '家事法官' },
     { tab: 'fam-lawyers', label: '家事律師' },
     { tab: 'firm-map', label: '事務所版圖' },
@@ -2585,7 +2585,7 @@ function showTab(tab) {
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
-  if (tab === 'jstat-market') { loadMarketTrendOnce(); return; }
+  if (tab === 'market') { loadMarketTrendOnce(); return; }
   if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
 
@@ -4660,7 +4660,7 @@ async function showLawyerDetail(name, certNumber) {
 }
 
 // ============================================================
-// 訴訟市場趨勢（jstat-market）：官方新收(market_year_trend) + 律師活動變化(lawyer_growth)
+// 訴訟市場趨勢（產業分析 tab=market）：官方新收(market_year_trend) + 律師活動變化(lawyer_growth)
 // ============================================================
 let _marketLoaded = false, _marketRows = null;
 const MKT_COLORS = { '民事訴訟': '#4f8ef7', '刑事訴訟': '#e05c5c', '家事': '#4caf82', '行政訴訟': '#c9a84c', '少年': '#45b7d1', '民事非訟': '#a06cd5', '民事執行': '#e0883c' };
