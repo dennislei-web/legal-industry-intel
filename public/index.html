@@ -6251,7 +6251,7 @@ async function loadFirmMap() {
 
 async function loadFamLawyers() {
   try {
-    // 年度下拉（家事年 cache 的年度清單，migration 053）
+    // 年度下拉（家事年 cache 的年度清單，migration 055）
     db.rpc('family_lawyer_years').then(({ data: yrs, error }) => {
       if (error) { console.log('family_lawyer_years error:', error); return; }
       const ysel = document.getElementById('flYearSelect');
@@ -6273,7 +6273,7 @@ async function loadFamLawyers() {
   } catch (e) { console.log('fam lawyers error:', e); }
 }
 
-// 年度切換：抓該年切片（migration 053 年 cache 表），結果留在記憶體、切回不重抓
+// 年度切換：抓該年切片（migration 055 年 cache 表），結果留在記憶體、切回不重抓
 async function flYearChange() {
   const y = document.getElementById('flYearSelect').value;
   try {
