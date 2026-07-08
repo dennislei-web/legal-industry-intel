@@ -118,21 +118,82 @@ def analyze_year_ranges(existing_lics):
     return year_nums, year_range
 
 
-def query_lic(lic_no):
-    """查詢單一證號的詳細資料"""
+def _query_once(lic_no):
+    """單次查詢。回傳 (status, data)：
+      'ok'       → 查得，data 為律師 dict
+      'empty'    → HTTP 200 但無資料（確定無此證號，不重試）
+      'notfound' → HTTP 404 / 其他 4xx（確定無此證號，不重試）
+      'retry'    → timeout / 連線錯誤 / 5xx / 非 JSON（暫時性失敗，應重試）
+    """
     try:
-        r = sess.get(f'{MOJ_BASE}/cert/lyinfosd/{lic_no}', timeout=10)
-        if r.status_code == 200:
+        r = sess.get(f'{MOJ_BASE}/cert/lyinfosd/{lic_no}', timeout=15)
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError):
+        return ('retry', None)
+    except requests.exceptions.RequestException:
+        return ('retry', None)
+
+    if r.status_code == 200:
+        try:
             resp = r.json()
-            data = resp.get('data')
-            # data 可能是 list 或 dict
-            if isinstance(data, list):
-                if data and data[0].get('name'):
-                    return data[0]
-            elif isinstance(data, dict) and data.get('name'):
-                return data
-    except Exception:
-        pass
+        except ValueError:
+            # 200 卻不是 JSON（多半被 WAF / gateway 暫時擋下）→ 當暫時性失敗重試
+            return ('retry', None)
+        data = resp.get('data')
+        if isinstance(data, list):
+            data = data[0] if data else None
+        if isinstance(data, dict) and data.get('name'):
+            return ('ok', data)
+        return ('empty', None)
+
+    if r.status_code == 404 or 400 <= r.status_code < 500:
+        return ('notfound', None)
+    # 5xx（含 429 gateway 過載）→ 暫時性失敗
+    return ('retry', None)
+
+
+def _era_allows_tai_variant(lic_no):
+    """臺⇄台 異體字互換只發生在早年（約 95 年以前，含無年份的極早期臺證字）。
+    近年證號一律「臺」，對其做「台」互換是永遠落空的白工，會讓掃描請求量翻倍。"""
+    m = re.match(r'^\(?(\d{2,3})\)?', lic_no)
+    if not m:
+        return True  # 無年份 = 極早年，允許互換
+    return int(m.group(1)) <= 95
+
+
+def query_lic(lic_no, _variant=True):
+    """查詢單一證號的詳細資料。
+
+    對 timeout / 連線錯誤 / 5xx / 非 JSON 等「暫時性失敗」重試（backoff 1s→3s→6s），
+    只有確定 HTTP 200 且回傳無資料、或 4xx 才判定為「無此證號」而放棄。
+    這修掉「密集區的洞」——偶發 API 失敗被誤當空號跳過的最大宗漏抓。
+
+    早年異體字：若「臺」版查無資料，自動改「台」版再試一次（反之亦然）。
+    """
+    delays = [1, 3, 6]  # 重試 backoff（秒）
+    final = 'retry'
+    for attempt in range(len(delays) + 1):
+        status, data = _query_once(lic_no)
+        if status == 'ok':
+            return data
+        if status in ('empty', 'notfound'):
+            final = status
+            break
+        # 暫時性失敗 → backoff 後重試（最後一次不再等）
+        if attempt < len(delays):
+            time.sleep(delays[attempt])
+
+    # 只在「確定空號」時做異體字互換；暫時性失敗耗盡不換（同源問題、且加倍負載無意義）
+    if _variant and final in ('empty', 'notfound') and _era_allows_tai_variant(lic_no):
+        if '臺' in lic_no:
+            alt = lic_no.replace('臺', '台')
+        elif '台' in lic_no:
+            alt = lic_no.replace('台', '臺')
+        else:
+            alt = None
+        if alt and alt != lic_no:
+            return query_lic(alt, _variant=False)
+
     return None
 
 
