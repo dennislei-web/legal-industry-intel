@@ -21,6 +21,7 @@
   python moj_alumni_refresh.py 5           # 只處理前 5 位（測試）
 """
 import os
+import re
 import sys
 import time
 import requests
@@ -93,6 +94,24 @@ def resolve_lic(alumnus, moj_by_name):
     return None, f'ambiguous_x{len(cands)}'
 
 
+# 一人所 firm_key 口徑同 mig 060 view / 前端 firmKeyRe
+SOLO_FIRM_KEY_RE = re.compile(r'^(.+?(?:法律|律師)事務所)')
+
+
+def is_solo_leader(name, office_norm):
+    """一人所唯一律師＝所長（2026-07-08 拍板；口徑＝mig 060 moj_solo_firm_lawyers）。
+    逐位 live 查 view（而非預載），避免吃到本輪回寫 moj_lawyers 前的舊狀態。"""
+    if not office_norm or '事務所' not in office_norm:
+        return False
+    m = SOLO_FIRM_KEY_RE.match(office_norm)
+    key = m.group(1) if m else office_norm
+    try:
+        rows = sb_get(f'moj_solo_firm_lawyers?select=name&firm_key=eq.{quote(key)}&limit=1')
+        return bool(rows) and rows[0]['name'] == name
+    except requests.RequestException:
+        return False  # 查不到就維持保守分類，下輪再試
+
+
 def classify(name, office_norm, current_category):
     """由事務所名推分類（安全規則；cohort/recent 特例在外層處理）"""
     if not office_norm:
@@ -102,6 +121,8 @@ def classify(name, office_norm, current_category):
         return current_category if current_category in ('cohort', 'recent') else 'cohort'
     if office_norm.startswith(name):
         return 'own_firm'  # 例：謝淯婷律師事務所
+    if is_solo_leader(name, office_norm):
+        return 'own_firm'  # 一人所唯一律師＝所長，例：蔡愷凌／均凌理韜
     if ('事務所' not in office_norm) and ('法律' not in office_norm):
         return 'inhouse'   # 例：元上工程股份有限公司
     return 'law_firm'
