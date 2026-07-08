@@ -1533,7 +1533,7 @@
 
             <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
               <div style="font-size:1.05rem;font-weight:600;margin-bottom:2px;">各地區律師活動</div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">地區＝判決法院所在縣市（court→courts.region，排除最高法院/最高行政）｜公開裁判書出現次數，非唯一案件數、同名合併。點長條可看該律師詳情。</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">地區＝判決法院所在縣市（court→courts.region，排除最高法院/最高行政）｜公開裁判書出現次數，非唯一案件數、同名合併。<span style="color:var(--gold);">👑</span>＝事務所所長；名字後為所屬事務所（依名冊，同名合併僅供參考）。點姓名可看該律師詳情。</div>
               <div id="market_regionTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
               <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                 <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
@@ -1544,7 +1544,7 @@
                 <div class="chart-card">
                     <div class="chart-title" id="market_topTitle">最活躍律師</div>
                     <div id="market_yearTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
-                    <div class="chart-container tall"><canvas id="market_chartTopLawyers"></canvas></div>
+                    <div id="market_topList" style="height:500px;overflow-y:auto;padding-right:4px;"></div>
                 </div>
                 <div class="chart-card">
                     <div class="chart-title">每年度活躍律師數（該地區年出庭 ≥ 5 案）</div>
@@ -4865,22 +4865,35 @@ async function renderRegionTopLawyers() {
   if (!_mktRegion) return;
   const t = document.getElementById('market_topTitle');
   if (t) t.textContent = `${_mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}${_mktRegionCat ? ' · ' + _mktRegionCat : ''}`;
-  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 18 });
+  const box = document.getElementById('market_topList');
+  if (box) box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">載入中…</div>';
+  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 20 });
   const rows = data || [];
-  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
-  if (chartInstances['mktTop']) chartInstances['mktTop'].destroy();
-  const ctx = document.getElementById('market_chartTopLawyers');
-  if (!ctx) return;
-  chartInstances['mktTop'] = new Chart(ctx.getContext('2d'), {
-    type: 'bar',
-    data: { labels: rows.map(r => r.name), datasets: [{ data: rows.map(r => Number(r.cases)), backgroundColor: 'rgba(79,142,247,0.72)' }] },
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.x.toLocaleString()} 次出庭` } } },
-      onClick: (evt, els) => { if (els.length) { const n = rows[els[0].index]?.name; if (n) showLawyerDetail(n, ''); } },
-      scales: { x: { ticks: { color: muted }, beginAtZero: true }, y: { ticks: { color: muted, font: { size: 10 } } } },
-    },
-  });
+  if (!box) return;
+  if (!rows.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">此地區／案類無資料</div>'; return; }
+  // 批次撈事務所（同名可能多所，取第一筆；配 FIRM_LEADERS 標所長）
+  const firmMap = {};
+  try {
+    const { data: fr } = await db.from('lawyers_combined').select('name,firm_name').in('name', rows.map(r => r.name));
+    (fr || []).forEach(x => { if (x.firm_name && !firmMap[x.name]) firmMap[x.name] = x.firm_name; });
+  } catch (e) { /* 事務所撈失敗不影響排行 */ }
+  const max = Number(rows[0].cases) || 1;
+  box.innerHTML = rows.map((r, i) => {
+    const cases = Number(r.cases);
+    const w = Math.max(3, Math.round(cases / max * 100));
+    const isLeader = !!(typeof FIRM_LEADERS !== 'undefined' && FIRM_LEADERS[r.name]);
+    const notInMoj = isLeader && typeof FIRM_LEADERS_NOT_IN_MOJ !== 'undefined' && FIRM_LEADERS_NOT_IN_MOJ.has(r.name);
+    const crown = isLeader ? `<span title="${escHtml(FIRM_LEADERS[r.name])}" style="cursor:help;">${notInMoj ? '⚠️' : '👑'}</span> ` : '';
+    const firm = firmMap[r.name] || (isLeader ? (FIRM_LEADERS[r.name].split('｜')[0] || '') : '');
+    const firmHtml = firm ? `<span style="color:var(--text-muted);font-size:0.72rem;margin-left:5px;">${escHtml(firm)}</span>` : '';
+    const nm = `<a href="#" onclick="showLawyerDetail('${escHtml(r.name).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;font-weight:${isLeader ? 600 : 400};">${escHtml(r.name)}</a>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border);">
+      <span style="width:18px;color:var(--text-muted);font-size:0.75rem;text-align:right;flex-shrink:0;">${i + 1}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${crown}${nm}${firmHtml}</span>
+      <span style="width:88px;height:7px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:rgba(79,142,247,0.78);"></span></span>
+      <span style="width:48px;text-align:right;color:var(--text-muted);flex-shrink:0;">${cases.toLocaleString()}</span>
+    </div>`;
+  }).join('');
 }
 
 async function renderRegionActive() {
