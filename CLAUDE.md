@@ -120,6 +120,15 @@
   lawyer_judgment_stats.cases_5yr（MOJ 名冊姓名唯一者歸戶）÷ MOJ 人數，Lawsnote 案件數
   自此完全退出 UI 與統計鏈
 
+## 010 合作律師 tab（migration 073）
+
+- 律師區子頁 `law010`（喆律校友會旁）：法律010 平台合作律師 × MOJ 現職所 × 官方案量
+- 資料源 `fact_010_monthly_lawyer`（lawyer-dashboard `sync_010.py` 每日重建，2023-11 起）→
+  view `law010_lawyer_summary` 即時聚合（歸戶分所條目、排除喆律所內列、months jsonb 逐月明細），
+  **無需另外 refresh**；只 grant authenticated（010 業績是內部資料，已 revoke anon）
+- 前端 client-side JOIN `lawyers_with_stats`（同名者以 010 案件地區推定，推定不了標「同名 N 筆」）＋
+  `moj_firm_stats_cache`（事務所規模）；「理湛」「安承」為總表簡稱、MOJ 查無屬預期
+
 ## 前端導覽結構
 
 - 兩層導覽：第一層 `showSection()`（律師/法官/資料來源/帳號管理），
