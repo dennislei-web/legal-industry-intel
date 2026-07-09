@@ -380,9 +380,9 @@ def main():
                           json={}, timeout=60)
         r.raise_for_status()
         have = set(r.json() or [])
-        # 202511 月包被官方重傳成殘缺版（僅離島+簡易庭）：重跑會把當初完整包算出的
-        # closed_case_month_stats 蓋成殘缺資料，永久跳過（該月案由細分視為缺資料）
-        todo = sorted(set(datasets) - have - {'202511'})
+        # 注意：若官方月包被重傳成殘缺版（202511 曾發生，2026-07-08 已修復），
+        # 重跑會把完整資料蓋成殘缺——回填前先抽查該月檔數（正常 ~300 檔/22 地院）
+        todo = sorted(set(datasets) - have)
         print(f'待回填案由 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
             run_month(ym, datasets[ym])
