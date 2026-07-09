@@ -3850,6 +3850,11 @@ function soloFirmKey(firmName) {
   const m = (firmName || '').match(SOLO_FIRM_KEY_RE);
   return m ? m[1] : (firmName || '');
 }
+// 政府標案金額顯示（元 → 萬/億）
+function fmtGovAmt(v) {
+  if (!v) return '金額未公開';
+  return v >= 1e8 ? (v / 1e8).toFixed(2) + ' 億' : Math.round(v / 1e4).toLocaleString() + ' 萬';
+}
 let SOLO_FIRM_MAP = null;   // firm_key -> 唯一律師姓名
 let _soloFirmLoading = null;
 function ensureSoloFirms() {
@@ -4152,6 +4157,21 @@ async function loadOffices() {
     }
   } catch(e) { console.warn('firm indep badge error:', e); }
 
+  // 政府標案徽章資料（gov_firm_stats view，mig 077：firm_key 已按截到第一個「事務所」合併分所）
+  try {
+    const byName = new Map(allOffices.map(o => [o.firm_name, o]));
+    for (let from = 0; ; from += 1000) {
+      const { data: gs } = await db.from('gov_firm_stats')
+        .select('firm_key, wins, total_amount, wins_5y')
+        .gt('wins', 0).range(from, from + 999);
+      (gs || []).forEach(r => {
+        const o = byName.get(r.firm_key);
+        if (o) { o.gov_wins = r.wins; o.gov_amount = r.total_amount; o.gov_wins_5y = r.wins_5y; }
+      });
+      if (!gs || gs.length < 1000) break;
+    }
+  } catch(e) { console.warn('firm gov tender badge error:', e); }
+
   // 註：先前這裡會再從原始 firm_websites 表用模糊匹配補官網，但該表夾帶大量
   // 黃頁/公會/媒合平台/共用落地頁雜訊，會在顯示層抵銷 DB 端清洗（migration 042
   // 的 firm_website_blocklist + 共用 URL 過濾）。官網來源現以清洗後的
@@ -4316,7 +4336,7 @@ function renderOffices() {
     const rank = start + i + 1;
     return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
       <td style="text-align:center;color:${rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};font-weight:${rank <= 3 ? '700' : '400'};font-size:0.85rem;">${rank}</td>
-      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="點擊查看 ${o.ex_judicial_officers.length} 位前司法官" style="text-decoration:none;cursor:pointer;color:var(--purple);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--purple);border-radius:10px;background:rgba(155,126,216,0.1);">⚖️${o.ex_judicial_officers.length}</a>` : ''}${o.indep_seats ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="上市櫃/興櫃獨立董事：${o.indep_lawyers} 位律師 / ${o.indep_seats} 席，點擊查看" style="text-decoration:none;cursor:pointer;color:var(--gold);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--gold);border-radius:10px;background:rgba(201,168,76,0.1);">🏛${o.indep_seats}</a>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
+      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="點擊查看 ${o.ex_judicial_officers.length} 位前司法官" style="text-decoration:none;cursor:pointer;color:var(--purple);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--purple);border-radius:10px;background:rgba(155,126,216,0.1);">⚖️${o.ex_judicial_officers.length}</a>` : ''}${o.indep_seats ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="上市櫃/興櫃獨立董事：${o.indep_lawyers} 位律師 / ${o.indep_seats} 席，點擊查看" style="text-decoration:none;cursor:pointer;color:var(--gold);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--gold);border-radius:10px;background:rgba(201,168,76,0.1);">🏛${o.indep_seats}</a>` : ''}${o.gov_wins ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="政府標案得標 ${o.gov_wins} 件 / 累計 ${fmtGovAmt(o.gov_amount)}${o.gov_wins_5y ? `（近 5 年 ${o.gov_wins_5y} 件）` : ''}，點擊查看" style="text-decoration:none;cursor:pointer;color:var(--teal,#3fb6a8);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--teal,#3fb6a8);border-radius:10px;background:rgba(63,182,168,0.1);">🏆${o.gov_wins}</a>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="font-size:0.82rem;">${(() => {
@@ -4397,6 +4417,20 @@ async function showFirmDetail(firmName) {
   } catch (e) { console.log('firm indep dirs error:', e); }
   const indepByLawyer = {};
   firmIndep.forEach(r => { (indepByLawyer[r.person_name] = indepByLawyer[r.person_name] || []).push(r); });
+
+  // 政府標案（含分所 LIKE prefix；gov_tender_firms/gov_tenders，mig 063）
+  let govRows = [];
+  try {
+    const { data: gt } = await db.from('gov_tender_firms')
+      .select('firm_name, is_winner, award_amount, gov_tenders(title, unit_name, award_year, award_date)')
+      .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
+      .range(0, 999);
+    govRows = (gt || []).filter(r => r.gov_tenders);
+  } catch (e) { console.log('firm gov tenders error:', e); }
+  const govWins = govRows.filter(r => r.is_winner)
+    .sort((a, b) => (b.gov_tenders.award_date || '').localeCompare(a.gov_tenders.award_date || ''));
+  const govAmtSum = govWins.reduce((s, r) => s + (r.award_amount || 0), 0);
+  const govWins5 = govWins.filter(r => r.gov_tenders.award_year >= new Date().getFullYear() - 4);
 
   const litAgg5 = computeFirmLitAgg(firmStats.filter(s => !s.name_ambiguous).map(s => ({
     name: s.name, cases: s.official_cases_5yr || 0, cats: s.official_cats_5yr, court: s.official_top_court
@@ -4508,6 +4542,26 @@ async function showFirmDetail(firmName) {
             `${escHtml(s.company_code)} ${escHtml(s.company_name)}<span style="color:var(--text-muted);font-size:0.78rem;">(${INDEP_MKT_LBL[s.market] || s.market})</span>`
           ).join('、')}</li>`).join('')}
       </ul>
+    </div>
+    ` : ''}
+
+    ${govRows.length ? `
+    <!-- 政府標案 -->
+    <div class="card" style="border-left:3px solid var(--teal,#3fb6a8);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--teal,#3fb6a8);">&#127942; 政府標案（得標 ${govWins.length} 件 / 投標 ${govRows.length} 件）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">政府電子採購網決標紀錄（10 萬元以上；機關以個人名義委任不走標案）— 累計得標 ${fmtGovAmt(govAmtSum)}${govWins5.length ? `，近 5 年 ${govWins5.length} 件 ${fmtGovAmt(govWins5.reduce((s, r) => s + (r.award_amount || 0), 0))}` : ''}</div>
+      ${govWins.length ? `
+      <div class="table-wrap" style="max-height:260px;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:52px;">年度</th><th>機關</th><th>案名</th><th style="width:90px;text-align:right;">決標金額</th></tr></thead>
+          <tbody>${govWins.map(r => `<tr>
+            <td>${r.gov_tenders.award_year || '-'}</td>
+            <td style="font-size:0.8rem;">${escHtml(r.gov_tenders.unit_name || '-')}</td>
+            <td style="font-size:0.8rem;max-width:280px;">${escHtml(r.gov_tenders.title || '-')}</td>
+            <td style="text-align:right;font-size:0.8rem;">${fmtGovAmt(r.award_amount)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '<div style="font-size:0.82rem;color:var(--text-muted);">有投標紀錄但尚無得標。</div>'}
     </div>
     ` : ''}
 
