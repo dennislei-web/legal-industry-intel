@@ -91,6 +91,16 @@
   `refresh_family_lawyer_stats()` 由 `refresh_stats()` 月更一併呼叫
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
 - 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
+- **Phase B 案由層（migration 069/070）**：parse 帶 JTITLE → `lawyer_month_stats.causes` /
+  `judge_month_stats.causes` jsonb（鍵=「案類|正規化案由」複合鍵，存**原始案由**；
+  mapping 改版只需重跑 `sync_cause_map` 相關 remap + `refresh_lawyer_cause_stats()`，
+  不必重解析月包）。`cause_group_map`（ck→種類）由 upload 時自動同步，mapping 單一真實源
+  = `cause_map.py` 的 `map_judgment()`。彙總表 `lawyer_cause_stats`（滾動 60 月，
+  refresh 已掛進 `refresh_stats()`）；RPC：`firm_cause_ranking`（事務所×案由排名，全國口徑）、
+  `cause_supply_stats`（案由×供給/集中度）、`cause_group_list`（下拉）。
+  前端：律師 modal「案由組成」卡、事務所版圖「案由種類」下拉（選了會停用法院篩選）、
+  產業分析「案由供需」tab（民事有 Phase A 市場對照欄，刑事/家事分組口徑不同不硬對）。
+  回填：`python judgment_stats.py causefill 202105 202604`（冪等跳過已帶 causes 的月）。
 - **律師官方統計（migration 046）**：`lawyer_judgment_stats`（按律師名彙總：cases_5yr
   滾動 60 月錨定資料最新月、cases_total、cats_5yr/cats_all、by_year、top_court_5yr），
   `refresh_lawyer_judgment_stats()` 全量重建（TRUNCATE+INSERT，`refresh_stats()` 月更一併呼叫）；

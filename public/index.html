@@ -744,6 +744,9 @@
             <option value="懲戒">懲戒</option>
             <option value="其他">其他</option>
           </select>
+          <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
+            <option value="">全部案由種類</option>
+          </select>
           <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
             <option value="">全部法院</option>
           </select>
@@ -788,6 +791,38 @@
         ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
+      </div>
+    </div>
+
+    <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
+    <div id="tab-cause-supply" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 案由供需地圖 — 市場量能 × 律師供給</div>
+        <div class="sub-tabs" id="csCatTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+          <button class="sub-tab-btn active" data-cat="民事">民事</button>
+          <button class="sub-tab-btn" data-cat="刑事">刑事</button>
+          <button class="sub-tab-btn" data-cat="家事">家事</button>
+        </div>
+        <div class="table-wrap" style="max-height:560px;overflow-y:auto;">
+          <table>
+            <thead><tr>
+              <th>案由種類</th>
+              <th style="text-align:right;">判決件數(近5年)</th>
+              <th style="text-align:right;">供給律師數</th>
+              <th style="text-align:right;">常態承辦律師</th>
+              <th style="text-align:right;">Top10 集中度</th>
+              <th style="text-align:right;" class="cs-mkt-col">市場終結件數/年</th>
+              <th style="text-align:right;" class="cs-mkt-col">市場 3 年變化</th>
+            </tr></thead>
+            <tbody id="csTableBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
+          ※ 供給面（判決件數/律師數/集中度）來自近 5 年公開裁判書案由（下限估計；常態承辦=該類近 5 年 ≥12 件）。
+          市場面兩欄來自終結案件微資料（民事訴訟檔，最新完整年；3 年變化為完整年對完整年），
+          <strong>僅民事有市場對照</strong>——刑事/家事的官方分組與判決書案由分組口徑不同，不硬對。
+          集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
+        </div>
       </div>
     </div>
 
@@ -2667,6 +2702,7 @@ const SECTIONS = {
     { tab: 'family', label: '家事法官' },
     { tab: 'fam-lawyers', label: '家事律師' },
     { tab: 'firm-map', label: '事務所版圖' },
+    { tab: 'cause-supply', label: '案由供需' },
   ],
   sources: [],
   admin: [],
@@ -2709,6 +2745,7 @@ function showTab(tab) {
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'fam-lawyers') loadFamLawyersOnce();
   if (tab === 'firm-map') loadFirmMapOnce();
+  if (tab === 'cause-supply') loadCauseSupplyOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
@@ -4885,11 +4922,13 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null;
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null;
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('lawyer_cause_stats').select('*').eq('name', name).maybeSingle()
+      .then(r => { causeStat = r.data; }),
     db.rpc('lawyer_pair_summary', { p_name: name, p_limit: 12 })
       .then(r => { pairs = r.data; }),
     db.rpc('lawyer_year_trend', { p_name: name })
@@ -5035,6 +5074,8 @@ async function showLawyerDetail(name, certNumber) {
       <div style="color:var(--text-muted);font-size:0.85rem;">查無公開裁判書出庭紀錄（家事裁定、非訟事件等多數不公開，實際案量可能高於此）</div>
     </div>
     `}
+
+    ${renderCauseCard(causeStat, l.name_ambiguous)}
 
     ${renderPairCard(pairs)}
 
@@ -5342,6 +5383,51 @@ function renderPairCard(pairs) {
           list(co, c => escHtml(c.peer), 'rgba(76,175,130,0.7)', '無協同紀錄'))}
         ${col('常對造律師', '民/家/行政、兩造皆委任時',
           list(op, o => escHtml(o.peer), 'rgba(224,92,92,0.7)', '無對造紀錄（多數案件對造未委任律師）'))}
+      </div>
+    </div>`;
+}
+
+// 律師案由組成卡（Phase B：lawyer_cause_stats，近 5 年公開裁判書 JTITLE）
+const CAUSE_CAT_COLORS = { '民事': 'rgba(79,142,247,0.7)', '刑事': 'rgba(224,92,92,0.7)',
+  '家事': 'rgba(76,175,130,0.7)', '行政': 'rgba(201,168,76,0.7)', '少年': 'rgba(69,183,209,0.7)',
+  '懲戒': 'rgba(160,108,213,0.7)', '其他': 'rgba(136,153,170,0.7)' };
+
+function renderCauseCard(cs, ambiguous) {
+  if (!cs || !cs.cases_5yr) return '';
+  const groups = Object.entries(cs.by_group || {}).sort((a, b) => b[1] - a[1]);
+  const tops = (cs.top_causes || []).slice(0, 10);
+  if (!groups.length) return '';
+  const gmax = groups[0][1];
+  const groupRows = groups.slice(0, 8).map(([g, n]) => {
+    const w = Math.max(4, Math.round(n / gmax * 100));
+    const pct = (n / cs.cases_5yr * 100).toFixed(0);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.85rem;">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(g)}</span>
+      <span style="width:110px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:rgba(79,142,247,0.7);"></span></span>
+      <span style="width:80px;text-align:right;color:var(--text-muted);flex-shrink:0;">${n}（${pct}%）</span>
+    </div>`;
+  }).join('');
+  const rawRows = tops.map(([ck, n]) => {
+    const [cat, cause] = String(ck).split('|');
+    const color = CAUSE_CAT_COLORS[cat] || CAUSE_CAT_COLORS['其他'];
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.82rem;">
+      <span style="width:8px;height:8px;border-radius:2px;background:${color};flex-shrink:0;" title="${escHtml(cat)}"></span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(cat)}｜${escHtml(cause)}">${escHtml(cause || '未填')}</span>
+      <span style="width:34px;text-align:right;color:var(--text-muted);flex-shrink:0;">${n}</span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128220; 案由組成 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 5 年公開裁判書案由（JTITLE）${ambiguous ? '，同名合併值 *' : ''}，僅判決足跡、和解撤回不在內</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">種類分布</div>
+          ${groupRows}
+        </div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">最常見原始案由 Top 10</div>
+          ${rawRows}
+        </div>
       </div>
     </div>`;
 }
@@ -6778,6 +6864,8 @@ const isZheluFirm = f => !!f && f.includes('喆律');
 let _fmLoaded = false;
 function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMap(); }
 
+let _fmGroups = [];  // cause_group_list 快取（Phase B 案由種類）
+
 async function initFirmMap() {
   try {
     const { data: courts } = await db.rpc('lms_court_list').range(0, 199);
@@ -6787,16 +6875,38 @@ async function initFirmMap() {
         courts.map(c => `<option value="${escHtml(c.court_name)}">${escHtml(c.court_name)} (${Number(c.cases).toLocaleString()})</option>`).join('');
     }
   } catch (e) { console.log('lms_court_list error:', e); }
+  try {
+    const { data: groups } = await db.rpc('cause_group_list').range(0, 499);
+    _fmGroups = groups || [];
+    renderFmGroupOptions();
+  } catch (e) { console.log('cause_group_list error:', e); }
   loadFirmMap();
+}
+
+// 案由種類下拉跟著案類篩選連動（選了案類只列該案類的種類）
+function renderFmGroupOptions() {
+  const cat = document.getElementById('fmCatSel').value;
+  const sel = document.getElementById('fmGroupSel');
+  const keep = sel.value;
+  const list = _fmGroups.filter(g => !cat || g.cat === cat);
+  sel.innerHTML = '<option value="">全部案由種類</option>' +
+    list.map(g => `<option value="${escHtml(g.cause_group)}">${escHtml(g.cause_group)}${cat ? '' : `（${escHtml(g.cat)}）`}</option>`).join('');
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
 async function loadFirmMap() {
   const cat = document.getElementById('fmCatSel').value || null;
+  const group = document.getElementById('fmGroupSel').value || null;
   const court = document.getElementById('fmCourtSel').value || null;
   const body = document.getElementById('fmTableBody');
+  renderFmGroupOptions();
   body.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
 
-  const { data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court }).range(0, 999);
+  // 選了案由種類 → 走 Phase B firm_cause_ranking（全國口徑，法院篩選不適用）
+  document.getElementById('fmCourtSel').disabled = !!group;
+  const { data: rows, error } = group
+    ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000 }).range(0, 999)
+    : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court }).range(0, 999);
   if (error || !rows?.length) {
     console.log('firm_court_ranking error:', error);
     body.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
@@ -6848,6 +6958,69 @@ async function loadFirmMap() {
       <td>${firmLink(r.firm_name, z ? 'font-weight:700;' : '')}</td>
       <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
       <td style="text-align:right;">${r.lawyer_count}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== 案由供需（Phase B cause_supply_stats × Phase A cause_group_yearly）=====
+let _csLoaded = false, _csMarket = null;
+function loadCauseSupplyOnce() { if (_csLoaded) return; _csLoaded = true; initCauseSupply(); }
+
+async function initCauseSupply() {
+  document.querySelectorAll('#csCatTabs .sub-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#csCatTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadCauseSupply(btn.dataset.cat);
+    };
+  });
+  try {
+    // 市場面（Phase A 終結微資料，民事訴訟檔）
+    const { data } = await db.rpc('cause_group_yearly', { p_file_type: '民事訴訟' });
+    _csMarket = data || [];
+  } catch (e) { _csMarket = []; }
+  loadCauseSupply('民事');
+}
+
+// 最新完整年件數 + 3 年變化（完整年對完整年）
+function csMarketCols(group) {
+  const rows = _csMarket || [];
+  const monthsByYear = {};
+  rows.forEach(r => { monthsByYear[r.y] = Math.max(monthsByYear[r.y] || 0, r.months); });
+  const fullYears = Object.keys(monthsByYear).filter(y => monthsByYear[y] >= 12).sort();
+  if (!fullYears.length) return null;
+  const latest = fullYears[fullYears.length - 1];
+  const base = fullYears[Math.max(0, fullYears.length - 4)];
+  const get = y => rows.filter(r => r.y === y && r.cause_group === group).reduce((s, r) => s + r.n, 0);
+  const nl = get(latest), nb = get(base);
+  return { nl, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null };
+}
+
+async function loadCauseSupply(cat) {
+  const body = document.getElementById('csTableBody');
+  body.innerHTML = '<tr><td colspan="7" class="loading">載入中</td></tr>';
+  const { data: rows, error } = await db.rpc('cause_supply_stats', { p_cat: cat }).range(0, 199);
+  if (error || !rows?.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    return;
+  }
+  const showMkt = cat === '民事';
+  document.querySelectorAll('.cs-mkt-col').forEach(el => { el.style.display = showMkt ? '' : 'none'; });
+  body.innerHTML = rows.map(r => {
+    let mktCells = '';
+    if (showMkt) {
+      const m = csMarketCols(r.cause_group);
+      mktCells = (m && m.nl) ? `<td style="text-align:right;">${m.nl.toLocaleString()}</td>
+        <td style="text-align:right;color:${m.chg >= 0 ? 'var(--red)' : 'var(--green)'};">${m.chg === null ? '-' : (m.chg >= 0 ? '+' : '') + m.chg.toFixed(1) + '%'}</td>`
+        : '<td style="text-align:right;">-</td><td style="text-align:right;">-</td>';
+    }
+    return `<tr>
+      <td>${escHtml(r.cause_group)}</td>
+      <td style="text-align:right;color:var(--gold);font-weight:600;">${Number(r.total_cases).toLocaleString()}</td>
+      <td style="text-align:right;">${Number(r.lawyers).toLocaleString()}</td>
+      <td style="text-align:right;">${Number(r.active_lawyers).toLocaleString()}</td>
+      <td style="text-align:right;">${r.top10_share == null ? '-' : (r.top10_share * 100).toFixed(1) + '%'}</td>
+      ${mktCells}
     </tr>`;
   }).join('');
 }

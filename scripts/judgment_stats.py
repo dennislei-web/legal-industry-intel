@@ -15,6 +15,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py run 202504               # download + parse + upload 一條龍
   python judgment_stats.py backfill 202001 202504   # 依序跑一段區間（跳過已上傳的月份）
   python judgment_stats.py pairfill 202005 202504   # Phase 2 配對回填（強制重解、跳過已上傳 pair 的月）
+  python judgment_stats.py causefill 202105 202604  # Phase B 案由回填（強制重解、跳過已帶 causes 的月）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full p7zip-rar）。
 """
@@ -29,6 +30,8 @@ from collections import defaultdict
 from datetime import date
 import requests
 from dotenv import load_dotenv
+
+from cause_map import norm_cause, map_judgment
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
@@ -454,11 +457,14 @@ def parse(yyyymm):
         if r.returncode != 0:
             raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
 
-    # 聚合鍵：(name, court) → {n, sum_days, cats{}, years{}}
+    # 聚合鍵：(name, court) → {n, sum_days, cats{}, causes{}}
     agg = defaultdict(lambda: {'n': 0, 'sum_days': 0, 'n_days': 0,
-                               'cats': defaultdict(int)})
-    # 律師聚合：(name, court) → {n, cats{}}
-    lagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
+                               'cats': defaultdict(int), 'causes': defaultdict(int)})
+    # 律師聚合：(name, court) → {n, cats{}, causes{}}
+    # causes 鍵 = 「案類|正規化JTITLE」複合鍵（Phase B，migration 069）
+    lagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int),
+                                'causes': defaultdict(int)})
+    cause_keys = set()  # 本月出現過的複合鍵（上傳時同步 cause_group_map）
     # 檢察官聚合：(name, office) → {n, cats{}}
     pagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
     # Phase 2 配對聚合
@@ -485,11 +491,14 @@ def parse(yyyymm):
             mc = RE_COURT.search(head.strip())
             court = normalize_court(mc.group(1)) if mc else '未知法院'
             cat = classify(head, doc.get('JCASE') or '')
+            ck = f'{cat}|{norm_cause(doc.get("JTITLE") or "")}'
+            cause_keys.add(ck)
             lawyers = extract_lawyers(jfull)
             for lname in lawyers:
                 la = lagg[(lname, court)]
                 la['n'] += 1
                 la['cats'][cat] += 1
+                la['causes'][ck] += 1
             # ── 協同/對造 pair（不需法官，judge-less 案件也要算）──
             if lawyers:
                 sided = extract_lawyers_sided(jfull)
@@ -542,6 +551,7 @@ def parse(yyyymm):
                 a = agg[(name, court)]
                 a['n'] += 1
                 a['cats'][cat] += 1
+                a['causes'][ck] += 1
                 if days is not None:
                     a['sum_days'] += days
                     a['n_days'] += 1
@@ -550,9 +560,10 @@ def parse(yyyymm):
 
     rows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
              'case_count': v['n'], 'sum_days': v['sum_days'], 'n_days': v['n_days'],
-             'cats': dict(v['cats'])} for k, v in agg.items()]
+             'cats': dict(v['cats']), 'causes': dict(v['causes'])} for k, v in agg.items()]
     lrows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
-              'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in lagg.items()]
+              'case_count': v['n'], 'cats': dict(v['cats']),
+              'causes': dict(v['causes'])} for k, v in lagg.items()]
     prows = [{'name': k[0], 'office_name': k[1], 'yyyymm': yyyymm,
               'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in pagg.items()]
     ljrows = [{'lawyer_name': k[0], 'judge_name': k[1], 'court_name': k[2],
@@ -564,7 +575,8 @@ def parse(yyyymm):
                'yyyymm': yyyymm, 'case_count': v} for k, v in opagg.items()]
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump({'judges': rows, 'lawyers': lrows, 'prosecutors': prows,
-                   'lawyer_judge': ljrows, 'cocounsel': corows, 'opposing': oprows},
+                   'lawyer_judge': ljrows, 'cocounsel': corows, 'opposing': oprows,
+                   'cause_keys': sorted(cause_keys)},
                   f, ensure_ascii=False)
     print(f'  解析完成：{n_files} 份裁判書，{len(rows)} 個 (法官,法院) 組合，'
           f'{len(lrows)} 個 (律師,法院) 組合，{len(prows)} 個 (檢察官,檢察署) 組合，'
@@ -611,12 +623,34 @@ def _upload_rows(table, yyyymm, rows):
         time.sleep(1)
 
 
+def sync_cause_map(cause_keys):
+    """把本月出現的「案類|案由」複合鍵 mapping 後 upsert 進 cause_group_map。
+    mapping 單一真實源在 cause_map.map_judgment()；規則改版後重跑本函式即可
+    remap（配合 refresh rollup），不必重解析月包。"""
+    rows = []
+    for ck in cause_keys:
+        cat, _, cause = ck.partition('|')
+        rows.append({'ck': ck, 'cat': cat, 'cause': cause,
+                     'cause_group': map_judgment(cat, cause)})
+    for i in range(0, len(rows), 500):
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/cause_group_map?on_conflict=ck',
+                          json=rows[i:i + 500],
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json',
+                                   'Prefer': 'resolution=merge-duplicates,return=minimal'},
+                          timeout=120, verify=False)
+        if r.status_code not in (200, 201, 204):
+            raise RuntimeError(f'cause_group_map 上傳失敗 {r.status_code}: {r.text[:200]}')
+    print(f'  cause_group_map 同步 {len(rows)} 鍵')
+
+
 def upload(yyyymm):
     out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
     with open(out_path, encoding='utf-8') as f:
         data = json.load(f)
     if isinstance(data, list):  # 舊格式（只有法官）
         data = {'judges': data, 'lawyers': []}
+    if data.get('cause_keys'):
+        sync_cause_map(data['cause_keys'])
     _upload_rows('judge_month_stats', yyyymm, data['judges'])
     if data['lawyers']:
         _upload_rows('lawyer_month_stats', yyyymm, data['lawyers'])
@@ -636,6 +670,15 @@ def pairs_uploaded(yyyymm):
     """該月律師×法官 pair 是否已上傳（pairfill 冪等跳過用）"""
     r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
                      params={'yyyymm': f'eq.{yyyymm}', 'select': 'yyyymm', 'limit': 1},
+                     headers=HEADERS_SB, timeout=30, verify=False)
+    return r.status_code == 200 and len(r.json()) > 0
+
+
+def causes_uploaded(yyyymm):
+    """該月 lawyer_month_stats 是否已帶案由（causefill 冪等跳過用）"""
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_month_stats',
+                     params={'yyyymm': f'eq.{yyyymm}', 'causes': 'not.is.null',
+                             'select': 'yyyymm', 'limit': 1},
                      headers=HEADERS_SB, timeout=30, verify=False)
     return r.status_code == 200 and len(r.json()) > 0
 
@@ -665,7 +708,7 @@ def prune_pairs():
 def refresh_stats():
     for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
                 'refresh_lawyer_judgment_stats', 'refresh_family_lawyer_stats',
-                'refresh_lawyer_region_stats'):
+                'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats'):
         print(f'  呼叫 {rpc}() ...')
         r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
@@ -742,6 +785,20 @@ if __name__ == '__main__':
             except Exception as e:
                 print(f'{ym}: 失敗 — {e}')
         refresh_stats()
+    elif cmd == 'causefill':
+        # Phase B 案由回填：強制重解（agg 快取沒存 JTITLE），冪等跳過已帶案由的月份。
+        # 會一併冪等重傳全部月表與 pair 表（內容除 causes 外不變）。
+        for ym in month_range(sys.argv[2], sys.argv[3]):
+            try:
+                if causes_uploaded(ym):
+                    print(f'{ym}: causes 已上傳，跳過')
+                    continue
+                old_agg = os.path.join(WORK_DIR, f'{ym}_agg.json')
+                if os.path.exists(old_agg):
+                    os.remove(old_agg)
+                run_month(ym, skip_uploaded=False, purge_rar=True)
+            except Exception as e:
+                print(f'{ym}: 失敗 — {e}')
     elif cmd == 'reclassify':
         # 分類邏輯改版後強制重跑：刪 agg 快取、無視已上傳紀錄，逐月重新 download+parse+upload
         for ym in month_range(sys.argv[2], sys.argv[3]):
