@@ -5634,15 +5634,17 @@ async function refreshAlumnusOne(id, name, skipConfirm) {
     });
     const out = await res.json();
     if (!out.success) throw new Error(out.error || `HTTP ${res.status}`);
-    // 輪詢該列 updated_at（最長 4 分鐘）；無變動的重爬不會動 updated_at，逾時就靜靜重載一次
+    // 輪詢該列 updated_at（最長 4 分鐘）；無變動的重爬不會動 updated_at
+    let changed = false;
     for (let k = 0; k < 24; k++) {
       await new Promise(r => setTimeout(r, 10000));
       const { data } = await db.from('zhelu_alumni').select('updated_at').eq('id', id).single();
-      if (data && data.updated_at !== before) break;
+      if (data && data.updated_at !== before) { changed = true; break; }
     }
     _alumniRows = null;
     _alumniRefreshing.delete(id);
     await loadAlumni();
+    if (!changed) alert(`「${name}」重爬完成但未偵測到資料變動。\n可能現職本來就沒變；也可能 MOJ 查詢偶發失敗（法務部 API 偶爾抖動），結果不如預期可再按一次 🔄。`);
   } catch (e) {
     _alumniRefreshing.delete(id);
     renderAlumniTable();
