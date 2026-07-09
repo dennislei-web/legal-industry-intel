@@ -4922,11 +4922,13 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null;
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null;
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('lawyer_client_concentration').select('*').eq('name', name).maybeSingle()
+      .then(r => { clientConc = r.data; }),
     db.from('lawyer_cause_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { causeStat = r.data; }),
     db.rpc('lawyer_pair_summary', { p_name: name, p_limit: 12 })
@@ -5074,6 +5076,8 @@ async function showLawyerDetail(name, certNumber) {
       <div style="color:var(--text-muted);font-size:0.85rem;">查無公開裁判書出庭紀錄（家事裁定、非訟事件等多數不公開，實際案量可能高於此）</div>
     </div>
     `}
+
+    ${renderClientCard(clientConc, l.name_ambiguous)}
 
     ${renderCauseCard(causeStat, l.name_ambiguous)}
 
@@ -5429,6 +5433,57 @@ function renderCauseCard(cs, ambiguous) {
           ${rawRows}
         </div>
       </div>
+    </div>`;
+}
+
+// 律師訴訟客戶集中度卡（lawyer_client_concentration：近 12 個月當事人欄法人客戶；
+// 目前僅涵蓋「人名事務所」律師，無資料時不顯示）
+const CONC_TIERS = {
+  A: { label: '高度集中｜推定專屬服務', color: 'var(--red)', desc: '出庭案件絕大多數代理同一法人，業務實質上服務單一客戶（可能為受僱法務開所或長期專屬顧問，判決無法區分聘僱形式）' },
+  B: { label: '中度集中｜偏單一客戶', color: 'var(--orange)', desc: '半數以上案件代理同一法人，訴訟業務高度依賴單一客戶' },
+  C: { label: '客源分散｜一般執業', color: 'var(--green)', desc: '客源分散，屬一般對外執業型態' },
+  D: { label: '樣本不足', color: 'var(--text-muted)', desc: '近 12 個月出庭少於 3 件，無法判讀集中度' },
+};
+
+function renderClientCard(cc, ambiguous) {
+  if (!cc) return '';
+  const t = CONC_TIERS[cc.tier] || CONC_TIERS.D;
+  const ents = cc.top_entities || [];
+  const emax = ents.length ? ents[0][1] : 0;
+  const entRows = ents.map(([e, n]) => {
+    const w = Math.max(4, Math.round(n / emax * 100));
+    const pct = cc.n_cases ? Math.round(n / cc.n_cases * 100) : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.85rem;">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(e)}">${escHtml(e)}</span>
+      <span style="width:110px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:rgba(201,168,76,0.75);"></span></span>
+      <span style="width:90px;text-align:right;color:var(--text-muted);flex-shrink:0;">${n} 件（${pct}%）</span>
+    </div>`;
+  }).join('');
+  const titles = (cc.top_titles || []).slice(0, 3).map(escHtml).join('｜');
+  const win = `${cc.window_start.slice(0, 4)}-${cc.window_start.slice(4)}～${cc.window_end.slice(0, 4)}-${cc.window_end.slice(4)}`;
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#127970; 訴訟客戶集中度 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 12 個月（${win}）公開裁判書當事人欄，法人客戶 per 案去重；目前僅涵蓋人名事務所律師</span></div>
+      ${ambiguous ? '<div style="font-size:0.75rem;color:var(--orange);margin-bottom:8px;">&#9888; 名冊中有同名律師，以下為同名合併數字</div>' : ''}
+      <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">集中度判讀</div>
+          <div style="font-size:1.05rem;font-weight:700;color:${t.color};padding-top:6px;">${t.label}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">12 個月出庭</div>
+          <div style="font-size:1.8rem;font-weight:700;">${cc.n_cases}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">Top1 法人客戶佔比</div>
+          <div style="font-size:1.8rem;font-weight:700;color:${t.color};">${Math.round((cc.top1_share || 0) * 100)}%</div>
+        </div>
+      </div>
+      ${ents.length ? `
+      <div style="font-size:0.82rem;font-weight:600;margin-bottom:4px;">主要法人客戶</div>
+      ${entRows}` : '<div style="color:var(--text-muted);font-size:0.85rem;">視窗內未見法人當事人（客戶多為個人，屬一般民眾案件）</div>'}
+      ${titles ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:8px;">主要案由：${titles}</div>` : ''}
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">${t.desc}</div>
     </div>`;
 }
 
