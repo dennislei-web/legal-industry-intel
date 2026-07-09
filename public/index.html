@@ -2673,6 +2673,7 @@ async function showDashboard() {
   db.from('user_profiles').select('role').eq('id', currentUser.id).single().then(({ data: profile }) => {
     isAdmin = profile?.role === 'admin';
     document.getElementById('navBtn_admin').style.display = isAdmin ? '' : 'none';
+    if (isAdmin) showSection(currentSection); // 重繪子頁列，讓 adminOnly tab（校友會/010）浮現
   });
   ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
   ensureLeaderOverrides(); // 前台標註所長對照表（mig 061，同上背景載）
@@ -2711,8 +2712,8 @@ const SECTIONS = {
     { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
     { tab: 'changes', label: '異動追蹤' },
-    { tab: 'alumni', label: '喆律校友會' },
-    { tab: 'law010', label: '010 合作律師' },
+    { tab: 'alumni', label: '喆律校友會', adminOnly: true },
+    { tab: 'law010', label: '010 合作律師', adminOnly: true },
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
@@ -2756,7 +2757,7 @@ function showSection(sec) {
   if (navBtn) navBtn.classList.add('active');
 
   const bar = document.getElementById('subTabsBar');
-  const tabs = SECTIONS[sec] || [];
+  const tabs = (SECTIONS[sec] || []).filter(t => !t.adminOnly || isAdmin);
   if (tabs.length) {
     bar.style.display = '';
     bar.innerHTML = tabs.map(t =>
@@ -2789,8 +2790,8 @@ function showTab(tab) {
   if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') loadChanges();
-  if (tab === 'alumni') loadAlumni();
-  if (tab === 'law010') loadLaw010();
+  if (tab === 'alumni' && isAdmin) loadAlumni();
+  if (tab === 'law010' && isAdmin) loadLaw010();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'judge-changes') loadJudgeChanges();
