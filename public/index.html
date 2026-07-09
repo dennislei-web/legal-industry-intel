@@ -1309,6 +1309,43 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: LAW010 (010 合作律師) ==================== -->
+    <div id="tab-law010" class="tab-content">
+      <div class="kpi-grid" id="law010Kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;"></div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128202; 合作狀態分布</div>
+        <div id="law010DistBar" style="display:flex;height:24px;border-radius:8px;overflow:hidden;gap:2px;background:var(--bg-main);margin-bottom:8px;"></div>
+        <div id="law010DistLegend" style="display:flex;flex-wrap:wrap;gap:8px 18px;font-size:0.78rem;color:var(--text-muted);"></div>
+      </div>
+      <div class="card" id="law010ClusterCard" style="margin-bottom:16px;display:none;">
+        <div class="card-title">&#127970; 同所合作聚落（同一事務所 2 位以上合作律師）</div>
+        <div id="law010Clusters"></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="law010Search" placeholder="搜尋姓名或事務所..." oninput="renderLaw010Table()">
+        <select id="law010Status" onchange="renderLaw010Table()"></select>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128203; 合作律師名單 <span id="law010Count" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>律師</th><th>010 案件地區</th><th>合作期間</th><th>狀態</th><th>近12月轉介</th><th>累計轉介</th><th>委任率</th><th>累計業績</th><th>現職事務所</th><th>官方近5年案件</th></tr>
+            </thead>
+            <tbody id="law010TableBody"><tr><td colspan="10" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          資料來源：法律010總表（每日自動同步，涵蓋 2023-11 起）× 法務部律師登錄 × 官方裁判書統計。
+          「業績」為 010 平台轉介口徑（含跨月收款）、委任率＝簽約÷出席；分所條目（如林冠宇-桃園）已歸戶到同一位律師。
+          現職事務所依姓名比對法務部名冊：同名者以 010 案件地區推定並標 ⚠、推定不了則列出筆數；「名冊查無」多為總表使用簡稱。
+          狀態依最後轉介月距資料最新月的間隔：現役 ≤3 個月、淡出 ≤12 個月、其餘為已停止。
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGE-CHANGES (法官異動追蹤) ==================== -->
     <div id="tab-judge-changes" class="tab-content">
       <div class="card" style="margin-bottom:16px;">
@@ -2674,6 +2711,7 @@ const SECTIONS = {
     { tab: 'offices', label: '事務所' },
     { tab: 'changes', label: '異動追蹤' },
     { tab: 'alumni', label: '喆律校友會' },
+    { tab: 'law010', label: '010 合作律師' },
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
@@ -2751,6 +2789,7 @@ function showTab(tab) {
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') loadChanges();
   if (tab === 'alumni') loadAlumni();
+  if (tab === 'law010') loadLaw010();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'judge-changes') loadJudgeChanges();
@@ -6017,6 +6056,175 @@ function renderAlumniTable() {
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="loading">無符合條件的校友</td></tr>';
   document.getElementById('alumniCount').textContent = `顯示 ${rows.length} / ${_alumniRows.length} 位`;
+}
+
+// ============================================================
+// LAW010 (010 合作律師)
+// ============================================================
+const LAW010_STATUS = {
+  active:  { label: '現役',   color: 'var(--green)',      dim: 'rgba(63,185,80,0.15)' },
+  fading:  { label: '淡出',   color: 'var(--orange)',     dim: 'rgba(210,153,34,0.15)' },
+  stopped: { label: '已停止', color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' },
+};
+let _law010Rows = null;   // view rows ＋ 前端補上 moj/status/last12 等衍生欄
+
+function law010MonthDiff(a, b) {  // yyyymm int 差幾個月
+  return (Math.floor(b / 100) * 12 + b % 100) - (Math.floor(a / 100) * 12 + a % 100);
+}
+function law010FmtM(m) { return m ? `${String(m).slice(0, 4)}-${String(m).slice(4)}` : '—'; }
+
+async function loadLaw010() {
+  if (_law010Rows) return;
+  const { data, error } = await db.from('law010_lawyer_summary').select('*');
+  if (error || !data || !data.length) {
+    document.getElementById('law010TableBody').innerHTML =
+      `<tr><td colspan="10" class="loading">載入失敗：${escHtml(error ? error.message : '無資料')}</td></tr>`;
+    return;
+  }
+  // 全體資料最新月（有轉介的月）當「現在」，避免同步時滯造成全員誤判停止
+  const maxMonth = Math.max(...data.map(r => r.last_month || 0));
+
+  // MOJ 現職 ＋ 官方案件統計（同名者依 010 案件地區推定）
+  const names = data.map(r => r.name);
+  const { data: moj } = await db.from('lawyers_with_stats')
+    .select('name,firm_name,region,official_cases_5yr,name_ambiguous')
+    .in('name', names);
+  const byName = {};
+  (moj || []).forEach(m => { (byName[m.name] = byName[m.name] || []).push(m); });
+
+  data.forEach(r => {
+    const gap = r.last_month ? law010MonthDiff(r.last_month, maxMonth) : 99;
+    r.status = gap <= 3 ? 'active' : gap <= 12 ? 'fading' : 'stopped';
+    // 近 12 個資料月的轉介件數（months jsonb 鍵=yyyymm，值=[轉介,簽約,業績]）
+    r.last12 = Object.entries(r.months || {})
+      .filter(([m]) => law010MonthDiff(+m, maxMonth) < 12)
+      .reduce((s, [, v]) => s + (v[0] || 0), 0);
+    const cands = byName[r.name] || [];
+    r.moj = null; r.mojNote = '';
+    if (cands.length === 1) r.moj = cands[0];
+    else if (cands.length > 1) {
+      const hit = cands.filter(c => c.region && (r.regions_010 || []).includes(c.region));
+      if (hit.length === 1) { r.moj = hit[0]; r.mojNote = '同名，依 010 案件地區推定'; }
+      else r.mojNote = `名冊同名 ${cands.length} 筆，無法推定`;
+    } else r.mojNote = '名冊查無（可能為簡稱）';
+  });
+
+  // 事務所規模（人數）
+  const firms = [...new Set(data.map(r => r.moj?.firm_name).filter(Boolean))];
+  const { data: fc } = firms.length
+    ? await db.from('moj_firm_stats_cache').select('firm_name,lawyer_count').in('firm_name', firms)
+    : { data: [] };
+  const firmSize = {};
+  (fc || []).forEach(f => { firmSize[f.firm_name] = f.lawyer_count; });
+  data.forEach(r => { r.firmSize = r.moj ? firmSize[r.moj.firm_name] : null; });
+
+  _law010Rows = data;
+  _law010Rows._maxMonth = maxMonth;
+  renderLaw010Summary();
+  renderLaw010Table();
+}
+
+function law010SetStatus(s) {
+  document.getElementById('law010Status').value = s;
+  renderLaw010Table();
+}
+
+function renderLaw010Summary() {
+  const rows = _law010Rows, total = rows.length;
+  const active = document.getElementById('law010Status').value || '';
+  const cnt = {};
+  rows.forEach(d => cnt[d.status] = (cnt[d.status] || 0) + 1);
+  const order = Object.keys(LAW010_STATUS).filter(s => cnt[s]);
+  const ref12 = rows.reduce((s, r) => s + r.last12, 0);
+  const nFirms = new Set(rows.filter(r => r.moj).map(r => r.moj.firm_name)).size;
+
+  document.getElementById('law010Kpis').innerHTML =
+    `<div class="kpi-card" onclick="law010SetStatus('')" style="cursor:pointer;${active===''?'border-color:var(--gold);':''}">
+      <div class="kpi-label">合作律師總數</div><div class="kpi-value">${total}</div><div class="kpi-sub">2023-11 起曾轉介</div></div>` +
+    order.map(s => `<div class="kpi-card" onclick="law010SetStatus('${s}')" style="cursor:pointer;${active===s?'border-color:var(--gold);':''}">
+      <div class="kpi-label"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${LAW010_STATUS[s].color};margin-right:5px;"></span>${LAW010_STATUS[s].label}</div>
+      <div class="kpi-value" style="color:${LAW010_STATUS[s].color};">${cnt[s]}</div></div>`).join('') +
+    `<div class="kpi-card"><div class="kpi-label">近12月轉介件數</div><div class="kpi-value">${ref12.toLocaleString()}</div>
+      <div class="kpi-sub">資料至 ${law010FmtM(rows._maxMonth)}</div></div>
+     <div class="kpi-card"><div class="kpi-label">合作事務所數</div><div class="kpi-value">${nFirms}</div><div class="kpi-sub">依法務部現職歸戶</div></div>`;
+
+  document.getElementById('law010DistBar').innerHTML = order.map(s =>
+    `<div style="flex:${cnt[s]};min-width:6px;background:${LAW010_STATUS[s].color};" title="${LAW010_STATUS[s].label} ${cnt[s]} 人"></div>`).join('');
+  document.getElementById('law010DistLegend').innerHTML = order.map(s =>
+    `<span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:3px;background:${LAW010_STATUS[s].color};display:inline-block;"></span>${LAW010_STATUS[s].label} ${cnt[s]} 人（${Math.round(cnt[s]/total*100)}%）</span>`).join('');
+
+  const sel = document.getElementById('law010Status');
+  sel.innerHTML = `<option value="">所有狀態</option>` +
+    order.map(s => `<option value="${s}">${LAW010_STATUS[s].label}（${cnt[s]}）</option>`).join('');
+  sel.value = active;
+
+  const byFirm = {};
+  rows.forEach(d => {
+    if (!d.moj) return;
+    (byFirm[d.moj.firm_name] = byFirm[d.moj.firm_name] || []).push(d.name);
+  });
+  const clusters = Object.entries(byFirm).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length);
+  if (clusters.length) {
+    document.getElementById('law010ClusterCard').style.display = '';
+    document.getElementById('law010Clusters').innerHTML = clusters.map(([f, v]) =>
+      `<div style="padding:5px 0;font-size:0.88rem;"><strong>${firmLink(f, 'font-weight:700;')}</strong>
+       <span style="color:var(--text-muted)">— ${v.map(n => lawyerLink(n, 'color:var(--text-muted);')).join('、')}（${v.length} 人）</span></div>`).join('');
+  }
+}
+
+// 近 12 個資料月轉介 sparkline（inline SVG 小長條）
+function law010Spark(months, maxMonth) {
+  const vals = [];
+  for (let i = 11; i >= 0; i--) {
+    const t = Math.floor(maxMonth / 100) * 12 + (maxMonth % 100) - 1 - i;
+    const ym = `${Math.floor(t / 12)}${String(t % 12 + 1).padStart(2, '0')}`;
+    vals.push((months && months[ym] && months[ym][0]) || 0);
+  }
+  const mx = Math.max(...vals, 1);
+  return `<svg width="74" height="18" style="vertical-align:middle;">${vals.map((v, i) =>
+    `<rect x="${i * 6}" y="${18 - Math.max(v / mx * 16, v > 0 ? 2 : 0.5)}" width="5" height="${Math.max(v / mx * 16, v > 0 ? 2 : 0.5)}" rx="1" fill="${v > 0 ? 'var(--blue)' : 'var(--border)'}"/>`).join('')}</svg>`;
+}
+
+function renderLaw010Table() {
+  const q = document.getElementById('law010Search').value.trim().toLowerCase();
+  const st = document.getElementById('law010Status').value;
+  let rows = _law010Rows.slice();
+  const maxMonth = _law010Rows._maxMonth;
+  if (st) rows = rows.filter(d => d.status === st);
+  if (q) rows = rows.filter(d =>
+    (d.name || '').toLowerCase().includes(q) ||
+    (d.moj?.firm_name || '').toLowerCase().includes(q));
+  rows.sort((a, b) => b.revenue_total - a.revenue_total);
+  renderLaw010Summary();
+
+  document.getElementById('law010TableBody').innerHTML = rows.map(d => {
+    const s = LAW010_STATUS[d.status];
+    const subEntries = (d.entries || []).filter(e => e !== d.name);
+    const regions = (d.regions_010 || []);
+    const regTxt = regions.slice(0, 4).join('、') + (regions.length > 4 ? ` 等 ${regions.length} 地` : '');
+    const signRate = d.attended_total > 0 ? Math.round(d.signed_total / d.attended_total * 100) + '%' : '—';
+    const firm = d.moj
+      ? `${firmLink(d.moj.firm_name)}${d.mojNote ? ' <span title="' + escHtml(d.mojNote) + '">&#9888;</span>' : ''}
+         <div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.moj.region || '')}${d.firmSize ? '・' + d.firmSize + ' 位律師' : ''}</div>`
+      : `<span style="color:var(--text-muted)">${escHtml(d.mojNote)}</span>`;
+    const cases5 = d.moj && d.moj.official_cases_5yr != null
+      ? d.moj.official_cases_5yr.toLocaleString() + (d.moj.name_ambiguous ? ' *' : '')
+      : '—';
+    return `<tr>
+      <td style="white-space:nowrap;">${d.moj ? lawyerLink(d.name, 'font-weight:700;') : `<strong>${escHtml(d.name)}</strong>`}
+        ${subEntries.length ? `<div style="font-size:0.72rem;color:var(--text-muted);">${escHtml(subEntries.join('、'))}</div>` : ''}</td>
+      <td style="max-width:150px;font-size:0.82rem;">${escHtml(regTxt)}</td>
+      <td style="white-space:nowrap;">${law010FmtM(d.first_month)} → ${law010FmtM(d.last_month)}</td>
+      <td><span style="display:inline-block;padding:2px 9px;border-radius:12px;font-size:0.74rem;font-weight:600;white-space:nowrap;color:${s.color};background:${s.dim};">${s.label}</span></td>
+      <td style="white-space:nowrap;">${d.last12.toLocaleString()} ${law010Spark(d.months, maxMonth)}</td>
+      <td>${d.referrals_total.toLocaleString()}</td>
+      <td>${signRate}</td>
+      <td style="white-space:nowrap;">${(d.revenue_total / 10000).toLocaleString(undefined, { maximumFractionDigits: 0 })} 萬</td>
+      <td>${firm}</td>
+      <td>${cases5}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="loading">無符合條件的律師</td></tr>';
+  document.getElementById('law010Count').textContent = `顯示 ${rows.length} / ${_law010Rows.length} 位`;
 }
 
 // ============================================================
