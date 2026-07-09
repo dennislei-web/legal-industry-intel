@@ -57,6 +57,7 @@ COMMENT ON VIEW law010_lawyer_summary IS
   '法律010 合作律師逐人聚合（fact_010_monthly_lawyer 歸戶）；months jsonb 鍵=yyyymm、值=[轉介,簽約,業績]；排除喆律所內列';
 
 REVOKE ALL ON law010_lawyer_summary FROM anon;
+REVOKE ALL ON law010_lawyer_summary FROM authenticated;
 GRANT SELECT ON law010_lawyer_summary TO authenticated;
 
 COMMIT;
