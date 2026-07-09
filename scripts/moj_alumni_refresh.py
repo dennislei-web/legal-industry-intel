@@ -157,7 +157,7 @@ AUTO_APPLY = {
 
 def main(limit=None, dry_run=False, only_name=None):
     print('[1/4] 載入校友名單...')
-    alumni = sb_get('zhelu_alumni?select=id,name,category,current_firm,current_region,note&order=id')
+    alumni = sb_get('zhelu_alumni?select=id,name,category,current_firm,current_region,note,moj_exclude&order=id')
     print(f'  共 {len(alumni)} 位校友')
     if only_name:
         alumni = [a for a in alumni if a['name'] == only_name]
@@ -186,6 +186,11 @@ def main(limit=None, dry_run=False, only_name=None):
 
     for i, a in enumerate(alumni, 1):
         tag = f'{a["name"]}(#{a["id"]})'
+        if a.get('moj_exclude'):
+            # MOJ 同名非本人（mig 067 前台標註）：完全不比對、不回寫，避免把別人的現職寫回來
+            print(f'  跳過: {tag} 已標「同名非本人」(moj_exclude)', flush=True)
+            stats['skipped'] += 1
+            continue
         moj, why = resolve_lic(a, moj_by_name)
 
         if moj is None:
