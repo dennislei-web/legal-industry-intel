@@ -1051,12 +1051,12 @@
         <div class="kpi-card">
           <div class="kpi-label">所長人數（推估）</div>
           <div class="kpi-value" id="kpiLeaderCount" style="color:var(--gold);">-</div>
-          <div class="kpi-sub" id="kpiLeaderCountSub">單人所＋姓名掛所名</div>
+          <div class="kpi-sub" id="kpiLeaderCountSub">單人所＋掛所名＋多人所假定 1 位</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">受雇律師人數（推估）</div>
           <div class="kpi-value" id="kpiEmployedCount" style="color:var(--green);">-</div>
-          <div class="kpi-sub">多人所且未掛名（含合夥/主持未掛名者，實際受雇數偏高估）</div>
+          <div class="kpi-sub">多人所且未掛名，已按無掛名所每所扣除 1 位假定所長（合夥未掛名者仍偏高估）</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">企業端律師人數</div>
@@ -2317,6 +2317,31 @@
             </div>
         </div>
 
+        <!-- Tab: 案由細分（終結案件微資料，Supabase closed_case_cause_* 表） -->
+        <div class="tab-content jstat" id="tab-jstat-causes">
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">案由細分 <span style="font-weight:400;font-size:12px;color:var(--text-muted);">終結案件微資料（2021 年起，月更）— 點種類卡片可鑽取原始案由與法院分布</span></div>
+                    <div class="sub-tabs" id="cause_ftTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+                    <div class="sub-tabs" id="cause_yearTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;"></div>
+                    <div id="cause_cards" class="desc-grid"><div style="color:var(--text-muted);padding:12px;">載入中…</div></div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:10px;" id="cause_footnote"></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title" id="cause_trendTitle">年度趨勢</div>
+                    <div class="chart-container"><canvas id="cause_chartTrend"></canvas></div>
+                </div>
+                <div class="chart-card" id="cause_drillRawCard" style="display:none;">
+                    <div class="chart-title" id="cause_drillRawTitle"></div>
+                    <div id="cause_drillRaw" style="max-height:500px;overflow-y:auto;"></div>
+                </div>
+                <div class="chart-card" id="cause_drillCourtCard" style="display:none;">
+                    <div class="chart-title" id="cause_drillCourtTitle"></div>
+                    <div class="chart-container tall"><canvas id="cause_chartCourts"></canvas></div>
+                </div>
+            </div>
+        </div>
+
     <!-- ==================== TAB: SOURCES ==================== -->
     <div id="tab-sources" class="tab-content">
       <div class="card">
@@ -2634,6 +2659,7 @@ const SECTIONS = {
     { tab: 'jstat-enforcement', label: '強制執行' },
     { tab: 'jstat-efficiency', label: '法院效率' },
     { tab: 'jstat-organs', label: '各法院比較' },
+    { tab: 'jstat-causes', label: '案由細分' },
   ],
   // 產業分析：垂直領域深度分析（目前為家事，未來可加刑事/勞動等）
   industry: [
@@ -2695,7 +2721,8 @@ function showTab(tab) {
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
   if (tab === 'market') { loadMarketTrendOnce(); return; }
-  if (tab.startsWith('jstat-')) loadJstatTab(tab);
+  if (tab === 'jstat-causes') loadCausesOnce();
+  else if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
 
 // ============================================================
@@ -4058,7 +4085,7 @@ async function loadOfficeAgeSeniority() {
   const corpRows = rows.filter(r => r.office_normalized && !isFirmOffice(r.office_normalized));
 
   // 律師身分結構（推估）：firm_key 正規化與 moj_firm_statistics() 同構（migration 048）
-  // 所長 = 單人所律師 or 姓名出現在所名；受雇 = 多人所且未掛名（合夥/主持未掛名者會被高估進來）
+  // 所長 = 單人所律師 or 姓名出現在所名；多人所若無人掛名，仍假定每所有 1 位所長（自受雇數移轉）
   const firmKeyOf = o => /(法律事務所|律師事務所)/.test(o) ? o.replace(/^(.+?(?:法律|律師)事務所).*$/, '$1') : o;
   const firmSizes = {};
   for (const r of firmRows) {
@@ -4066,14 +4093,22 @@ async function loadOfficeAgeSeniority() {
     firmSizes[k] = (firmSizes[k] || 0) + 1;
   }
   let leaderCount = 0, employedCount = 0, soloCount = 0;
+  const namedLeaderFirms = new Set();
   for (const r of firmRows) {
     const k = firmKeyOf(r.office_normalized);
     if (firmSizes[k] === 1) { leaderCount++; soloCount++; }
-    else if (r.name && k.includes(r.name)) leaderCount++;
+    else if (r.name && k.includes(r.name)) { leaderCount++; namedLeaderFirms.add(k); }
     else employedCount++;
   }
+  let assumedLeaderCount = 0;
+  for (const k in firmSizes) {
+    if (firmSizes[k] > 1 && !namedLeaderFirms.has(k)) assumedLeaderCount++;
+  }
+  const namedLeaderCount = leaderCount - soloCount;
+  leaderCount += assumedLeaderCount;
+  employedCount -= assumedLeaderCount;
   document.getElementById('kpiLeaderCount').textContent = leaderCount.toLocaleString();
-  document.getElementById('kpiLeaderCountSub').textContent = `單人所 ${soloCount.toLocaleString()}＋姓名掛所名 ${(leaderCount - soloCount).toLocaleString()}`;
+  document.getElementById('kpiLeaderCountSub').textContent = `單人所 ${soloCount.toLocaleString()}＋掛所名 ${namedLeaderCount.toLocaleString()}＋多人所假定 ${assumedLeaderCount.toLocaleString()}`;
   document.getElementById('kpiEmployedCount').textContent = employedCount.toLocaleString();
   document.getElementById('kpiInhouseCount').textContent = corpRows.length.toLocaleString();
 
@@ -8914,6 +8949,192 @@ async function showCourtDetail(name) {
             console.error('供需比圖載入失敗', err);
         }
     }
+
+    // ===== 案由細分（終結案件微資料 closed_case_cause_* 表，migration 064）=====
+    const CAUSE_FTS = ['民事訴訟', '民事非訟', '家事訴訟', '家事非訟', '刑事訴訟'];
+    // 常見條號 → 罪名（僅顯示輔助；不在表內就只顯示條號）
+    const CRIME_NAMES = {
+        '刑法§339': '詐欺', '刑法§339-1': '收費設備詐欺', '刑法§339-2': '自動付款設備詐欺',
+        '刑法§339-3': '電腦詐欺', '刑法§339-4': '加重詐欺', '刑法§320': '普通竊盜',
+        '刑法§321': '加重竊盜', '刑法§185-3': '不能安全駕駛', '刑法§185-4': '肇事逃逸',
+        '刑法§284': '過失傷害', '刑法§277': '普通傷害', '刑法§278': '重傷',
+        '刑法§271': '殺人', '刑法§302': '剝奪行動自由', '刑法§304': '強制',
+        '刑法§305': '恐嚇危害安全', '刑法§346': '恐嚇取財', '刑法§354': '毀損器物',
+        '刑法§210': '偽造私文書', '刑法§216': '行使偽造文書', '刑法§266': '賭博',
+        '刑法§268': '圖利供給賭場', '刑法§335': '普通侵占', '刑法§336': '公務公益業務侵占',
+        '刑法§342': '背信', '刑法§344': '重利', '刑法§309': '公然侮辱', '刑法§310': '誹謗',
+        '刑法§135': '妨害公務執行', '刑法§149': '聚眾不解散', '刑法§150': '聚眾施強暴脅迫',
+        '刑法§315-1': '窺視竊聽竊錄', '刑法§173': '放火燒燬現住建築物', '刑法§352': '毀損文書',
+    };
+    const CAUSE_TREND_COLORS = [COLORS.blue, COLORS.red, COLORS.orange, COLORS.green, COLORS.purple, COLORS.teal];
+    let causeInited = false;
+    const causeYearly = {};   // ft → cause_group_yearly rows（快取）
+    const causeState = { ft: null, year: null };
+    let causeTrendChart = null, causeCourtChart = null;
+
+    window.loadCausesOnce = function() {
+        if (causeInited) return;
+        causeInited = true;
+        const cs = getComputedStyle(document.body);
+        Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#8899aa';
+        Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || '#1e3050';
+        const bar = document.getElementById('cause_ftTabs');
+        bar.innerHTML = CAUSE_FTS.map(ft => `<button class="sub-tab-btn" data-ft="${ft}">${ft}</button>`).join('');
+        bar.querySelectorAll('button').forEach(b => b.addEventListener('click', () => selectCauseFt(b.dataset.ft)));
+        selectCauseFt('民事訴訟');
+    };
+
+    const causeUnit = () => causeState.ft === '刑事訴訟' ? '人' : '件';
+
+    async function selectCauseFt(ft) {
+        causeState.ft = ft;
+        document.querySelectorAll('#cause_ftTabs button').forEach(b =>
+            b.classList.toggle('active', b.dataset.ft === ft));
+        hideCauseDrill();
+        const cardsEl = document.getElementById('cause_cards');
+        if (!causeYearly[ft]) {
+            cardsEl.innerHTML = '<div style="color:var(--text-muted);padding:12px;">載入中…</div>';
+            const { data, error } = await db.rpc('cause_group_yearly', { p_file_type: ft });
+            if (error || !data) {
+                cardsEl.innerHTML = `<div style="grid-column:1/-1;color:var(--red);padding:12px;">⚠️ 載入失敗（${error?.message || '無資料'}）— 再點一次分頁重試</div>`;
+                causeInited = false;
+                return;
+            }
+            causeYearly[ft] = data;
+        }
+        const rows = causeYearly[ft];
+        // 年份清單（含該年資料月數；<12 = 不完整年）
+        const monthsByYear = {};
+        rows.forEach(r => { monthsByYear[r.y] = Math.max(monthsByYear[r.y] || 0, r.months); });
+        const years = Object.keys(monthsByYear).sort();
+        const complete = years.filter(y => monthsByYear[y] >= 12);
+        causeState.year = complete.length ? complete[complete.length - 1] : years[years.length - 1];
+        const yBar = document.getElementById('cause_yearTabs');
+        yBar.innerHTML = years.map(y =>
+            `<button class="sub-tab-btn" data-y="${y}">${y}${monthsByYear[y] < 12 ? ` (${monthsByYear[y]}月)` : ''}</button>`).join('');
+        yBar.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+            causeState.year = b.dataset.y;
+            hideCauseDrill();
+            renderCauseCards(monthsByYear);
+        }));
+        renderCauseCards(monthsByYear);
+        renderCauseTrend(monthsByYear);
+    }
+
+    function renderCauseCards(monthsByYear) {
+        const { ft, year } = causeState;
+        document.querySelectorAll('#cause_yearTabs button').forEach(b =>
+            b.classList.toggle('active', b.dataset.y === year));
+        const rows = causeYearly[ft].filter(r => r.y === year);
+        const total = rows.reduce((s, r) => s + r.n, 0);
+        // 基準年 = 最早的完整年（雙方皆完整才顯示變化率）
+        const baseYear = Object.keys(monthsByYear).sort().find(y => monthsByYear[y] >= 12);
+        const showChange = baseYear && baseYear !== year && monthsByYear[year] >= 12;
+        const baseByGroup = {};
+        if (showChange) causeYearly[ft].filter(r => r.y === baseYear).forEach(r => { baseByGroup[r.cause_group] = r.n; });
+        const unit = causeUnit();
+        const html = rows.sort((a, b) => b.n - a.n).map((r, i) => {
+            const pct = total ? (r.n / total * 100).toFixed(1) : 0;
+            let changeHtml = '';
+            if (showChange && baseByGroup[r.cause_group]) {
+                const ch = (r.n - baseByGroup[r.cause_group]) / baseByGroup[r.cause_group] * 100;
+                changeHtml = ` <span class="${ch >= 0 ? 'change-up' : 'change-down'}">${ch >= 0 ? '+' : ''}${ch.toFixed(1)}%</span>`;
+            }
+            const convHtml = (ft === '刑事訴訟' && r.n) ? `<div class="desc-text">科刑 ${formatNumber(r.convicted)} 人（${(r.convicted / r.n * 100).toFixed(0)}%）</div>` : '';
+            return `<div class="desc-item ${i < 3 ? `top-${i + 1}` : ''}" style="cursor:pointer;" onclick="showCauseDrill('${r.cause_group.replace(/'/g, '&#39;')}')">
+                <div class="desc-header">
+                    <span class="desc-name">${r.cause_group}</span>
+                    <span class="desc-stats">${formatNumber(r.n)} ${unit} (${pct}%)${changeHtml}</span>
+                </div>${convHtml}
+            </div>`;
+        }).join('');
+        const noteChange = showChange ? `變化率為 ${baseYear} → ${year} 年累計變化（僅完整年份顯示）。` : '';
+        document.getElementById('cause_cards').innerHTML = html;
+        document.getElementById('cause_footnote').innerHTML =
+            `${noteChange}資料來源：司法院開放資料「終結案件資料」月包（案件層級微資料，2021-01 起）。口徑為<strong>終結</strong>件數（含和解、撤回等未經判決終結），與官方月報「新收」不同。` +
+            (ft === '刑事訴訟'
+                ? '刑事僅地方法院；計數單位=被告人次（每被告取第一個罪名層為主要罪名）；「科刑」=有期徒刑/拘役/罰金/無期徒刑/死刑。'
+                : (ft === '民事訴訟'
+                    ? '種類依案由關鍵字自動歸類（對齊官方月報 13 類標籤，歸類規則為本站近似，非官方口徑）。'
+                    : '種類為本站依案由關鍵字的務實分組。'));
+    }
+
+    function renderCauseTrend(monthsByYear) {
+        const { ft, year } = causeState;
+        const rows = causeYearly[ft];
+        const years = Object.keys(monthsByYear).sort();
+        const top = rows.filter(r => r.y === year).sort((a, b) => b.n - a.n).slice(0, 6).map(r => r.cause_group);
+        const byGroupYear = {};
+        rows.forEach(r => { byGroupYear[r.cause_group + '|' + r.y] = r.n; });
+        if (causeTrendChart) causeTrendChart.destroy();
+        causeTrendChart = new Chart(document.getElementById('cause_chartTrend'), {
+            type: 'line',
+            data: {
+                labels: years.map(y => y + (monthsByYear[y] < 12 ? '*' : '')),
+                datasets: top.map((g, i) => ({
+                    label: g,
+                    data: years.map(y => byGroupYear[g + '|' + y] || 0),
+                    borderColor: CAUSE_TREND_COLORS[i],
+                    backgroundColor: COLORS_ALPHA(CAUSE_TREND_COLORS[i], 0.1),
+                    tension: 0.3, pointRadius: 3,
+                }))
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' ' + causeUnit() } } }
+            }
+        });
+        document.getElementById('cause_trendTitle').textContent =
+            `${ft} 年度趨勢（${year} 年前 6 大種類；* 為不足 12 個月的年份）`;
+    }
+
+    function hideCauseDrill() {
+        document.getElementById('cause_drillRawCard').style.display = 'none';
+        document.getElementById('cause_drillCourtCard').style.display = 'none';
+    }
+
+    window.showCauseDrill = async function(group) {
+        const { ft, year } = causeState;
+        const rawCard = document.getElementById('cause_drillRawCard');
+        const courtCard = document.getElementById('cause_drillCourtCard');
+        rawCard.style.display = '';
+        courtCard.style.display = '';
+        document.getElementById('cause_drillRawTitle').textContent = `「${group}」${ft === '刑事訴訟' ? '條號' : '原始案由'} Top 30（${year} 年，全國）`;
+        document.getElementById('cause_drillCourtTitle').textContent = `「${group}」法院分布（${year} 年）`;
+        document.getElementById('cause_drillRaw').innerHTML = '<div style="color:var(--text-muted);padding:12px;">載入中…</div>';
+        const [rawRes, courtRes] = await Promise.all([
+            db.rpc('cause_raw_top', { p_file_type: ft, p_group: group, p_year: year, p_limit: 30 }),
+            db.rpc('cause_court_matrix', { p_file_type: ft, p_year: year, p_group: group }),
+        ]);
+        const raws = rawRes.data || [];
+        const totalRaw = raws.reduce((s, r) => s + r.n, 0);
+        const unit = causeUnit();
+        document.getElementById('cause_drillRaw').innerHTML = raws.map(r => {
+            const w = totalRaw ? (r.n / raws[0].n * 100) : 0;
+            const name = ft === '刑事訴訟' && CRIME_NAMES[r.cause] ? `${r.cause} <span style="color:var(--text-muted);">${CRIME_NAMES[r.cause]}</span>` : r.cause;
+            const conv = (ft === '刑事訴訟' && r.n) ? ` <span style="color:var(--text-muted);font-size:11px;">科刑${(r.convicted / r.n * 100).toFixed(0)}%</span>` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12.5px;">
+                <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}${conv}</div>
+                <div style="width:120px;height:8px;background:var(--bg-row);border-radius:4px;overflow:hidden;flex-shrink:0;"><div style="width:${w}%;height:100%;background:${COLORS.blue};"></div></div>
+                <div style="width:70px;text-align:right;flex-shrink:0;">${formatNumber(r.n)} ${unit}</div>
+            </div>`;
+        }).join('') || '<div style="color:var(--text-muted);padding:12px;">無資料</div>';
+        const courts = (courtRes.data || []).sort((a, b) => b.n - a.n).slice(0, 20);
+        if (causeCourtChart) causeCourtChart.destroy();
+        causeCourtChart = new Chart(document.getElementById('cause_chartCourts'), {
+            type: 'bar',
+            data: {
+                labels: courts.map(c => c.court_name.replace(/^(臺灣|福建)/, '')),
+                datasets: [{ data: courts.map(c => c.n), backgroundColor: COLORS_ALPHA(COLORS.blue, 0.7) }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false },
+                           tooltip: { callbacks: { label: ctx => formatNumber(ctx.raw) + ' ' + unit } } }
+            }
+        });
+        rawCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
 
     let jstatData = null;
     let jstatFetch = null;
