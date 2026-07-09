@@ -1341,6 +1341,7 @@
           資料來源：法律010總表（每日自動同步，涵蓋 2023-11 起）× 法務部律師登錄 × 官方裁判書統計。
           「業績」為 010 平台轉介口徑（含跨月收款）、委任率＝簽約÷出席；分所條目（如林冠宇-桃園）已歸戶到同一位律師。
           現職事務所依姓名比對法務部名冊：同名者以 010 案件地區推定並標 ⚠、推定不了則列出筆數；「名冊查無」多為總表使用簡稱。
+          「理湛」為所級合作條目（理湛聯合法律事務所），非個人律師。
           狀態依最後轉介月距資料最新月的間隔：現役 ≤3 個月、淡出 ≤12 個月、其餘為已停止。
         </div>
       </div>
@@ -6067,6 +6068,8 @@ const LAW010_STATUS = {
   stopped: { label: '已停止', color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' },
 };
 let _law010Rows = null;   // view rows ＋ 前端補上 moj/status/last12 等衍生欄
+// 010 總表以「事務所簡稱」記錄的所級合作條目（非個人律師）→ 對應 MOJ 事務所全名
+const LAW010_FIRM_ALIAS = { '理湛': '理湛聯合法律事務所' };
 
 function law010MonthDiff(a, b) {  // yyyymm int 差幾個月
   return (Math.floor(b / 100) * 12 + b % 100) - (Math.floor(a / 100) * 12 + a % 100);
@@ -6100,7 +6103,8 @@ async function loadLaw010() {
       .filter(([m]) => law010MonthDiff(+m, maxMonth) < 12)
       .reduce((s, [, v]) => s + (v[0] || 0), 0);
     const cands = byName[r.name] || [];
-    r.moj = null; r.mojNote = '';
+    r.moj = null; r.mojNote = ''; r.firmAlias = LAW010_FIRM_ALIAS[r.name] || null;
+    if (r.firmAlias) return;  // 所級合作：不做個人比對
     if (cands.length === 1) r.moj = cands[0];
     else if (cands.length > 1) {
       const hit = cands.filter(c => c.region && (r.regions_010 || []).includes(c.region));
@@ -6108,15 +6112,16 @@ async function loadLaw010() {
       else r.mojNote = `名冊同名 ${cands.length} 筆，無法推定`;
     } else r.mojNote = '名冊查無（可能為簡稱）';
   });
+  data.forEach(r => { r.firmName = r.moj?.firm_name || r.firmAlias || null; });
 
   // 事務所規模（人數）
-  const firms = [...new Set(data.map(r => r.moj?.firm_name).filter(Boolean))];
+  const firms = [...new Set(data.map(r => r.firmName).filter(Boolean))];
   const { data: fc } = firms.length
     ? await db.from('moj_firm_stats_cache').select('firm_name,lawyer_count').in('firm_name', firms)
     : { data: [] };
   const firmSize = {};
   (fc || []).forEach(f => { firmSize[f.firm_name] = f.lawyer_count; });
-  data.forEach(r => { r.firmSize = r.moj ? firmSize[r.moj.firm_name] : null; });
+  data.forEach(r => { r.firmSize = r.firmName ? firmSize[r.firmName] : null; });
 
   _law010Rows = data;
   _law010Rows._maxMonth = maxMonth;
@@ -6136,7 +6141,7 @@ function renderLaw010Summary() {
   rows.forEach(d => cnt[d.status] = (cnt[d.status] || 0) + 1);
   const order = Object.keys(LAW010_STATUS).filter(s => cnt[s]);
   const ref12 = rows.reduce((s, r) => s + r.last12, 0);
-  const nFirms = new Set(rows.filter(r => r.moj).map(r => r.moj.firm_name)).size;
+  const nFirms = new Set(rows.map(r => r.firmName).filter(Boolean)).size;
 
   document.getElementById('law010Kpis').innerHTML =
     `<div class="kpi-card" onclick="law010SetStatus('')" style="cursor:pointer;${active===''?'border-color:var(--gold);':''}">
@@ -6160,8 +6165,8 @@ function renderLaw010Summary() {
 
   const byFirm = {};
   rows.forEach(d => {
-    if (!d.moj) return;
-    (byFirm[d.moj.firm_name] = byFirm[d.moj.firm_name] || []).push(d.name);
+    if (!d.firmName) return;
+    (byFirm[d.firmName] = byFirm[d.firmName] || []).push(d.name);
   });
   const clusters = Object.entries(byFirm).filter(([, v]) => v.length >= 2).sort((a, b) => b[1].length - a[1].length);
   if (clusters.length) {
@@ -6193,7 +6198,7 @@ function renderLaw010Table() {
   if (st) rows = rows.filter(d => d.status === st);
   if (q) rows = rows.filter(d =>
     (d.name || '').toLowerCase().includes(q) ||
-    (d.moj?.firm_name || '').toLowerCase().includes(q));
+    (d.firmName || '').toLowerCase().includes(q));
   rows.sort((a, b) => b.revenue_total - a.revenue_total);
   renderLaw010Summary();
 
@@ -6203,7 +6208,10 @@ function renderLaw010Table() {
     const regions = (d.regions_010 || []);
     const regTxt = regions.slice(0, 4).join('、') + (regions.length > 4 ? ` 等 ${regions.length} 地` : '');
     const signRate = d.attended_total > 0 ? Math.round(d.signed_total / d.attended_total * 100) + '%' : '—';
-    const firm = d.moj
+    const firm = d.firmAlias
+      ? `${firmLink(d.firmAlias)}
+         <div style="font-size:0.74rem;color:var(--text-muted);">以事務所名義合作${d.firmSize ? '・' + d.firmSize + ' 位律師' : ''}</div>`
+      : d.moj
       ? `${firmLink(d.moj.firm_name)}${d.mojNote ? ' <span title="' + escHtml(d.mojNote) + '">&#9888;</span>' : ''}
          <div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.moj.region || '')}${d.firmSize ? '・' + d.firmSize + ' 位律師' : ''}</div>`
       : `<span style="color:var(--text-muted)">${escHtml(d.mojNote)}</span>`;
@@ -6211,7 +6219,7 @@ function renderLaw010Table() {
       ? d.moj.official_cases_5yr.toLocaleString() + (d.moj.name_ambiguous ? ' *' : '')
       : '—';
     return `<tr>
-      <td style="white-space:nowrap;">${d.moj ? lawyerLink(d.name, 'font-weight:700;') : `<strong>${escHtml(d.name)}</strong>`}
+      <td style="white-space:nowrap;">${d.moj ? lawyerLink(d.name, 'font-weight:700;') : `<strong>${escHtml(d.name)}</strong>`}${d.firmAlias ? ' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:0.68rem;color:var(--text-muted);background:var(--ghost-bg);border:1px solid var(--border);">事務所</span>' : ''}
         ${subEntries.length ? `<div style="font-size:0.72rem;color:var(--text-muted);">${escHtml(subEntries.join('、'))}</div>` : ''}</td>
       <td style="max-width:150px;font-size:0.82rem;">${escHtml(regTxt)}</td>
       <td style="white-space:nowrap;">${law010FmtM(d.first_month)} → ${law010FmtM(d.last_month)}</td>
