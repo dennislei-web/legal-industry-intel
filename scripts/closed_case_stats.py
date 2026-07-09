@@ -12,6 +12,13 @@
 版式防呆：15-17 必須是合理民國日期，不符的列跳過並計數（保護版式漂移/其他檔型）。
 court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）。
 
+案由細分（migration 064，mapping 見 cause_map.py）：
+  民事訴訟/家事訴訟（案由=欄5）＋民事非訟/家事非訟（案由=欄5、日期在欄13-15）
+  ＋刑事訴訟罪名層（1.1 列：1法名 2條 3條之N 9裁判結果；每被告取第一個罪名層
+  當主要罪名，計數單位=被告人次，科刑=有期徒刑/拘役/罰金/無期/死刑）
+  → closed_case_cause_stats（月×法院×檔型×種類）
+  → closed_case_cause_national（月×檔型×正規化原始案由）
+
 「刑事訴訟」檔是階層式（0!案件層 → 1!被告層 → 1.1!罪名層），只解析資料夾名含
 「地方法院」者（高院/最高/智財被告層辯護欄位置不同，見官方欄位說明文件）：
   案件層：13-15 終結年月日、16 終結情形、21 自訴人是否有律師代理
@@ -26,6 +33,7 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   python closed_case_stats.py auto             # 找最新月包，DB 沒有才跑（workflow 用）
   python closed_case_stats.py backfill         # 回填 API 上所有月包（跳過 DB 已有的）
   python closed_case_stats.py backfill-criminal  # 回填缺「刑事訴訟」列的月份（民事重跑 upsert 冪等）
+  python closed_case_stats.py backfill-causes   # 回填 cause 表缺的月份（整月重跑，全部 upsert 冪等）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full）。
 """
@@ -42,6 +50,8 @@ from collections import defaultdict, Counter
 import requests
 from dotenv import load_dotenv
 
+from cause_map import norm_cause, map_cause, map_criminal
+
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
     sys.stdout.reconfigure(line_buffering=True, encoding='utf-8')
@@ -55,6 +65,7 @@ WORK_DIR = os.environ.get('CLOSED_CASE_WORK_DIR') or os.path.join(os.path.dirnam
 os.makedirs(WORK_DIR, exist_ok=True)
 
 FILE_TYPES = ('民事訴訟', '家事訴訟')
+NONLIT_TYPES = ('民事非訟', '家事非訟')
 TITLE_RE = re.compile(r'^(\d{3})年(\d{1,2})月司法院及所屬各級法院之終結案件資料')
 
 
@@ -109,7 +120,7 @@ def existing_months(file_type=None):
 # ============================================================
 
 def parse_line(line):
-    """回傳 (p_rep, d_rep, outcome, amount) 或 None（版式不符）"""
+    """回傳 (p_rep, d_rep, outcome, amount, cause) 或 None（版式不符）"""
     c = line.split('!')
     if len(c) < 30 or c[0] != '0':
         return None
@@ -128,13 +139,32 @@ def parse_line(line):
             amount = float(c[29])
         except ValueError:
             pass
-    return p_rep, d_rep, outcome, amount
+    return p_rep, d_rep, outcome, amount, norm_cause(c[5])
 
 
-def parse_criminal_file(lines, a):
-    """解析單一地院刑事訴訟檔（階層式），聚合進 a，回傳跳過列數"""
+def parse_nonlit_line(line):
+    """民事非訟/家事非訟列（日期在欄 13-15）→ 正規化案由，版式不符回 None"""
+    c = line.split('!')
+    if len(c) < 17 or c[0] != '0':
+        return None
+    try:
+        y, m, d = int(c[13]), int(c[14]), int(c[15])
+    except ValueError:
+        return None
+    if not (90 <= y <= 130 and 1 <= m <= 12 and 1 <= d <= 31):
+        return None
+    return norm_cause(c[5])
+
+
+CONVICT_OUTCOMES = ('有期徒刑', '拘役', '罰金', '無期徒刑', '死刑')
+
+
+def parse_criminal_file(lines, a, add_cause):
+    """解析單一地院刑事訴訟檔（階層式），聚合進 a，回傳跳過列數
+    add_cause(cause, group, convicted)：每被告第一個罪名層列（主要罪名）叫一次"""
     skipped = 0
     cur = None  # 當前有效案件 {'hired':bool,'self_rep':bool,'outcome':str}
+    want_crime = False  # 目前被告尚未取得主要罪名
 
     def flush():
         nonlocal cur
@@ -151,6 +181,7 @@ def parse_criminal_file(lines, a):
         c = line.split('!')
         if c[0] == '0':
             flush()
+            want_crime = False
             ok = len(c) >= 28
             if ok:
                 try:
@@ -168,6 +199,11 @@ def parse_criminal_file(lines, a):
             a['defense'][val] += 1
             if val.startswith('選任律師辯護'):
                 cur['hired'] = True
+            want_crime = True
+        elif c[0] == '1.1' and cur is not None and want_crime and len(c) > 9:
+            cause, group = map_criminal(c[1], c[2], c[3])
+            add_cause(cause, group, c[9].strip() in CONVICT_OUTCOMES)
+            want_crime = False
     flush()
     return skipped
 
@@ -190,6 +226,16 @@ def run_month(yyyymm, fileset_id):
     agg = defaultdict(lambda: {'total': 0, 'p': 0, 'd': 0, 'both': 0,
                                'outcomes': Counter(), 'amt': 0.0, 'amt_n': 0,
                                'defense': Counter()})
+    # 案由細分聚合（migration 064）：
+    # cagg (court, ft, group) / nagg (ft, cause, group) → [件數, 科刑數(刑事)]
+    cagg = defaultdict(lambda: [0, 0])
+    nagg = defaultdict(lambda: [0, 0])
+
+    def add_cause(court, ft, cause, group, convicted=False):
+        for k, d in ((( court, ft, group), cagg), ((ft, cause, group), nagg)):
+            d[k][0] += 1
+            d[k][1] += convicted
+
     skipped = 0
     # 刑事訴訟檔（僅地院版式）
     for path in glob.glob(os.path.join(ext, '**', '*.刑事訴訟.txt'), recursive=True):
@@ -200,7 +246,9 @@ def run_month(yyyymm, fileset_id):
             lines = io.open(path, encoding='utf-8-sig').read().splitlines()
         except UnicodeDecodeError:
             lines = io.open(path, encoding='cp950', errors='replace').read().splitlines()
-        skipped += parse_criminal_file(lines, agg[(court, '刑事訴訟')])
+        skipped += parse_criminal_file(
+            lines, agg[(court, '刑事訴訟')],
+            lambda cause, group, conv, _c=court: add_cause(_c, '刑事訴訟', cause, group, conv))
     for ft in FILE_TYPES:
         for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
             court = norm_court(os.path.basename(os.path.dirname(path)))
@@ -216,7 +264,7 @@ def run_month(yyyymm, fileset_id):
                     if line.startswith('0!'):
                         skipped += 1
                     continue
-                p_rep, d_rep, outcome, amount = parsed
+                p_rep, d_rep, outcome, amount, cause = parsed
                 a = agg[(court, ft)]
                 a['total'] += 1
                 a['p'] += p_rep
@@ -226,6 +274,24 @@ def run_month(yyyymm, fileset_id):
                 if amount:
                     a['amt'] += amount
                     a['amt_n'] += 1
+                add_cause(court, ft, cause, map_cause(ft, cause))
+    # 非訟檔（民事非訟/家事非訟）只做案由細分，不進 closed_case_month_stats
+    for ft in NONLIT_TYPES:
+        for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
+            court = norm_court(os.path.basename(os.path.dirname(path)))
+            try:
+                lines = io.open(path, encoding='utf-8-sig').read().splitlines()
+            except UnicodeDecodeError:
+                lines = io.open(path, encoding='cp950', errors='replace').read().splitlines()
+            for line in lines:
+                if not line or line == '#':
+                    continue
+                cause = parse_nonlit_line(line)
+                if cause is None:
+                    if line.startswith('0!'):
+                        skipped += 1
+                    continue
+                add_cause(court, ft, cause, map_cause(ft, cause))
 
     records = [
         {'yyyymm': yyyymm, 'court_name': court, 'file_type': ft,
@@ -245,6 +311,25 @@ def run_month(yyyymm, fileset_id):
         if resp.status_code not in (200, 201, 204):
             raise RuntimeError(f'上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
         print(f'  上傳 OK')
+
+    # 案由細分兩表（migration 064）
+    c_rows = [{'yyyymm': yyyymm, 'court_name': k[0], 'file_type': k[1], 'cause_group': k[2],
+               'case_count': v[0], 'convicted': v[1] if k[1] == '刑事訴訟' else None}
+              for k, v in cagg.items()]
+    n_rows = [{'yyyymm': yyyymm, 'file_type': k[0], 'cause': k[1], 'cause_group': k[2],
+               'case_count': v[0], 'convicted': v[1] if k[0] == '刑事訴訟' else None}
+              for k, v in nagg.items()]
+    for table, conflict, rows in (
+            ('closed_case_cause_stats', 'yyyymm,court_name,file_type,cause_group', c_rows),
+            ('closed_case_cause_national', 'yyyymm,file_type,cause', n_rows)):
+        url = f'{SUPABASE_URL}/rest/v1/{table}?on_conflict={conflict}'
+        headers = {**HEADERS_SB, 'Content-Type': 'application/json',
+                   'Prefer': 'resolution=merge-duplicates,return=minimal'}
+        for i in range(0, len(rows), 2000):
+            resp = requests.post(url, headers=headers, json=rows[i:i + 2000], timeout=120)
+            if resp.status_code not in (200, 201, 204):
+                raise RuntimeError(f'{table} 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
+    print(f'  案由細分上傳 OK（法院層 {len(c_rows)} 列 / 全國案由層 {len(n_rows)} 列）')
     # 清理磁碟
     os.remove(arc)
     shutil.rmtree(ext, ignore_errors=True)
@@ -285,6 +370,20 @@ def main():
         have = existing_months('刑事訴訟')
         todo = sorted(set(datasets) - have)
         print(f'待回填刑事 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
+        for ym in todo:
+            run_month(ym, datasets[ym])
+            time.sleep(1)
+    elif cmd == 'backfill-causes':
+        # 回填案由細分表缺的月份（重跑整月，全部 upsert 冪等）
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/closed_case_cause_months',
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          json={}, timeout=60)
+        r.raise_for_status()
+        have = set(r.json() or [])
+        # 202511 月包被官方重傳成殘缺版（僅離島+簡易庭）：重跑會把當初完整包算出的
+        # closed_case_month_stats 蓋成殘缺資料，永久跳過（該月案由細分視為缺資料）
+        todo = sorted(set(datasets) - have - {'202511'})
+        print(f'待回填案由 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
             run_month(ym, datasets[ym])
             time.sleep(1)
