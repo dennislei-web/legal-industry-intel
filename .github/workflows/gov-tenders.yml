@@ -1,0 +1,35 @@
+name: 政府標案（法律服務）爬取
+
+on:
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: '分片總數（每片一個 runner，各自 IP 繞過 API 單 IP 限流）'
+        required: false
+        default: '4'
+  schedule:
+    - cron: '0 19 5 * *'  # 每月 5 日 UTC 19:00 = 台灣凌晨 3:00 增量（已快取空、但 DB upsert 冪等，只補新案）
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Crawl shard
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: python -u gov_tenders.py run-shard ${{ matrix.shard }} 4
