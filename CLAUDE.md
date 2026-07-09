@@ -127,7 +127,12 @@
   view `law010_lawyer_summary` 即時聚合（歸戶分所條目、排除喆律所內列、months jsonb 逐月明細），
   **無需另外 refresh**；只 grant authenticated（010 業績是內部資料，已 revoke anon）
 - 前端 client-side JOIN `lawyers_with_stats`（同名者以 010 案件地區推定，推定不了標「同名 N 筆」）＋
-  `moj_firm_stats_cache`（事務所規模）；「理湛」「安承」為總表簡稱、MOJ 查無屬預期
+  `moj_firm_stats_cache`（事務所規模）；「理湛」（理湛聯合）「安承」（Anherit 品牌）為非個人條目，
+  走前端 `LAW010_FIRM_ALIAS` 對照
+- **admin 限定（mig 075）**：本頁＋喆律校友會僅 admin 可見。資料鎖在 DB（zhelu_alumni
+  admin-only SELECT policy；law010_lawyer_summary 的 admin gate 寫在 **view 內**——view owner
+  繞底表 RLS、grant 分不出 admin；副作用：service key 查該 view 回空，測試要 set request.jwt.claims
+  模擬）。UI 用 SECTIONS `adminOnly` 旗標＋profile 載入後重繪子頁列
 
 ## 前端導覽結構
 
