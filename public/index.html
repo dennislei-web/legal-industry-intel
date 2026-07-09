@@ -1341,7 +1341,7 @@
           資料來源：法律010總表（每日自動同步，涵蓋 2023-11 起）× 法務部律師登錄 × 官方裁判書統計。
           「業績」為 010 平台轉介口徑（含跨月收款）、委任率＝簽約÷出席；分所條目（如林冠宇-桃園）已歸戶到同一位律師。
           現職事務所依姓名比對法務部名冊：同名者以 010 案件地區推定並標 ⚠、推定不了則列出筆數；「名冊查無」多為總表使用簡稱。
-          「理湛」為所級合作條目（理湛聯合法律事務所），非個人律師。
+          「理湛」為所級合作條目（理湛聯合法律事務所）、「安承」為跨所品牌（安承 Anherit 安心辦繼承：林宗憲、翁健祥、陳建佑三所聯盟），均非個人律師。
           狀態依最後轉介月距資料最新月的間隔：現役 ≤3 個月、淡出 ≤12 個月、其餘為已停止。
         </div>
       </div>
@@ -4366,6 +4366,18 @@ async function showFirmDetail(firmName) {
       if (!fs || fs.length < 1000) break;
     }
   } catch (e) { console.log('firm official stats error:', e); }
+
+  // 上市櫃獨董席次（含分所，firm_indep_directorships view 已過濾為覆核確認者）
+  let firmIndep = [];
+  try {
+    const { data: fi } = await db.from('firm_indep_directorships').select('*')
+      .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
+      .order('person_name');
+    firmIndep = fi || [];
+  } catch (e) { console.log('firm indep dirs error:', e); }
+  const indepByLawyer = {};
+  firmIndep.forEach(r => { (indepByLawyer[r.person_name] = indepByLawyer[r.person_name] || []).push(r); });
+
   const litAgg5 = computeFirmLitAgg(firmStats.filter(s => !s.name_ambiguous).map(s => ({
     name: s.name, cases: s.official_cases_5yr || 0, cats: s.official_cats_5yr, court: s.official_top_court
   })));
@@ -4465,6 +4477,20 @@ async function showFirmDetail(firmName) {
     </div>
     ` : ''}
 
+    ${firmIndep.length ? `
+    <!-- 上市櫃獨立董事 -->
+    <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃獨立董事（${Object.keys(indepByLawyer).length} 位律師 / ${firmIndep.length} 席）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">MOPS 獨立董監事兼任揭露，已用簡歷覆核律師身分 — 通常反映公司治理人脈與企業客戶網絡</div>
+      <ul style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.7;">
+        ${Object.entries(indepByLawyer).map(([n, seats]) =>
+          `<li><strong>${lawyerLink(n, 'font-weight:700;')}</strong> — ${seats.map(s =>
+            `${escHtml(s.company_code)} ${escHtml(s.company_name)}<span style="color:var(--text-muted);font-size:0.78rem;">(${s.market === 'listed' ? '上市' : '上櫃'})</span>`
+          ).join('、')}</li>`).join('')}
+      </ul>
+    </div>
+    ` : ''}
+
     ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${firmLink(n, 'color:var(--text-muted);')} (${c}人)`).join('、')}</div>` : ''}
 
     <!-- Charts -->
@@ -4520,7 +4546,7 @@ async function showFirmDetail(firmName) {
               ? ` <a href="#" class="leader-mark-btn" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
               : (!isLeader ? ` <a href="#" class="leader-mark-btn" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
-              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${adminBtn}</td>
+              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${indepByLawyer[l.name] ? ` <span title="上市櫃獨立董事：${escHtml(indepByLawyer[l.name].map(s => s.company_name).join('、'))}" style="font-size:0.7rem;cursor:help;">🏛</span>` : ''}${adminBtn}</td>
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
@@ -4962,11 +4988,14 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null;
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('lawyer_indep_directorships').select('*').eq('person_name', name)
+      .in('verify_status', ['office_matched', 'lawyer_confirmed'])
+      .then(r => { indepDirs = r.data || []; }),
     db.from('lawyer_client_concentration').select('*').eq('name', name).maybeSingle()
       .then(r => { clientConc = r.data; }),
     db.from('lawyer_cause_stats').select('*').eq('name', name).maybeSingle()
@@ -5004,8 +5033,12 @@ async function showLawyerDetail(name, certNumber) {
   const birthYear = moj?.birth_year;
   const age = birthYear && birthYear < 200 ? `民國 ${birthYear} 年 (${new Date().getFullYear() - (1911 + birthYear)} 歲)` : '-';
 
+  // 獨董席次歸屬：釘到證號者需證號一致；未釘證號（同名多人）不顯示避免張冠李戴
+  indepDirs = indepDirs.filter(r => r.lic_no && licNo && r.lic_no === licNo);
+
   // 來源標籤
   const sources = [];
+  if (indepDirs.length) sources.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">上市櫃獨董 ×${indepDirs.length}</span>`);
   if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
   if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
@@ -5068,6 +5101,8 @@ async function showLawyerDetail(name, certNumber) {
         </tbody>
       </table>
     </div>
+
+    ${renderIndepDirCard(indepDirs)}
 
     ${stat?.cases_total ? `
     <div class="card" style="margin-bottom:16px;">
@@ -5484,6 +5519,29 @@ const CONC_TIERS = {
   C: { label: '客源分散｜一般執業', color: 'var(--green)', desc: '客源分散，屬一般對外執業型態' },
   D: { label: '樣本不足', color: 'var(--text-muted)', desc: '近 12 個月出庭少於 3 件，無法判讀集中度' },
 };
+
+// 上市櫃獨董席次卡（lawyer_indep_directorships，MOPS t187ap30 簡歷覆核後資料）
+function renderIndepDirCard(rows) {
+  if (!rows || !rows.length) return '';
+  const fmtDate = d => d && d.length >= 7 ? `${d.slice(0, 3)}/${d.slice(3, 5)}/${d.slice(5, 7)}` : '-';
+  return `
+    <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃獨立董事（${rows.length} 席）</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">MOPS 獨立董監事兼任揭露，已用簡歷覆核律師身分${rows.some(r => r.verify_status === 'lawyer_confirmed') ? '；「簡歷含律師」者為姓名唯一比對' : ''}</div>
+      <table style="width:100%;font-size:0.85rem;">
+        <thead><tr style="color:var(--text-muted);font-size:0.75rem;"><th style="text-align:left;padding:4px 8px;">公司</th><th style="text-align:left;padding:4px 8px;">市場</th><th style="text-align:left;padding:4px 8px;">職稱</th><th style="text-align:left;padding:4px 8px;">就任</th><th style="text-align:left;padding:4px 8px;">覆核依據</th></tr></thead>
+        <tbody>
+        ${rows.map(r => `<tr>
+          <td style="padding:4px 8px;font-weight:600;">${escHtml(r.company_code)} ${escHtml(r.company_name)}</td>
+          <td style="padding:4px 8px;">${r.market === 'listed' ? '上市' : '上櫃'}</td>
+          <td style="padding:4px 8px;">${escHtml(r.title)}</td>
+          <td style="padding:4px 8px;color:var(--text-muted);">${fmtDate(r.appointed_date)}</td>
+          <td style="padding:4px 8px;font-size:0.75rem;color:var(--text-muted);">${r.verify_status === 'office_matched' ? '簡歷載明事務所' : '簡歷含「律師」'}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
 
 function renderClientCard(cc, ambiguous) {
   if (!cc) return '';
@@ -6068,8 +6126,13 @@ const LAW010_STATUS = {
   stopped: { label: '已停止', color: 'var(--text-muted)', dim: 'rgba(136,153,170,0.15)' },
 };
 let _law010Rows = null;   // view rows ＋ 前端補上 moj/status/last12 等衍生欄
-// 010 總表以「事務所簡稱」記錄的所級合作條目（非個人律師）→ 對應 MOJ 事務所全名
-const LAW010_FIRM_ALIAS = { '理湛': '理湛聯合法律事務所' };
+// 010 總表以「事務所/品牌簡稱」記錄的非個人條目：
+//   firm  = MOJ 事務所全名（連事務所 modal）
+//   brand = 跨所聯盟品牌（無 MOJ 實體，連官網）
+const LAW010_FIRM_ALIAS = {
+  '理湛': { firm: '理湛聯合法律事務所' },
+  '安承': { brand: '安承 Anherit', url: 'https://rich99.tw/', note: '繼承服務品牌：林宗憲（達言）、翁健祥、陳建佑（資鋒）三所聯盟' },
+};
 
 function law010MonthDiff(a, b) {  // yyyymm int 差幾個月
   return (Math.floor(b / 100) * 12 + b % 100) - (Math.floor(a / 100) * 12 + a % 100);
@@ -6103,8 +6166,9 @@ async function loadLaw010() {
       .filter(([m]) => law010MonthDiff(+m, maxMonth) < 12)
       .reduce((s, [, v]) => s + (v[0] || 0), 0);
     const cands = byName[r.name] || [];
-    r.moj = null; r.mojNote = ''; r.firmAlias = LAW010_FIRM_ALIAS[r.name] || null;
-    if (r.firmAlias) return;  // 所級合作：不做個人比對
+    const alias = LAW010_FIRM_ALIAS[r.name] || null;
+    r.moj = null; r.mojNote = ''; r.firmAlias = alias?.firm || null; r.brandAlias = alias?.brand ? alias : null;
+    if (alias) return;  // 所級/品牌級合作：不做個人比對
     if (cands.length === 1) r.moj = cands[0];
     else if (cands.length > 1) {
       const hit = cands.filter(c => c.region && (r.regions_010 || []).includes(c.region));
@@ -6208,7 +6272,10 @@ function renderLaw010Table() {
     const regions = (d.regions_010 || []);
     const regTxt = regions.slice(0, 4).join('、') + (regions.length > 4 ? ` 等 ${regions.length} 地` : '');
     const signRate = d.attended_total > 0 ? Math.round(d.signed_total / d.attended_total * 100) + '%' : '—';
-    const firm = d.firmAlias
+    const firm = d.brandAlias
+      ? `<a href="${escHtml(d.brandAlias.url)}" target="_blank" style="color:var(--blue);text-decoration:none;">${escHtml(d.brandAlias.brand)} &#8599;</a>
+         <div style="font-size:0.74rem;color:var(--text-muted);">${escHtml(d.brandAlias.note || '跨所聯盟品牌')}</div>`
+      : d.firmAlias
       ? `${firmLink(d.firmAlias)}
          <div style="font-size:0.74rem;color:var(--text-muted);">以事務所名義合作${d.firmSize ? '・' + d.firmSize + ' 位律師' : ''}</div>`
       : d.moj
@@ -6219,7 +6286,7 @@ function renderLaw010Table() {
       ? d.moj.official_cases_5yr.toLocaleString() + (d.moj.name_ambiguous ? ' *' : '')
       : '—';
     return `<tr>
-      <td style="white-space:nowrap;">${d.moj ? lawyerLink(d.name, 'font-weight:700;') : `<strong>${escHtml(d.name)}</strong>`}${d.firmAlias ? ' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:0.68rem;color:var(--text-muted);background:var(--ghost-bg);border:1px solid var(--border);">事務所</span>' : ''}
+      <td style="white-space:nowrap;">${d.moj ? lawyerLink(d.name, 'font-weight:700;') : `<strong>${escHtml(d.name)}</strong>`}${(d.firmAlias || d.brandAlias) ? ` <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:0.68rem;color:var(--text-muted);background:var(--ghost-bg);border:1px solid var(--border);">${d.brandAlias ? '品牌' : '事務所'}</span>` : ''}
         ${subEntries.length ? `<div style="font-size:0.72rem;color:var(--text-muted);">${escHtml(subEntries.join('、'))}</div>` : ''}</td>
       <td style="max-width:150px;font-size:0.82rem;">${escHtml(regTxt)}</td>
       <td style="white-space:nowrap;">${law010FmtM(d.first_month)} → ${law010FmtM(d.last_month)}</td>
