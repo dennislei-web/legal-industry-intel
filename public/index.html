@@ -5693,6 +5693,17 @@ async function saveAlumniAdd() {
   }
 }
 
+async function editAlumnusNote(id) {
+  const row = (_alumniRows || []).find(r => r.id === id);
+  if (!row) return;
+  const v = prompt(`編輯「${row.name}」的備註（清空＝刪除備註）：`, row.note || '');
+  if (v === null || v.trim() === (row.note || '')) return;
+  const { error } = await db.from('zhelu_alumni').update({ note: v.trim() || null }).eq('id', id);
+  if (error) { alert('儲存失敗：' + error.message); return; }
+  row.note = v.trim() || null;
+  renderAlumniTable();
+}
+
 async function deleteAlumnus(id, name) {
   if (!confirm(`刪除手動新增的校友「${name}」？此動作無法復原。`)) return;
   const { error } = await db.from('zhelu_alumni').delete().eq('id', id);
@@ -5794,7 +5805,7 @@ function renderAlumniTable() {
       <td>${firm}${lsn}${exp ? '<div>' + exp + '</div>' : ''}</td>
       <td>${escHtml(d.current_region || '—')}</td>
       <td>${d.lawsnote_cases != null ? d.lawsnote_cases : '—'}</td>
-      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${escHtml(d.note || '')}</td>
+      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${escHtml(d.note || '')}${isAdmin ? ` <a href="#" class="leader-mark-btn" onclick="editAlumnusNote(${d.id});return false;" title="編輯備註" style="font-size:0.72rem;text-decoration:none;">✏️</a>` : ''}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="loading">無符合條件的校友</td></tr>';
   document.getElementById('alumniCount').textContent = `顯示 ${rows.length} / ${_alumniRows.length} 位`;
