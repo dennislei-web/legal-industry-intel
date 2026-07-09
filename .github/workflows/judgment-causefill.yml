@@ -1,0 +1,101 @@
+name: Phase B 案由回填（causefill）
+
+# 判決書案由回填搬上雲端跑（本機關機也能完成）。
+# causefill 冪等：已帶 causes 的月份自動跳過，失敗月重 dispatch 即補。
+# 4 個 shard 平行、月份區間互斥（_upload_rows 先刪後插是按月操作，不同月不互撞）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      ranges_json:
+        description: '月份區間 shards（JSON array，格式 "起-迄"）'
+        required: false
+        default: '["202105-202207","202208-202310","202311-202501","202502-202603"]'
+
+concurrency:
+  group: judgment-causefill
+  cancel-in-progress: false
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        range: ${{ fromJSON(github.event.inputs.ranges_json || '["202105-202207","202208-202310","202311-202501","202502-202603"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full p7zip-rar
+
+      - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
+        run: |
+          IP=$(curl -s "https://dns.google/resolve?name=opendata.judicial.gov.tw&type=A" | jq -r '[.Answer[]? | select(.type==1)][0].data // empty')
+          if [ -z "$IP" ]; then IP=210.69.124.89; fi
+          echo "resolved: $IP"
+          echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
+
+      - name: Causefill ${{ matrix.range }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
+          JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
+          SEVENZ_PATH: 7z
+        working-directory: scripts
+        run: |
+          RANGE="${{ matrix.range }}"
+          python judgment_stats.py causefill "${RANGE%-*}" "${RANGE#*-}"
+
+  refresh:
+    runs-on: ubuntu-latest
+    needs: shard
+    if: always()   # 部分 shard 失敗也先 refresh（缺月重 dispatch 補跑即可）
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Refresh 彙總表 + 檢查缺月
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install -q requests
+          python - <<'EOF'
+          import os, requests, sys
+          url = os.environ['SUPABASE_URL'].strip()
+          key = os.environ['SUPABASE_SERVICE_KEY'].strip()
+          H = {'apikey': key, 'Authorization': f'Bearer {key}'}
+          for rpc in ('refresh_lawyer_cause_stats', 'refresh_judge_judgment_stats',
+                      'refresh_prosecutor_stats', 'refresh_lawyer_judgment_stats',
+                      'refresh_family_lawyer_stats', 'refresh_lawyer_region_stats',
+                      'refresh_firm_stats_cache'):
+              r = requests.post(f'{url}/rest/v1/rpc/{rpc}', json={},
+                                headers={**H, 'Content-Type': 'application/json'}, timeout=900)
+              print(rpc, 'HTTP', r.status_code)
+          # 缺月檢查（202105-202604 應全帶 causes）
+          missing = []
+          y, m = 2021, 5
+          while (y, m) <= (2026, 4):
+              ym = f'{y}{m:02d}'
+              r = requests.get(f'{url}/rest/v1/lawyer_month_stats',
+                               params={'yyyymm': f'eq.{ym}', 'causes': 'not.is.null',
+                                       'select': 'yyyymm', 'limit': 1}, headers=H, timeout=30)
+              if not r.json():
+                  missing.append(ym)
+              m += 1
+              if m > 12: y, m = y + 1, 1
+          print('缺 causes 的月份:', missing or '無 ✅')
+          if missing:
+              sys.exit(1)  # 讓 run 標紅，提醒重 dispatch 補跑
+          EOF
