@@ -12,11 +12,13 @@
 
 覆核資料源＝席次母體：TWSE t187ap30_L / TPEx mopsfin_t187ap30_O「獨立董監事兼任情形
 彙總表」，含每位獨董的主要現職/主要經歷（揭露義務，全數有填），且比 t187ap11 持股
-快照新（股東會改選後 ap11 要隔月才反映）。覆核邏輯：
+快照新（股東會改選後 ap11 要隔月才反映）。興櫃無 ap30，席次取 ap11_R。覆核邏輯：
   office_matched   簡歷提到該同名律師名冊登記的事務所 → 釘到特定 lic_no
   lawyer_confirmed 簡歷含「律師」字樣
   legal_related    簡歷僅含 法律/法學/法務
   no_signal        簡歷無法律相關字樣（很可能同名非律師）
+  cross_confirmed  興櫃席次，同名者已有上市/上櫃覆核確認席次 → 繼承 lic_no
+  name_match_only  興櫃席次，僅姓名比對（無簡歷可核）→ 不上前端頁面
 """
 import json
 import os
@@ -47,6 +49,7 @@ def rest(method, path, body=None, headers=None):
 SOURCES = [
     ('listed', 'https://openapi.twse.com.tw/v1/opendata/t187ap11_L'),
     ('otc', 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap11_O'),
+    ('emerging', 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap11_R'),
 ]
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36'
 # 筆數防呆：兩市場合計向來 4 萬多筆，低於此值視為來源異常，不覆蓋既有資料
@@ -77,8 +80,9 @@ def fetch_all():
                 continue
             rows.append({
                 'market': market,
-                'company_code': (d.get('公司代號') or '').strip(),
-                'company_name': (d.get('公司名稱') or '').strip(),
+                # 興櫃 _R 資料集用英文欄位鍵（SecuritiesCompanyCode/CompanyName）
+                'company_code': (d.get('公司代號') or d.get('SecuritiesCompanyCode') or '').strip(),
+                'company_name': (d.get('公司名稱') or d.get('CompanyName') or '').strip(),
                 'title': (d.get('職稱') or '').strip(),
                 'person_name': name,
                 'person_name_norm': norm_name(name),
@@ -186,8 +190,34 @@ def cmd_verify():
     # 席次母體直接用 ap30（比 ap11 持股快照新：6 月股東會改選後 ap11 尚未反映）
     seats = rows
 
+    # 興櫃：無 ap30 簡歷資料集，席次取自 ap11_R 持股明細（獨立董事本人）
+    req = urllib.request.Request('https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap11_R',
+                                 headers={'User-Agent': UA})
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        rdata = json.load(resp)
+    emerging = {}
+    for d in rdata:
+        title = (d.get('職稱') or '').strip()
+        name = (d.get('姓名') or '').strip()
+        code = (d.get('SecuritiesCompanyCode') or '').strip()
+        if '獨立董事' not in title or not name or not code or (code, name) in emerging:
+            continue
+        emerging[(code, name)] = {
+            'company_code': code,
+            'company_name': (d.get('CompanyName') or '').strip(),
+            'person_name': name,
+            'person_name_norm': norm_name(name),
+            'market': 'emerging',
+            'title': '獨立董事',
+            'appointed_date': None,
+            'current_position': None,
+            'experience': None,
+        }
+    log(f'emerging t187ap11_R: 獨立董事 {len(emerging)} 席')
+
     # 名冊候選：只抓有出現在席次中的姓名
-    names = sorted({s['person_name_norm'] for s in seats})
+    names = sorted({s['person_name_norm'] for s in seats} |
+                   {s['person_name_norm'] for s in emerging.values()})
     roster = {}  # name_norm -> [ {lic_no, office_normalized}, ... ]
     for i in range(0, len(names), 80):
         batch = ','.join(f'"{n}"' for n in names[i:i + 80])
@@ -232,6 +262,35 @@ def cmd_verify():
             'matched_office': matched_office,
             'current_position': s['current_position'],
             'experience': s['experience'],
+        })
+
+    # 興櫃席次：交叉確認（同名者已有上市/上櫃簡歷覆核確認 → 繼承身分），否則僅名單
+    confirmed_lic = {norm_name(r['person_name']): r['lic_no'] for r in out
+                     if r['verify_status'] in ('office_matched', 'lawyer_confirmed') and r['lic_no']}
+    for s in emerging.values():
+        cands = roster.get(s['person_name_norm'])
+        if not cands:
+            continue
+        lic_no = confirmed_lic.get(s['person_name_norm'])
+        if lic_no:
+            status = 'cross_confirmed'
+        else:
+            status = 'name_match_only'
+            if len(cands) == 1:
+                lic_no = cands[0]['lic_no']
+        out.append({
+            'lic_no': lic_no,
+            'person_name': s['person_name'],
+            'company_code': s['company_code'],
+            'company_name': s['company_name'],
+            'market': 'emerging',
+            'title': s['title'],
+            'appointed_date': None,
+            'same_name_lawyers': len(cands),
+            'verify_status': status,
+            'matched_office': None,
+            'current_position': None,
+            'experience': None,
         })
 
     log(f'覆核完成 {len(out)} 席，覆蓋 lawyer_indep_directorships…')

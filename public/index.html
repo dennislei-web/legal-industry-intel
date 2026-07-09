@@ -4316,7 +4316,7 @@ function renderOffices() {
     const rank = start + i + 1;
     return `<tr${blReason ? ' style="background:rgba(224,92,92,0.06);"' : ''}>
       <td style="text-align:center;color:${rank <= 3 ? 'var(--gold)' : 'var(--text-muted)'};font-weight:${rank <= 3 ? '700' : '400'};font-size:0.85rem;">${rank}</td>
-      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="點擊查看 ${o.ex_judicial_officers.length} 位前司法官" style="text-decoration:none;cursor:pointer;color:var(--purple);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--purple);border-radius:10px;background:rgba(155,126,216,0.1);">⚖️${o.ex_judicial_officers.length}</a>` : ''}${o.indep_seats ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="上市櫃獨立董事：${o.indep_lawyers} 位律師 / ${o.indep_seats} 席，點擊查看" style="text-decoration:none;cursor:pointer;color:var(--gold);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--gold);border-radius:10px;background:rgba(201,168,76,0.1);">🏛${o.indep_seats}</a>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
+      <td><a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(o.firm_name)}</a>${blBadge}${o.ex_judicial_officers && o.ex_judicial_officers.length ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="點擊查看 ${o.ex_judicial_officers.length} 位前司法官" style="text-decoration:none;cursor:pointer;color:var(--purple);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--purple);border-radius:10px;background:rgba(155,126,216,0.1);">⚖️${o.ex_judicial_officers.length}</a>` : ''}${o.indep_seats ? ` <a href="#" onclick="showFirmDetail('${escHtml(o.firm_name).replace(/'/g, "\\'")}');return false;" title="上市櫃/興櫃獨立董事：${o.indep_lawyers} 位律師 / ${o.indep_seats} 席，點擊查看" style="text-decoration:none;cursor:pointer;color:var(--gold);font-size:0.75rem;vertical-align:middle;padding:1px 5px;border:1px solid var(--gold);border-radius:10px;background:rgba(201,168,76,0.1);">🏛${o.indep_seats}</a>` : ''}${FIRM_TAGLINES[o.firm_name] ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;font-weight:400;">${escHtml(FIRM_TAGLINES[o.firm_name])}</div>` : ''}</td>
       <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(o.lawyer_count).toLocaleString()}</td>
       <td>${escHtml(o.main_region || '-')}</td>
       <td style="font-size:0.82rem;">${(() => {
@@ -4498,14 +4498,14 @@ async function showFirmDetail(firmName) {
     ` : ''}
 
     ${firmIndep.length ? `
-    <!-- 上市櫃獨立董事 -->
+    <!-- 上市櫃/興櫃獨立董事 -->
     <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
-      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃獨立董事（${Object.keys(indepByLawyer).length} 位律師 / ${firmIndep.length} 席）</div>
+      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃/興櫃獨立董事（${Object.keys(indepByLawyer).length} 位律師 / ${firmIndep.length} 席）</div>
       <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">MOPS 獨立董監事兼任揭露，已用簡歷覆核律師身分 — 通常反映公司治理人脈與企業客戶網絡</div>
       <ul style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.7;">
         ${Object.entries(indepByLawyer).map(([n, seats]) =>
           `<li><strong>${lawyerLink(n, 'font-weight:700;')}</strong> — ${seats.map(s =>
-            `${escHtml(s.company_code)} ${escHtml(s.company_name)}<span style="color:var(--text-muted);font-size:0.78rem;">(${s.market === 'listed' ? '上市' : '上櫃'})</span>`
+            `${escHtml(s.company_code)} ${escHtml(s.company_name)}<span style="color:var(--text-muted);font-size:0.78rem;">(${INDEP_MKT_LBL[s.market] || s.market})</span>`
           ).join('、')}</li>`).join('')}
       </ul>
     </div>
@@ -4566,7 +4566,7 @@ async function showFirmDetail(firmName) {
               ? ` <a href="#" class="leader-mark-btn" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
               : (!isLeader ? ` <a href="#" class="leader-mark-btn" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
-              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${indepByLawyer[l.name] ? ` <span title="上市櫃獨立董事：${escHtml(indepByLawyer[l.name].map(s => s.company_name).join('、'))}" style="font-size:0.7rem;cursor:help;">🏛</span>` : ''}${adminBtn}</td>
+              <td>${lawyerLink(l.name, 'font-weight:700;')}${isLeader ? ' <span title="' + escHtml(isLeader) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${indepByLawyer[l.name] ? ` <span title="上市櫃/興櫃獨立董事：${escHtml(indepByLawyer[l.name].map(s => s.company_name).join('、'))}" style="font-size:0.7rem;cursor:help;">🏛</span>` : ''}${adminBtn}</td>
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
@@ -5014,7 +5014,7 @@ async function showLawyerDetail(name, certNumber) {
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
     db.from('lawyer_indep_directorships').select('*').eq('person_name', name)
-      .in('verify_status', ['office_matched', 'lawyer_confirmed'])
+      .in('verify_status', ['office_matched', 'lawyer_confirmed', 'cross_confirmed'])
       .then(r => { indepDirs = r.data || []; }),
     db.from('lawyer_client_concentration').select('*').eq('name', name).maybeSingle()
       .then(r => { clientConc = r.data; }),
@@ -5540,23 +5540,25 @@ const CONC_TIERS = {
   D: { label: '樣本不足', color: 'var(--text-muted)', desc: '近 12 個月出庭少於 3 件，無法判讀集中度' },
 };
 
-// 上市櫃獨董席次卡（lawyer_indep_directorships，MOPS t187ap30 簡歷覆核後資料）
+// 上市櫃/興櫃獨董席次卡（lawyer_indep_directorships，MOPS t187ap30 簡歷覆核後資料）
+const INDEP_MKT_LBL = { listed: '上市', otc: '上櫃', emerging: '興櫃' };
+const INDEP_VERIFY_LBL = { office_matched: '簡歷載明事務所', lawyer_confirmed: '簡歷含「律師」', cross_confirmed: '上市櫃席次交叉確認' };
 function renderIndepDirCard(rows) {
   if (!rows || !rows.length) return '';
   const fmtDate = d => d && d.length >= 7 ? `${d.slice(0, 3)}/${d.slice(3, 5)}/${d.slice(5, 7)}` : '-';
   return `
     <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
-      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃獨立董事（${rows.length} 席）</div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">MOPS 獨立董監事兼任揭露，已用簡歷覆核律師身分${rows.some(r => r.verify_status === 'lawyer_confirmed') ? '；「簡歷含律師」者為姓名唯一比對' : ''}</div>
+      <div class="card-title" style="color:var(--gold);">&#127974; 上市櫃/興櫃獨立董事（${rows.length} 席）</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">MOPS 獨立董監事兼任揭露，已用簡歷覆核律師身分${rows.some(r => r.verify_status === 'lawyer_confirmed') ? '；「簡歷含律師」者為姓名唯一比對' : ''}${rows.some(r => r.verify_status === 'cross_confirmed') ? '；興櫃無簡歷資料集，以上市櫃已確認席次交叉認定' : ''}</div>
       <table style="width:100%;font-size:0.85rem;">
         <thead><tr style="color:var(--text-muted);font-size:0.75rem;"><th style="text-align:left;padding:4px 8px;">公司</th><th style="text-align:left;padding:4px 8px;">市場</th><th style="text-align:left;padding:4px 8px;">職稱</th><th style="text-align:left;padding:4px 8px;">就任</th><th style="text-align:left;padding:4px 8px;">覆核依據</th></tr></thead>
         <tbody>
         ${rows.map(r => `<tr>
           <td style="padding:4px 8px;font-weight:600;">${escHtml(r.company_code)} ${escHtml(r.company_name)}</td>
-          <td style="padding:4px 8px;">${r.market === 'listed' ? '上市' : '上櫃'}</td>
+          <td style="padding:4px 8px;">${INDEP_MKT_LBL[r.market] || r.market}</td>
           <td style="padding:4px 8px;">${escHtml(r.title)}</td>
           <td style="padding:4px 8px;color:var(--text-muted);">${fmtDate(r.appointed_date)}</td>
-          <td style="padding:4px 8px;font-size:0.75rem;color:var(--text-muted);">${r.verify_status === 'office_matched' ? '簡歷載明事務所' : '簡歷含「律師」'}</td>
+          <td style="padding:4px 8px;font-size:0.75rem;color:var(--text-muted);">${INDEP_VERIFY_LBL[r.verify_status] || '-'}</td>
         </tr>`).join('')}
         </tbody>
       </table>
