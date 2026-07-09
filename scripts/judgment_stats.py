@@ -788,6 +788,8 @@ if __name__ == '__main__':
     elif cmd == 'causefill':
         # Phase B 案由回填：強制重解（agg 快取沒存 JTITLE），冪等跳過已帶案由的月份。
         # 會一併冪等重傳全部月表與 pair 表（內容除 causes 外不變）。
+        # 失敗（多為 Supabase 5xx）等 90 秒重傳一次：agg 快取還在，upload 先刪後插
+        # 也順便修掉半殘月——半殘月 causes_uploaded 會誤判 true，不能留給下次跳過。
         for ym in month_range(sys.argv[2], sys.argv[3]):
             try:
                 if causes_uploaded(ym):
@@ -798,7 +800,14 @@ if __name__ == '__main__':
                     os.remove(old_agg)
                 run_month(ym, skip_uploaded=False, purge_rar=True)
             except Exception as e:
-                print(f'{ym}: 失敗 — {e}')
+                print(f'{ym}: 失敗 — {e}，90 秒後重試上傳一次')
+                time.sleep(90)
+                try:
+                    upload(ym)
+                    cleanup(ym, purge_rar=True)
+                    print(f'{ym}: 重試成功')
+                except Exception as e2:
+                    print(f'{ym}: 重試仍失敗 — {e2}（重 dispatch 可補跑）')
     elif cmd == 'reclassify':
         # 分類邏輯改版後強制重跑：刪 agg 快取、無視已上傳紀錄，逐月重新 download+parse+upload
         for ym in month_range(sys.argv[2], sys.argv[3]):
