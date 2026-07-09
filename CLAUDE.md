@@ -24,7 +24,12 @@
 - `moj_lawyers` — 法務部律師主表（lic_no 為主鍵）
 - `moj_firm_stats_cache` — 事務所統計快取表（普通 table，非 MV），由 `refresh_firm_stats_cache` RPC 以 UPSERT 更新（migration 020）
 - `firm_profiles` — 事務所補充資料（官網、備註等手動編輯）
-- `firm_websites` — 爬蟲找到的官網
+- `firm_websites` — 爬蟲找到的官網；**官網成立條件 = 該網域首頁含所名**（`verified=true`，
+  migration 065）。`moj_firm_statistics()` 只出 verified 官網，另疊 blocklist/共用URL/外國TLD 過濾。
+  ⚠️ **重寫 moj_firm_statistics() 時務必保留 clean_web 官網清洗段**——048 重寫時弄丟過一次，
+  雜訊官網 428→1073 全數回歸（065 修復）。共用驗證邏輯在 `scripts/website_verify.py`；
+  既有資料重驗跑 `scripts/verify_firm_websites.py`（直打 PostgREST：本機 .env 是新版
+  sb_secret key，舊版 supabase-py 會報 Invalid API key）
 - `judges` / `courts` / `judges_combined` — 法官/法院
 - `prosecutor_month_stats` / `prosecutor_stats` — 檢察官統計（migration 029），`judgment_stats.py` 從刑事裁判書萃取「檢察官○○○提起公訴/到庭執行職務」＋所屬檢察署，`refresh_prosecutor_stats` RPC 彙總；約半數刑事判決不具名檢察官，案件數為下限估計
 - `prosecutor_offices` — 檢察署基本資料 30 署（migration 033 種子）；**現職檢察官數用 `prosecutor_active_summary()` / `prosecutor_active_by_office()` RPC**（最新資料月具名數＋跨署主要歸屬去重，實測與法務統計官方 114 年底 1,460 誤差 <1%）。`prosecutor_stats` 的列數是五年累計（人×署）組合，**不是現職人數**，別直接當檢察官總數用

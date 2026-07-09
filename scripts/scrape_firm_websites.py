@@ -1,9 +1,13 @@
 """
-事務所官網爬蟲 v2
+事務所官網爬蟲 v3
 - 自動從 moj_firm_statistics() sync 所有事務所進 firm_websites
 - 支援 BATCH_SIZE=0 代表跑所有未爬過的
 - 改善命中率：多重 query 策略 + 評分機制
 - 延遲可控 (SCRAPE_DELAY)
+- v3（2026-07）：寫入前驗證 — 候選 URL 正規化為網域首頁、首頁必須含所名、
+  網域過 DB blocklist（firm_website_blocklist）與外國 TLD、拒收已被
+  其他事務所占用的 URL；通過才寫入並標 verified=true。
+  背景：v2 直接存搜尋第一名，混進大量黃頁/新聞/公會/他所網頁（見 migration 042/065）
 """
 import os
 import re
@@ -12,6 +16,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, unquote
 from utils import get_supabase, log
+from website_verify import load_blocklist, host_blocked, homepage_of, verify_firm_website
 
 BATCH_SIZE = int(os.environ.get('BATCH_SIZE', '0'))  # 0 = 全部
 SCRAPE_DELAY = float(os.environ.get('SCRAPE_DELAY', '1.8'))  # 秒
@@ -69,13 +74,15 @@ def search_duckduckgo(query, retries=2):
     return []
 
 
-def score_candidate(url, title, description, firm_name):
+def score_candidate(url, title, description, firm_name, blocklist=None):
     """評分一個搜尋結果是否像官網 (0-100)"""
     domain = urlparse(url).netloc.lower()
-    # 排除黑名單
+    # 排除黑名單（內建清單 + DB firm_website_blocklist + 外國 TLD）
     for excl in EXCLUDE_DOMAINS:
         if excl in domain:
             return -1
+    if blocklist is not None and host_blocked(domain, blocklist):
+        return -1
     # 基礎分數
     score = 0
     full_text = (title + ' ' + description + ' ' + domain).lower()
@@ -111,9 +118,9 @@ def score_candidate(url, title, description, firm_name):
     return score
 
 
-def find_firm_website(firm_name):
-    """搜尋事務所官網，多輪 query 取最佳評分"""
-    # 去除尾巴的「律師」等雜字
+def find_firm_website(firm_name, blocklist, taken_urls):
+    """搜尋事務所官網：多輪 query 評分排序後，逐一「首頁含所名」驗證，
+    通過才回傳（URL 一律正規化為網域首頁；已被他所占用的首頁跳過）"""
     clean = firm_name.strip()
     queries = [
         f'{clean} 官網',
@@ -127,7 +134,7 @@ def find_firm_website(firm_name):
             if r['url'] in seen_urls:
                 continue
             seen_urls.add(r['url'])
-            s = score_candidate(r['url'], r['title'], r['description'], firm_name)
+            s = score_candidate(r['url'], r['title'], r['description'], firm_name, blocklist)
             if s > 0:
                 all_candidates.append((s, r))
         if all_candidates and max(c[0] for c in all_candidates) >= 50:
@@ -136,16 +143,28 @@ def find_firm_website(firm_name):
     if not all_candidates:
         return None
     all_candidates.sort(key=lambda x: -x[0])
-    best_score, best = all_candidates[0]
-    # 低分不回傳，避免誤判
-    if best_score < 25:
-        return None
-    return {
-        'website_url': best['url'],
-        'website_title': (best['title'] or '')[:200],
-        'description': (best['description'] or '')[:500],
-        'score': best_score,
-    }
+
+    # 寫入前驗證：取前 3 名候選，逐一抓網域首頁確認含所名
+    tried_homes = set()
+    for score, cand in all_candidates[:3]:
+        if score < 25:
+            break  # 低分不驗，避免誤判
+        home = homepage_of(cand['url'])
+        if not home or home in tried_homes:
+            continue
+        tried_homes.add(home)
+        ok, final_home, title = verify_firm_website(cand['url'], firm_name, blocklist)
+        if not ok:
+            continue
+        if final_home in taken_urls:
+            continue  # 同一首頁已配給別家 = 錯配/共用落地頁
+        return {
+            'website_url': final_home,
+            'website_title': (title or cand['title'] or '')[:200],
+            'description': (cand['description'] or '')[:500],
+            'score': score,
+        }
+    return None
 
 
 def sync_moj_firms_to_table(sb):
@@ -198,11 +217,31 @@ def sync_moj_firms_to_table(sb):
     return len(to_insert)
 
 
+def fetch_taken_urls(sb):
+    """已配置給任一事務所的官網（避免同一首頁配多家）"""
+    taken = set()
+    start = 0
+    while True:
+        r = (sb.table('firm_websites').select('website_url')
+               .not_.is_('website_url', 'null').range(start, start + 999).execute())
+        if not r.data:
+            break
+        taken.update(x['website_url'] for x in r.data if x.get('website_url'))
+        if len(r.data) < 1000:
+            break
+        start += 1000
+    return taken
+
+
 def main():
     sb = get_supabase()
 
     # Step 1: sync MOJ 事務所到 firm_websites
     sync_moj_firms_to_table(sb)
+
+    blocklist = load_blocklist(sb)
+    taken_urls = fetch_taken_urls(sb)
+    log(f'blocklist 網域: {len(blocklist)}，已占用官網: {len(taken_urls)}')
 
     # Step 2: 取得待爬的事務所
     log(f'\n=== 爬取官網 ===')
@@ -236,12 +275,15 @@ def main():
     for idx, firm in enumerate(firms, 1):
         name = firm['firm_name']
         try:
-            result = find_firm_website(name)
+            result = find_firm_website(name, blocklist, taken_urls)
             update = {'website_scraped': True, 'scraped_at': 'now()'}
             if result:
                 update['website_url'] = result['website_url']
                 update['website_title'] = result['website_title']
                 update['description'] = result['description']
+                update['verified'] = True
+                update['verified_at'] = 'now()'
+                taken_urls.add(result['website_url'])
                 found += 1
                 if idx % 20 == 0 or idx == 1:
                     log(f'  [{idx}/{total}] ✓ {name} → {result["website_url"][:70]} (score={result["score"]})')
