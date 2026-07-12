@@ -1371,11 +1371,6 @@
           <option value="60">近 5 年</option>
           <option value="0">全部</option>
         </select>
-        <select id="jchgType" onchange="renderJudgeChanges()">
-          <option value="">所有類型</option>
-          <option value="appear">進場</option>
-          <option value="leave">退場</option>
-        </select>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
         <div class="card"><div class="card-title">&#128200; 法官流入排行（進場）</div><div id="jchgInflow" class="loading">載入中</div></div>
@@ -1392,7 +1387,29 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-title">&#128260; 異動明細</div>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span>&#128260; 異動明細</span>
+          <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="jchgYear" onchange="jchgPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="">所有年度</option>
+            </select>
+            <select id="jchgMonthOnly" onchange="jchgPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="">所有月份</option>
+              <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+              <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+              <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
+              <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+            </select>
+            <select id="jchgCourt" onchange="jchgPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;max-width:220px;">
+              <option value="">所有法院</option>
+            </select>
+            <select id="jchgType" onchange="jchgPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="">進＋退場</option>
+              <option value="appear">進場</option>
+              <option value="leave">退場</option>
+            </select>
+          </span>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -1402,6 +1419,25 @@
           </table>
         </div>
         <div class="pagination" id="jchgPagination"></div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span>&#128203; 退場法官名冊</span>
+          <select id="jchgRosterSort" onchange="jchgRosterSortKey=this.value;jchgRosterPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+            <option value="month">退場月：新 → 舊</option>
+            <option value="active_months">活躍月數：多 → 少</option>
+          </select>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>退場月</th><th>法官</th><th>法院</th><th>活躍月數</th><th>信心</th></tr>
+            </thead>
+            <tbody id="jchgRosterBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination" id="jchgRosterPagination"></div>
       </div>
     </div>
 
@@ -6465,6 +6501,9 @@ function renderLaw010Table() {
 // ============================================================
 let _jchgRows = null;
 let jchgPage = 0;
+// 退場法官名冊（07-07 併版時 JS 先進、HTML 與宣告漏掉，此為補齊）
+let jchgRosterPage = 0;
+let jchgRosterSortKey = 'month';
 
 function judgeMonthGap(a, b) {
   return (+b.slice(0,4)*12 + +b.slice(4,6)) - (+a.slice(0,4)*12 + +a.slice(4,6));
@@ -6526,6 +6565,22 @@ async function loadJudgeChanges(force) {
     return;
   }
   _jchgRows = data || [];
+
+  // 明細篩選下拉：年度 + 法院（依資料動態生成；重載時保留現選值）
+  const rows0 = _jchgRows.filter(r => r.court_name !== '未知法院');
+  const ySel = document.getElementById('jchgYear'), cSel = document.getElementById('jchgCourt');
+  const yKeep = ySel.value, cKeep = cSel.value;
+  const years = [...new Set(rows0.map(r => r.event_month.slice(0, 4)))].sort().reverse();
+  ySel.innerHTML = '<option value="">所有年度</option>' +
+    years.map(y => `<option value="${y}">${y} 年</option>`).join('');
+  const courtCnt = {};
+  rows0.forEach(r => { courtCnt[r.court_name] = (courtCnt[r.court_name] || 0) + 1; });
+  cSel.innerHTML = '<option value="">所有法院</option>' +
+    Object.keys(courtCnt).sort((a, b) => courtCnt[b] - courtCnt[a])
+      .map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  if (yKeep) ySel.value = yKeep;
+  if (cKeep) cSel.value = cKeep;
+
   renderJudgeChanges();
 }
 
@@ -6604,10 +6659,20 @@ function renderJudgeChanges() {
       </div>`;
     }).join('');
 
-  // 明細（期間內 + 搜尋 + 類型）
-  let rows = win;
+  // 明細（期間內 + 年月 + 法院 + 搜尋 + 類型）
+  // 有選「年度」時以年度為準、不受上方期間窗限制（免得選 2022 卻被近 24 個月篩空）；
+  // 只選「月份」則在期間窗內比對（跨年同月）。
+  const yearSel = document.getElementById('jchgYear').value;
+  const mmSel = document.getElementById('jchgMonthOnly').value;
+  const courtSel = document.getElementById('jchgCourt').value;
+  let base = yearSel
+    ? _jchgRows.filter(r => r.court_name !== '未知法院' && r.event_month.slice(0, 4) === yearSel)
+    : win;
+  if (mmSel) base = base.filter(r => r.event_month.slice(4, 6) === mmSel);
+  if (courtSel) base = base.filter(r => r.court_name === courtSel);
+  if (kw) base = base.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
+  let rows = base;
   if (type) rows = rows.filter(r => r.change_type === type);
-  if (kw) rows = rows.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
 
   const body = document.getElementById('jchgTableBody');
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -6631,9 +6696,8 @@ function renderJudgeChanges() {
   }
   renderPagination('jchgPagination', jchgPage, rows.length, p => { jchgPage = p; renderJudgeChanges(); });
 
-  // ── 退場法官名冊：期間內的 leave，套搜尋、排序、分頁 ──
-  let roster = win.filter(r => r.change_type === 'leave');
-  if (kw) roster = roster.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
+  // ── 退場法官名冊：期間內的 leave，套年月/法院/搜尋、排序、分頁 ──
+  let roster = base.filter(r => r.change_type === 'leave');
   roster = roster.slice().sort((a, b) =>
     jchgRosterSortKey === 'active_months'
       ? (b.active_months || 0) - (a.active_months || 0)
