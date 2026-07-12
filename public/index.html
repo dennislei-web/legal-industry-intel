@@ -6558,7 +6558,7 @@ async function loadJudgeChanges(force) {
   jchgPage = 0;
   ['jchgInflow', 'jchgOutflow', 'jchgNet'].forEach(id => { document.getElementById(id).className = 'loading'; });
   const { data, error } = await db.from('judge_changes')
-    .select('name,court_name,change_type,event_month,case_count,in_current_roster,confidence')
+    .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence')
     .order('event_month', { ascending: false }).limit(20000);
   if (error) {
     document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="5" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;

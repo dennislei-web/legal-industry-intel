@@ -192,6 +192,9 @@ def normalize_court(name):
         return '臺灣高等法院'
     return '未知法院'
 RE_NOT_JUDGE_LINE = re.compile(r'書\s*記\s*官|檢\s*察\s*官|辯\s*護\s*人|司法事務官|法官助理')
+# 姓名級停用字：署名列黏到的程序用語（「不得上訴」「得抗告」「附錄法條」「鄭瑋附表」等）
+# 與 migration 081 的 refresh_judge_changes 濾網同步，改一邊要同步另一邊
+RE_JUDGE_NAME_NOISE = re.compile(r'上訴|抗告|附表|附錄|主文|原告|被告|聲請|宣示|以上')
 
 # 字別 → 案類（粗分）。JID 內含裁判類別碼，但月包檔名/ID 較可靠的是全文首行。
 CAT_BY_DOCNAME = [('刑事', '刑事'), ('民事', '民事'), ('行政', '行政'),
@@ -422,7 +425,7 @@ def extract_judges(jfull):
         if RE_NOT_JUDGE_LINE.search(line):
             continue
         name = re.sub(r'[\s　]', '', m.group(1))
-        if 2 <= len(name) <= 4 and name not in names:
+        if 2 <= len(name) <= 4 and name not in names and not RE_JUDGE_NAME_NOISE.search(name):
             names.append(name)
     return names
 
