@@ -5062,11 +5062,13 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [];
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('gov_lawyer_tenders').select('*').eq('lawyer_name', name)
+      .then(r => { govTen = r.data || []; }),
     db.from('lawyer_indep_directorships').select('*').eq('person_name', name)
       .in('verify_status', ['office_matched', 'lawyer_confirmed', 'cross_confirmed'])
       .then(r => { indepDirs = r.data || []; }),
@@ -5110,9 +5112,14 @@ async function showLawyerDetail(name, certNumber) {
   // 獨董席次歸屬：釘到證號者需證號一致；未釘證號（同名多人）不顯示避免張冠李戴
   indepDirs = indepDirs.filter(r => r.lic_no && licNo && r.lic_no === licNo);
 
+  // 政府標案歸戶（一人所/個人名義；view 以姓名歸戶）
+  const govWinsL = govTen.filter(r => r.is_winner)
+    .sort((a, b) => (b.award_date || '').localeCompare(a.award_date || ''));
+
   // 來源標籤
   const sources = [];
   if (indepDirs.length) sources.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">上市櫃獨董 ×${indepDirs.length}</span>`);
+  if (govWinsL.length) sources.push(`<span class="badge" style="background:rgba(63,182,168,0.2);color:var(--teal,#3fb6a8);">政府標案 ×${govWinsL.length}</span>`);
   if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
   if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
@@ -5177,6 +5184,26 @@ async function showLawyerDetail(name, certNumber) {
     </div>
 
     ${renderIndepDirCard(indepDirs)}
+
+    ${govTen.length ? `
+    <!-- 政府標案（個人歸戶） -->
+    <div class="card" style="border-left:3px solid var(--teal,#3fb6a8);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--teal,#3fb6a8);">&#127942; 政府標案（得標 ${govWinsL.length} 件 / 投標 ${govTen.length} 件）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">以${escHtml([...new Set(govTen.map(r => r.via))].join('、'))}投標的決標紀錄，累計得標 ${fmtGovAmt(govWinsL.reduce((s, r) => s + (r.award_amount || 0), 0))}${l.name_ambiguous ? '；&#9888; 名冊有同名律師，個人名義投標為同名合併' : ''}</div>
+      ${govWinsL.length ? `
+      <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:52px;">年度</th><th>機關</th><th>案名</th><th style="width:90px;text-align:right;">決標金額</th></tr></thead>
+          <tbody>${govWinsL.map(r => `<tr>
+            <td>${r.award_year || '-'}</td>
+            <td style="font-size:0.8rem;">${escHtml(r.unit_name || '-')}</td>
+            <td style="font-size:0.8rem;max-width:280px;">${escHtml(r.title || '-')}</td>
+            <td style="text-align:right;font-size:0.8rem;">${fmtGovAmt(r.award_amount)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>` : '<div style="font-size:0.82rem;color:var(--text-muted);">有投標紀錄但尚無得標。</div>'}
+    </div>
+    ` : ''}
 
     ${stat?.cases_total ? `
     <div class="card" style="margin-bottom:16px;">
