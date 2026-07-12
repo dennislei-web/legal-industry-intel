@@ -104,7 +104,8 @@
   refresh 已掛進 `refresh_stats()`）；RPC：`firm_cause_ranking`（事務所×案由排名，全國口徑）、
   `cause_supply_stats`（案由×供給/集中度）、`cause_group_list`（下拉）。
   前端：律師 modal「案由組成」卡、事務所版圖「案由種類」下拉（選了會停用法院篩選）、
-  產業分析「案由供需」tab（民事有 Phase A 市場對照欄，刑事/家事分組口徑不同不硬對）。
+  產業分析「案由供需」tab（民事有 Phase A 市場對照欄，刑事/家事分組口徑不同不硬對；
+  點列開 modal 看桶內原始案由明細——`cause_group_causes` 表，migration 080，同掛 refresh 月更）。
   回填：`python judgment_stats.py causefill 202105 202604`（冪等跳過已帶 causes 的月）。
 - **律師官方統計（migration 046）**：`lawyer_judgment_stats`（按律師名彙總：cases_5yr
   滾動 60 月錨定資料最新月、cases_total、cats_5yr/cats_all、by_year、top_court_5yr），
