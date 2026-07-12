@@ -3150,7 +3150,7 @@ async function loadLawyers() {
   lawyerTotal = count || 0;
 
   if (error) { console.error('lawyers_combined error:', error); return; }
-  await ensureSoloFirms(); // 一人所所長判定需要對照表
+  await Promise.all([ensureSoloFirms(), ensureLawyerFlags()]); // 一人所所長判定 + 獨董/標案標記對照表
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
@@ -3204,7 +3204,7 @@ async function loadLawyers() {
 
     const linfo = leaderInfo(l.name, l.firm_name);
     return `<tr>
-      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${linfo ? ' <span title="' + escHtml(linfo) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${linfo ? ' <span title="' + escHtml(linfo) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${INDEP_LIC_MAP && l.moj_lic_no && INDEP_LIC_MAP.get(l.moj_lic_no) ? ` <span title="上市櫃/興櫃獨立董事 ×${INDEP_LIC_MAP.get(l.moj_lic_no)} 席" style="font-size:0.7rem;cursor:help;">🏛</span>` : ''}${GOV_LAWYER_MAP && GOV_LAWYER_MAP.get(l.name) ? ` <span title="政府標案得標 ${GOV_LAWYER_MAP.get(l.name)} 件（一人所/個人名義歸戶${l.name_ambiguous ? '；名冊有同名律師，可能為同名合併' : ''}）" style="font-size:0.7rem;cursor:help;">🏆</span>` : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${l.firm_name ? firmLink(l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1')) : '-'}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
@@ -3854,6 +3854,34 @@ function soloFirmKey(firmName) {
 function fmtGovAmt(v) {
   if (!v) return '金額未公開';
   return v >= 1e8 ? (v / 1e8).toFixed(2) + ' 億' : Math.round(v / 1e4).toLocaleString() + ' 萬';
+}
+// 律師列表姓名旁標記對照表：🏛 獨董（按證號，無同名問題）、🏆 政府標案得標（姓名歸戶）
+let INDEP_LIC_MAP = null;   // lic_no -> 席次數
+let GOV_LAWYER_MAP = null;  // 姓名 -> 得標件數
+let _lawyerFlagsLoading = null;
+function ensureLawyerFlags() {
+  if (!_lawyerFlagsLoading) {
+    _lawyerFlagsLoading = (async () => {
+      try {
+        const lic = new Map(), gov = new Map();
+        for (let from = 0; ; from += 1000) {
+          const { data } = await db.from('lawyer_indep_directorships').select('lic_no')
+            .in('verify_status', ['office_matched', 'lawyer_confirmed', 'cross_confirmed'])
+            .not('lic_no', 'is', null).range(from, from + 999);
+          (data || []).forEach(r => lic.set(r.lic_no, (lic.get(r.lic_no) || 0) + 1));
+          if (!data || data.length < 1000) break;
+        }
+        for (let from = 0; ; from += 1000) {
+          const { data } = await db.from('gov_lawyer_tenders').select('lawyer_name')
+            .eq('is_winner', true).range(from, from + 999);
+          (data || []).forEach(r => gov.set(r.lawyer_name, (gov.get(r.lawyer_name) || 0) + 1));
+          if (!data || data.length < 1000) break;
+        }
+        INDEP_LIC_MAP = lic; GOV_LAWYER_MAP = gov;
+      } catch (e) { console.log('lawyer flags load error:', e); _lawyerFlagsLoading = null; }
+    })();
+  }
+  return _lawyerFlagsLoading;
 }
 let SOLO_FIRM_MAP = null;   // firm_key -> 唯一律師姓名
 let _soloFirmLoading = null;
