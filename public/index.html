@@ -4094,10 +4094,13 @@ function sortOffices(col) {
   renderOffices();
 }
 
+let officeLoadSeq = 0;  // 併發載入序號：晚啟動的載入使早前未完成的作廢
 async function loadOffices() {
   // 使用 cache 表 (moj_firm_stats_cache) 讀取，速度 ~0.2s (比 RPC 的 ~8s 快 40 倍)
   // cache 每天凌晨自動 refresh，或手動呼叫 refresh_firm_stats_cache()
-  allOffices = [];
+  if (allOffices.length) { renderOffices(); return; }  // 本次開頁已載過：直接重繪，不重抓
+  const mySeq = ++officeLoadSeq;
+  let rows = [];  // 先累加到區域變數；直接累加全域 allOffices 會被併發呼叫交錯出整份重複
   const PAGE = 1000;
   let from = 0;
   while (true) {
@@ -4111,14 +4114,16 @@ async function loadOffices() {
       console.error('moj_firm_stats_cache error:', error);
       // Fallback 到 RPC（慢但保底）
       const { data: rpcData } = await db.rpc('moj_firm_statistics').range(0, 999);
-      if (rpcData) allOffices = rpcData;
+      if (rpcData) rows = rpcData;
       break;
     }
     if (!data || data.length === 0) break;
-    allOffices = allOffices.concat(data);
+    rows = rows.concat(data);
     if (data.length < PAGE) break;
     from += PAGE;
   }
+  if (mySeq !== officeLoadSeq) return;  // 期間又觸發了新的載入：放棄本次結果
+  allOffices = rows;
 
   // 分類：事務所 vs 法人/公司
   const isFirm = o => /事務所/.test(o.firm_name);
