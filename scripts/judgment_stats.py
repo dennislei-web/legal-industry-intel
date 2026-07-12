@@ -790,6 +790,8 @@ if __name__ == '__main__':
         # 會一併冪等重傳全部月表與 pair 表（內容除 causes 外不變）。
         # 失敗（多為 Supabase 5xx）等 90 秒重傳一次：agg 快取還在，upload 先刪後插
         # 也順便修掉半殘月——半殘月 causes_uploaded 會誤判 true，不能留給下次跳過。
+        # 有月份最終失敗時 exit 1（CI shard 才不會假綠燈）。
+        failed = []
         for ym in month_range(sys.argv[2], sys.argv[3]):
             try:
                 if causes_uploaded(ym):
@@ -808,6 +810,10 @@ if __name__ == '__main__':
                     print(f'{ym}: 重試成功')
                 except Exception as e2:
                     print(f'{ym}: 重試仍失敗 — {e2}（重 dispatch 可補跑）')
+                    failed.append(ym)
+        if failed:
+            print(f'最終失敗月份: {failed}')
+            sys.exit(1)
     elif cmd == 'reclassify':
         # 分類邏輯改版後強制重跑：刪 agg 快取、無視已上傳紀錄，逐月重新 download+parse+upload
         for ym in month_range(sys.argv[2], sys.argv[3]):
