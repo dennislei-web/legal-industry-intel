@@ -197,6 +197,20 @@ def query_lic(lic_no, _variant=True):
     return None
 
 
+def query_lic_status(lic_no):
+    """回傳 (data, 'ok'|'gone'|'flaky')。
+
+    gone  = MOJ 確認查無此證號（HTTP 200 空 data / 404；query_lic 內的重試與
+            早年異體字互換都試過）→ 已從名冊移除（註銷/停止登錄），不是網路抖動。
+    flaky = timeout/5xx 連線問題重試耗盡，無法斷定，呼叫端不可當異動處理。
+    """
+    data = query_lic(lic_no)
+    if data is not None:
+        return data, 'ok'
+    status, _ = _query_once(lic_no)  # 再確認一次以區分「確定查無」vs「連線失敗」
+    return None, ('gone' if status in ('empty', 'notfound') else 'flaky')
+
+
 def to_lawyer_record(lic_no, data):
     """轉換為 moj_lawyers 表格式"""
     # guild_name 可能是字串或 list

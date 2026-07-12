@@ -34,7 +34,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
     sys.stdout.reconfigure(line_buffering=True, encoding='utf-8')
 
-from moj_licno_scan import normalize_office, query_lic, _query_once  # noqa: E402（需要先 load_dotenv）
+from moj_licno_scan import normalize_office, query_lic_status  # noqa: E402（需要先 load_dotenv）
 
 SUPABASE_URL = os.environ['SUPABASE_URL'].strip()
 SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY'].strip()
@@ -63,18 +63,6 @@ def sb_patch(path, payload):
             time.sleep(5 * (attempt + 1))
     print(f'  ! PATCH {path} timeout，放棄', flush=True)
     return False
-
-
-def query_lic_status(lic_no):
-    """回傳 (data, 'ok'|'gone'|'flaky')。
-    gone = MOJ 確認查無此證號（200 空回應/404，含 query_lic 的異體字互換都試過）
-         → 律師已從名冊移除（註銷/停止登錄），不是網路抖動。
-    flaky = timeout/5xx 連線問題耗盡，無法斷定。"""
-    data = query_lic(lic_no)
-    if data is not None:
-        return data, 'ok'
-    status, _ = _query_once(lic_no)  # 再確認一次以區分「確定查無」vs「連線失敗」
-    return None, ('gone' if status in ('empty', 'notfound') else 'flaky')
 
 
 def resolve_lic(alumnus, moj_by_name):

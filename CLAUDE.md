@@ -44,6 +44,11 @@
 - MOJ API 每筆 ~3-5 秒，全量要 ~15 小時 → `moj-office-refresh.yml` 每日凌晨 1 點按證號 hash 分 7 片跑（`--shard k 7`），一週刷完一輪
 - `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號（發現新進律師，INSERT 也會被 trigger 記錄）
 - 注意：`moj_lawyer_detail_fetch.py` **不會**更新 office 欄位（只補 detail），別誤以為它能偵測異動
+- **除名偵測（mig 079）**：MOJ「確定查無」（200 空 data / 404，`query_lic_status()` 已排除網路抖動）
+  兩段確認——首輪記 `dereg_candidate_at`，下輪（≥3 天）仍查無才標 `deregistered_at` +
+  state_desc=「名冊查無（推定除名）」（trigger 自動入異動追蹤）；之後又查得到會自動解除（自癒）。
+  已除名者不計入 `moj_firm_statistics()` 人數與 `moj_solo_firm_lawyers`；firm modal 清單沉底標「已除名」。
+  單筆手動：`moj_office_refresh.py --check <證號>`（唯讀）/ `--mark-dereg <證號>`（三次確認後標記）
 
 ## 裁判書開放資料管線（法官統計）
 
