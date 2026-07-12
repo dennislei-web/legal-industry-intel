@@ -425,6 +425,10 @@ def extract_judges(jfull):
         if RE_NOT_JUDGE_LINE.search(line):
             continue
         name = re.sub(r'[\s　]', '', m.group(1))
+        # 「以上正本證明…」折行黏字：「以」落在署名行尾 → 「○○○以」。現任名冊
+        # 4 字名無「以」結尾者，去尾不誤傷（migration 082 清歷史資料同規則）
+        if len(name) == 4 and name.endswith('以'):
+            name = name[:3]
         if 2 <= len(name) <= 4 and name not in names and not RE_JUDGE_NAME_NOISE.search(name):
             names.append(name)
     return names
