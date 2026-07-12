@@ -818,7 +818,8 @@
           </table>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
-          ※ 供給面（判決件數/律師數/集中度）來自近 5 年公開裁判書案由（下限估計；常態承辦=該類近 5 年 ≥12 件）。
+          ※ <strong>點任一列可展開該類別的案由明細</strong>（「其他民法」等剩餘桶尤其建議先看明細再解讀）。
+          供給面（判決件數/律師數/集中度）來自近 5 年公開裁判書案由（下限估計；常態承辦=該類近 5 年 ≥12 件）。
           市場面兩欄來自終結案件微資料（民事訴訟檔，最新完整年；3 年變化為完整年對完整年），
           <strong>僅民事有市場對照</strong>——刑事/家事的官方分組與判決書案由分組口徑不同，不硬對。
           集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
@@ -7486,6 +7487,7 @@ function csMarketCols(group) {
   return { nl, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null };
 }
 
+let _csRows = [];
 async function loadCauseSupply(cat) {
   const body = document.getElementById('csTableBody');
   body.innerHTML = '<tr><td colspan="7" class="loading">載入中</td></tr>';
@@ -7494,9 +7496,10 @@ async function loadCauseSupply(cat) {
     body.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
     return;
   }
+  _csRows = rows;
   const showMkt = cat === '民事';
   document.querySelectorAll('.cs-mkt-col').forEach(el => { el.style.display = showMkt ? '' : 'none'; });
-  body.innerHTML = rows.map(r => {
+  body.innerHTML = rows.map((r, i) => {
     let mktCells = '';
     if (showMkt) {
       const m = csMarketCols(r.cause_group);
@@ -7504,8 +7507,8 @@ async function loadCauseSupply(cat) {
         <td style="text-align:right;color:${m.chg >= 0 ? 'var(--red)' : 'var(--green)'};">${m.chg === null ? '-' : (m.chg >= 0 ? '+' : '') + m.chg.toFixed(1) + '%'}</td>`
         : '<td style="text-align:right;">-</td><td style="text-align:right;">-</td>';
     }
-    return `<tr>
-      <td>${escHtml(r.cause_group)}</td>
+    return `<tr style="cursor:pointer;" onclick="csDrill(${i})" title="點擊查看此類別的案由明細">
+      <td>${escHtml(r.cause_group)} <span style="color:var(--text-muted);font-size:0.72rem;">▸ 明細</span></td>
       <td style="text-align:right;color:var(--gold);font-weight:600;">${Number(r.total_cases).toLocaleString()}</td>
       <td style="text-align:right;">${Number(r.lawyers).toLocaleString()}</td>
       <td style="text-align:right;">${Number(r.active_lawyers).toLocaleString()}</td>
@@ -7513,6 +7516,69 @@ async function loadCauseSupply(cat) {
       ${mktCells}
     </tr>`;
   }).join('');
+}
+
+// 案由種類鑽取：點列開 modal 看桶內原始案由明細（cause_group_causes，migration 080）
+const _cgcCache = {};
+async function csDrill(i) {
+  const r = _csRows?.[i];
+  if (!r) return;
+  const grp = r.cause_group;
+  const modal = document.getElementById('causeGroupModal');
+  modal.style.display = 'flex';
+  document.getElementById('causeGroupModalTitle').textContent = grp + ' — 案由明細';
+  const body = document.getElementById('causeGroupModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    if (!_cgcCache[grp]) {
+      const { data, error } = await db.from('cause_group_causes')
+        .select('*').eq('cause_group', grp).single();
+      if (error) throw error;
+      _cgcCache[grp] = data;
+    }
+    const d = _cgcCache[grp];
+    const top = d.top_causes || [];
+    const topSum = top.reduce((s, t) => s + Number(t[1]), 0);
+    const rest = Number(d.total) - topSum;
+    const isFallback = grp.startsWith('其他');
+    body.innerHTML = `
+      ${isFallback ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+        「${escHtml(grp)}」是分類的<strong>剩餘桶</strong>——關鍵字比對不到具名種類的${escHtml(d.cat || '')}案由都歸入此類，
+        內容異質（件數大、集中度低是分類方式造成的），解讀市場訊號請以下方明細為準。</div>` : ''}
+      <div style="margin-bottom:10px;font-size:0.85rem;">
+        近 5 年判決件數 <strong style="color:var(--gold);">${Number(d.total).toLocaleString()}</strong>
+        ・涵蓋 <strong>${Number(d.distinct_causes).toLocaleString()}</strong> 種案由字串（顯示前 ${top.length} 大）
+      </div>
+      <div class="table-wrap" style="max-height:56vh;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:40px;">#</th><th>案由</th>
+            <th style="text-align:right;">件數</th><th style="text-align:right;">佔比</th></tr></thead>
+          <tbody>
+            ${top.map((t, idx) => `<tr>
+              <td style="color:var(--text-muted);">${idx + 1}</td>
+              <td>${escHtml(t[0])}</td>
+              <td style="text-align:right;color:var(--gold);font-weight:600;">${Number(t[1]).toLocaleString()}</td>
+              <td style="text-align:right;">${(Number(t[1]) / Number(d.total) * 100).toFixed(1)}%</td>
+            </tr>`).join('')}
+            ${rest > 0 ? `<tr>
+              <td></td>
+              <td style="color:var(--text-muted);">…其餘 ${(Number(d.distinct_causes) - top.length).toLocaleString()} 種案由合計</td>
+              <td style="text-align:right;color:var(--text-muted);">${rest.toLocaleString()}</td>
+              <td style="text-align:right;color:var(--text-muted);">${(rest / Number(d.total) * 100).toFixed(1)}%</td>
+            </tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
+        ※ 件數為近 5 年公開裁判書的律師端加總（一案多位律師會重複計），與供需表「判決件數」同口徑；
+        「等」結尾的案由是裁判書原始寫法（一案多請求），未與主案由合併。
+      </div>`;
+  } catch (e) {
+    body.innerHTML = '<div class="empty-state"><div class="msg">載入失敗，請稍後再試</div></div>';
+  }
+}
+function closeCauseGroupModal() {
+  document.getElementById('causeGroupModal').style.display = 'none';
 }
 
 async function loadFamLawyers() {
@@ -9933,6 +9999,18 @@ async function showCourtDetail(name) {
         <button class="modal-close" onclick="closeJudgeCareerModal()">&times;</button>
         <h2 id="judgeCareerTitle" class="modal-title"></h2>
         <div id="judgeCareerBody"></div>
+      </div>
+    </div>
+    <!-- 案由種類明細 Modal（案由供需 tab 點列開啟） -->
+    <div id="causeGroupModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCauseGroupModal();">
+      <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+          <h2 id="causeGroupModalTitle">載入中...</h2>
+          <button onclick="closeCauseGroupModal()">✕</button>
+        </div>
+        <div class="modal-body" id="causeGroupModalBody">
+          <div class="loading">載入中</div>
+        </div>
       </div>
     </div>
     <div id="courtModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCourtModal();">
