@@ -2396,7 +2396,12 @@
                 <div class="chart-card full">
                     <div class="chart-title">案由細分 <span style="font-weight:400;font-size:12px;color:var(--text-muted);">終結案件微資料（2021 年起，月更）— 點種類卡片可鑽取原始案由與法院分布</span></div>
                     <div class="sub-tabs" id="cause_ftTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
-                    <div class="sub-tabs" id="cause_yearTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;"></div>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+                        <div class="sub-tabs" id="cause_yearTabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+                        <span id="cause_baseWrap" style="margin-left:auto;display:none;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">比較基準
+                            <select id="cause_baseSel" style="background:var(--bg-row);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:12px;"></select>
+                        </span>
+                    </div>
                     <div id="cause_cards" class="desc-grid"><div style="color:var(--text-muted);padding:12px;">載入中…</div></div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:10px;" id="cause_footnote"></div>
                 </div>
@@ -4417,7 +4422,12 @@ async function showFirmDetail(firmName) {
     from += 1000;
   }
 
-  if (allLawyers.length === 0) {
+  // 已除名者（state_desc=名冊查無（推定除名），mig 079）不計入現役統計，清單沉底標註
+  const deregLawyers = allLawyers.filter(l => (l.state_desc || '').startsWith('名冊查無'));
+  allLawyers = allLawyers.filter(l => !(l.state_desc || '').startsWith('名冊查無'));
+  const deregNames = new Set(deregLawyers.map(l => l.name));
+
+  if (allLawyers.length === 0 && deregLawyers.length === 0) {
     bodyEl.innerHTML = '<div class="empty-state"><div class="msg">此事務所無律師資料</div></div>';
     return;
   }
@@ -4460,12 +4470,14 @@ async function showFirmDetail(firmName) {
   const govAmtSum = govWins.reduce((s, r) => s + (r.award_amount || 0), 0);
   const govWins5 = govWins.filter(r => r.gov_tenders.award_year >= new Date().getFullYear() - 4);
 
-  const litAgg5 = computeFirmLitAgg(firmStats.filter(s => !s.name_ambiguous).map(s => ({
+  // 官方訴訟戰力排除同名不明者與已除名者（已除名＝非現任名冊，口徑同人數統計）
+  const litLawyers = firmStats.filter(s => !s.name_ambiguous && !deregNames.has(s.name));
+  const litAgg5 = computeFirmLitAgg(litLawyers.map(s => ({
     name: s.name, cases: s.official_cases_5yr || 0, cats: s.official_cats_5yr, court: s.official_top_court
   })));
   const litTotal = litAgg5.total;
   _firmLit = {
-    names: firmStats.filter(s => !s.name_ambiguous).map(s => s.name),
+    names: litLawyers.map(s => s.name),
     agg5: litAgg5, totalLawyers: allLawyers.length, yearRows: null
   };
 
@@ -4622,7 +4634,7 @@ async function showFirmDetail(firmName) {
 
     <!-- 律師列表 -->
     <div class="card">
-      <div class="card-title">律師清單（${total} 位）</div>
+      <div class="card-title">律師清單（${total} 位${deregLawyers.length ? `<span style="font-weight:400;font-size:0.78rem;color:var(--text-muted);">｜另 ${deregLawyers.length} 位已除名</span>` : ''}）</div>
       <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
         <table>
           <thead><tr>
@@ -4655,7 +4667,16 @@ async function showFirmDetail(firmName) {
               <td>${escHtml(l.main_region || '-')}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escHtml(contact)}</td>
             </tr>`;
-          }).join('');
+          }).join('')
+          // 已除名者沉底（不計入上方現役統計；state_desc 由 moj_office_refresh.py 除名偵測寫入）
+          + deregLawyers.map(l => `<tr style="opacity:0.55;">
+              <td>${lawyerLink(l.name, 'font-weight:700;')} <span style="font-size:0.66rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;white-space:nowrap;">已除名</span></td>
+              <td>${l.sex || '-'}</td>
+              <td style="font-size:0.8rem;">${l.birth_year && l.birth_year < 200 ? `民${l.birth_year}` : '-'}</td>
+              <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
+              <td>${escHtml(l.main_region || '-')}</td>
+              <td style="font-size:0.75rem;color:var(--text-muted);">名冊查無（推定除名）</td>
+            </tr>`).join('');
           })()}</tbody>
         </table>
       </div>
@@ -9641,7 +9662,7 @@ async function showCourtDetail(name) {
     const CAUSE_TREND_COLORS = [COLORS.blue, COLORS.red, COLORS.orange, COLORS.green, COLORS.purple, COLORS.teal];
     let causeInited = false;
     const causeYearly = {};   // ft → cause_group_yearly rows（快取）
-    const causeState = { ft: null, year: null };
+    const causeState = { ft: null, year: null, base: 'prev' };  // base: 'prev'=自動取前一完整年，或指定年份字串
     let causeTrendChart = null, causeCourtChart = null;
 
     window.loadCausesOnce = function() {
@@ -9699,9 +9720,24 @@ async function showCourtDetail(name) {
             b.classList.toggle('active', b.dataset.y === year));
         const rows = causeYearly[ft].filter(r => r.y === year);
         const total = rows.reduce((s, r) => s + r.n, 0);
-        // 基準年 = 最早的完整年（雙方皆完整才顯示變化率）
-        const baseYear = Object.keys(monthsByYear).sort().find(y => monthsByYear[y] >= 12);
-        const showChange = baseYear && baseYear !== year && monthsByYear[year] >= 12;
+        // 基準年：預設 = 選定年的前一個完整年，可由下拉自選（雙方皆完整才顯示變化率）
+        const priorYears = Object.keys(monthsByYear).sort()
+            .filter(y => monthsByYear[y] >= 12 && y < year);
+        let baseYear = causeState.base;
+        if (baseYear === 'prev' || !priorYears.includes(baseYear)) baseYear = priorYears[priorYears.length - 1];
+        const showChange = !!baseYear && monthsByYear[year] >= 12;
+        // 比較基準下拉（僅選定年為完整年且有可比年份時顯示）
+        const baseWrap = document.getElementById('cause_baseWrap');
+        const baseSel = document.getElementById('cause_baseSel');
+        if (showChange) {
+            baseWrap.style.display = 'flex';
+            baseSel.innerHTML = `<option value="prev">前一年（${priorYears[priorYears.length - 1]}）</option>` +
+                priorYears.map(y => `<option value="${y}">${y}</option>`).join('');
+            baseSel.value = priorYears.includes(causeState.base) ? causeState.base : 'prev';
+            baseSel.onchange = () => { causeState.base = baseSel.value; renderCauseCards(monthsByYear); };
+        } else {
+            baseWrap.style.display = 'none';
+        }
         const baseByGroup = {};
         if (showChange) causeYearly[ft].filter(r => r.y === baseYear).forEach(r => { baseByGroup[r.cause_group] = r.n; });
         const unit = causeUnit();
@@ -9720,7 +9756,7 @@ async function showCourtDetail(name) {
                 </div>${convHtml}
             </div>`;
         }).join('');
-        const noteChange = showChange ? `變化率為 ${baseYear} → ${year} 年累計變化（僅完整年份顯示）。` : '';
+        const noteChange = showChange ? `變化率為 ${baseYear} → ${year} 年變化（預設與前一個完整年比較，可由右上「比較基準」自選；僅完整年份顯示）。` : '';
         document.getElementById('cause_cards').innerHTML = html;
         // 各檔型相對官方統計的實測覆蓋率（用官方 113 年 vs 本表 2024 對比，見 migration 064）
         const coverageNote = {
