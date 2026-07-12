@@ -708,7 +708,8 @@ def prune_pairs():
 def refresh_stats():
     for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
                 'refresh_lawyer_judgment_stats', 'refresh_family_lawyer_stats',
-                'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats'):
+                'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats',
+                'refresh_judge_changes'):
         print(f'  呼叫 {rpc}() ...')
         r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
