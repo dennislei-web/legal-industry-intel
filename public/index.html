@@ -466,6 +466,11 @@
     .jstat .sub-tab-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); transition: all 0.15s; font-family: inherit; }
     .jstat .sub-tab-btn:hover { background: var(--bg-hover); color: var(--text); }
     .jstat .sub-tab-btn.active { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--tab-active-color); }
+    /* 章節索引（圖表分頁頁頂：一眼看到本頁有哪些區塊，點了捲到該段） */
+    .sec-index { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:8px 12px; background:var(--bg-row); border:1px solid var(--border); border-radius:8px; }
+    .sec-index-label { font-size:12px; color:var(--text-muted); margin-right:2px; white-space:nowrap; }
+    .sec-chip { padding:4px 10px; background:var(--ghost-bg); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all 0.15s; }
+    .sec-chip:hover { border-color:var(--blue); color:var(--blue); }
 
     .jstat .desc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
     .jstat .desc-item { background: var(--bg-row); border-left: 3px solid var(--blue); border-radius: 6px; padding: 12px 14px; }
@@ -2940,6 +2945,8 @@ function showTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
+  // 圖表分頁頁頂章節索引（domain/topics 走子分頁、由各自 switcher 產生）
+  if (content && tab !== 'domain' && tab !== 'jstat-topics') buildSectionIndex(content);
   document.querySelectorAll('#subTabsBar .tab-btn').forEach(btn =>
     btn.classList.toggle('active', btn.id === 'tabBtn_' + tab));
 
@@ -2966,6 +2973,33 @@ function showTab(tab) {
   if (tab === 'jstat-causes') loadCausesOnce();
   else if (tab === 'jstat-repcurve') loadRepCurveOnce();
   else if (tab.startsWith('jstat-')) loadJstatTab(tab);
+}
+
+// 章節索引：掃描分頁內的圖表卡標題，於頁頂生成一排可點 chip（點了平滑捲到該段）。
+// 只針對有 .chart-card 的圖表分頁；收合式分頁（.ff-toggle，如人才流動）與單區塊分頁自動略過。
+function buildSectionIndex(container) {
+  if (!container || container.querySelector('.ff-toggle')) return;
+  const old = container.querySelector(':scope > .sec-index');
+  if (old) old.remove();
+  const cards = Array.from(container.querySelectorAll('.chart-card')).filter(c => {
+    const t = c.querySelector(':scope > .chart-title');
+    return t && t.textContent.trim();
+  });
+  if (cards.length < 2) return;
+  const bar = document.createElement('div');
+  bar.className = 'sec-index';
+  bar.innerHTML = '<span class="sec-index-label">&#128278; 本頁區塊：</span>';
+  cards.forEach((card, i) => {
+    if (!card.id) card.id = (container.id || 'tab') + '_sec' + i;
+    const raw = card.querySelector(':scope > .chart-title').textContent.trim().replace(/\s+/g, ' ');
+    const chip = document.createElement('button');
+    chip.className = 'sec-chip';
+    chip.textContent = raw.length > 16 ? raw.slice(0, 15) + '…' : raw;
+    chip.title = raw;
+    chip.onclick = () => card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    bar.appendChild(chip);
+  });
+  container.insertBefore(bar, container.firstChild);
 }
 
 // ============================================================
@@ -7794,6 +7828,7 @@ window.switchDomainTab = function(d) {
   if (d === 'fam-lawyers') loadFamLawyersOnce();
   else if (d === 'firm-map') loadFirmMapOnce();
   else if (d === 'cause-supply') loadCauseSupplyOnce();
+  buildSectionIndex(document.getElementById('tab-' + d));
 };
 
 async function initCauseSupply() {
@@ -8820,6 +8855,7 @@ async function showCourtDetail(name) {
             jstatTopicBuilt.add(topic);
             jstatTopicBuilders[topic](jstatTopicData);
         }
+        if (window.buildSectionIndex) buildSectionIndex(document.getElementById('tab-jstat-' + topic));
     };
     const tabBuilders = {
         overview: buildOverviewCharts,
