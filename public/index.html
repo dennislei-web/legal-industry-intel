@@ -1810,7 +1810,14 @@
         </div>
 
         <!-- Tab: 民事 -->
-        <div class="tab-content jstat" id="tab-jstat-civil">
+        <div class="tab-content jstat" id="tab-jstat-topics">
+            <div class="sub-tabs" id="jstat_topicTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+                <button class="sub-tab-btn active" data-topic="civil" onclick="switchJstatTopic('civil')">民事案件</button>
+                <button class="sub-tab-btn" data-topic="family" onclick="switchJstatTopic('family')">家事案件</button>
+                <button class="sub-tab-btn" data-topic="criminal" onclick="switchJstatTopic('criminal')">刑事案件</button>
+                <button class="sub-tab-btn" data-topic="enforcement" onclick="switchJstatTopic('enforcement')">強制執行</button>
+            </div>
+<div class="jstat-subpanel" id="tab-jstat-civil">
             <div class="chart-grid">
                 <div class="chart-card full">
                     <div class="chart-title">地方法院民事案件收結趨勢</div>
@@ -1959,7 +1966,7 @@
         </div>
 
         <!-- Tab: 家事 -->
-        <div class="tab-content jstat" id="tab-jstat-family">
+        <div class="jstat-subpanel" id="tab-jstat-family" style="display:none;">
             <div class="chart-grid">
                 <div class="chart-card full">
                     <div class="chart-title">地方法院家事案件收結趨勢</div>
@@ -2133,7 +2140,7 @@
         </div>
 
         <!-- Tab: 刑事 -->
-        <div class="tab-content jstat" id="tab-jstat-criminal">
+        <div class="jstat-subpanel" id="tab-jstat-criminal" style="display:none;">
             <div class="chart-grid">
                 <div class="chart-card full">
                     <div class="chart-title">地方法院刑事案件收結趨勢</div>
@@ -2308,7 +2315,7 @@
         </div>
 
         <!-- Tab: 強制執行 -->
-        <div class="tab-content jstat" id="tab-jstat-enforcement">
+        <div class="jstat-subpanel" id="tab-jstat-enforcement" style="display:none;">
             <div class="chart-grid">
                 <div class="chart-card full">
                     <div class="chart-title">強制執行案件收結趨勢</div>
@@ -2450,25 +2457,10 @@
             </div>
         </div>
 
-        <!-- Tab: 效率 -->
-        <div class="tab-content jstat" id="tab-jstat-efficiency">
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <div class="chart-title">平均結案天數比較（民事 vs 刑事）</div>
-                    <div class="chart-container"><canvas id="jstat_chartAvgDaysCompare"></canvas></div>
+        
                 </div>
-                <div class="chart-card">
-                    <div class="chart-title">每位法官月均結案件數</div>
-                    <div class="chart-container"><canvas id="jstat_chartJudgeCaseload"></canvas></div>
-                </div>
-                <div class="chart-card full">
-                    <div class="chart-title">案件積壓率（未結/新收）</div>
-                    <div class="chart-container"><canvas id="jstat_chartBacklogRate"></canvas></div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Tab: 各法院 -->
+        <!-- Tab: 各法院比較（含法院效率，efficiency 已併入此頁） -->
         <div class="tab-content jstat" id="tab-jstat-organs">
             <div class="chart-grid">
                 <div class="chart-card full">
@@ -2492,6 +2484,21 @@
                         僅計地院本院訴訟案件：民事不含簡易庭／非訟／執行，刑事僅第一審（不含附帶民訴、偵查聲請、簡易處刑）。
                         <span id="jstat_sdModeNote" style="display:none;">「有委任律師」= 官方新收 × 該地區終結案件微資料的委任率（民事：任一造有律師代理；刑事：任一被告選任律師辯護，含法扶，不含公設辯護人／義務律師），反映實際流向律師市場的案源。</span>
                     </div>
+                </div>
+                <div class="chart-card full" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">
+                    <div class="chart-title" style="color:var(--text-muted);">&#9201;&#65039; 法院效率指標</div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">平均結案天數比較（民事 vs 刑事）</div>
+                    <div class="chart-container"><canvas id="jstat_chartAvgDaysCompare"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">每位法官月均結案件數</div>
+                    <div class="chart-container"><canvas id="jstat_chartJudgeCaseload"></canvas></div>
+                </div>
+                <div class="chart-card full">
+                    <div class="chart-title">案件積壓率（未結/新收）</div>
+                    <div class="chart-container"><canvas id="jstat_chartBacklogRate"></canvas></div>
                 </div>
             </div>
         </div>
@@ -2839,13 +2846,9 @@ const SECTIONS = {
   ],
   jstat: [
     { tab: 'jstat-overview', label: '總覽' },
-    { tab: 'jstat-civil', label: '民事案件' },
-    { tab: 'jstat-family', label: '家事案件' },
-    { tab: 'jstat-criminal', label: '刑事案件' },
-    { tab: 'jstat-enforcement', label: '強制執行' },
-    { tab: 'jstat-efficiency', label: '法院效率' },
     { tab: 'jstat-organs', label: '各法院比較' },
     { tab: 'jstat-causes', label: '案由細分' },
+    { tab: 'jstat-topics', label: '案件專題' },
   ],
   // 產業分析：垂直領域深度分析（目前為家事，未來可加刑事/勞動等）
   industry: [
@@ -8654,14 +8657,25 @@ async function showCourtDetail(name) {
     }
 
 
+    // 案件專題（civil/family/criminal/enforcement 收攏為子分頁）
+    let jstatTopicData = null;
+    const jstatTopicBuilders = { civil: buildCivilCharts, family: buildFamilyCharts, criminal: buildCriminalCharts, enforcement: buildEnforcementCharts };
+    const jstatTopicBuilt = new Set();
+    window.switchJstatTopic = function(topic) {
+        document.querySelectorAll('#jstat_topicTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.topic === topic));
+        ['civil', 'family', 'criminal', 'enforcement'].forEach(t => {
+            const el = document.getElementById('tab-jstat-' + t);
+            if (el) el.style.display = (t === topic) ? 'block' : 'none';
+        });
+        if (!jstatTopicBuilt.has(topic) && jstatTopicData && jstatTopicBuilders[topic]) {
+            jstatTopicBuilt.add(topic);
+            jstatTopicBuilders[topic](jstatTopicData);
+        }
+    };
     const tabBuilders = {
         overview: buildOverviewCharts,
-        civil: buildCivilCharts,
-        family: buildFamilyCharts,
-        criminal: buildCriminalCharts,
-        enforcement: buildEnforcementCharts,
-        efficiency: buildEfficiencyCharts,
-        organs: buildOrganCharts,
+        organs: (d) => { buildOrganCharts(d); buildEfficiencyCharts(d); },
+        topics: (d) => { jstatTopicData = d; switchJstatTopic('civil'); },
     };
 
 
