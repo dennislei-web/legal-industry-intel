@@ -133,6 +133,7 @@ def parse_pages():
         print(f'*** {len(all_warns)} warnings（解析器需補樣態，勿直接上傳）***')
         for w in all_warns:
             print(' !', w)
+        sys.exit(1)   # CI 防呆：有警告代表新樣態，擋住 upload
 
 
 def upload():

@@ -48,3 +48,18 @@ jobs:
           fi
           echo "目標月份: $YM"
           python judgment_stats.py run "$YM"
+
+      - name: Refresh 官方遷調邊（人審會決議 → judge_transfers → 異動歸因）
+        # 全量重抓 65+ 頁約 3 分鐘；parse 有新句型警告會 exit 1 擋 upload（解析器要補樣態）
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: |
+          python jy_transfers.py list
+          python jy_transfers.py fetch
+          python jy_transfers.py parse
+          python jy_transfers.py upload
+          curl -sf -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_judge_change_transfers" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -d '{}'
