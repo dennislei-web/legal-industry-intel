@@ -951,6 +951,18 @@
           </div>
         </div>
       </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title" style="color:var(--blue);">&#127793; 新血招募 TOP — 名冊新增律師進哪些所</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          「新進律師」= 法務部名冊新掛號的律師（多為新科），看哪些事務所在吸納新血。與上方跨所挖角互補。
+        </div>
+        <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">新進人數</th></tr></thead>
+            <tbody id="ffIntakeBody"><tr><td colspan="3" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:12px;">
         ※ 資料源為法務部律師名冊每日比對（trigger 自 2026-07-03 起追蹤），為<strong>累積型縱向資料</strong>，時窗越長樣本越厚。
         事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
@@ -7502,10 +7514,11 @@ async function loadFirmFlowOnce() {
   if (_ffLoaded) return;
   _ffLoaded = true;
   try {
-    const [sumRes, rankRes, matRes] = await Promise.all([
+    const [sumRes, rankRes, matRes, intakeRes] = await Promise.all([
       db.rpc('firm_flow_summary'),
       db.rpc('firm_flow_ranking'),
       db.rpc('firm_flow_matrix', { p_min: 2 }),
+      db.rpc('firm_intake_ranking'),
     ]);
     const s = sumRes.data || {};
     document.getElementById('ffSince').textContent = s.tracking_since || '-';
@@ -7532,6 +7545,13 @@ async function loadFirmFlowOnce() {
       <td>${firmCell(m.to_firm)}</td>
       <td style="text-align:right;font-weight:700;color:${m.n >= 3 ? 'var(--red)' : 'var(--text)'};">${m.n}</td></tr>`).join('')
       : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">目前尚無 ≥ 2 人的團隊移動</td></tr>';
+
+    const intake = (intakeRes.data || []).slice(0, 30);
+    document.getElementById('ffIntakeBody').innerHTML = intake.length ? intake.map((r, i) => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+      <td style="color:var(--text-muted);">${i + 1}</td>
+      <td>${firmCell(r.firm_key)}</td>
+      <td style="text-align:right;font-weight:700;color:var(--blue);">${r.intake}</td></tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
   } catch (e) {
     _ffLoaded = false;
     document.getElementById('ffMatrixBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);">載入失敗：${escHtml(e.message || '')}</td></tr>`;
