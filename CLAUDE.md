@@ -146,6 +146,15 @@
 - 兩層導覽：第一層 `showSection()`（律師/法官/資料來源/帳號管理），
   第二層子頁定義在 `SECTIONS` 常數（index.html），新增子頁要同時加 tab-content div
   和 `showTab()` 的 lazy load 分支
+- **重要：tab-content div 全是同層 siblings，`showTab()` 只依 id 顯示對應 div、與所屬 section 無關**
+  → 把子頁在 section 間搬移只需改 `SECTIONS`（div 不必實體移動）
+- **2026-07 Phase 1 產業分析整併**：家事法官（`family`）從產業分析移到**法官區**（純 SECTIONS 改）；
+  「家事律師/事務所版圖/案由供需」收攏成「**領域版圖**」（`tab-domain`，內部 3 個 `domain-subpanel`：
+  `tab-fam-lawyers/firm-map/cause-supply`，class 由 `tab-content` 改 `domain-subpanel`，
+  `switchDomainTab()` 控制顯示、各 builder lazy-load 一次不變）。產業分析 6→3 tab
+  （訴訟市場趨勢/領域版圖/人才流動）。⚠️ **未做**：「地區市場」（公會 tab＋總覽地區分布圖＋
+  訴訟市場趨勢內嵌 region_top 合併）——DB 驅動需登入才能驗渲染，待人工核；領域版圖內三面板的
+  重複件數圖也待內容層去重
 
 ## Migration 注意
 
