@@ -1464,7 +1464,7 @@
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">進場</div><div class="kpi-value" id="kpiJchgAppear" style="color:var(--green);">-</div><div class="kpi-sub">選定期間</div></div>
-        <div class="kpi-card"><div class="kpi-label">退場</div><div class="kpi-value" id="kpiJchgLeave" style="color:var(--red);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">退場</div><div class="kpi-value" id="kpiJchgLeave" style="color:var(--red);">-</div><div class="kpi-sub" id="kpiJchgLeaveSub">選定期間</div></div>
         <div class="kpi-card"><div class="kpi-label">淨變動</div><div class="kpi-value" id="kpiJchgNet" style="color:var(--gold);">-</div><div class="kpi-sub">進場 − 退場</div></div>
         <div class="kpi-card"><div class="kpi-label">最新資料月</div><div class="kpi-value" id="kpiJchgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">裁判書涵蓋至</div></div>
       </div>
@@ -6589,14 +6589,23 @@ async function loadJudgeChanges(force) {
   if (_jchgRows && !force) { renderJudgeChanges(); return; }
   jchgPage = 0;
   ['jchgInflow', 'jchgOutflow', 'jchgNet'].forEach(id => { document.getElementById(id).className = 'loading'; });
-  const { data, error } = await db.from('judge_changes')
-    .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url')
-    .order('event_month', { ascending: false }).limit(20000);
-  if (error) {
-    document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="6" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
-    return;
+  // PostgREST 硬上限 1000 列／回應，.limit(20000) 會被靜默截斷 → 逐頁 range 抓齊全量，
+  // 否則 KPI/排行/明細只吃到最新 1000 列（退場曾因此低報近半）。
+  const PAGE = 1000;
+  let all = [], from = 0;
+  for (;;) {
+    const { data, error } = await db.from('judge_changes')
+      .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url')
+      .order('event_month', { ascending: false }).range(from, from + PAGE - 1);
+    if (error) {
+      document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="6" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
+      return;
+    }
+    all = all.concat(data || []);
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
   }
-  _jchgRows = data || [];
+  _jchgRows = all;
 
   // 明細篩選下拉：年度 + 法院（依資料動態生成；重載時保留現選值）
   const rows0 = _jchgRows.filter(r => r.court_name !== '未知法院');
@@ -6663,17 +6672,26 @@ function renderJudgeChanges() {
 
   // KPI（期間內，不受搜尋/類型影響）
   const appearN = win.filter(r => r.change_type === 'appear').length;
-  const leaveN = win.filter(r => r.change_type === 'leave').length;
+  const leaves = win.filter(r => r.change_type === 'leave');
+  const leaveN = leaves.length;
+  const leaveXferN = leaves.filter(r => r.transfer_to).length;   // 對到官方遷調邊
+  const leaveStayN = leaveN - leaveXferN;                        // 查無遷調（推定離開審判職）
   const net = appearN - leaveN;
   document.getElementById('kpiJchgAppear').textContent = appearN.toLocaleString();
   document.getElementById('kpiJchgLeave').textContent = leaveN.toLocaleString();
+  document.getElementById('kpiJchgLeaveSub').innerHTML = leaveN
+    ? `官方轉調 <b style="color:var(--blue);">${leaveXferN}</b>　查無 <b style="color:var(--orange);">${leaveStayN}</b>`
+    : '選定期間';
   document.getElementById('kpiJchgNet').textContent = (net > 0 ? '+' : '') + net.toLocaleString();
 
-  // 排行（按法院聚合，期間內）
-  const inflow = {}, outflow = {};
+  // 排行（按法院聚合，期間內）。outflow 同時記「其中官方轉調」數以供拆分顯示。
+  const inflow = {}, outflow = {}, outflowXfer = {};
   win.forEach(r => {
     if (r.change_type === 'appear') inflow[r.court_name] = (inflow[r.court_name] || 0) + 1;
-    else if (r.change_type === 'leave') outflow[r.court_name] = (outflow[r.court_name] || 0) + 1;
+    else if (r.change_type === 'leave') {
+      outflow[r.court_name] = (outflow[r.court_name] || 0) + 1;
+      if (r.transfer_to) outflowXfer[r.court_name] = (outflowXfer[r.court_name] || 0) + 1;
+    }
   });
   const courtLink = c =>
     `<a href="#" onclick="document.getElementById('jchgSearch').value='${escHtml(c).replace(/'/g, "\\'")}';renderJudgeChanges();return false;" style="color:var(--blue);text-decoration:none;">${escHtml(c)}</a>`;
@@ -6685,10 +6703,22 @@ function renderJudgeChanges() {
         <span>${i + 1}. ${courtLink(court)}</span><span style="font-weight:600;">${n} 人</span>
       </div>`).join('');
   };
+  // 退場排行專用：每院「N 人」後附「其中官方轉調 X」灰字
+  const rankHtmlOut = obj => {
+    const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    if (!all.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
+    return all.slice(0, 15).map(([court, n], i) => {
+      const x = outflowXfer[court] || 0;
+      const sub = x ? `<span style="color:var(--text-muted);font-weight:400;">（轉調 ${x}）</span>` : '';
+      return `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <span>${i + 1}. ${courtLink(court)}</span><span style="font-weight:600;">${n} 人 ${sub}</span>
+      </div>`;
+    }).join('');
+  };
   document.getElementById('jchgInflow').className = '';
   document.getElementById('jchgOutflow').className = '';
   document.getElementById('jchgInflow').innerHTML = rankHtml(inflow);
-  document.getElementById('jchgOutflow').innerHTML = rankHtml(outflow);
+  document.getElementById('jchgOutflow').innerHTML = rankHtmlOut(outflow);
 
   // 淨變動
   const netObj = {};
