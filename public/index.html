@@ -1480,15 +1480,17 @@
               <option value="">進＋退場</option>
               <option value="appear">進場</option>
               <option value="leave">退場</option>
+              <option value="leave_xfer">退場-官方轉調</option>
+              <option value="leave_stay">退場-查無遷調</option>
             </select>
           </span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>資料月</th><th>法官</th><th>法院</th><th>類型</th><th>信心</th></tr>
+              <tr><th>資料月</th><th>法官</th><th>法院</th><th>類型</th><th>信心</th><th>官方遷調</th></tr>
             </thead>
-            <tbody id="jchgTableBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+            <tbody id="jchgTableBody"><tr><td colspan="6" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
         <div class="pagination" id="jchgPagination"></div>
@@ -1505,9 +1507,9 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>退場月</th><th>法官</th><th>法院</th><th>活躍月數</th><th>信心</th></tr>
+              <tr><th>退場月</th><th>法官</th><th>法院</th><th>活躍月數</th><th>信心</th><th>官方遷調</th></tr>
             </thead>
-            <tbody id="jchgRosterBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+            <tbody id="jchgRosterBody"><tr><td colspan="6" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
         <div class="pagination" id="jchgRosterPagination"></div>
@@ -6632,10 +6634,10 @@ async function loadJudgeChanges(force) {
   jchgPage = 0;
   ['jchgInflow', 'jchgOutflow', 'jchgNet'].forEach(id => { document.getElementById(id).className = 'loading'; });
   const { data, error } = await db.from('judge_changes')
-    .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence')
+    .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url')
     .order('event_month', { ascending: false }).limit(20000);
   if (error) {
-    document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="5" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
+    document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="6" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
     return;
   }
   _jchgRows = data || [];
@@ -6662,6 +6664,22 @@ const JCHG_TYPE_META = {
   appear: { label: '進場', cls: 'badge-green' },
   leave: { label: '退場', cls: 'badge-red' },
 };
+
+// 官方遷調欄：退場列顯示「調往○院」、進場列顯示「自○院調來」，皆連結人審會決議原文。
+// 查無遷調邊的退場列＝在公告涵蓋範圍（2019-12 起）內找不到官方紀錄，較可能真的離開審判職，
+// 但仍可能是留職停薪、調行政職或解析漏接，不宣稱「確定離職」。
+function jchgXferCell(r) {
+  const link = (txt) => r.transfer_url
+    ? `<a href="${escHtml(r.transfer_url)}" target="_blank" rel="noopener" title="${escHtml('人審會決議原文')}" style="color:var(--blue);text-decoration:none;">${txt}</a>`
+    : txt;
+  if (r.change_type === 'leave' && r.transfer_to)
+    return link('&#8594; ' + escHtml(r.transfer_to));
+  if (r.change_type === 'appear' && r.transfer_from)
+    return link('&#8592; ' + escHtml(r.transfer_from));
+  if (r.change_type === 'leave')
+    return '<span style="color:var(--text-muted);" title="2019-12 起的人審會決議查無此人自該院之遷調；較可能離開審判職，惟不排除留職停薪／調行政職／同名誤差">查無遷調</span>';
+  return '<span style="color:var(--text-muted);">—</span>';
+}
 
 // yyyymm 往前推 n 個月（回傳 yyyymm 字串）
 function jchgMonthMinus(yyyymm, n) {
@@ -6746,13 +6764,15 @@ function renderJudgeChanges() {
   if (courtSel) base = base.filter(r => r.court_name === courtSel);
   if (kw) base = base.filter(r => (r.name || '').includes(kw) || (r.court_name || '').includes(kw));
   let rows = base;
-  if (type) rows = rows.filter(r => r.change_type === type);
+  if (type === 'leave_xfer') rows = rows.filter(r => r.change_type === 'leave' && r.transfer_to);
+  else if (type === 'leave_stay') rows = rows.filter(r => r.change_type === 'leave' && !r.transfer_to);
+  else if (type) rows = rows.filter(r => r.change_type === type);
 
   const body = document.getElementById('jchgTableBody');
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   if (jchgPage >= totalPages) jchgPage = totalPages - 1;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無異動紀錄</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無異動紀錄</td></tr>';
   } else {
     body.innerHTML = rows.slice(jchgPage * PAGE_SIZE, (jchgPage + 1) * PAGE_SIZE).map(r => {
       const meta = JCHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
@@ -6765,6 +6785,7 @@ function renderJudgeChanges() {
         <td>${escHtml(r.court_name || '-')}</td>
         <td><span class="badge ${meta.cls}">${meta.label}</span></td>
         <td>${conf}</td>
+        <td>${jchgXferCell(r)}</td>
       </tr>`;
     }).join('');
   }
@@ -6780,7 +6801,7 @@ function renderJudgeChanges() {
   const rPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
   if (jchgRosterPage >= rPages) jchgRosterPage = rPages - 1;
   if (!roster.length) {
-    rBody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
+    rBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
   } else {
     rBody.innerHTML = roster.slice(jchgRosterPage * PAGE_SIZE, (jchgRosterPage + 1) * PAGE_SIZE).map(r => {
       const conf = r.confidence === 'confirmed'
@@ -6792,6 +6813,7 @@ function renderJudgeChanges() {
         <td>${escHtml(r.court_name || '-')}</td>
         <td style="font-variant-numeric:tabular-nums;">${r.active_months != null ? r.active_months : '-'}</td>
         <td>${conf}</td>
+        <td>${jchgXferCell(r)}</td>
       </tr>`;
     }).join('');
   }
