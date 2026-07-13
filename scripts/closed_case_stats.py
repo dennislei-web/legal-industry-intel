@@ -34,6 +34,7 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   python closed_case_stats.py backfill         # 回填 API 上所有月包（跳過 DB 已有的）
   python closed_case_stats.py backfill-criminal  # 回填缺「刑事訴訟」列的月份（民事重跑 upsert 冪等）
   python closed_case_stats.py backfill-causes   # 回填 cause 表缺的月份（整月重跑，全部 upsert 冪等）
+  python closed_case_stats.py backfill-amount   # 回填標的金額×委任表缺的月份（整月重跑，upsert 冪等）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full）。
 """
@@ -68,11 +69,47 @@ FILE_TYPES = ('民事訴訟', '家事訴訟')
 NONLIT_TYPES = ('民事非訟', '家事非訟')
 TITLE_RE = re.compile(r'^(\d{3})年(\d{1,2})月司法院及所屬各級法院之終結案件資料')
 
+# 訴訟標的金額級距桶（migration 087；單位=元）→「金額×是否委任」交叉。
+# (label, 上界含) ；末桶無上界。0 桶=標的金額為 0（實務極少，非財產訴訟多為無金額欄不入表）
+AMOUNT_BUCKETS = [
+    ('0', 0),
+    ('1-10萬', 100_000),
+    ('10-50萬', 500_000),
+    ('50-100萬', 1_000_000),
+    ('100-500萬', 5_000_000),
+    ('500-1000萬', 10_000_000),
+    ('1000萬+', None),
+]
+AMOUNT_BUCKET_ORDER = [b[0] for b in AMOUNT_BUCKETS]
+
+
+def amount_bucket(amt):
+    """標的金額（元）落入級距桶 label；amt<=0 → '0'，超過 1000 萬 → '1000萬+'"""
+    if amt <= 0:
+        return '0'
+    for label, hi in AMOUNT_BUCKETS[1:-1]:
+        if amt <= hi:
+            return label
+    return '1000萬+'
+
 
 def norm_court(name):
     """月包資料夾名正規化：202101~202506 帶「民事/刑事」後綴、偶有空格，
     去掉以與 courts.name / court_case_stats 對齊（migration 045 已清理歷史資料）"""
     return re.sub(r'(民事|刑事)$', '', name.replace(' ', ''))
+
+
+def read_lines(path):
+    """讀月包 txt。本機 Windows 跑時，7z 對少數中文檔名解壓不全會讓 glob 列出的
+    路徑 open 不到（FileNotFoundError）——容錯跳過該檔回 None（印 warning 供事後查），
+    避免整趟 backfill 中止。零星壞檔對全國聚合影響可忽略。"""
+    try:
+        return io.open(path, encoding='utf-8-sig').read().splitlines()
+    except UnicodeDecodeError:
+        return io.open(path, encoding='cp950', errors='replace').read().splitlines()
+    except OSError as e:
+        print(f'  ⚠️ 跳過讀取失敗檔（{type(e).__name__}）：{os.path.basename(path)}')
+        return None
 
 
 # ============================================================
@@ -230,6 +267,8 @@ def run_month(yyyymm, fileset_id):
     # cagg (court, ft, group) / nagg (ft, cause, group) → [件數, 科刑數(刑事)]
     cagg = defaultdict(lambda: [0, 0])
     nagg = defaultdict(lambda: [0, 0])
+    # 標的金額×委任交叉（migration 087）：(court, ft, bucket) → [n, repped_n]
+    aragg = defaultdict(lambda: [0, 0])
 
     def add_cause(court, ft, cause, group, convicted=False):
         for k, d in ((( court, ft, group), cagg), ((ft, cause, group), nagg)):
@@ -242,20 +281,18 @@ def run_month(yyyymm, fileset_id):
         court = norm_court(os.path.basename(os.path.dirname(path)))
         if '地方法院' not in court:
             continue
-        try:
-            lines = io.open(path, encoding='utf-8-sig').read().splitlines()
-        except UnicodeDecodeError:
-            lines = io.open(path, encoding='cp950', errors='replace').read().splitlines()
+        lines = read_lines(path)
+        if lines is None:
+            continue
         skipped += parse_criminal_file(
             lines, agg[(court, '刑事訴訟')],
             lambda cause, group, conv, _c=court: add_cause(_c, '刑事訴訟', cause, group, conv))
     for ft in FILE_TYPES:
         for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
             court = norm_court(os.path.basename(os.path.dirname(path)))
-            try:
-                lines = io.open(path, encoding='utf-8-sig').read().splitlines()
-            except UnicodeDecodeError:
-                lines = io.open(path, encoding='cp950', errors='replace').read().splitlines()
+            lines = read_lines(path)
+            if lines is None:
+                continue
             for line in lines:
                 if not line or line == '#':
                     continue
@@ -274,15 +311,18 @@ def run_month(yyyymm, fileset_id):
                 if amount:
                     a['amt'] += amount
                     a['amt_n'] += 1
+                if amount is not None:
+                    ar = aragg[(court, ft, amount_bucket(amount))]
+                    ar[0] += 1
+                    ar[1] += (p_rep or d_rep)
                 add_cause(court, ft, cause, map_cause(ft, cause))
     # 非訟檔（民事非訟/家事非訟）只做案由細分，不進 closed_case_month_stats
     for ft in NONLIT_TYPES:
         for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
             court = norm_court(os.path.basename(os.path.dirname(path)))
-            try:
-                lines = io.open(path, encoding='utf-8-sig').read().splitlines()
-            except UnicodeDecodeError:
-                lines = io.open(path, encoding='cp950', errors='replace').read().splitlines()
+            lines = read_lines(path)
+            if lines is None:
+                continue
             for line in lines:
                 if not line or line == '#':
                     continue
@@ -330,6 +370,20 @@ def run_month(yyyymm, fileset_id):
             if resp.status_code not in (200, 201, 204):
                 raise RuntimeError(f'{table} 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
     print(f'  案由細分上傳 OK（法院層 {len(c_rows)} 列 / 全國案由層 {len(n_rows)} 列）')
+
+    # 標的金額×委任交叉（migration 087）
+    ar_rows = [{'yyyymm': yyyymm, 'court_name': k[0], 'file_type': k[1],
+                'amount_bucket': k[2], 'n': v[0], 'repped_n': v[1]}
+               for k, v in aragg.items()]
+    if ar_rows:
+        url = f'{SUPABASE_URL}/rest/v1/closed_case_amount_rep?on_conflict=yyyymm,court_name,file_type,amount_bucket'
+        headers = {**HEADERS_SB, 'Content-Type': 'application/json',
+                   'Prefer': 'resolution=merge-duplicates,return=minimal'}
+        for i in range(0, len(ar_rows), 2000):
+            resp = requests.post(url, headers=headers, json=ar_rows[i:i + 2000], timeout=120)
+            if resp.status_code not in (200, 201, 204):
+                raise RuntimeError(f'closed_case_amount_rep 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
+    print(f'  標的金額×委任上傳 OK（{len(ar_rows)} 列）')
     # 清理磁碟
     os.remove(arc)
     shutil.rmtree(ext, ignore_errors=True)
@@ -384,6 +438,18 @@ def main():
         # 重跑會把完整資料蓋成殘缺——回填前先抽查該月檔數（正常 ~300 檔/22 地院）
         todo = sorted(set(datasets) - have)
         print(f'待回填案由 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
+        for ym in todo:
+            run_month(ym, datasets[ym])
+            time.sleep(1)
+    elif cmd == 'backfill-amount':
+        # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/closed_case_amount_months',
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          json={}, timeout=60)
+        r.raise_for_status()
+        have = set(r.json() or [])
+        todo = sorted(set(datasets) - have)
+        print(f'待回填金額 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
             run_month(ym, datasets[ym])
             time.sleep(1)

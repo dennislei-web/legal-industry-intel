@@ -1841,6 +1841,25 @@
             </div>
         </div>
 
+        <!-- Tab: 委任門檻（訴訟標的金額 × 委任率，closed_case_amount_rep 表，migration 087） -->
+        <div class="tab-content jstat" id="tab-jstat-repcurve">
+            <div class="jstat-inner">
+                <div class="chart-card">
+                    <div class="chart-title">委任門檻：標的金額多大，當事人才請律師
+                        <span style="font-weight:400;font-size:12px;color:var(--text-muted);">終結案件微資料（2021 年起，月更）— 各金額級距的委任律師比率與案件量</span>
+                    </div>
+                    <div id="repcurveTypeBtns" class="chip-row" style="margin-bottom:10px;">
+                        <button class="chip active" onclick="setRepCurveType('民事訴訟')">民事訴訟</button>
+                        <button class="chip" onclick="setRepCurveType('家事訴訟')">家事訴訟</button>
+                    </div>
+                    <div id="repcurveYearBtns" class="chip-row" style="margin-bottom:14px;"></div>
+                    <div id="repcurveContent">
+                        <div class="chart-card" style="height:440px;"><canvas id="repcurveChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Tab: 民事 -->
         <div class="tab-content jstat" id="tab-jstat-topics">
             <div class="sub-tabs" id="jstat_topicTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
@@ -2880,6 +2899,7 @@ const SECTIONS = {
     { tab: 'jstat-overview', label: '總覽' },
     { tab: 'jstat-organs', label: '各法院比較' },
     { tab: 'jstat-causes', label: '案由細分' },
+    { tab: 'jstat-repcurve', label: '委任門檻' },
     { tab: 'jstat-topics', label: '案件專題' },
   ],
   // 產業分析：訴訟市場趨勢 / 領域版圖（家事律師+事務所版圖+案由供需 sub-tab）/ 人才流動
@@ -2944,6 +2964,7 @@ function showTab(tab) {
   if (tab === 'admin' && isAdmin) loadAdminUsers();
   if (tab === 'market') { loadMarketTrendOnce(); return; }
   if (tab === 'jstat-causes') loadCausesOnce();
+  else if (tab === 'jstat-repcurve') loadRepCurveOnce();
   else if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
 
@@ -10036,6 +10057,108 @@ async function showCourtDetail(name) {
         } catch (err) {
             console.error('供需比圖載入失敗', err);
         }
+    }
+
+    // ===== 委任門檻：標的金額 × 委任率（closed_case_amount_rep 表，migration 087）=====
+    let repcurveLoaded = false, repcurveChart = null;
+    let curRepType = '民事訴訟', curRepYear = 'all';
+    const REPCURVE_YEARS = ['2021', '2022', '2023', '2024', '2025', '2026'];
+
+    window.loadRepCurveOnce = function() {
+        if (repcurveLoaded) return;
+        repcurveLoaded = true;
+        renderRepCurveYearButtons();
+        loadRepCurveData();
+    };
+
+    async function loadRepCurveData() {
+        const wrap = document.getElementById('repcurveContent');
+        try {
+            const params = { p_file_type: curRepType };
+            if (curRepYear !== 'all') params.p_year = curRepYear;
+            const { data, error } = await db.rpc('amount_rep_curve', params);
+            if (error) throw error;
+            renderRepCurveChart(data || []);
+        } catch (err) {
+            wrap.innerHTML = `<div style="color:var(--red);padding:20px;">委任門檻資料載入失敗：${err.message || err}</div>`;
+        }
+    }
+
+    window.setRepCurveType = function(t) {
+        curRepType = t;
+        document.querySelectorAll('#repcurveTypeBtns .chip').forEach(b =>
+            b.classList.toggle('active', b.textContent === t));
+        loadRepCurveData();
+    };
+
+    window.setRepCurveYear = function(y) {
+        curRepYear = y;
+        renderRepCurveYearButtons();
+        loadRepCurveData();
+    };
+
+    function renderRepCurveYearButtons() {
+        const box = document.getElementById('repcurveYearBtns');
+        if (!box) return;
+        box.innerHTML = '<button class="chip' + (curRepYear === 'all' ? ' active' : '') +
+            '" onclick="setRepCurveYear(\'all\')">全部年</button>' +
+            REPCURVE_YEARS.map(y => '<button class="chip' + (curRepYear === y ? ' active' : '') +
+                '" onclick="setRepCurveYear(\'' + y + '\')">' + y + '</button>').join('');
+    }
+
+    function renderRepCurveChart(rows) {
+        // 只留有案件的桶（「0」桶全期恆 0，非財產訴訟為無金額欄不入表）
+        const data = (rows || []).filter(r => r.n > 0);
+        const wrap = document.getElementById('repcurveContent');
+        wrap.innerHTML =
+            '<div class="chart-card" style="height:440px;"><canvas id="repcurveChart"></canvas></div>' +
+            '<div id="repcurveSummary" style="margin-top:12px;font-size:13px;color:var(--text-muted);line-height:1.7;"></div>' +
+            '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);line-height:1.6;">' +
+            '口徑：僅民事／家事「訴訟」且填有新台幣訴訟標的金額之終結案件（非財產訴訟多無金額欄、不納入）。' +
+            '委任＝原告或被告任一造有律師代理（含法律扶助）。金額為<strong>訴訟標的</strong>金額（起訴請求額），非成交或判賠額。' +
+            '資料源：司法院開放資料終結案件月包，全國各級法院合計。</div>';
+        if (repcurveChart) { repcurveChart.destroy(); repcurveChart = null; }
+        const sumEl = document.getElementById('repcurveSummary');
+        if (!data.length) { sumEl.textContent = '此條件無資料。'; return; }
+        const labels = data.map(r => r.amount_bucket);
+        const counts = data.map(r => r.n);
+        const rates = data.map(r => r.rate === null ? null : Math.round(r.rate * 1000) / 10);
+        repcurveChart = new Chart(document.getElementById('repcurveChart'), {
+            data: {
+                labels,
+                datasets: [
+                    { type: 'bar', label: '案件量', data: counts, yAxisID: 'y',
+                      backgroundColor: 'rgba(148,163,184,0.45)', order: 2 },
+                    { type: 'line', label: '委任律師比率 (%)', data: rates, yAxisID: 'y1',
+                      borderColor: 'rgba(56,132,255,1)', backgroundColor: 'rgba(56,132,255,1)',
+                      borderWidth: 3, pointRadius: 5, pointHoverRadius: 7, tension: 0.25, order: 1 },
+                ],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { callbacks: { label: (c) => c.dataset.yAxisID === 'y1'
+                        ? `委任率 ${c.parsed.y}%` : `案件量 ${c.parsed.y.toLocaleString()} 件` } },
+                },
+                scales: {
+                    x: { title: { display: true, text: '訴訟標的金額級距' } },
+                    y: { beginAtZero: true, position: 'left', title: { display: true, text: '案件量（件）' } },
+                    y1: { beginAtZero: true, max: 100, position: 'right', title: { display: true, text: '委任律師比率 (%)' },
+                          grid: { drawOnChartArea: false } },
+                },
+            },
+        });
+        const totN = data.reduce((s, r) => s + r.n, 0);
+        const totR = data.reduce((s, r) => s + r.repped_n, 0);
+        const lo = data[0], hi = data[data.length - 1];
+        const pct = (r) => r.rate === null ? '—' : (r.rate * 100).toFixed(1) + '%';
+        sumEl.innerHTML =
+            `樣本 <strong>${totN.toLocaleString()}</strong> 件（${curRepYear === 'all' ? '2021–2026' : curRepYear} 年${curRepType}），` +
+            `整體委任率 <strong>${totN ? (totR / totN * 100).toFixed(1) : '—'}%</strong>。` +
+            `標的 <strong>${lo.amount_bucket}</strong> 的案件僅 <strong>${pct(lo)}</strong> 委任律師，` +
+            `<strong>${hi.amount_bucket}</strong> 則達 <strong>${pct(hi)}</strong>` +
+            `——標的金額越大，當事人越傾向委任律師，委任率呈單調上升。`;
     }
 
     // ===== 案由細分（終結案件微資料 closed_case_cause_* 表，migration 064）=====
