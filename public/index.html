@@ -1151,63 +1151,6 @@
       </div>
     </div>
 
-    <!-- ==================== TAB: FIRMS (律師公會) ==================== -->
-    <div id="tab-firms" class="tab-content">
-      <div class="kpi-grid" id="firmKpis">
-        <div class="kpi-card">
-          <div class="kpi-label">律師公會數</div>
-          <div class="kpi-value" id="kpiBarCount">-</div>
-          <div class="kpi-sub">全國律師聯合會</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">執業律師總數</div>
-          <div class="kpi-value" id="kpiBarActiveTotal">-</div>
-          <div class="kpi-sub">目前執業中</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">最大公會</div>
-          <div class="kpi-value" id="kpiBarLargest">-</div>
-          <div class="kpi-sub" id="kpiBarLargestSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均每公會律師數</div>
-          <div class="kpi-value" id="kpiBarAvg">-</div>
-          <div class="kpi-sub">執業中律師</div>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-title">&#128202; 各公會執業律師人數</div>
-          <div class="chart-container" style="min-height:400px;"><canvas id="chartBarAssoc"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-title">&#127760; 各公會律師佔比</div>
-          <div class="chart-container" style="min-height:400px;"><canvas id="chartBarPie"></canvas></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">&#128203; 各律師公會詳細資料</div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>排名</th>
-                <th>公會名稱</th>
-                <th>地區</th>
-                <th>執業中律師</th>
-                <th>已屆期律師</th>
-                <th>律師總數</th>
-                <th>執業率</th>
-              </tr>
-            </thead>
-            <tbody id="firmTableBody">
-              <tr><td colspan="7" class="loading">載入中</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
     <!-- ==================== TAB: OFFICES (事務所) ==================== -->
     <div id="tab-offices" class="tab-content">
       <!-- 第零列：律師身分結構（推估） -->
@@ -2889,7 +2832,6 @@ const SECTIONS = {
   lawyer: [
     { tab: 'overview', label: '總覽' },
     { tab: 'lawyers', label: '律師' },
-    { tab: 'firms', label: '公會' },
     { tab: 'offices', label: '事務所' },
     { tab: 'changes', label: '異動追蹤' },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
@@ -2963,7 +2905,6 @@ function showTab(tab) {
   if (tab === 'region-market') loadRegionMarketOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'lawyers') loadLawyers();
-  if (tab === 'firms') loadFirms();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') loadChanges();
   if (tab === 'alumni' && isAdmin) loadAlumni();
@@ -3423,132 +3364,6 @@ async function loadMergedKpis() {
   set('kpiMergedMoj', stats.has_moj);
   set('kpiMergedTwba', stats.has_twba);
   set('kpiMergedLawsnote', stats.has_lawsnote);
-}
-
-// ============================================================
-// FIRMS TAB (律師公會)
-// ============================================================
-async function loadFirms() {
-  // Fetch ALL lawyer_members with pagination (Supabase default limit is 1000)
-  let allLawyers = [];
-  let from = 0;
-  const pageSize = 1000;
-  while (true) {
-    const { data, error: err } = await db.from('lawyer_members')
-      .select('bar_association,region,is_active')
-      .range(from, from + pageSize - 1);
-    if (err) { console.error(err); return; }
-    if (!data || data.length === 0) break;
-    allLawyers = allLawyers.concat(data);
-    if (data.length < pageSize) break;
-    from += pageSize;
-  }
-
-  if (!allLawyers.length) {
-    document.getElementById('firmTableBody').innerHTML = '<tr><td colspan="7" class="empty-state"><div class="msg">無資料</div></td></tr>';
-    return;
-  }
-
-  // Aggregate by bar_association
-  const assocMap = {};
-  for (const l of allLawyers) {
-    const key = l.bar_association || '未知';
-    if (!assocMap[key]) assocMap[key] = { bar_association: key, region: l.region || '未知', active: 0, inactive: 0 };
-    if (l.is_active) assocMap[key].active++;
-    else assocMap[key].inactive++;
-  }
-  const assocList = Object.values(assocMap).sort((a, b) => b.active - a.active);
-
-  // KPIs
-  const totalActive = assocList.reduce((s, a) => s + a.active, 0);
-  const totalAll = assocList.reduce((s, a) => s + a.active + a.inactive, 0);
-  document.getElementById('kpiBarCount').textContent = assocList.length;
-  document.getElementById('kpiBarActiveTotal').textContent = totalActive.toLocaleString();
-  if (assocList.length > 0) {
-    document.getElementById('kpiBarLargest').textContent = assocList[0].region;
-    document.getElementById('kpiBarLargestSub').textContent = `${assocList[0].active.toLocaleString()} 位執業律師`;
-    document.getElementById('kpiBarAvg').textContent = Math.round(totalActive / assocList.length);
-  }
-
-  // Bar chart - top 15
-  const top15 = assocList.slice(0, 15);
-  renderBarAssocChart(top15);
-
-  // Pie chart - top 8 + others
-  renderBarPieChart(assocList, totalActive);
-
-  // Table
-  const tbody = document.getElementById('firmTableBody');
-  tbody.innerHTML = assocList.map((a, i) => {
-    const total = a.active + a.inactive;
-    const rate = total > 0 ? (a.active / total * 100).toFixed(1) : '0.0';
-    const rateCls = Number(rate) >= 80 ? 'badge-green' : Number(rate) >= 50 ? 'badge-orange' : 'badge-red';
-    return `<tr>
-      <td>${i + 1}</td>
-      <td><strong>${escHtml(a.bar_association)}</strong></td>
-      <td>${escHtml(a.region)}</td>
-      <td>${a.active.toLocaleString()}</td>
-      <td>${a.inactive.toLocaleString()}</td>
-      <td>${total.toLocaleString()}</td>
-      <td><span class="badge ${rateCls}">${rate}%</span></td>
-    </tr>`;
-  }).join('');
-}
-
-function renderBarAssocChart(data) {
-  if (chartInstances.barAssoc) chartInstances.barAssoc.destroy();
-  const ctx = document.getElementById('chartBarAssoc').getContext('2d');
-  chartInstances.barAssoc = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: data.map(r => r.region),
-      datasets: [
-        { label: '執業中', data: data.map(r => r.active), backgroundColor: '#4caf82', borderRadius: 4 },
-        { label: '已屆期', data: data.map(r => r.inactive), backgroundColor: '#e05c5c88', borderRadius: 4 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      scales: {
-        x: { stacked: true, ticks: { color: '#8899aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { stacked: true, ticks: { color: '#8899aa' }, grid: { display: false } }
-      },
-      plugins: { legend: { labels: { color: '#8899aa' } } }
-    }
-  });
-}
-
-function renderBarPieChart(data, totalActive) {
-  if (chartInstances.barPie) chartInstances.barPie.destroy();
-  const top8 = data.slice(0, 8);
-  const othersActive = data.slice(8).reduce((s, a) => s + a.active, 0);
-  const labels = top8.map(r => r.region);
-  const values = top8.map(r => r.active);
-  if (othersActive > 0) { labels.push('其他'); values.push(othersActive); }
-
-  const colors = ['#4f8ef7', '#c9a84c', '#4caf82', '#e05c5c', '#9b7ed8', '#e0954a', '#5bc0de', '#ff6b81', '#8899aa'];
-  const ctx = document.getElementById('chartBarPie').getContext('2d');
-  chartInstances.barPie = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'right', labels: { color: '#8899aa', padding: 12 } },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const pct = (ctx.parsed / totalActive * 100).toFixed(1);
-              return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} 人 (${pct}%)`;
-            }
-          }
-        }
-      }
-    }
-  });
 }
 
 // ============================================================
