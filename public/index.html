@@ -794,6 +794,75 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 人才流動（挖角矩陣，資料源 moj_lawyer_changes） ==================== -->
+    <div id="tab-firm-flow" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128260; 事務所人才流動 — 挖角 / 出走矩陣</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">
+          追蹤全國律師名冊每日異動，聚合成事務所層的人才進出。<strong id="ffSince">-</strong> 起累積，逐日增值。
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+          <div class="kpi-card">
+            <div class="kpi-label">跨所移動</div>
+            <div class="kpi-value" id="ffKpiFirm2Firm">-</div>
+            <div class="kpi-sub">事務所→事務所</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">進入執業</div>
+            <div class="kpi-value" style="color:var(--green);" id="ffKpiEnter">-</div>
+            <div class="kpi-sub">企業/公職→事務所</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">離開執業</div>
+            <div class="kpi-value" style="color:var(--red);" id="ffKpiLeave">-</div>
+            <div class="kpi-sub">事務所→企業/公職</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">新進律師</div>
+            <div class="kpi-value" style="color:var(--blue);" id="ffKpiNew">-</div>
+            <div class="kpi-sub">名冊新增</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128293; 團隊出走矩陣 — A 所 → B 所（同期 ≥ 2 人）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          同一時窗多位律師由同一所移往同一所，多半是團隊集體出走或事務所拆夥。
+        </div>
+        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>原事務所</th><th style="text-align:center;">&#8594;</th><th>新事務所</th><th style="text-align:right;">人數</th></tr></thead>
+            <tbody id="ffMatrixBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+        <div class="card">
+          <div class="card-title" style="color:var(--green);">&#11014;&#65039; 淨流入 TOP（人才吸磁）</div>
+          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
+              <tbody id="ffInBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="color:var(--red);">&#11015;&#65039; 淨流出 TOP（人才流失）</div>
+          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
+              <tbody id="ffOutBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:12px;">
+        ※ 資料源為法務部律師名冊每日比對（trigger 自 2026-07-03 起追蹤），為<strong>累積型縱向資料</strong>，時窗越長樣本越厚。
+        事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
+        企業法務、公職等非事務所去向歸入「進入/離開執業」，不計入跨所矩陣與淨流動排行。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
     <div id="tab-cause-supply" class="tab-content">
       <div class="card" style="margin-bottom:16px;">
@@ -2784,6 +2853,7 @@ const SECTIONS = {
     { tab: 'family', label: '家事法官' },
     { tab: 'fam-lawyers', label: '家事律師' },
     { tab: 'firm-map', label: '事務所版圖' },
+    { tab: 'firm-flow', label: '人才流動' },
     { tab: 'cause-supply', label: '案由供需' },
   ],
   sources: [],
@@ -2827,6 +2897,7 @@ function showTab(tab) {
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'fam-lawyers') loadFamLawyersOnce();
   if (tab === 'firm-map') loadFirmMapOnce();
+  if (tab === 'firm-flow') loadFirmFlowOnce();
   if (tab === 'cause-supply') loadCauseSupplyOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firms') loadFirms();
@@ -7520,6 +7591,53 @@ async function loadFirmMap() {
       <td style="text-align:right;">${r.lawyer_count}</td>
     </tr>`;
   }).join('');
+}
+
+// ===== 人才流動（挖角矩陣，RPC firm_flow_*，資料源 moj_lawyer_changes）=====
+let _ffLoaded = false;
+function firmCell(name) {
+  const z = isZheluFirm(name);
+  const safe = escHtml(name).replace(/'/g, "\\'");
+  return `<a href="#" onclick="showFirmDetail('${safe}');return false;" style="color:${z ? 'var(--green)' : 'var(--blue)'};${z ? 'font-weight:700;' : ''}text-decoration:none;">${escHtml(name)}${z ? ' 👑' : ''}</a>`;
+}
+async function loadFirmFlowOnce() {
+  if (_ffLoaded) return;
+  _ffLoaded = true;
+  try {
+    const [sumRes, rankRes, matRes] = await Promise.all([
+      db.rpc('firm_flow_summary'),
+      db.rpc('firm_flow_ranking'),
+      db.rpc('firm_flow_matrix', { p_min: 2 }),
+    ]);
+    const s = sumRes.data || {};
+    document.getElementById('ffSince').textContent = s.tracking_since || '-';
+    document.getElementById('ffKpiFirm2Firm').textContent = (s.firm_to_firm ?? 0).toLocaleString();
+    document.getElementById('ffKpiEnter').textContent = (s.entering ?? 0).toLocaleString();
+    document.getElementById('ffKpiLeave').textContent = (s.leaving ?? 0).toLocaleString();
+    document.getElementById('ffKpiNew').textContent = (s.new_lawyers ?? 0).toLocaleString();
+
+    const rank = rankRes.data || [];
+    const inRows = rank.filter(r => r.net > 0).slice(0, 25);
+    const outRows = rank.filter(r => r.net < 0).slice(-25).reverse();
+    const rowHtml = r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+      <td>${firmCell(r.firm_key)}</td>
+      <td style="text-align:right;color:var(--green);">${r.moved_in || ''}</td>
+      <td style="text-align:right;color:var(--red);">${r.moved_out || ''}</td>
+      <td style="text-align:right;font-weight:700;color:${r.net > 0 ? 'var(--green)' : 'var(--red)'};">${r.net > 0 ? '+' : ''}${r.net}</td></tr>`;
+    document.getElementById('ffInBody').innerHTML = inRows.length ? inRows.map(rowHtml).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
+    document.getElementById('ffOutBody').innerHTML = outRows.length ? outRows.map(rowHtml).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
+
+    const mat = matRes.data || [];
+    document.getElementById('ffMatrixBody').innerHTML = mat.length ? mat.map(m => `<tr${(isZheluFirm(m.from_firm) || isZheluFirm(m.to_firm)) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+      <td>${firmCell(m.from_firm)}</td>
+      <td style="text-align:center;color:var(--text-muted);">&#8594;</td>
+      <td>${firmCell(m.to_firm)}</td>
+      <td style="text-align:right;font-weight:700;color:${m.n >= 3 ? 'var(--red)' : 'var(--text)'};">${m.n}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">目前尚無 ≥ 2 人的團隊移動</td></tr>';
+  } catch (e) {
+    _ffLoaded = false;
+    document.getElementById('ffMatrixBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);">載入失敗：${escHtml(e.message || '')}</td></tr>`;
+  }
 }
 
 // ===== 案由供需（Phase B cause_supply_stats × Phase A cause_group_yearly）=====
