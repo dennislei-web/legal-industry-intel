@@ -920,47 +920,62 @@
         </div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128293; 團隊出走矩陣 — A 所 → B 所（同期 ≥ 2 人）</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
-          同一時窗多位律師由同一所移往同一所，多半是團隊集體出走或事務所拆夥。
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128293; 團隊出走矩陣 — A 所 → B 所（同期 ≥ 2 人）
         </div>
-        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>原事務所</th><th style="text-align:center;">&#8594;</th><th>新事務所</th><th style="text-align:right;">人數</th></tr></thead>
-            <tbody id="ffMatrixBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
-        <div class="card">
-          <div class="card-title" style="color:var(--green);">&#11014;&#65039; 淨流入 TOP（人才吸磁）</div>
-          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
-            <table>
-              <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
-              <tbody id="ffInBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-            </table>
+        <div class="ff-body" style="display:none;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
+            同一時窗多位律師由同一所移往同一所，多半是團隊集體出走或事務所拆夥。
           </div>
-        </div>
-        <div class="card">
-          <div class="card-title" style="color:var(--red);">&#11015;&#65039; 淨流出 TOP（人才流失）</div>
-          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+          <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
             <table>
-              <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
-              <tbody id="ffOutBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+              <thead><tr><th>原事務所</th><th style="text-align:center;">&#8594;</th><th>新事務所</th><th style="text-align:right;">人數</th></tr></thead>
+              <tbody id="ffMatrixBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title" style="color:var(--blue);">&#127793; 新血招募 TOP — 名冊新增律師進哪些所</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
-          「新進律師」= 法務部名冊新掛號的律師（多為新科），看哪些事務所在吸納新血。與上方跨所挖角互補。
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128202; 淨流入 / 淨流出 排行（人才吸磁 vs 流失）
         </div>
-        <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">新進人數</th></tr></thead>
-            <tbody id="ffIntakeBody"><tr><td colspan="3" class="loading">載入中</td></tr></tbody>
-          </table>
+        <div class="ff-body" style="display:none;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:8px;">
+            <div>
+              <div class="card-title" style="color:var(--green);font-size:0.95rem;">&#11014;&#65039; 淨流入 TOP（人才吸磁）</div>
+              <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+                <table>
+                  <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
+                  <tbody id="ffInBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="card-title" style="color:var(--red);font-size:0.95rem;">&#11015;&#65039; 淨流出 TOP（人才流失）</div>
+              <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+                <table>
+                  <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
+                  <tbody id="ffOutBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--blue);">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127793; 新血招募 TOP — 名冊新增律師進哪些所
+        </div>
+        <div class="ff-body" style="display:none;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
+            「新進律師」= 法務部名冊新掛號的律師（多為新科），看哪些事務所在吸納新血。與上方跨所挖角互補。
+          </div>
+          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">新進人數</th></tr></thead>
+              <tbody id="ffIntakeBody"><tr><td colspan="3" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:12px;">
@@ -7505,6 +7520,15 @@ async function loadFirmMap() {
 
 // ===== 人才流動（挖角矩陣，RPC firm_flow_*，資料源 moj_lawyer_changes）=====
 let _ffLoaded = false;
+// 區塊收合：標題可點，預設收起（讓使用者一眼看到本頁有哪些區塊）
+function toggleFf(el) {
+  const body = el.parentElement.querySelector('.ff-body');
+  if (!body) return;
+  const caret = el.querySelector('.ff-caret');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (caret) caret.innerHTML = open ? '&#9660;' : '&#9654;';  // ▼ 展開 / ▶ 收起
+}
 function firmCell(name) {
   const z = isZheluFirm(name);
   const safe = escHtml(name).replace(/'/g, "\\'");
