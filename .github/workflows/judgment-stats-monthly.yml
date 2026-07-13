@@ -49,6 +49,19 @@ jobs:
           echo "目標月份: $YM"
           python judgment_stats.py run "$YM"
 
+      - name: 共署 pair（重用本次已下載的月包 RAR）
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SEVENZ_PATH: 7z
+        working-directory: scripts
+        run: |
+          YM="${{ github.event.inputs.yyyymm }}"
+          if [ -z "$YM" ]; then
+            YM=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y%m)
+          fi
+          python jy_copanel.py run "$YM"
+
       - name: Refresh 官方遷調邊（人審會決議 → judge_transfers → 異動歸因）
         # 全量重抓 65+ 頁約 3 分鐘；parse 有新句型警告會 exit 1 擋 upload（解析器要補樣態）
         env:
