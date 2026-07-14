@@ -1385,11 +1385,12 @@
                 <th style="cursor:pointer" onclick="sortOffices('avg_cases')" title="官方近 5 年出庭數 ÷ 法務部律師人數（公開裁判書，下限估計）">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_age')">平均年齡 <span id="sortIcon_o__avg_age">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_sen')">平均年資 <span id="sortIcon_o__avg_sen">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('founded_year')" title="來源：事務所官網/公開資料，人工與 AI 研究彙整，僅涵蓋部分事務所">成立年份 <span id="sortIcon_o_founded_year">↕</span></th>
                 <th>官網</th>
               </tr>
             </thead>
             <tbody id="officeTableBody">
-              <tr><td colspan="9" class="loading">載入中</td></tr>
+              <tr><td colspan="10" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
@@ -4241,7 +4242,7 @@ function searchOffices() {
 function sortOffices(col) {
   if (officeSortCol === col) { officeSortAsc = !officeSortAsc; }
   else { officeSortCol = col; officeSortAsc = (col === 'lawyer_count' || col === 'avg_cases') ? false : true; }
-  ['firm_name','lawyer_count','main_region','avg_cases'].forEach(c => {
+  ['firm_name','lawyer_count','main_region','avg_cases','_avg_age','_avg_sen','founded_year'].forEach(c => {
     const icon = document.getElementById('sortIcon_o_' + c);
     if (icon) icon.textContent = c === col ? (officeSortAsc ? '↑' : '↓') : '↕';
   });
@@ -4309,21 +4310,24 @@ async function loadOffices() {
 
   // 補上 firm_profiles 手動新增的官網
   try {
-    const { data: fpWebs, error: fpErr } = await db.from('firm_profiles').select('firm_name, website_url, ex_judicial_officers');
+    const { data: fpWebs, error: fpErr } = await db.from('firm_profiles').select('firm_name, website_url, ex_judicial_officers, founded_year');
     if (fpErr) console.warn('firm_profiles query error:', fpErr);
     if (fpWebs && fpWebs.length) {
       const fpMap = {};
       const fpJudicialMap = {};
+      const fpFoundedMap = {};
       for (const fp of fpWebs) {
         if (fp.website_url) fpMap[fp.firm_name] = fp.website_url;
         if (fp.ex_judicial_officers && fp.ex_judicial_officers.length) {
           fpJudicialMap[fp.firm_name] = fp.ex_judicial_officers;
         }
+        if (fp.founded_year) fpFoundedMap[fp.firm_name] = fp.founded_year;
       }
       let merged = 0;
       for (const o of allOffices) {
         if (!o.website_url && fpMap[o.firm_name]) { o.website_url = fpMap[o.firm_name]; merged++; }
         if (fpJudicialMap[o.firm_name]) o.ex_judicial_officers = fpJudicialMap[o.firm_name];
+        if (fpFoundedMap[o.firm_name]) o.founded_year = fpFoundedMap[o.firm_name];
       }
       if (merged) {
         const withWeb = allOffices.filter(o => o.website_url).length;
@@ -4505,8 +4509,11 @@ function renderOffices() {
   // Sort
   filtered.sort((a, b) => {
     let va = a[officeSortCol], vb = b[officeSortCol];
-    if (va == null) va = officeSortCol === 'firm_name' ? 'zzz' : -1;
-    if (vb == null) vb = officeSortCol === 'firm_name' ? 'zzz' : -1;
+    // founded_year：無資料者不論升降序一律沉底
+    const nullVal = officeSortCol === 'firm_name' ? 'zzz'
+      : (officeSortCol === 'founded_year' && officeSortAsc) ? 99999 : -1;
+    if (va == null) va = nullVal;
+    if (vb == null) vb = nullVal;
     if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
     else { va = Number(va) || 0; vb = Number(vb) || 0; }
     return officeSortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
@@ -4518,7 +4525,7 @@ function renderOffices() {
 
   const tbody = document.getElementById('officeTableBody');
   if (!page.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="msg">無資料</div></td></tr>';
     renderPagination('officePagination', officePage, officeTotal, p => { officePage = p; renderOffices(); });
     return;
   }
@@ -4541,7 +4548,7 @@ function renderOffices() {
       })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
-      <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
+      <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o.founded_year ? `<span title="約 ${new Date().getFullYear() - o.founded_year} 年歷史">${o.founded_year}</span>` : '-'}</td>
       <td style="text-align:center;">${webLink}</td>
     </tr>`;
   }).join('');
