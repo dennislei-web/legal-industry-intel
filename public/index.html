@@ -5451,7 +5451,8 @@ async function showLawyerDetail(name, certNumber) {
           ${moj?.email ? row('Email', `<a href="mailto:${escHtml(moj.email)}" style="color:var(--blue);">${escHtml(moj.email)}</a>`) : ''}
           ${moj?.tel ? row('電話', escHtml(moj.tel)) : ''}
           ${moj?.address ? row('地址', escHtml(moj.address)) : ''}
-          ${l.practice_start_date ? row('執業起始', escHtml(l.practice_start_date)) : ''}
+          ${moj?.practice_start_date ? row('執業起始', escHtml(moj.practice_start_date)) : ''}
+          ${l.practice_start_date && l.practice_start_date !== moj?.practice_start_date ? row('本期執業登錄', escHtml(l.practice_start_date) + (l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : '')) : ''}
           ${moj?.state_desc && moj.state_desc !== '正常' ? row('狀態', `<span style="color:var(--orange);">${escHtml(moj.state_desc)}</span>`) : ''}
           ${moj?.discipline ? row('懲戒記錄', `<span style="color:var(--red);">⚠ ${escHtml(moj.discipline)}</span>`) : ''}
         </tbody>
