@@ -999,7 +999,7 @@
         <div class="kpi-card"><div class="kpi-label">現職律師</div><div class="kpi-value" id="spKpiTotal">-</div><div class="kpi-sub">法務部名冊</div></div>
         <div class="kpi-card"><div class="kpi-label">近5年均進場</div><div class="kpi-value" style="color:var(--blue);" id="spKpiIntake">-</div><div class="kpi-sub">新科律師/年</div></div>
         <div class="kpi-card"><div class="kpi-label">現 65 歲以上</div><div class="kpi-value" style="color:var(--gold);" id="spKpi65">-</div><div class="kpi-sub" id="spKpi65Pct">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">未來5年退休潮</div><div class="kpi-value" style="color:var(--red);" id="spKpiRetire">-</div><div class="kpi-sub">屆 65 歲人數</div></div>
+        <div class="kpi-card"><div class="kpi-label">2036 預估供給</div><div class="kpi-value" style="color:var(--green);" id="spKpiProj">-</div><div class="kpi-sub" id="spKpiProjSub">淨供給模型</div></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128200; 歷年新科律師進場</div>
@@ -1012,7 +1012,8 @@
         <div class="chart-container" style="height:300px;"><canvas id="spAgeChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#127794; 退休潮 — 未來 10 年每年屆 65 歲人數</div>
+        <div class="card-title">&#127794; 模型：每年預估退出人數（漸進退休）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">依實測年齡曲線的漸進退休（<strong>非「屆 65 全退」</strong>）：跨 60–85 歲逐年流失，隨下方滑桿連動。</div>
         <div class="chart-container" style="height:300px;"><canvas id="spRetireChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
@@ -1021,17 +1022,17 @@
           <label>年進場數：<strong id="spIntakeVal">573</strong>
             <input type="range" id="spIntakeSlider" min="200" max="1000" step="10" value="573" style="vertical-align:middle;width:160px;">
           </label>
-          <label>假設退休年齡：<strong id="spRetAgeVal">65</strong>
-            <input type="range" id="spRetAgeSlider" min="60" max="75" step="1" value="65" style="vertical-align:middle;width:120px;">
+          <label>半退休年齡：<strong id="spMidVal">72</strong>
+            <input type="range" id="spMidSlider" min="66" max="78" step="1" value="72" style="vertical-align:middle;width:120px;">
           </label>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
-          驅動式情境，非預測。淨供給(年) = 上年 + 年進場數 － 當年屆退休年齡人數。未計死亡/中途離業等其他流失（會使實際供給再低一些）。
+          漸進退休情境（非斷崖）：每歲退出率隨年齡上升（logistic），<strong>半退休年齡</strong>＝累計半數退出的年齡。淨供給(年)＝上年＋年進場數－各歲當年退出。
         </div>
         <div class="chart-container" style="height:320px;"><canvas id="spProjChart"></canvas></div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 現職名冊為存活者樣本；「屆 65」假設一律退休，但實務上約 <span id="spOver65Note">-</span> 仍在執業，故退休潮為上限估計。考選部報考/及格數（更前緣的領先指標）可後續接入。
+        ※ <strong>關鍵事實</strong>：律師<strong>不是 65 歲斷崖退休</strong>——現職名冊 65 歲(約126人)與 64 歲(約132人)相近、70 歲仍約 79 人、75 歲仍約 39 人在執業（<span id="spOver65Note">-</span>）。故本模型改採<strong>漸進退休</strong>（logistic hazard，退休率隨年齡上升），非「屆 65 全退」。因早年律師界較小、老齡人數本就偏低，實測年齡曲線為退休率<strong>上限</strong>，真實供給可能再高一些。考選部報考/及格數（更前緣領先指標）可後續接入。
       </div>
     </div>
 
@@ -7717,9 +7718,9 @@ async function loadSupplyOnce() {
     _spData = data;
     _spAgeMap = {}; (data.age_hist || []).forEach(x => { _spAgeMap[x.age] = x.n; });
     renderSupply();
-    const s1 = document.getElementById('spIntakeSlider'), s2 = document.getElementById('spRetAgeSlider');
+    const s1 = document.getElementById('spIntakeSlider'), s2 = document.getElementById('spMidSlider');
     if (s1) s1.oninput = () => { document.getElementById('spIntakeVal').textContent = s1.value; renderSupplyProjection(); };
-    if (s2) s2.oninput = () => { document.getElementById('spRetAgeVal').textContent = s2.value; renderSupplyProjection(); };
+    if (s2) s2.oninput = () => { document.getElementById('spMidVal').textContent = s2.value; renderSupplyProjection(); };
     if (s1) s1.value = data.recent_intake_avg || 573;
     if (document.getElementById('spIntakeVal')) document.getElementById('spIntakeVal').textContent = (data.recent_intake_avg || 573);
   } catch (e) {
@@ -7729,15 +7730,13 @@ async function loadSupplyOnce() {
   }
 }
 function renderSupply() {
-  const d = _spData, ny = d.anchor_year_ad, blue = _spVar('--blue'), gold = _spVar('--gold'), red = _spVar('--red'), muted = _spVar('--text-muted');
+  const d = _spData, blue = _spVar('--blue'), gold = _spVar('--gold'), red = _spVar('--red');
   const over65 = Object.entries(_spAgeMap).reduce((s, [a, n]) => s + (+a >= 65 ? n : 0), 0);
-  const retire5 = [60, 61, 62, 63, 64].reduce((s, a) => s + (_spAgeMap[a] || 0), 0);
   document.getElementById('spKpiTotal').textContent = d.total_active.toLocaleString();
   document.getElementById('spKpiIntake').textContent = (d.recent_intake_avg || '-');
   document.getElementById('spKpi65').textContent = over65.toLocaleString();
   document.getElementById('spKpi65Pct').textContent = '佔 ' + (100 * over65 / d.total_active).toFixed(1) + '%';
-  document.getElementById('spKpiRetire').textContent = retire5.toLocaleString();
-  const o65 = document.getElementById('spOver65Note'); if (o65) o65.textContent = over65.toLocaleString() + ' 位 65 歲以上';
+  const o65 = document.getElementById('spOver65Note'); if (o65) o65.textContent = over65.toLocaleString() + ' 位（' + (100 * over65 / d.total_active).toFixed(1) + '%）65 歲以上仍在執業';
   // 1. 進場趨勢
   const iby = d.intake_by_year || [];
   _spNewChart('spIntakeChart', {
@@ -7745,38 +7744,52 @@ function renderSupply() {
     data: { labels: iby.map(x => x.year), datasets: [{ label: '新科律師進場', data: iby.map(x => x.n), backgroundColor: blue, borderRadius: 3 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
-  // 2. 年齡結構（單齡長條）
+  // 2. 年齡結構（單齡長條；紅=65+ 仍執業，證明無 65 歲斷崖）
   const ages = (d.age_hist || []);
   _spNewChart('spAgeChart', {
     type: 'bar',
     data: { labels: ages.map(x => x.age), datasets: [{ label: '人數', data: ages.map(x => x.n), backgroundColor: ages.map(x => x.age >= 65 ? red : x.age >= 60 ? gold : blue) }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { title: c => c[0].label + ' 歲' } } }, scales: { x: { title: { display: true, text: '年齡（歲）' }, ticks: { maxTicksLimit: 20 } }, y: { beginAtZero: true } } }
   });
-  // 3. 退休潮（未來10年每年屆65）
-  const rl = [], rn = [];
-  for (let k = 1; k <= 10; k++) { rl.push(ny + k); rn.push(_spAgeMap[65 - k] || 0); }
-  _spNewChart('spRetireChart', {
-    type: 'bar',
-    data: { labels: rl, datasets: [{ label: '屆 65 歲人數', data: rn, backgroundColor: gold, borderRadius: 3 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
   renderSupplyProjection();
 }
+// 漸進退休 hazard：base + ceil / (1 + e^-(age-mid)/k)。mid=半退休年齡（累計半數退出）。
+function _spHazard(age, mid) { return 0.005 + 0.40 / (1 + Math.exp(-(age - mid) / 4)); }
 function renderSupplyProjection() {
-  const d = _spData, ny = d.anchor_year_ad, green = _spVar('--green'), muted = _spVar('--text-muted');
+  const d = _spData, ny = d.anchor_year_ad, green = _spVar('--green'), gold = _spVar('--gold');
   const intake = +(document.getElementById('spIntakeSlider') || {}).value || d.recent_intake_avg || 573;
-  const retAge = +(document.getElementById('spRetAgeSlider') || {}).value || 65;
-  const labels = [ny], pool = [d.total_active];
-  let p = d.total_active;
+  const mid = +(document.getElementById('spMidSlider') || {}).value || 72;
+  // cohort-component 模擬：逐歲套 hazard 退出、逐年老化、新進場入 30 歲
+  let pop = {}; Object.entries(_spAgeMap).forEach(([a, n]) => { pop[+a] = n; });
+  const agedSum = Object.values(pop).reduce((s, n) => s + n, 0);
+  const ageless = d.total_active - agedSum; // 無年齡資料者，視為不老化常數
+  const labels = [ny], poolLine = [d.total_active], exitYears = [], exitVals = [];
   for (let k = 1; k <= 10; k++) {
-    const retiring = _spAgeMap[retAge - k] || 0; // 今年 retAge-k 歲者，第 k 年屆 retAge
-    p = p + intake - retiring;
-    labels.push(ny + k); pool.push(Math.round(p));
+    let exits = 0; const nw = {};
+    Object.keys(pop).forEach(a => {
+      a = +a; const e = pop[a] * Math.min(0.6, _spHazard(a, mid)); exits += e;
+      nw[a + 1] = (nw[a + 1] || 0) + (pop[a] - e);
+    });
+    nw[30] = (nw[30] || 0) + intake;
+    pop = {}; Object.entries(nw).forEach(([a, n]) => { if (+a >= 24 && +a <= 95) pop[+a] = n; });
+    const tot = Object.values(pop).reduce((s, n) => s + n, 0) + ageless;
+    labels.push(ny + k); poolLine.push(Math.round(tot));
+    exitYears.push(ny + k); exitVals.push(Math.round(exits));
   }
+  const proj2036 = poolLine[poolLine.length - 1];
+  const kp = document.getElementById('spKpiProj'); if (kp) kp.textContent = proj2036.toLocaleString();
+  const kps = document.getElementById('spKpiProjSub'); if (kps) kps.textContent = (proj2036 >= d.total_active ? '+' : '') + (proj2036 - d.total_active).toLocaleString() + ' vs 今';
+  // 淨供給投影線
   _spNewChart('spProjChart', {
     type: 'line',
-    data: { labels, datasets: [{ label: '淨供給（現職律師數）', data: pool, borderColor: green, backgroundColor: 'rgba(76,175,130,0.12)', fill: true, tension: 0.25, pointRadius: 3 }] },
+    data: { labels, datasets: [{ label: '淨供給（現職律師數）', data: poolLine, borderColor: green, backgroundColor: 'rgba(76,175,130,0.12)', fill: true, tension: 0.25, pointRadius: 3 }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toLocaleString() + ' 人' } } }, scales: { y: { beginAtZero: false } } }
+  });
+  // 模型每年實際退出（漸進，跨各老齡；非「屆65全退」）
+  _spNewChart('spRetireChart', {
+    type: 'bar',
+    data: { labels: exitYears, datasets: [{ label: '預估退出人數', data: exitVals, backgroundColor: gold, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toLocaleString() + ' 人退出' } } }, scales: { y: { beginAtZero: true } } }
   });
 }
 
