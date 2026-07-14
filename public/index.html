@@ -5407,7 +5407,7 @@ async function showLawyerDetail(name, certNumber) {
   if (indepDirs.length) sources.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">上市櫃獨董 ×${indepDirs.length}</span>`);
   if (govWinsL.length) sources.push(`<span class="badge" style="background:rgba(63,182,168,0.2);color:var(--teal,#3fb6a8);">政府標案 ×${govWinsL.length}</span>`);
   if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
-  if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
+  if (l.has_twba) sources.push('<span class="badge badge-blue" title="全國律師聯合會全國執業名冊有登錄" style="cursor:help;">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
   if (l.is_historical) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);" title="僅見於歷史裁判書資料，現行名冊查無且近 5 年無官方案件（推定已離開執業）">歷史名冊</span>');
 
@@ -5455,7 +5455,7 @@ async function showLawyerDetail(name, certNumber) {
       <table style="width:100%;font-size:0.9rem;">
         <tbody>
           ${row('事務所', firmLink)}
-          ${row('登錄公會', escHtml((moj?.guild_names || []).join('、') || region || '-'))}
+          ${row('主區域公會', escHtml((moj?.guild_names || []).join('、') || region || '-'))}
           ${row('證號', escHtml(licNo || '-'))}
           ${row('年資', seniority)}
           ${row('出生年齡', age)}
@@ -5465,8 +5465,8 @@ async function showLawyerDetail(name, certNumber) {
           ${moj?.address ? row('地址', escHtml(moj.address)) : ''}
           ${moj?.practice_start_date ? row('執業起始', escHtml(moj.practice_start_date)) : ''}
           ${l.has_twba && l.practice_start_date
-            ? row('全國執業', `<span style="color:var(--green);font-weight:600;">&#10003; 已登錄</span> <span title="全聯會全國執業名冊之本期登錄效期（換所/換證會重設起日）" style="cursor:help;">${escHtml(l.practice_start_date)}${l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : ''}</span>`)
-            : row('全國執業', '<span style="color:var(--text-muted);" title="全聯會全國執業名冊查無，僅於主區域公會執業">— 未登錄</span>')}
+            ? row('全國執業', `<span style="color:var(--green);font-weight:600;">&#10003; 已登錄</span> <span title="全律會全國執業名冊之登錄效期（起迄月）；已登錄者可於全國執業" style="cursor:help;">${escHtml(l.practice_start_date)}${l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : ''}</span>`)
+            : row('全國執業', '<span style="color:var(--text-muted);" title="全律會全國執業名冊查無。可能僅於主區域公會執業，或有向全律會登錄個別跨區執業（跨區登錄無公開名冊，無法查證）">— 未登錄<span style="font-size:0.75rem;">（跨區狀態無公開資料）</span></span>')}
           ${moj?.state_desc && moj.state_desc !== '正常' ? row('狀態', `<span style="color:var(--orange);">${escHtml(moj.state_desc)}</span>`) : ''}
           ${moj?.discipline ? row('懲戒記錄', `<span style="color:var(--red);">⚠ ${escHtml(moj.discipline)}</span>`) : ''}
         </tbody>
