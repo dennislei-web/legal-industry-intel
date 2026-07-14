@@ -463,9 +463,12 @@
     .jstat .kpi-change.up { color: var(--red); }
     .jstat .kpi-change.down { color: var(--green); }
 
-    .jstat .sub-tab-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); transition: all 0.15s; font-family: inherit; }
-    .jstat .sub-tab-btn:hover { background: var(--bg-hover); color: var(--text); }
-    .jstat .sub-tab-btn.active { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--tab-active-color); }
+    .sub-tab-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); transition: all 0.15s; font-family: inherit; }
+    .sub-tab-btn:hover { background: var(--bg-hover); color: var(--text); }
+    .sub-tab-btn.active { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--tab-active-color); }
+    /* 領域版圖頂層切換（家事律師/事務所版圖/案由供需）：加大並用實心填色凸顯選中 */
+    #domainTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
+    #domainTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
     /* 章節索引（圖表分頁頁頂：一眼看到本頁有哪些區塊，點了捲到該段） */
     .sec-index { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:8px 12px; background:var(--bg-row); border:1px solid var(--border); border-radius:8px; }
     .sec-index-label { font-size:12px; color:var(--text-muted); margin-right:2px; white-space:nowrap; }
@@ -3528,6 +3531,10 @@ async function loadLawyers() {
     if (l.moj_discipline) {
       badges.push(`<span class="badge" style="margin:1px;background:color-mix(in srgb, var(--red) 25%, transparent);color:var(--red);" title="有懲戒記錄: ${escHtml(l.moj_discipline)}">⚠ 懲戒</span>`);
     }
+    // 歷史名冊：僅 Lawsnote 來源且近 5 年官方裁判書 0 件（mig 091）
+    if (l.is_historical) {
+      badges.push(`<span class="badge" style="margin:1px;background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);" title="僅見於歷史裁判書資料，現行名冊查無且近 5 年無官方案件（推定已離開執業）">歷史名冊</span>`);
+    }
     const srcHtml = badges.join('') || '<span style="color:var(--text-muted);">-</span>';
 
     // 組合 tooltip: 性別/出生年/email/電話/地址
@@ -5402,6 +5409,7 @@ async function showLawyerDetail(name, certNumber) {
   if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
   if (l.has_twba) sources.push('<span class="badge badge-blue">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
+  if (l.is_historical) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);" title="僅見於歷史裁判書資料，現行名冊查無且近 5 年無官方案件（推定已離開執業）">歷史名冊</span>');
 
   // 負責人標記（人工白名單優先，否則一人所自動認定）
   const linfo = leaderInfo(name, l.firm_name);
