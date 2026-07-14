@@ -586,9 +586,9 @@
           <div class="kpi-sub">現役登錄律師</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">Lawsnote 律師</div>
-          <div class="kpi-value" id="kpiLawsnoteCount" style="color:var(--green);">-</div>
-          <div class="kpi-sub" id="kpiLawsnoteSub">含案件數資料</div>
+          <div class="kpi-label">歷史名冊</div>
+          <div class="kpi-value" id="kpiHistoricalCount" style="color:var(--text-muted);">-</div>
+          <div class="kpi-sub">僅見歷史裁判書，推定已離開執業</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">平均出庭數</div>
@@ -1342,7 +1342,7 @@
         <div class="kpi-card"><div class="kpi-label">三者皆有</div><div class="kpi-value" id="kpiMergedAll3" style="color:var(--green);">-</div><div class="kpi-sub">MOJ + 全聯會 + Lawsnote</div></div>
         <div class="kpi-card"><div class="kpi-label">法務部 (MOJ)</div><div class="kpi-value" id="kpiMergedMoj" style="color:var(--purple);">-</div><div class="kpi-sub">現役登錄律師</div></div>
         <div class="kpi-card"><div class="kpi-label">全聯會</div><div class="kpi-value" id="kpiMergedTwba" style="color:var(--blue);">-</div><div class="kpi-sub">律師公會名冊</div></div>
-        <div class="kpi-card"><div class="kpi-label">Lawsnote</div><div class="kpi-value" id="kpiMergedLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">含案件數資料</div></div>
+        <div class="kpi-card"><div class="kpi-label">Lawsnote</div><div class="kpi-value" id="kpiMergedLawsnote" style="color:var(--orange);">-</div><div class="kpi-sub">enrichment：專長標籤/個人頁</div></div>
       </div>
       <div class="search-bar">
         <input type="text" id="lawyerSearch" placeholder="搜尋律師姓名或事務所..." oninput="searchLawyers()">
@@ -3053,15 +3053,15 @@ async function showDashboard() {
 
 async function loadOverviewFast() {
   // 先平行載入最重要的 KPI（不含圖表）
-  const [merged, moj, lawsnote] = await Promise.all([
+  const [merged, moj, historical] = await Promise.all([
     db.from('lawyers_combined').select('*', { count: 'exact', head: true }),
     db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true),
-    db.from('lawsnote_lawyers').select('*', { count: 'exact', head: true }),
+    db.from('lawyers_with_stats').select('*', { count: 'exact', head: true }).eq('is_historical', true),
   ]);
   document.getElementById('kpiLawyerCount').textContent = merged.count?.toLocaleString() || '0';
   document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
   document.getElementById('kpiRegistryCount').textContent = moj.count?.toLocaleString() || '0';
-  document.getElementById('kpiLawsnoteCount').textContent = lawsnote.count?.toLocaleString() || '0';
+  document.getElementById('kpiHistoricalCount').textContent = historical.count?.toLocaleString() || '0';
 
   // 然後背景載入其餘的（圖表、統計等）
   loadOverview();
@@ -3248,8 +3248,7 @@ async function loadOverview() {
   document.getElementById('kpiSources').textContent = srcCount != null ? srcCount : '0';
   document.getElementById('kpiSourcesSub').textContent = '資料來源';
 
-  // Lawsnote KPIs (from cache)
-  document.getElementById('kpiLawsnoteCount').textContent = (stats.lawsnote_raw || 0).toLocaleString();
+  // 歷史名冊 KPI 由 loadOverviewFast() 以 is_historical 即時計數（mig 091），此處不再覆寫
   try {
     // 官方裁判書口徑（lawyer_judgment_stats，僅計近 5 年有出庭紀錄者）
     const { data: avgOfficial } = await db.rpc('official_avg_cases');
