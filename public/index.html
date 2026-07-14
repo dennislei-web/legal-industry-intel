@@ -4548,6 +4548,7 @@ function renderOffices() {
       })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_age != null ? o._avg_age : '-'}</td>
+      <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o._avg_sen != null ? o._avg_sen + ' 年' : '-'}</td>
       <td style="text-align:center;color:var(--text-muted);font-size:0.85rem;">${o.founded_year ? `<span title="約 ${new Date().getFullYear() - o.founded_year} 年歷史">${o.founded_year}</span>` : '-'}</td>
       <td style="text-align:center;">${webLink}</td>
     </tr>`;
