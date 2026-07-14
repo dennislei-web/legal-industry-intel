@@ -5970,6 +5970,72 @@ function closeLawyerModal() {
   });
 }
 
+// 律師檔案一鍵匯出 PDF：複製 modal 內容到列印視窗（Chart.js canvas 轉快照圖），由瀏覽器列印對話框另存 PDF
+function exportLawyerPdf() {
+  const bodyEl = document.getElementById('lawyerModalBody');
+  if (!bodyEl || bodyEl.querySelector('.loading')) { alert('律師資料載入中，請稍候再匯出'); return; }
+  const name = (document.getElementById('lawyerModalTitle')?.textContent || '律師').trim();
+
+  const clone = bodyEl.cloneNode(true);
+
+  // canvas 帶不進新視窗；快照的文字色跟當前主題走，底色也要一起帶，暗色主題下才不會白底配淺字
+  const cardBg = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#ffffff';
+  clone.querySelectorAll('canvas').forEach(c => {
+    const live = c.id && document.getElementById(c.id);
+    const img = document.createElement('img');
+    if (live) img.src = live.toDataURL('image/png');
+    img.style.cssText = `width:100%;background:${cardBg};border-radius:8px;padding:6px;box-sizing:border-box;`;
+    c.replaceWith(img);
+  });
+
+  clone.querySelectorAll('a').forEach(a => a.removeAttribute('onclick'));
+  clone.querySelectorAll('a.btn').forEach(el => (el.parentElement || el).remove());
+  clone.querySelectorAll('[style*="max-height"]').forEach(el => { el.style.maxHeight = 'none'; el.style.overflowY = 'visible'; });
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('瀏覽器阻擋了彈出視窗，請允許彈出視窗後重試'); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  w.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
+<title>${escHtml(name)}_律師檔案_${today}</title>
+<style>
+  @page { size: A4; margin: 13mm; }
+  :root {
+    --bg-main:#ffffff; --bg-card:#ffffff; --bg-row:#f0f2f5; --border:#d0d5dd; --border-light:#e0e4eb;
+    --gold:#a3842a; --gold-light:#8b6f1e; --text:#1a1a2e; --text-muted:#6b7280;
+    --blue:#2563eb; --blue-dim:rgba(37,99,235,0.1); --green:#15803d; --green-dim:rgba(21,128,61,0.12);
+    --red:#dc2626; --red-dim:rgba(220,38,38,0.1); --orange:#d97706; --orange-dim:rgba(217,119,6,0.1);
+    --purple:#7c3aed; --purple-dim:rgba(124,58,237,0.1); --teal:#0f766e;
+  }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: -apple-system, 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', sans-serif; color: var(--text); margin: 0; font-size: 14px; }
+  .pdf-header { border-bottom: 2px solid var(--gold); padding-bottom: 10px; margin-bottom: 16px; }
+  .pdf-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+  .pdf-header .sub { font-size: 0.78rem; color: var(--text-muted); }
+  .card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; page-break-inside: avoid; }
+  .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+  .badge-orange { background: var(--orange-dim); color: var(--orange); }
+  table { width: 100%; border-collapse: collapse; }
+  th { padding: 8px 10px; text-align: left; font-size: 0.72rem; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-row); }
+  td { padding: 7px 10px; font-size: 0.82rem; border-bottom: 1px solid var(--border-light); }
+  a { color: var(--blue); text-decoration: none; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pdf-foot { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--text-muted); }
+</style></head><body>
+<div class="pdf-header">
+  <h1>${escHtml(name)}</h1>
+  <div class="sub">法律產業情報｜律師檔案｜產出日期 ${today}</div>
+</div>
+${clone.innerHTML}
+<div class="pdf-foot">資料來源：法務部律師查詢系統、全國律師聯合會名冊、司法院公開裁判書、政府電子採購網、公開資訊觀測站、Lawsnote。裁判書出庭統計為下限估計（家事裁定等多不公開）。</div>
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
+</body></html>`);
+  w.document.close();
+}
+
 // ============================================================
 // SOURCES TAB
 // ============================================================
@@ -10808,7 +10874,10 @@ async function showCourtDetail(name) {
   <div class="modal-content" style="max-width:680px;">
     <div class="modal-header">
       <h2 id="lawyerModalTitle">載入中...</h2>
-      <button onclick="closeLawyerModal()">✕</button>
+      <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+        <button onclick="exportLawyerPdf()" title="匯出 PDF" style="font-size:0.8rem;border:1px solid var(--border);border-radius:6px;padding:5px 12px;white-space:nowrap;">&#11015; 匯出 PDF</button>
+        <button onclick="closeLawyerModal()">✕</button>
+      </div>
     </div>
     <div class="modal-body" id="lawyerModalBody">
       <div class="loading">載入中</div>
