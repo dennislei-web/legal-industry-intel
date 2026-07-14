@@ -1145,6 +1145,51 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 非訟版圖（商標/專利代理 — 不打官司的律師市場，TIPO 名簿＋年報統計） ==================== -->
+    <div id="tab-nonlit" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        律師市場不只訴訟——<strong>商標與專利代理</strong>是「不打官司的律師業務」：每年約 9.7 萬件商標申請＋7.2 萬件專利申請，8 成以上透過代理人送件。資料源：<a href="https://data.gov.tw/dataset/59717" target="_blank" style="color:var(--blue);">商標代理人登錄名簿</a>＋<a href="https://data.gov.tw/dataset/25642" target="_blank" style="color:var(--blue);">專利案件代理人資訊</a>（TIPO，月更）＋智慧財產局年報統計。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">商標申請（114 年）</div><div class="kpi-value" id="nlKpiTm">-</div><div class="kpi-sub" id="nlKpiTmSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">專利申請（114 年）</div><div class="kpi-value" style="color:var(--blue);" id="nlKpiPt">-</div><div class="kpi-sub">發明/新型/設計合計</div></div>
+        <div class="kpi-card"><div class="kpi-label">登錄商標代理的律師</div><div class="kpi-value" style="color:var(--gold);" id="nlKpiTmLawyers">-</div><div class="kpi-sub" id="nlKpiTmLawyersSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">近3年代理專利的律師</div><div class="kpi-value" style="color:var(--green);" id="nlKpiPtLawyers">-</div><div class="kpi-sub" id="nlKpiPtLawyersSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 商標／專利申請量趨勢</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">商標申請 12 年成長 28%、<strong>114 年 97,411 件創歷史新高</strong>（+7.8%）；專利穩定在 7.2 萬件上下——訴訟市場之外，這是一個量還在成長的市場。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="nlTrendChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#9878;&#65039; 誰在做商標代理（登錄名簿 <span id="nlTmTotal">-</span> 人）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><strong>律師佔 54%</strong>——113/05 商標代理人登錄新制上路後，律師免考試逕行備查，成為商標代理最大職業群。</div>
+          <div class="chart-container" style="height:280px;"><canvas id="nlTmTypeChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128295; 誰在做專利代理（近3年實際代理 <span id="nlPtTotal">-</span> 人）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">專利端由<strong>專利師（45%）</strong>主導，律師佔 32%；台北集中度 <strong id="nlPtTaipei">-</strong>。有 <strong id="nlBoth">-</strong> 位律師商標＋專利兩邊都做。</div>
+          <div class="chart-container" style="height:280px;"><canvas id="nlPtTypeChart"></canvas></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#127970; 律師事務所商標代理布局 TOP（律師身分登錄人數）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">理律 26 位律師登錄居冠；<strong>綜合大所＋涉外所包辦前段班</strong>，一般訴訟型事務所幾乎缺席。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="nlTmFirmChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128188; 專利代理事務所 TOP（近3年有代理之人數）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">理律 55 人斷層領先（第 2 名的近 3 倍）；專利市場由<strong>少數大所＋專門智權所</strong>寡占。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="nlPtFirmChart"></canvas></div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 商標代理人名簿＝登錄（商標代理人，須認證考試）＋備查（律師／會計師，免考試）口徑，每月 10 日更新；未登錄備查者不得以代理人名義招攬商標業務（商標法 98-1，罰 3–15 萬）。專利代理人名單僅含<strong>近 3 年有實際代理案件</strong>者（活動口徑，非全部證照持有人）。代理率（專利 93.8%／商標 84.1%）為 109 年 9 月經濟部新申請案統計快照，僅供量級參考。申請量為 TIPO 年報數字（年更）。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 地區市場（供給×需求×活躍度，以選地區為主軸整併） ==================== -->
     <div id="tab-region-market" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -3061,6 +3106,7 @@ const SECTIONS = {
     { tab: 'supply', label: '供給預測' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解市場' },
+    { tab: 'nonlit', label: '非訟版圖' },
     { tab: 'domain', label: '領域版圖' },
     { tab: 'firm-flow', label: '人才流動' },
   ],
@@ -3110,6 +3156,7 @@ function showTab(tab) {
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
   if (tab === 'adr') loadAdrOnce();
+  if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'offices') loadOffices();
@@ -8142,6 +8189,73 @@ async function loadAdrOnce() {
     _adrLoaded = false;
     const el = document.getElementById('adrKpiClosed'); if (el) el.textContent = '載入失敗';
     console.error('調解市場資料載入失敗', e);
+  }
+}
+
+// ===== 非訟版圖（TIPO 商標/專利代理，靜態 data/nonlit_stats.json）=====
+let _nlLoaded = false;
+const _nlCharts = {};
+function _nlChart(id, cfg) {
+  if (_nlCharts[id]) _nlCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _nlCharts[id] = new Chart(el.getContext('2d'), cfg);
+  requestAnimationFrame(() => { if (_nlCharts[id]) _nlCharts[id].resize(); });
+}
+async function loadNonlitOnce() {
+  if (_nlLoaded) return;
+  _nlLoaded = true;
+  try {
+    const d = await (await fetch('data/nonlit_stats.json?v=' + Date.now())).json();
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    const tmLast = d.tm_apply.cases[d.tm_apply.cases.length - 1];
+    const tmPrev = d.tm_apply.cases[d.tm_apply.cases.length - 2];
+    document.getElementById('nlKpiTm').textContent = (tmLast / 10000).toFixed(1) + ' 萬';
+    document.getElementById('nlKpiTmSub').textContent = '歷史新高（+' + ((tmLast / tmPrev - 1) * 100).toFixed(1) + '%）';
+    document.getElementById('nlKpiPt').textContent = (d.pt_apply.total[d.pt_apply.total.length - 1] / 10000).toFixed(1) + ' 萬';
+    const tmL = d.tm_agents.by_type.find(x => x[0] === '律師')[1];
+    document.getElementById('nlKpiTmLawyers').textContent = tmL.toLocaleString();
+    document.getElementById('nlKpiTmLawyersSub').textContent = '佔全國律師 ' + (tmL / d.tm_agents.bar_total * 100).toFixed(1) + '%';
+    const ptL = d.pt_agents.by_type.find(x => x[0] === '律師')[1];
+    document.getElementById('nlKpiPtLawyers').textContent = ptL.toLocaleString();
+    document.getElementById('nlKpiPtLawyersSub').textContent = '佔全國律師 ' + (ptL / d.tm_agents.bar_total * 100).toFixed(1) + '%';
+    document.getElementById('nlTmTotal').textContent = d.tm_agents.total.toLocaleString();
+    document.getElementById('nlPtTotal').textContent = d.pt_agents.total.toLocaleString();
+    document.getElementById('nlPtTaipei').textContent = (d.pt_agents.taipei / d.pt_agents.total * 100).toFixed(0) + '%';
+    document.getElementById('nlBoth').textContent = d.cross_both_lawyers;
+    // 1) 申請量趨勢（商標 12 年、專利後 5 年以 null 補前段）
+    const ptPad = Array(d.tm_apply.years.length - d.pt_apply.years.length).fill(null);
+    _nlChart('nlTrendChart', {
+      type: 'line',
+      data: {
+        labels: d.tm_apply.years.map(x => x + '年'),
+        datasets: [
+          { label: '商標申請註冊（案件計）', data: d.tm_apply.cases, borderColor: gold, tension: 0.2, pointRadius: 3 },
+          { label: '專利申請（三種合計）', data: [...ptPad, ...d.pt_apply.total], borderColor: blue, tension: 0.2, pointRadius: 3, spanGaps: false },
+          { label: '其中發明專利', data: [...ptPad, ...d.pt_apply.invention], borderColor: muted, tension: 0.2, pointRadius: 2, borderDash: [5, 4] }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: c => c.dataset.label + '：' + (c.parsed.y == null ? '無資料' : c.parsed.y.toLocaleString()) } } }, scales: { y: { beginAtZero: true } } }
+    });
+    // 2) 身分結構雙 doughnut
+    const mkDough = (id, rows, pal) => _nlChart(id, {
+      type: 'doughnut',
+      data: { labels: rows.map(x => x[0] + ' ' + (x[1] / rows.reduce((s, r) => s + r[1], 0) * 100).toFixed(0) + '%'), datasets: [{ data: rows.map(x => x[1]), backgroundColor: pal }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: c => rows[c.dataIndex][0] + '：' + rows[c.dataIndex][1].toLocaleString() + ' 人' } } } }
+    });
+    mkDough('nlTmTypeChart', d.tm_agents.by_type, [gold, blue, muted]);
+    mkDough('nlPtTypeChart', d.pt_agents.by_type, [blue, gold, muted]);
+    // 3) 事務所排行雙 bar
+    const mkBar = (id, rows, color, lbl) => _nlChart(id, {
+      type: 'bar',
+      data: { labels: rows.map(r => r[0]), datasets: [{ label: lbl, data: rows.map(r => r[1]), backgroundColor: color, borderRadius: 3 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true }, y: { ticks: { font: { size: 10 } } } } }
+    });
+    mkBar('nlTmFirmChart', d.tm_agents.top_firms_lawyer, gold, '登錄律師數');
+    mkBar('nlPtFirmChart', d.pt_agents.top_firms, blue, '近3年代理人數');
+  } catch (e) {
+    _nlLoaded = false;
+    const el = document.getElementById('nlKpiTm'); if (el) el.textContent = '載入失敗';
+    console.error('非訟版圖資料載入失敗', e);
   }
 }
 
