@@ -718,7 +718,9 @@ def refresh_stats():
                 'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats',
                 'refresh_judge_changes',
                 # judge_changes 是 TRUNCATE 重建，遷調配對欄要跟著補（migration 084）
-                'refresh_judge_change_transfers'):
+                'refresh_judge_change_transfers',
+                # 官方邊之外，用署名軌跡＋區間重疊防呆補推定轉調（migration 089）
+                'refresh_judge_change_inferred_transfers'):
         print(f'  呼叫 {rpc}() ...')
         r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
