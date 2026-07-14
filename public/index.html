@@ -1550,16 +1550,16 @@
     <div id="tab-judge-changes" class="tab-content">
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
-          &#9888;&#65039; 本頁依<strong>裁判書署名</strong>逐月反推法官在各法院的異動，非官方人事令。已分三類：<strong>進場</strong>（真新進）、<strong>異動</strong>（法院間轉調＝人審會決議<b>官方確認</b> ＋ 署名軌跡<b>推定</b>；推定＝跨院署名時間銜接且區間不重疊、以共署圈防同名誤判）、<strong>退場</strong>（真退場，排除轉出）。官方遷調欄標「（推定）」者即後者。
+          &#9888;&#65039; 本頁依<strong>裁判書署名</strong>逐月反推法官在各法院的異動，非官方人事令。已分三類：<strong>進場</strong>（真新進）、<strong>異動</strong>（法院間轉調＝人審會決議<b>官方確認</b> ＋ 署名軌跡<b>推定</b>；推定＝跨院署名時間銜接且區間不重疊、以共署圈防同名誤判）、<strong>退場</strong>（真退場，排除轉出）。官方遷調欄標「（推定）」者即後者。<b style="color:var(--orange);">注意：進退場是「署名活躍度」的上界，非逐人到職/離職名冊</b>——退場含「休庭未主筆但仍在職」與未廓清的同名續任（約 4 成退場者退場後仍在他院署名）。KPI 副標的「全新／全無後續署名」才是高信心下界。
           「名冊確認」＝已比對司法院現任名冊；「疑似」＝可能為久未掛名或同名，未必為真異動。
           <strong>「官方遷調」欄</strong>已與司法院人審會決議（2019-12 起）比對：退場列標<strong>「&#8594; 調往某院」</strong>者為官方確認轉調（可點連結看決議原文），標<strong>「查無遷調」</strong>者在公告範圍內查無此人自該院之遷調，較可能離開審判職，惟不排除留職停薪／調行政職／借調或同名誤差。
           資料涵蓋至 2026-04（裁判書開放資料晚兩月發布）；官方名冊月快照已自本月起累積，未來提供權威 diff。
         </div>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
-        <div class="kpi-card"><div class="kpi-label">進場</div><div class="kpi-value" id="kpiJchgAppear" style="color:var(--green);">-</div><div class="kpi-sub">真新進（排除轉入）</div></div>
+        <div class="kpi-card"><div class="kpi-label">進場</div><div class="kpi-value" id="kpiJchgAppear" style="color:var(--green);">-</div><div class="kpi-sub" id="kpiJchgAppearSub">真新進（排除轉入）</div></div>
         <div class="kpi-card"><div class="kpi-label">異動</div><div class="kpi-value" id="kpiJchgMove" style="color:var(--blue);">-</div><div class="kpi-sub">法院間轉調（官方＋推定）</div></div>
-        <div class="kpi-card"><div class="kpi-label">退場</div><div class="kpi-value" id="kpiJchgLeave" style="color:var(--red);">-</div><div class="kpi-sub">真退場（排除轉出）</div></div>
+        <div class="kpi-card"><div class="kpi-label">退場</div><div class="kpi-value" id="kpiJchgLeave" style="color:var(--red);">-</div><div class="kpi-sub" id="kpiJchgLeaveSub">真退場（排除轉出）</div></div>
         <div class="kpi-card"><div class="kpi-label">最新資料月</div><div class="kpi-value" id="kpiJchgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">裁判書涵蓋至</div></div>
       </div>
       <div class="search-bar">
@@ -6690,7 +6690,7 @@ async function loadJudgeChanges(force) {
   let all = [], from = 0;
   for (;;) {
     const { data, error } = await db.from('judge_changes')
-      .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url,inferred_to,inferred_from')
+      .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url,inferred_to,inferred_from,cross_court_other_side')
       .order('event_month', { ascending: false }).range(from, from + PAGE - 1);
     if (error) {
       document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="6" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
@@ -6775,12 +6775,21 @@ function renderJudgeChanges() {
   //   進場＝真新進（appear 且非轉入）／異動＝官方轉調（任一側掛遷調邊）／退場＝真退場（leave 且非轉出）
   // 轉調一次會產生「原院退場列(transfer_to)＋新院進場列(transfer_from)」兩筆，皆歸「異動」，
   //   與既有「法院層事件」計數一致（同一人到任/離任本就各算一筆）。
-  const appearN = win.filter(r => jchgCat(r) === 'appear_new').length;
+  const appearRows = win.filter(r => jchgCat(r) === 'appear_new');
+  const leaveRows = win.filter(r => jchgCat(r) === 'leave_true');
+  const appearN = appearRows.length;
   const moveN = win.filter(r => jchgCat(r) === 'move').length;
-  const leaveN = win.filter(r => jchgCat(r) === 'leave_true').length;
+  const leaveN = leaveRows.length;
+  // 高信心下界：另一側無跨院署名者（進場＝到任前從未署名的全新；退場＝退場後全無署名的確定離職）
+  const appearCore = appearRows.filter(r => !r.cross_court_other_side).length;
+  const leaveCore = leaveRows.filter(r => !r.cross_court_other_side).length;
   document.getElementById('kpiJchgAppear').textContent = appearN.toLocaleString();
   document.getElementById('kpiJchgMove').textContent = moveN.toLocaleString();
   document.getElementById('kpiJchgLeave').textContent = leaveN.toLocaleString();
+  document.getElementById('kpiJchgAppearSub').innerHTML =
+    `真新進 · 全新 <b style="color:var(--green);">${appearCore.toLocaleString()}</b>`;
+  document.getElementById('kpiJchgLeaveSub').innerHTML =
+    `真退場 · 全無後續署名 <b style="color:var(--red);">${leaveCore.toLocaleString()}</b>`;
 
   // 排行（按法院聚合，期間內）。異動含官方＋推定；轉入＝進場側、轉出＝退場側
   const inflow = {}, outflow = {}, moveIn = {}, moveOut = {};

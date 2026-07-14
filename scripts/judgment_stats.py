@@ -720,7 +720,9 @@ def refresh_stats():
                 # judge_changes 是 TRUNCATE 重建，遷調配對欄要跟著補（migration 084）
                 'refresh_judge_change_transfers',
                 # 官方邊之外，用署名軌跡＋區間重疊防呆補推定轉調（migration 089）
-                'refresh_judge_change_inferred_transfers'):
+                'refresh_judge_change_inferred_transfers',
+                # 進退場信心旗標：標記另一側是否有跨院署名（migration 090）
+                'refresh_judge_change_confidence_flag'):
         print(f'  呼叫 {rpc}() ...')
         r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
