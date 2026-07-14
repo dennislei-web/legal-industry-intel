@@ -576,19 +576,9 @@
     <div id="tab-overview" class="tab-content active">
       <div class="kpi-grid" id="overviewKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
-          <div class="kpi-label">律師總數（合併）</div>
-          <div class="kpi-value" id="kpiLawyerCount">-</div>
-          <div class="kpi-sub" id="kpiLawyerSub">載入中...</div>
-        </div>
-        <div class="kpi-card">
           <div class="kpi-label">法務部 (MOJ)</div>
           <div class="kpi-value" id="kpiRegistryCount" style="color:var(--purple);">-</div>
           <div class="kpi-sub">現役登錄律師</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">歷史名冊</div>
-          <div class="kpi-value" id="kpiHistoricalCount" style="color:var(--text-muted);">-</div>
-          <div class="kpi-sub">僅見歷史裁判書，推定已離開執業</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">平均出庭數</div>
@@ -3053,15 +3043,8 @@ async function showDashboard() {
 
 async function loadOverviewFast() {
   // 先平行載入最重要的 KPI（不含圖表）
-  const [merged, moj, historical] = await Promise.all([
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }),
-    db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true),
-    db.from('lawyers_with_stats').select('*', { count: 'exact', head: true }).eq('is_historical', true),
-  ]);
-  document.getElementById('kpiLawyerCount').textContent = merged.count?.toLocaleString() || '0';
-  document.getElementById('kpiLawyerSub').textContent = '法務部 + 全聯會 + Lawsnote 去重';
+  const moj = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true);
   document.getElementById('kpiRegistryCount').textContent = moj.count?.toLocaleString() || '0';
-  document.getElementById('kpiHistoricalCount').textContent = historical.count?.toLocaleString() || '0';
 
   // 然後背景載入其餘的（圖表、統計等）
   loadOverview();
@@ -3230,9 +3213,7 @@ async function loadOverview() {
   if (statsCache) statsCache.forEach(s => stats[s.key] = s.value);
 
   // 只在 loadOverviewFast 還沒設過時才用 cache 值（避免覆蓋即時查詢的結果）
-  if (document.getElementById('kpiLawyerCount').textContent === '-') {
-    document.getElementById('kpiLawyerCount').textContent = (stats.total || 0).toLocaleString();
-    document.getElementById('kpiLawyerSub').textContent = '三源去重合併';
+  if (document.getElementById('kpiRegistryCount').textContent === '-') {
     document.getElementById('kpiRegistryCount').textContent = (stats.has_moj || 0).toLocaleString();
   }
 
