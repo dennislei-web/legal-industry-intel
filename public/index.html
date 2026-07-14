@@ -5990,6 +5990,7 @@ function exportLawyerPdf() {
 
   clone.querySelectorAll('a').forEach(a => a.removeAttribute('onclick'));
   clone.querySelectorAll('a.btn').forEach(el => (el.parentElement || el).remove());
+  clone.querySelectorAll('button').forEach(b => b.remove());
   clone.querySelectorAll('[style*="max-height"]').forEach(el => { el.style.maxHeight = 'none'; el.style.overflowY = 'visible'; });
 
   const w = window.open('', '_blank');
