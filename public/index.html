@@ -1041,11 +1041,15 @@
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         法律扶助基金會服務<strong>付不起律師</strong>的中低收入族群——這塊「低端市場」的量與結構，是商業訴訟市場看不到的另一半，與 010 潛在客群邊界重疊。資料源：<strong id="lafSrc">法扶會官方年報</strong>（年更）。
       </div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
-        <div class="kpi-card"><div class="kpi-label">申請案件量</div><div class="kpi-value" id="lafKpiApply">-</div><div class="kpi-sub">2024（含法律諮詢）</div></div>
-        <div class="kpi-card"><div class="kpi-label">准予扶助</div><div class="kpi-value" style="color:var(--green);" id="lafKpiApproved">-</div><div class="kpi-sub">含諮詢及受委託專案</div></div>
-        <div class="kpi-card"><div class="kpi-label">律師承辦案</div><div class="kpi-value" style="color:var(--blue);" id="lafKpiAid">-</div><div class="kpi-sub">扶助案件量（含專案）</div></div>
-        <div class="kpi-card"><div class="kpi-label">法律諮詢</div><div class="kpi-value" style="color:var(--gold);" id="lafKpiConsult">-</div><div class="kpi-sub">件/年</div></div>
+      <div class="sub-tabs" id="lafYearBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:8px;">
+        <div class="kpi-card"><div class="kpi-label">申請案件量（含諮詢）</div><div class="kpi-value" id="lafKpiApply">-</div><div class="kpi-sub" id="lafKpiApplySub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">准予扶助一般案件</div><div class="kpi-value" style="color:var(--green);" id="lafKpiGeneral">-</div><div class="kpi-sub" id="lafKpiGeneralSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">律師承辦案（含專案）</div><div class="kpi-value" style="color:var(--blue);" id="lafKpiAid">-</div><div class="kpi-sub" id="lafKpiAidSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">法律諮詢</div><div class="kpi-value" style="color:var(--gold);" id="lafKpiConsult">-</div><div class="kpi-sub" id="lafKpiConsultSub">-</div></div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:14px;">
+        ※ 四張卡口徑與下方趨勢圖四條線一致，可逐年切換或看 2018–2024 加總；2024 准予扶助<strong>總計</strong>（含諮詢及受委託專案）約 18.4 萬件。下方類型結構／案由 TOP5／受扶助者身分等明細僅 2024 年報有整理，<strong>不隨年份切換</strong>。
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128200; 法扶市場量趨勢（2018–2024）</div>
@@ -5443,7 +5447,7 @@ async function showLawyerDetail(name, certNumber) {
       <table style="width:100%;font-size:0.9rem;">
         <tbody>
           ${row('事務所', firmLink)}
-          ${row('公會/地區', escHtml(region))}
+          ${row('登錄公會', escHtml((moj?.guild_names || []).join('、') || region || '-'))}
           ${row('證號', escHtml(licNo || '-'))}
           ${row('年資', seniority)}
           ${row('出生年齡', age)}
@@ -5452,7 +5456,9 @@ async function showLawyerDetail(name, certNumber) {
           ${moj?.tel ? row('電話', escHtml(moj.tel)) : ''}
           ${moj?.address ? row('地址', escHtml(moj.address)) : ''}
           ${moj?.practice_start_date ? row('執業起始', escHtml(moj.practice_start_date)) : ''}
-          ${l.practice_start_date && l.practice_start_date !== moj?.practice_start_date ? row('本期執業登錄', escHtml(l.practice_start_date) + (l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : '')) : ''}
+          ${l.has_twba && l.practice_start_date
+            ? row('全國執業', `<span style="color:var(--green);font-weight:600;">&#10003; 已登錄</span> <span title="全聯會全國執業名冊之本期登錄效期（換所/換證會重設起日）" style="cursor:help;">${escHtml(l.practice_start_date)}${l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : ''}</span>`)
+            : row('全國執業', '<span style="color:var(--text-muted);" title="全聯會全國執業名冊查無，僅於主區域公會執業">— 未登錄</span>')}
           ${moj?.state_desc && moj.state_desc !== '正常' ? row('狀態', `<span style="color:var(--orange);">${escHtml(moj.state_desc)}</span>`) : ''}
           ${moj?.discipline ? row('懲戒記錄', `<span style="color:var(--red);">⚠ ${escHtml(moj.discipline)}</span>`) : ''}
         </tbody>
@@ -7953,10 +7959,10 @@ async function loadLafOnce() {
     const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
     const PAL = [red, blue, gold, green, '#a06cd5'];
     document.getElementById('lafSrc').textContent = d.source;
-    document.getElementById('lafKpiApply').textContent = (y.apply / 10000).toFixed(0) + ' 萬';
-    document.getElementById('lafKpiApproved').textContent = (y.approved_total / 10000).toFixed(1) + ' 萬';
-    document.getElementById('lafKpiAid').textContent = y.aid_cases.toLocaleString();
-    document.getElementById('lafKpiConsult').textContent = y.consult.toLocaleString();
+    document.getElementById('lafYearBar').innerHTML = t.years.map(yy =>
+      `<button class="sub-tab-btn" data-laf-year="${yy}" onclick="lafSelectYear(${yy})">${yy}</button>`).join('')
+      + `<button class="sub-tab-btn" data-laf-year="sum" onclick="lafSelectYear('sum')">2018–24 加總</button>`;
+    lafSelectYear(d.latest_year || 2024);
     document.getElementById('lafLawyers').textContent = y.aid_lawyers.toLocaleString();
     // 趨勢
     _lafChart('lafTrendChart', {
@@ -7998,6 +8004,33 @@ async function loadLafOnce() {
     console.error('法扶資料載入失敗', e);
   }
 }
+window.lafSelectYear = function(sel) {
+  if (!_lafData) return;
+  document.querySelectorAll('#lafYearBar .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.lafYear === String(sel)));
+  const t = _lafData.trend, ys = t.years;
+  const fields = [['apply', 'lafKpiApply'], ['general', 'lafKpiGeneral'], ['aid_cases', 'lafKpiAid'], ['consult', 'lafKpiConsult']];
+  if (sel === 'sum') {
+    fields.forEach(([k, id]) => {
+      const vals = t[k];
+      const missing = ys.filter((_, i) => vals[i] == null);
+      const total = vals.reduce((s, v) => s + (v || 0), 0);
+      document.getElementById(id).textContent = total.toLocaleString();
+      document.getElementById(id + 'Sub').textContent = missing.length === 0
+        ? '2018–2024 七年加總'
+        : `${ys.length - missing.length} 年加總（年報缺 ${missing.join('、')}）`;
+    });
+  } else {
+    const i = ys.indexOf(Number(sel));
+    fields.forEach(([k, id]) => {
+      const v = t[k][i], prev = i > 0 ? t[k][i - 1] : null;
+      document.getElementById(id).textContent = v == null ? '—' : v.toLocaleString();
+      let sub = sel + ' 年';
+      if (v == null) sub += '（年報未載）';
+      else if (prev != null) { const pct = (v / prev - 1) * 100; sub += `（YoY ${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%）`; }
+      document.getElementById(id + 'Sub').textContent = sub;
+    });
+  }
+};
 window.lafShowCause = function(cat) {
   document.querySelectorAll('#lafCauseTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.lafCause === cat));
   const rows = (_lafData.y2024.cause_top5[cat] || []);
