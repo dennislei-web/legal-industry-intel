@@ -5978,13 +5978,39 @@ function exportLawyerPdf() {
 
   const clone = bodyEl.cloneNode(true);
 
-  // canvas 帶不進新視窗；快照的文字色跟當前主題走，底色也要一起帶，暗色主題下才不會白底配淺字
-  const cardBg = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#ffffff';
+  // 匯出前把三張圖臨時換成亮色（白紙用）重繪、白底合成快照，照完立刻還原目前主題
+  const INK = '#475569', PRINT_GRID = '#d8dee9';
+  const snaps = {};
+  const savedDefaults = { color: Chart.defaults.color, borderColor: Chart.defaults.borderColor };
+  Chart.defaults.color = INK; Chart.defaults.borderColor = PRINT_GRID;
+  const touched = [];
+  ['lwTrend', 'lwCats', 'lwCourts'].forEach(k => {
+    const ch = chartInstances[k];
+    if (!ch || !ch.canvas) return;
+    const saved = [];
+    const setColor = (obj, key) => { if (obj && obj[key] != null) { saved.push([obj, key, obj[key]]); obj[key] = INK; } };
+    Object.values(ch.options.scales || {}).forEach(s => setColor(s.ticks, 'color'));
+    setColor(ch.options.plugins?.legend?.labels, 'color');
+    ch.update('none');
+    ch.draw(); // update 的重繪走 rAF 非同步，快照前必須同步畫一次
+    const c = ch.canvas;
+    const out = document.createElement('canvas');
+    out.width = c.width; out.height = c.height;
+    const g = out.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, out.width, out.height);
+    g.drawImage(c, 0, 0);
+    snaps[c.id] = { url: out.toDataURL('image/png'), w: c.clientWidth || c.width, h: c.clientHeight || c.height };
+    touched.push({ ch, saved });
+  });
+  touched.forEach(({ saved }) => saved.forEach(([o, k, v]) => { o[k] = v; }));
+  Chart.defaults.color = savedDefaults.color; Chart.defaults.borderColor = savedDefaults.borderColor;
+  touched.forEach(({ ch }) => ch.update('none'));
+
   clone.querySelectorAll('canvas').forEach(c => {
-    const live = c.id && document.getElementById(c.id);
+    const s = snaps[c.id];
     const img = document.createElement('img');
-    if (live) img.src = live.toDataURL('image/png');
-    img.style.cssText = `width:100%;background:${cardBg};border-radius:8px;padding:6px;box-sizing:border-box;`;
+    if (s) { img.src = s.url; img.style.aspectRatio = `${s.w} / ${s.h}`; }
+    img.style.width = '100%';
     c.replaceWith(img);
   });
 
@@ -5992,6 +6018,8 @@ function exportLawyerPdf() {
   clone.querySelectorAll('a.btn').forEach(el => (el.parentElement || el).remove());
   clone.querySelectorAll('button').forEach(b => b.remove());
   clone.querySelectorAll('[style*="max-height"]').forEach(el => { el.style.maxHeight = 'none'; el.style.overflowY = 'visible'; });
+  // 報告式版面用金色左槓當小節標題，卡片自帶的 border-left 會撞色，拿掉
+  clone.querySelectorAll('.card[style*="border-left"]').forEach(el => { el.style.borderLeft = 'none'; });
 
   const w = window.open('', '_blank');
   if (!w) { alert('瀏覽器阻擋了彈出視窗，請允許彈出視窗後重試'); return; }
@@ -5999,7 +6027,7 @@ function exportLawyerPdf() {
   w.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
 <title>${escHtml(name)}_律師檔案_${today}</title>
 <style>
-  @page { size: A4; margin: 13mm; }
+  @page { size: A4; margin: 12mm 13mm; }
   :root {
     --bg-main:#ffffff; --bg-card:#ffffff; --bg-row:#f0f2f5; --border:#d0d5dd; --border-light:#e0e4eb;
     --gold:#a3842a; --gold-light:#8b6f1e; --text:#1a1a2e; --text-muted:#6b7280;
@@ -6008,27 +6036,32 @@ function exportLawyerPdf() {
     --purple:#7c3aed; --purple-dim:rgba(124,58,237,0.1); --teal:#0f766e;
   }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { font-family: -apple-system, 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', sans-serif; color: var(--text); margin: 0; font-size: 14px; }
-  .pdf-header { border-bottom: 2px solid var(--gold); padding-bottom: 10px; margin-bottom: 16px; }
-  .pdf-header h1 { margin: 0 0 4px; font-size: 1.5rem; }
-  .pdf-header .sub { font-size: 0.78rem; color: var(--text-muted); }
-  .card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; page-break-inside: avoid; }
-  .card-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  body { font-family: -apple-system, 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', sans-serif; color: var(--text); margin: 0; font-size: 13px; line-height: 1.55; }
+  .pdf-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid var(--gold); padding-bottom: 8px; margin-bottom: 14px; }
+  .pdf-header h1 { margin: 0; font-size: 1.55rem; letter-spacing: 2px; }
+  .pdf-header .sub { font-size: 0.75rem; color: var(--text-muted); text-align: right; line-height: 1.5; }
+  /* 報告式版面：不用卡片外框，讓內容自然跨頁流動 */
+  .card { border: none; border-radius: 0; padding: 0 !important; margin: 0 0 20px !important; }
+  .card-title { font-size: 1rem; font-weight: 700; border-left: 4px solid var(--gold); padding-left: 9px; margin-bottom: 10px; break-after: avoid; page-break-after: avoid; }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
   .badge-green { background: var(--green-dim); color: var(--green); }
   .badge-red { background: var(--red-dim); color: var(--red); }
   .badge-blue { background: var(--blue-dim); color: var(--blue); }
   .badge-orange { background: var(--orange-dim); color: var(--orange); }
   table { width: 100%; border-collapse: collapse; }
-  th { padding: 8px 10px; text-align: left; font-size: 0.72rem; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-row); }
-  td { padding: 7px 10px; font-size: 0.82rem; border-bottom: 1px solid var(--border-light); }
+  thead { display: table-header-group; }
+  th { padding: 7px 10px; text-align: left; font-size: 0.72rem; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-row); }
+  td { padding: 6px 10px; font-size: 0.82rem; border-bottom: 1px solid var(--border-light); }
+  tr { break-inside: avoid; page-break-inside: avoid; }
   a { color: var(--blue); text-decoration: none; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .pdf-foot { margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.7rem; color: var(--text-muted); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; break-inside: avoid; page-break-inside: avoid; }
+  img { break-inside: avoid; page-break-inside: avoid; max-height: 70mm; object-fit: contain; object-position: left center; }
+  .table-wrap { break-inside: auto; }
+  .pdf-foot { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.68rem; color: var(--text-muted); }
 </style></head><body>
 <div class="pdf-header">
   <h1>${escHtml(name)}</h1>
-  <div class="sub">法律產業情報｜律師檔案｜產出日期 ${today}</div>
+  <div class="sub">法律產業情報｜律師檔案<br>產出日期 ${today}</div>
 </div>
 ${clone.innerHTML}
 <div class="pdf-foot">資料來源：法務部律師查詢系統、全國律師聯合會名冊、司法院公開裁判書、政府電子採購網、公開資訊觀測站、Lawsnote。裁判書出庭統計為下限估計（家事裁定等多不公開）。</div>
