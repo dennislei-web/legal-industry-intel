@@ -1083,6 +1083,61 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 調解市場（ADR — 鄉鎮市調解＋法院調解，訴訟市場旁的免費替代品） ==================== -->
+    <div id="tab-adr" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        鄉鎮市調解<strong>免費</strong>、成立經法院核定後<strong>與確定判決同一效力</strong>——是站在訴訟市場旁邊的替代品，不看這塊會誤判紛爭市場總量。資料源：<strong>內政統計通報</strong>（鄉鎮市區調解，年更）＋<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院官方收結件統計</a>（法院端調解）。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">鄉鎮市調解結案</div><div class="kpi-value" id="adrKpiClosed">-</div><div class="kpi-sub">113 年（民國）</div></div>
+        <div class="kpi-card"><div class="kpi-label">調解成立</div><div class="kpi-value" style="color:var(--green);" id="adrKpiSuccess">-</div><div class="kpi-sub" id="adrKpiRateSub">成立率 -</div></div>
+        <div class="kpi-card"><div class="kpi-label">家事法院調解</div><div class="kpi-value" style="color:var(--blue);" id="adrKpiFam">-</div><div class="kpi-sub">114 年地院新收</div></div>
+        <div class="kpi-card"><div class="kpi-label">高院移付調解</div><div class="kpi-value" style="color:var(--gold);" id="adrKpiRef">-</div><div class="kpi-sub" id="adrKpiRefSub">114 年新收</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 鄉鎮市調解量與成立率（近 10 年）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">結案量穩定在 13–15 萬件（110 年 COVID 短暫下探），成立率<strong>連年走高、113 年 83.2% 歷年新高</strong>——免費且有判決效力的紛爭出口，效率還在變好。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="adrTrendChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 量級對照：調解成立 vs 地院訴訟新收</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">鄉鎮市調解每年<strong>成立</strong> 11–12 萬件，量級約為地院民事訴訟新收的 6 成——訴訟市場旁邊一直存在「半個市場」的免費分流，且法院端與調解端<strong>同步成長</strong>，紛爭總量在變大。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="adrCompareChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#128106; 家事戰場：調解是訴訟的 3 倍</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">家事事件<strong>調解前置</strong>，地院家事調解每年約 3 萬件、家事訴訟一審不到 1 萬件——家事紛爭 3/4 的入口在調解室，不在法庭。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="adrFamilyChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128640; 法院端 ADR 化：移付調解十年 8.7 倍</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">高等法院民事<strong>移付調解</strong>從 104 年 608 件成長到 114 年 5,293 件——連已經在打官司的案件，法院都在往調解推。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="adrReferralChart"></canvas></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#129513; 鄉鎮市調解結構（113 年結案）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">刑事佔 2/3、其中<strong>傷害案件佔 90.4%</strong>（車禍為大宗）；民事以<strong>債權債務（67.1%）</strong>為主——與律師市場的案型高度重疊。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="adrTypeChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127961;&#65039; 六都調解量與成立率（113 年）</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">臺中量最大（2.3 萬件）且成立率 96.1% 全國最高；<strong>臺北量最少（6,591 件）</strong>——北部紛爭更傾向直接進法院，中南部先進調解室。</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>縣市</th><th style="text-align:right;">結案件數</th><th style="text-align:right;">成立率</th></tr></thead>
+              <tbody id="adrCityBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 鄉鎮市區調解為內政部統計通報之<strong>結案</strong>口徑（年更、非即時），全國 <strong id="adrDistricts">-</strong> 個鄉鎮市區、<strong id="adrMembers">-</strong> 位調解委員，平均每萬人口聲請 <strong id="adrPer10k">-</strong> 件。法院端為司法院官方 ODS <strong>新收</strong>口徑，僅涵蓋家事調解程序／調解裁定、高院移付調解與智商法院調解；<strong>地院民事聲請調解與勞動調解不在此份資料</strong>，法院端總量實際更高。成立之調解經法院核定後與民事確定判決有同一效力。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 地區市場（供給×需求×活躍度，以選地區為主軸整併） ==================== -->
     <div id="tab-region-market" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -2998,6 +3053,7 @@ const SECTIONS = {
     { tab: 'region-market', label: '地區市場' },
     { tab: 'supply', label: '供給預測' },
     { tab: 'laf', label: '法扶市場' },
+    { tab: 'adr', label: '調解市場' },
     { tab: 'domain', label: '領域版圖' },
     { tab: 'firm-flow', label: '人才流動' },
   ],
@@ -3046,6 +3102,7 @@ function showTab(tab) {
   if (tab === 'region-market') loadRegionMarketOnce();
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
+  if (tab === 'adr') loadAdrOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'offices') loadOffices();
@@ -7949,6 +8006,102 @@ window.lafShowCause = function(cat) {
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
   });
 };
+
+// ===== 調解市場（ADR — 內政統計通報＋司法院官方統計，靜態 data/adr_stats.json）=====
+let _adrLoaded = false;
+const _adrCharts = {};
+function _adrChart(id, cfg) {
+  if (_adrCharts[id]) _adrCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _adrCharts[id] = new Chart(el.getContext('2d'), cfg);
+  requestAnimationFrame(() => { if (_adrCharts[id]) _adrCharts[id].resize(); });
+}
+async function loadAdrOnce() {
+  if (_adrLoaded) return;
+  _adrLoaded = true;
+  try {
+    const d = await (await fetch('data/adr_stats.json?v=' + Date.now())).json();
+    const t = d.town, c = d.court, y = d.y113;
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    document.getElementById('adrKpiClosed').textContent = (y.closed / 10000).toFixed(1) + ' 萬';
+    document.getElementById('adrKpiSuccess').textContent = (y.success / 10000).toFixed(1) + ' 萬';
+    document.getElementById('adrKpiRateSub').textContent = '成立率 ' + y.rate + '%（歷年新高）';
+    document.getElementById('adrKpiFam').textContent = c.family_mediation[c.family_mediation.length - 1].toLocaleString();
+    const refLast = c.hc_civil_referral[c.hc_civil_referral.length - 1];
+    document.getElementById('adrKpiRef').textContent = refLast.toLocaleString();
+    document.getElementById('adrKpiRefSub').textContent = '114 年新收（十年 ×' + (refLast / c.hc_civil_referral[0]).toFixed(1) + '）';
+    document.getElementById('adrDistricts').textContent = y.districts.toLocaleString();
+    document.getElementById('adrMembers').textContent = y.members.toLocaleString();
+    document.getElementById('adrPer10k').textContent = y.per10k_apply;
+    // 1) 鄉鎮市調解量＋成立率（bar + line 雙軸）
+    _adrChart('adrTrendChart', {
+      data: {
+        labels: t.years.map(x => x + '年'),
+        datasets: [
+          { type: 'bar', label: '結案件數', data: t.closed, backgroundColor: muted + '55', yAxisID: 'y', order: 3 },
+          { type: 'bar', label: '調解成立', data: t.success, backgroundColor: green, yAxisID: 'y', order: 2 },
+          { type: 'line', label: '成立率(%)', data: t.rate, borderColor: gold, tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 1 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + (ctx.dataset.yAxisID === 'y2' ? ctx.parsed.y + '%' : ctx.parsed.y.toLocaleString()) } } }, scales: { y: { beginAtZero: true }, y2: { position: 'right', min: 70, max: 90, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } }
+    });
+    // 2) 量級對照（訴訟年份多一年 114，鄉鎮調解以 null 補）
+    _adrChart('adrCompareChart', {
+      type: 'line',
+      data: {
+        labels: c.years.map(x => x + '年'),
+        datasets: [
+          { label: '地院刑事一審新收', data: c.criminal_lit, borderColor: muted, tension: 0.2, pointRadius: 2 },
+          { label: '地院民事訴訟新收', data: c.civil_lit, borderColor: blue, tension: 0.2, pointRadius: 2 },
+          { label: '鄉鎮市調解成立', data: [...t.success, null], borderColor: green, tension: 0.2, pointRadius: 3 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + (ctx.parsed.y == null ? '無資料' : ctx.parsed.y.toLocaleString()) } } }, scales: { y: { beginAtZero: true } } }
+    });
+    // 3) 家事：調解 vs 訴訟
+    _adrChart('adrFamilyChart', {
+      type: 'line',
+      data: {
+        labels: c.years.map(x => x + '年'),
+        datasets: [
+          { label: '家事調解程序(地院新收)', data: c.family_mediation, borderColor: green, tension: 0.2, pointRadius: 3 },
+          { label: '家事訴訟一審(地院新收)', data: c.family_lit, borderColor: blue, tension: 0.2, pointRadius: 2 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
+    });
+    // 4) 法院端移付調解成長
+    _adrChart('adrReferralChart', {
+      type: 'line',
+      data: {
+        labels: c.years.map(x => x + '年'),
+        datasets: [
+          { label: '高院民事移付調解', data: c.hc_civil_referral, borderColor: gold, tension: 0.2, pointRadius: 3 },
+          { label: '高院家事移付調解', data: c.hc_family_referral, borderColor: red, tension: 0.2, pointRadius: 2 },
+          { label: '智商法院調解', data: c.ipc_mediation, borderColor: muted, tension: 0.2, pointRadius: 2 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
+    });
+    // 5) 結構 doughnut（民/刑，tooltip 帶主要案類）
+    const typeTip = i => {
+      const seg = i === 0 ? y.criminal : y.civil;
+      return seg.top.map(x => x[0] + ' ' + x[2] + '%').join('、');
+    };
+    _adrChart('adrTypeChart', {
+      type: 'doughnut',
+      data: { labels: ['刑事 ' + y.criminal.share + '%', '民事 ' + y.civil.share + '%'], datasets: [{ data: [y.criminal.closed, y.civil.closed], backgroundColor: [red, blue] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.parsed.toLocaleString() + ' 件（主要：' + typeTip(ctx.dataIndex) + '）' } } } }
+    });
+    // 6) 六都表
+    document.getElementById('adrCityBody').innerHTML = y.cities.map(r =>
+      `<tr><td>${escHtml(r[0])}</td><td style="text-align:right;">${r[1].toLocaleString()}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${r[2]}%</td></tr>`).join('');
+  } catch (e) {
+    _adrLoaded = false;
+    const el = document.getElementById('adrKpiClosed'); if (el) el.textContent = '載入失敗';
+    console.error('調解市場資料載入失敗', e);
+  }
+}
 
 async function loadSupplyOnce() {
   if (_spLoaded) return;
