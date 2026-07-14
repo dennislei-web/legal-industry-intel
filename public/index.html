@@ -990,6 +990,51 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 供給預測（律師供給端 — 進場趨勢 / 年齡結構 / 退休潮 / 淨供給投影） ==================== -->
+    <div id="tab-supply" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        全站多在看「現在」的訴訟需求；本頁看<strong>供給端</strong>——律師從哪來、年齡結構、退休潮，投影未來供給。資料源：法務部現職名冊（進場日 <code>practice_start_date</code>、出生 <code>birth_year</code>，覆蓋率 99%）。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">現職律師</div><div class="kpi-value" id="spKpiTotal">-</div><div class="kpi-sub">法務部名冊</div></div>
+        <div class="kpi-card"><div class="kpi-label">近5年均進場</div><div class="kpi-value" style="color:var(--blue);" id="spKpiIntake">-</div><div class="kpi-sub">新科律師/年</div></div>
+        <div class="kpi-card"><div class="kpi-label">現 65 歲以上</div><div class="kpi-value" style="color:var(--gold);" id="spKpi65">-</div><div class="kpi-sub" id="spKpi65Pct">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">未來5年退休潮</div><div class="kpi-value" style="color:var(--red);" id="spKpiRetire">-</div><div class="kpi-sub">屆 65 歲人數</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 歷年新科律師進場</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">依現職名冊 <code>practice_start_date</code>。近 10-15 年可靠；早年因離所/退休者不計而低估（存活者偏差）。</div>
+        <div class="chart-container" style="height:300px;"><canvas id="spIntakeChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128101; 現有人力年齡結構</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">中位數約 43 歲。<code>birth_year</code> 為民國年，年齡＝當年－(birth_year+1911)。</div>
+        <div class="chart-container" style="height:300px;"><canvas id="spAgeChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127794; 退休潮 — 未來 10 年每年屆 65 歲人數</div>
+        <div class="chart-container" style="height:300px;"><canvas id="spRetireChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128302; 淨供給投影（情境模型）</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:10px 0 4px;font-size:0.85rem;">
+          <label>年進場數：<strong id="spIntakeVal">573</strong>
+            <input type="range" id="spIntakeSlider" min="200" max="1000" step="10" value="573" style="vertical-align:middle;width:160px;">
+          </label>
+          <label>假設退休年齡：<strong id="spRetAgeVal">65</strong>
+            <input type="range" id="spRetAgeSlider" min="60" max="75" step="1" value="65" style="vertical-align:middle;width:120px;">
+          </label>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          驅動式情境，非預測。淨供給(年) = 上年 + 年進場數 － 當年屆退休年齡人數。未計死亡/中途離業等其他流失（會使實際供給再低一些）。
+        </div>
+        <div class="chart-container" style="height:320px;"><canvas id="spProjChart"></canvas></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 現職名冊為存活者樣本；「屆 65」假設一律退休，但實務上約 <span id="spOver65Note">-</span> 仍在執業，故退休潮為上限估計。考選部報考/及格數（更前緣的領先指標）可後續接入。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 地區市場（供給×需求×活躍度，以選地區為主軸整併） ==================== -->
     <div id="tab-region-market" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -2902,6 +2947,7 @@ const SECTIONS = {
   industry: [
     { tab: 'market', label: '訴訟市場趨勢' },
     { tab: 'region-market', label: '地區市場' },
+    { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '領域版圖' },
     { tab: 'firm-flow', label: '人才流動' },
   ],
@@ -2948,6 +2994,7 @@ function showTab(tab) {
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'firm-flow') loadFirmFlowOnce();
   if (tab === 'region-market') loadRegionMarketOnce();
+  if (tab === 'supply') loadSupplyOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'offices') loadOffices();
@@ -2972,8 +3019,8 @@ function buildSectionIndex(container) {
   if (!container || container.querySelector('.ff-toggle')) return;
   const old = container.querySelector(':scope > .sec-index');
   if (old) old.remove();
-  const cards = Array.from(container.querySelectorAll('.chart-card')).filter(c => {
-    const t = c.querySelector(':scope > .chart-title');
+  const cards = Array.from(container.querySelectorAll('.chart-card, .card')).filter(c => {
+    const t = c.querySelector(':scope > .chart-title, :scope > .card-title');
     return t && t.textContent.trim();
   });
   if (cards.length < 2) return;
@@ -2982,7 +3029,7 @@ function buildSectionIndex(container) {
   bar.innerHTML = '<span class="sec-index-label">&#128278; 本頁區塊：</span>';
   cards.forEach((card, i) => {
     if (!card.id) card.id = (container.id || 'tab') + '_sec' + i;
-    const raw = card.querySelector(':scope > .chart-title').textContent.trim().replace(/\s+/g, ' ');
+    const raw = card.querySelector(':scope > .chart-title, :scope > .card-title').textContent.trim().replace(/\s+/g, ' ');
     const chip = document.createElement('button');
     chip.className = 'sec-chip';
     chip.textContent = raw.length > 16 ? raw.slice(0, 15) + '…' : raw;
@@ -7649,6 +7696,89 @@ async function loadFirmFlowOnce() {
 let _rmLoaded = false, _rmRegion = null, _rmYear = null, _rmCat = null, _rmRows = [], _rmTotalLawyers = 0;
 const RM_CATS = [null, '民事', '刑事', '家事', '行政', '少年'];
 const RM_YEARS = [null, 2026, 2025, 2024, 2023, 2022, 2021, 2020];
+
+// ===== 供給預測（律師供給端：進場趨勢/年齡結構/退休潮/淨供給投影，RPC lawyer_supply_stats）=====
+let _spLoaded = false, _spData = null, _spAgeMap = null;
+const _spCharts = {};
+function _spVar(n) { return getComputedStyle(document.body).getPropertyValue(n).trim() || '#888'; }
+function _spNewChart(id, cfg) {
+  if (_spCharts[id]) _spCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _spCharts[id] = new Chart(el.getContext('2d'), cfg);
+  // 保險：若建圖時容器尚未 reflow（0 寬），下一 frame 重算尺寸
+  requestAnimationFrame(() => { if (_spCharts[id]) _spCharts[id].resize(); });
+}
+async function loadSupplyOnce() {
+  if (_spLoaded) return;
+  _spLoaded = true;
+  try {
+    const { data, error } = await db.rpc('lawyer_supply_stats');
+    if (error) throw error;
+    _spData = data;
+    _spAgeMap = {}; (data.age_hist || []).forEach(x => { _spAgeMap[x.age] = x.n; });
+    renderSupply();
+    const s1 = document.getElementById('spIntakeSlider'), s2 = document.getElementById('spRetAgeSlider');
+    if (s1) s1.oninput = () => { document.getElementById('spIntakeVal').textContent = s1.value; renderSupplyProjection(); };
+    if (s2) s2.oninput = () => { document.getElementById('spRetAgeVal').textContent = s2.value; renderSupplyProjection(); };
+    if (s1) s1.value = data.recent_intake_avg || 573;
+    if (document.getElementById('spIntakeVal')) document.getElementById('spIntakeVal').textContent = (data.recent_intake_avg || 573);
+  } catch (e) {
+    _spLoaded = false;
+    const el = document.getElementById('spKpiTotal'); if (el) el.textContent = '載入失敗';
+    console.error('供給預測載入失敗', e);
+  }
+}
+function renderSupply() {
+  const d = _spData, ny = d.anchor_year_ad, blue = _spVar('--blue'), gold = _spVar('--gold'), red = _spVar('--red'), muted = _spVar('--text-muted');
+  const over65 = Object.entries(_spAgeMap).reduce((s, [a, n]) => s + (+a >= 65 ? n : 0), 0);
+  const retire5 = [60, 61, 62, 63, 64].reduce((s, a) => s + (_spAgeMap[a] || 0), 0);
+  document.getElementById('spKpiTotal').textContent = d.total_active.toLocaleString();
+  document.getElementById('spKpiIntake').textContent = (d.recent_intake_avg || '-');
+  document.getElementById('spKpi65').textContent = over65.toLocaleString();
+  document.getElementById('spKpi65Pct').textContent = '佔 ' + (100 * over65 / d.total_active).toFixed(1) + '%';
+  document.getElementById('spKpiRetire').textContent = retire5.toLocaleString();
+  const o65 = document.getElementById('spOver65Note'); if (o65) o65.textContent = over65.toLocaleString() + ' 位 65 歲以上';
+  // 1. 進場趨勢
+  const iby = d.intake_by_year || [];
+  _spNewChart('spIntakeChart', {
+    type: 'bar',
+    data: { labels: iby.map(x => x.year), datasets: [{ label: '新科律師進場', data: iby.map(x => x.n), backgroundColor: blue, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+  // 2. 年齡結構（單齡長條）
+  const ages = (d.age_hist || []);
+  _spNewChart('spAgeChart', {
+    type: 'bar',
+    data: { labels: ages.map(x => x.age), datasets: [{ label: '人數', data: ages.map(x => x.n), backgroundColor: ages.map(x => x.age >= 65 ? red : x.age >= 60 ? gold : blue) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { title: c => c[0].label + ' 歲' } } }, scales: { x: { title: { display: true, text: '年齡（歲）' }, ticks: { maxTicksLimit: 20 } }, y: { beginAtZero: true } } }
+  });
+  // 3. 退休潮（未來10年每年屆65）
+  const rl = [], rn = [];
+  for (let k = 1; k <= 10; k++) { rl.push(ny + k); rn.push(_spAgeMap[65 - k] || 0); }
+  _spNewChart('spRetireChart', {
+    type: 'bar',
+    data: { labels: rl, datasets: [{ label: '屆 65 歲人數', data: rn, backgroundColor: gold, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+  renderSupplyProjection();
+}
+function renderSupplyProjection() {
+  const d = _spData, ny = d.anchor_year_ad, green = _spVar('--green'), muted = _spVar('--text-muted');
+  const intake = +(document.getElementById('spIntakeSlider') || {}).value || d.recent_intake_avg || 573;
+  const retAge = +(document.getElementById('spRetAgeSlider') || {}).value || 65;
+  const labels = [ny], pool = [d.total_active];
+  let p = d.total_active;
+  for (let k = 1; k <= 10; k++) {
+    const retiring = _spAgeMap[retAge - k] || 0; // 今年 retAge-k 歲者，第 k 年屆 retAge
+    p = p + intake - retiring;
+    labels.push(ny + k); pool.push(Math.round(p));
+  }
+  _spNewChart('spProjChart', {
+    type: 'line',
+    data: { labels, datasets: [{ label: '淨供給（現職律師數）', data: pool, borderColor: green, backgroundColor: 'rgba(76,175,130,0.12)', fill: true, tension: 0.25, pointRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toLocaleString() + ' 人' } } }, scales: { y: { beginAtZero: false } } }
+  });
+}
 
 async function loadRegionMarketOnce() {
   if (_rmLoaded) return;
