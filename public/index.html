@@ -1507,17 +1507,21 @@
           <div id="chgNet" class="loading">載入中</div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">&#128260; 異動明細</div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>日期</th><th>律師</th><th>類型</th><th>異動內容</th></tr>
-            </thead>
-            <tbody id="chgTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-          </table>
+      <div class="card" id="chgDetailCard">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128260; 異動明細
         </div>
-        <div class="pagination" id="chgPagination"></div>
+        <div class="ff-body" style="display:none;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>日期</th><th>律師</th><th>類型</th><th>異動內容</th></tr>
+              </thead>
+              <tbody id="chgTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="chgPagination"></div>
+        </div>
       </div>
 
       <!-- ===== 事務所人才流動（原產業分析「人才流動」頁併入，累積口徑、分所歸戶）===== -->
@@ -6209,7 +6213,14 @@ async function loadChanges(force) {
   renderChanges();
 }
 
-function filterChanges() { chgPage = 0; chgRankPage = { inflow: 0, outflow: 0, net: 0 }; renderChanges(); }
+function filterChanges() { chgPage = 0; chgRankPage = { inflow: 0, outflow: 0, net: 0 }; chgExpandDetail(); renderChanges(); }
+
+// 異動明細預設收合；使用者搜尋或選類型時自動展開（否則篩了看不到結果）
+function chgExpandDetail() {
+  const card = document.getElementById('chgDetailCard');
+  const body = card && card.querySelector(':scope > .ff-body');
+  if (body && body.style.display === 'none') toggleFf(card.querySelector('.ff-toggle'));
+}
 
 function chgRankNav(key, page) { chgRankPage[key] = page; renderChanges(); }
 
