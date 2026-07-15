@@ -4772,6 +4772,15 @@ async function showFirmDetail(firmName) {
   const govAmtSum = govWins.reduce((s, r) => s + (r.award_amount || 0), 0);
   const govWins5 = govWins.filter(r => r.gov_tenders.award_year >= new Date().getFullYear() - 4);
 
+  // 商標/專利代理件數（tipo_firm_stats，mig 092；含分所 LIKE prefix）
+  let tipoFm = [];
+  try {
+    const { data: tf } = await db.from('tipo_firm_stats')
+      .select('kind,year_tw,cases,agents_n')
+      .or(`firm.eq.${firmName},firm.like.${firmName}%`);
+    tipoFm = tf || [];
+  } catch (e) { console.log('firm tipo stats error:', e); }
+
   // 官方訴訟戰力排除同名不明者與已除名者（已除名＝非現任名冊，口徑同人數統計）
   const litLawyers = firmStats.filter(s => !s.name_ambiguous && !deregNames.has(s.name));
   const litAgg5 = computeFirmLitAgg(litLawyers.map(s => ({
@@ -4906,6 +4915,8 @@ async function showFirmDetail(firmName) {
       </div>` : '<div style="font-size:0.82rem;color:var(--text-muted);">有投標紀錄但尚無得標。</div>'}
     </div>
     ` : ''}
+
+    ${renderTipoAgencyCard(tipoFm, { withAgents: true, note: '事務所歸戶依現行代理人名簿之執業處所（現任口徑），名簿外代理人不計入' })}
 
     ${branchList.length > 1 ? `<div style="margin-bottom:12px;font-size:0.82rem;color:var(--text-muted);">含分所：${branchList.map(([n, c]) => `${firmLink(n, 'color:var(--text-muted);')} (${c}人)`).join('、')}</div>` : ''}
 
@@ -5413,11 +5424,13 @@ async function showLawyerDetail(name, certNumber) {
   const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [];
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('tipo_agent_stats').select('kind,year_tw,cases').eq('agent_name', name)
+      .then(r => { tipoAg = r.data || []; }),
     db.from('gov_lawyer_tenders').select('*').eq('lawyer_name', name)
       .then(r => { govTen = r.data || []; }),
     db.from('lawyer_indep_directorships').select('*').eq('person_name', name)
@@ -5559,6 +5572,8 @@ async function showLawyerDetail(name, certNumber) {
       </div>` : '<div style="font-size:0.82rem;color:var(--text-muted);">有投標紀錄但尚無得標。</div>'}
     </div>
     ` : ''}
+
+    ${renderTipoAgencyCard(tipoAg, { note: l.name_ambiguous ? '&#9888; 名冊中有同名律師，以姓名比對之代理件數為同名合併' : '' })}
 
     ${stat?.cases_total ? `
     <div class="card" style="margin-bottom:16px;">
@@ -5975,6 +5990,37 @@ const CONC_TIERS = {
   C: { label: '客源分散｜一般執業', color: 'var(--green)', desc: '客源分散，屬一般對外執業型態' },
   D: { label: '樣本不足', color: 'var(--text-muted)', desc: '近 12 個月出庭少於 3 件，無法判讀集中度' },
 };
+
+// 商標/專利代理件數卡（tipo_agent_stats / tipo_firm_stats，mig 092；律師與事務所 modal 共用）
+// rows: [{kind:'tm'|'pt', year_tw, cases[, agents_n]}]；opts.withAgents 加「代理人數」欄；opts.note 補充警語
+function renderTipoAgencyCard(rows, opts = {}) {
+  if (!rows || !rows.length) return '';
+  const YEARS = [112, 113, 114, 115];
+  const kinds = [['tm', '商標申請'], ['pt', '專利']];
+  const body = kinds.map(([k, lbl]) => {
+    const kr = rows.filter(r => r.kind === k);
+    if (!kr.length) return '';
+    const total = kr.reduce((s, r) => s + r.cases, 0);
+    const tds = YEARS.map(y => {
+      const m = kr.filter(r => r.year_tw === y).reduce((s, r) => s + r.cases, 0);
+      return `<td style="text-align:right;">${m ? m.toLocaleString() : '-'}</td>`;
+    }).join('');
+    const agentsTd = opts.withAgents ? `<td style="text-align:right;">${Math.max(...kr.map(r => r.agents_n || 0)) || '-'}</td>` : '';
+    return `<tr><td>${lbl}</td>${tds}<td style="text-align:right;font-weight:700;color:var(--purple,#7c3aed);">${total.toLocaleString()}</td>${agentsTd}</tr>`;
+  }).join('');
+  return `
+    <div class="card" style="border-left:3px solid var(--purple,#7c3aed);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--purple,#7c3aed);"><span style="display:inline-block;font-size:0.7em;padding:2px 4px;border:1px solid currentColor;border-radius:4px;vertical-align:middle;">智</span> 商標／專利代理件數（智慧局逐案統計）</div>
+      ${opts.note ? `<div style="font-size:0.75rem;color:var(--orange);margin-bottom:6px;">${opts.note}</div>` : ''}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>類型</th><th style="text-align:right;">112</th><th style="text-align:right;">113</th><th style="text-align:right;">114</th><th style="text-align:right;">115<span style="font-weight:400;font-size:0.7rem;">(進行)</span></th><th style="text-align:right;">合計</th>${opts.withAgents ? '<th style="text-align:right;">代理人數</th>' : ''}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">年份＝申請年（民國）；同一案多位代理人各記 1 件。專利＝發明公開＋新型/設計公告，<strong>發明公開滯後約 18 個月、114 年起不完整</strong>。詳見產業分析「非訟版圖」。</div>
+    </div>`;
+}
 
 // 上市櫃/興櫃獨董席次卡（lawyer_indep_directorships，MOPS t187ap30 簡歷覆核後資料）
 const INDEP_MKT_LBL = { listed: '上市', otc: '上櫃', emerging: '興櫃' };
