@@ -1319,6 +1319,64 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 公證市場（民間公證人 — 供給/價格雙管制的特許市場，司法院名冊全量＋統計月報） ==================== -->
+    <div id="tab-notary" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        2001 年公證法雙軌制後，公證業務由<strong>法院公證處＋民間公證人</strong>並行——這是一個<strong>供給管制</strong>（專技考試年錄取個位數）＋<strong>價格管制</strong>（公證法明定費率）的特許市場，也是強制執行、繼承、租賃等案件的<strong>訴訟前端入口</strong>。資料源：<a href="https://www.judicial.gov.tw/tw/lp-152-1.html" target="_blank" style="color:var(--blue);">司法院民間公證人名冊</a>（全量 518 筆登錄紀錄）＋司法院統計月報＋<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=B0010010" target="_blank" style="color:var(--blue);">公證法</a>費用章。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">現職民間公證人</div><div class="kpi-value" id="ntKpiActive">-</div><div class="kpi-sub" id="ntKpiActiveSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">臺北轄區佔比</div><div class="kpi-value" style="color:var(--blue);" id="ntKpiTaipei">-</div><div class="kpi-sub" id="ntKpiTaipeiSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">法院公證處事件</div><div class="kpi-value" style="color:var(--gold);" id="ntKpiCourt">-</div><div class="kpi-sub" id="ntKpiCourtSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">114 年考試錄取</div><div class="kpi-value" style="color:var(--green);" id="ntKpiExam">-</div><div class="kpi-sub" id="ntKpiExamSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128201; 法院公證處事件量（近 11 年）——量往民間移轉</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">地方法院公證處辦理事件（<strong>不含民間公證人</strong>）十年 <strong>-30%</strong>：109 年 COVID 谷底後回升又回落——雙軌制的設計目的就是把量移給民間，這條下行曲線就是移轉的證據。制度立法時全國法院年辦公認證約 60–70 萬件，如今法院端僅剩 6.7 萬件，<strong>大宗量體已在民間公證人手上</strong>。</div>
+        <div class="chart-container" style="height:300px;"><canvas id="ntCourtChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#128506;&#65039; 各轄區現職分布——臺北一區佔 44%</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">全職集中六都；<strong>15 個非核心轄區合計僅 53 位全職</strong>（雲林 4、南投 2、澎湖 2、金馬各 1）——地方公證需求的外溢是空白帶。</div>
+          <div class="chart-container" style="height:420px;"><canvas id="ntRegionChart"></canvas></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">&#129517; 兼職＝律師的「半張執照」</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">與法務部律師名冊姓名比對：<strong>兼職公證人 96% 是執業律師</strong>（103/107），但依名冊登載「僅辦理文書認證」，碰不到公證書業務（租賃逕受強制執行、遺囑等）；全職者僅 11%（23/218）在律師名冊——多為公證人考試／法院公證人轉任出身。※ 同名同姓可能略高估。</div>
+            <div class="chart-container" style="height:200px;"><canvas id="ntOverlapChart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">&#128176; 法定公證費（公證法 §109 起）</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">認證費為公證費之<strong>半數</strong>（§120）、<strong>逕受強制執行加收 1/2</strong>（§119）、夜間假日加收 1/2（§122）——費率法定＝無定價權，營收天花板＝件數×費率。</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>標的金額</th><th style="text-align:right;">公證費（元）</th></tr></thead>
+              <tbody id="ntFeeBody"></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#128200; 現職者證書年度分布——90/91 年開辦潮＋近年回補</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">民國 90–91 年雙軌制開辦首波遴任後，每年進場個位數到二十餘人（含遷移轄區換證）；考試端 111 年錄取 11 人、114 年僅 6 人——<strong>供給天花板被制度鎖死</strong>，歷來另有 176 筆註銷（辭職／屆齡／遷移）。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="ntCertYearChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127970; 個人所天花板——沒有規模化玩家</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><span id="ntOfficeStat">-</span>——最大聯合所也只有 6 位公證人。法定費率×個人產能＝單人天花板；以日辦 6–10 件、混合均價 800–1,500 元粗估，民間端年營收約 <strong>3–9 億元</strong>、人均 130–380 萬（推估，非官方數字）。</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>聯合事務所（2 人以上）</th><th style="text-align:right;">公證人數</th></tr></thead>
+            <tbody id="ntJointBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 名冊為司法院登錄全量（<span id="ntRosterMeta">-</span>），「證書年度」含遷移轄區換證、非嚴格等於新任年。<strong>民間公證人年度事件量司法院僅於統計年報揭露、尚未取得公開表格</strong>，本頁民間端規模為推估；法院端為統計月報「地方法院辦理公證事件」口徑。公證書就強制執行事項有執行名義效力（拿到即可聲請強制執行、免訴訟）——公證是強制執行／繼承／租賃案件的上游入口。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 商標專利（商標/專利代理 — 不打官司的律師市場，TIPO 名簿＋年報統計） ==================== -->
     <div id="tab-nonlit" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -3218,6 +3276,7 @@ const SECTIONS = {
     { tab: 'domain', label: '訴訟市場' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解市場' },
+    { tab: 'notary', label: '公證市場' },
     { tab: 'nonlit', label: '商標專利' },
   ],
   sources: [],
@@ -3264,6 +3323,7 @@ function showTab(tab) {
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
   if (tab === 'adr') loadAdrOnce();
+  if (tab === 'notary') loadNotaryOnce();
   if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'overview') loadLawyerRankCardsOnce();
@@ -8602,6 +8662,87 @@ async function loadAdrOnce() {
     _adrLoaded = false;
     const el = document.getElementById('adrKpiClosed'); if (el) el.textContent = '載入失敗';
     console.error('調解市場資料載入失敗', e);
+  }
+}
+
+// ===== 公證市場（民間公證人 — 司法院名冊全量＋統計月報，靜態 data/notary_stats.json）=====
+let _ntLoaded = false;
+const _ntCharts = {};
+function _ntChart(id, cfg) {
+  if (_ntCharts[id]) _ntCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _ntCharts[id] = new Chart(el.getContext('2d'), cfg);
+  requestAnimationFrame(() => { if (_ntCharts[id]) _ntCharts[id].resize(); });
+}
+async function loadNotaryOnce() {
+  if (_ntLoaded) return;
+  _ntLoaded = true;
+  try {
+    const d = await (await fetch('data/notary_stats.json?v=' + Date.now())).json();
+    const s = d.supply, cn = d.court_notarization;
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    // KPI
+    document.getElementById('ntKpiActive').textContent = s.active.toLocaleString();
+    document.getElementById('ntKpiActiveSub').textContent = `全職 ${s.full}／兼職 ${s.part}`;
+    const tp = s.regions.find(r => r[0] === '臺北');
+    const tpN = tp[1] + tp[2];
+    document.getElementById('ntKpiTaipei').textContent = Math.round(tpN / s.active * 100) + '%';
+    document.getElementById('ntKpiTaipeiSub').textContent = `${tpN} 位（全職 ${tp[1]}）`;
+    const lastC = cn.counts[cn.counts.length - 1];
+    document.getElementById('ntKpiCourt').textContent = (lastC / 10000).toFixed(1) + ' 萬';
+    document.getElementById('ntKpiCourtSub').textContent = `${cn.years[cn.years.length - 1]} 年（十年 ${Math.round((lastC / cn.counts[0] - 1) * 100)}%）`;
+    const ex = d.exam[d.exam.length - 1];
+    document.getElementById('ntKpiExam').textContent = ex.passed + ' 人';
+    document.getElementById('ntKpiExamSub').textContent = `${ex.takers} 人到考（${d.exam[0].year} 年錄取 ${d.exam[0].passed}）`;
+    document.getElementById('ntRosterMeta').textContent = `${d.meta.total_records} 筆、${d.meta.roster_date} 爬取`;
+    document.getElementById('ntOfficeStat').textContent = `${s.full} 位全職分布在 ${s.offices_full} 間事務所，2 人以上聯合所僅 ${s.offices_multi} 間`;
+    // 1) 法院公證事件趨勢
+    _ntChart('ntCourtChart', {
+      type: 'bar',
+      data: {
+        labels: cn.years.map(y => y + '年'),
+        datasets: [{ label: '地方法院辦理公證事件', data: cn.counts, backgroundColor: gold + '99', borderColor: gold, borderWidth: 1 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString() + ' 件' } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '萬' } } } }
+    });
+    // 2) 地區分布（橫向堆疊）
+    _ntChart('ntRegionChart', {
+      type: 'bar',
+      data: {
+        labels: s.regions.map(r => r[0]),
+        datasets: [
+          { label: '全職', data: s.regions.map(r => r[1]), backgroundColor: blue, stack: 's' },
+          { label: '兼職（僅認證）', data: s.regions.map(r => r[2]), backgroundColor: muted + '88', stack: 's' }
+        ]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { x: { beginAtZero: true }, y: { ticks: { font: { size: 10 }, autoSkip: false } } } }
+    });
+    // 3) 律師名冊重疊（雙 bar 百分比）
+    const ov = s.lawyer_overlap;
+    _ntChart('ntOverlapChart', {
+      type: 'bar',
+      data: {
+        labels: ['兼職公證人', '全職公證人'],
+        datasets: [{ label: '姓名見於法務部律師名冊', data: [Math.round(ov.part[0] / ov.part[1] * 100), Math.round(ov.full[0] / ov.full[1] * 100)], backgroundColor: [green, blue] }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + '%（' + (ctx.dataIndex === 0 ? ov.part[0] + '/' + ov.part[1] : ov.full[0] + '/' + ov.full[1]) + '）' } } }, scales: { x: { min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+    });
+    // 4) 證書年度分布
+    const cy = s.cert_years;
+    _ntChart('ntCertYearChart', {
+      type: 'bar',
+      data: { labels: cy.years.map(y => y + ''), datasets: [{ label: '現職者證書年度（民國）', data: cy.counts, backgroundColor: green + '99', borderColor: green, borderWidth: 1 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true } } }
+    });
+    // 5) 費用表 + 聯合所表
+    document.getElementById('ntFeeBody').innerHTML = d.fees.map(r =>
+      `<tr><td>${r[0]}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${r[1]}</td></tr>`).join('');
+    document.getElementById('ntJointBody').innerHTML = s.top_joint.map(r =>
+      `<tr><td>${escHtml(r[0])}</td><td style="text-align:right;">${r[1]}</td></tr>`).join('');
+  } catch (e) {
+    _ntLoaded = false;
+    const el = document.getElementById('ntKpiActive'); if (el) el.textContent = '載入失敗';
+    console.error('公證市場資料載入失敗', e);
   }
 }
 
