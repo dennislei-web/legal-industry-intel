@@ -664,9 +664,15 @@
           <div class="card-title">&#128142; 跨界影響力 — 獨董與政府標案</div>
           <div style="font-size:0.78rem;font-weight:600;color:var(--gold);margin:6px 0 4px;">上市櫃獨立董事席次 TOP 10</div>
           <div id="lwIndepList"><div class="loading">載入中</div></div>
-          <div style="font-size:0.78rem;font-weight:600;color:var(--blue);margin:14px 0 4px;">政府標案得標 TOP 10</div>
+          <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px;">
+            <span style="font-size:0.78rem;font-weight:600;color:var(--blue);">政府標案得標 TOP 10</span>
+            <div class="sub-tabs" id="lwGovTabs" style="display:flex;gap:4px;">
+              <button class="sub-tab-btn active" data-sort="wins">標數</button>
+              <button class="sub-tab-btn" data-sort="amount">金額</button>
+            </div>
+          </div>
           <div id="lwGovList"><div class="loading">載入中</div></div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次（含興櫃）；標案＝一人所＋個人名義投標歸戶，同名律師會合併。</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次（含興櫃）；標案＝一人所＋個人名義投標歸戶，同名律師會合併；金額僅計已公開決標者。</div>
         </div>
       </div>
     </div>
@@ -855,9 +861,15 @@
           <div class="card-title">&#128142; 跨界影響力 — 獨董與政府標案</div>
           <div style="font-size:0.78rem;font-weight:600;color:var(--gold);margin:6px 0 4px;">上市櫃獨董席次 TOP 10 事務所</div>
           <div id="foIndepList"><div class="loading">載入中</div></div>
-          <div style="font-size:0.78rem;font-weight:600;color:var(--blue);margin:14px 0 4px;">政府標案得標 TOP 10 事務所</div>
+          <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px;">
+            <span style="font-size:0.78rem;font-weight:600;color:var(--blue);">政府標案得標 TOP 10 事務所</span>
+            <div class="sub-tabs" id="foGovTabs" style="display:flex;gap:4px;">
+              <button class="sub-tab-btn active" data-sort="wins">標數</button>
+              <button class="sub-tab-btn" data-sort="amount">金額</button>
+            </div>
+          </div>
           <div id="foGovList"><div class="loading">載入中</div></div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次歸戶現任所；標案＝投標名稱截到「事務所」歸戶（分所合併）。</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次歸戶現任所；標案＝投標名稱截到「事務所」歸戶（分所合併）；金額僅計已公開決標者。</div>
         </div>
       </div>
     </div>
@@ -3654,6 +3666,7 @@ function loadLawyerRankCardsOnce() {
   initTipoCard('lwTipoTabs', 'lwTipoList', 'lwTipoYear', false);
   loadLwIndep();
   loadLwGov();
+  wireGovSortTabs('lwGovTabs', loadLwGov);
 }
 
 // 近 5 年出庭 TOP 10（lawyer_judgment_stats，mig 046；同名合併值）
@@ -3792,17 +3805,35 @@ async function loadLwIndep() {
   } catch (e) { box.innerHTML = rankFailMsg(e); }
 }
 
-// 政府標案得標律師榜（gov_top_lawyers RPC，mig 093）
-async function loadLwGov() {
+// 政府標案卡「標數/金額」切換共用接線
+function wireGovSortTabs(tabsId, loader) {
+  document.querySelectorAll('#' + tabsId + ' .sub-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#' + tabsId + ' .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loader(btn.dataset.sort);
+    };
+  });
+}
+
+// 政府標案得標律師榜（gov_top_lawyers RPC，mig 093/094）；sort: wins=標數、amount=金額
+async function loadLwGov(sort = 'wins') {
   const box = document.getElementById('lwGovList');
+  box.innerHTML = '<div class="loading">載入中</div>';
   try {
-    const { data, error } = await db.rpc('gov_top_lawyers', { p_limit: 10 });
+    const { data, error } = await db.rpc('gov_top_lawyers', { p_limit: 10, p_sort: sort });
     if (error) throw error;
+    const byAmt = sort === 'amount';
     box.innerHTML = rankListHtml(data || [], {
-      value: r => Number(r.wins),
+      value: r => Number(byAmt ? r.total_amount || 0 : r.wins),
       label: r => lwNameLink(r.name),
-      sub: r => (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '') + (r.last_win_year ? `｜最近 ${r.last_win_year}` : ''),
-      text: r => Number(r.wins) + ' 標',
+      sub: r => (byAmt
+        ? Number(r.wins) + ' 標'
+        : (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '金額未公開'))
+        + (r.last_win_year ? `｜最近 ${r.last_win_year}` : ''),
+      text: r => byAmt
+        ? (r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開')
+        : Number(r.wins) + ' 標',
     });
   } catch (e) { box.innerHTML = rankFailMsg(e); }
 }
@@ -3819,6 +3850,7 @@ function loadFirmOverviewOnce() {
   initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
   loadFoIndep();
   loadFoGov();
+  wireGovSortTabs('foGovTabs', loadFoGov);
 }
 
 // 人才流動快照（firm_flow_ranking RPC 前 5；完整版在異動追蹤）
@@ -3865,19 +3897,28 @@ async function loadFoIndep() {
   } catch (e) { box.innerHTML = rankFailMsg(e); }
 }
 
-// 政府標案得標 TOP 10 事務所（gov_firm_stats view，mig 077）
-async function loadFoGov() {
+// 政府標案得標 TOP 10 事務所（gov_firm_stats view，mig 077）；sort: wins=標數、amount=金額
+async function loadFoGov(sort = 'wins') {
   const box = document.getElementById('foGovList');
+  box.innerHTML = '<div class="loading">載入中</div>';
   try {
+    const byAmt = sort === 'amount';
     const { data, error } = await db.from('gov_firm_stats')
       .select('firm_key, wins, total_amount, wins_5y').gt('wins', 0)
-      .order('wins', { ascending: false }).limit(10);
+      .order(byAmt ? 'total_amount' : 'wins', { ascending: false, nullsFirst: false })
+      .order(byAmt ? 'wins' : 'total_amount', { ascending: false, nullsFirst: false })
+      .limit(10);
     if (error) throw error;
     box.innerHTML = rankListHtml(data || [], {
-      value: r => Number(r.wins),
+      value: r => Number(byAmt ? r.total_amount || 0 : r.wins),
       label: r => firmLink(r.firm_key),
-      sub: r => (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '') + (r.wins_5y ? `｜近5年 ${r.wins_5y}` : ''),
-      text: r => Number(r.wins) + ' 標',
+      sub: r => (byAmt
+        ? Number(r.wins) + ' 標'
+        : (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '金額未公開'))
+        + (r.wins_5y ? `｜近5年 ${r.wins_5y}` : ''),
+      text: r => byAmt
+        ? (r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開')
+        : Number(r.wins) + ' 標',
     });
   } catch (e) { box.innerHTML = rankFailMsg(e); }
 }
