@@ -66,7 +66,7 @@ def mk_conn(cwd):
     return f
 
 
-APPL_NO_RE = re.compile(r'_(\d+)\.xml$')
+APPL_NO_RE = re.compile(r'_(\d+(?:D\d+)?)\.xml$')  # 設計案含衍生設計後綴（112300034D01）
 
 
 def parse_case(data):
