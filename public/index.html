@@ -1039,10 +1039,11 @@
         <div class="kpi-card"><div class="kpi-label">申請案件量（含諮詢）</div><div class="kpi-value" id="lafKpiApply">-</div><div class="kpi-sub" id="lafKpiApplySub">-</div></div>
         <div class="kpi-card"><div class="kpi-label">准予扶助一般案件</div><div class="kpi-value" style="color:var(--green);" id="lafKpiGeneral">-</div><div class="kpi-sub" id="lafKpiGeneralSub">-</div></div>
         <div class="kpi-card"><div class="kpi-label">律師承辦案（含專案）</div><div class="kpi-value" style="color:var(--blue);" id="lafKpiAid">-</div><div class="kpi-sub" id="lafKpiAidSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">准予專案案件（推估）</div><div class="kpi-value" style="color:#a06cd5;" id="lafKpiProject">-</div><div class="kpi-sub" id="lafKpiProjectSub">-</div></div>
         <div class="kpi-card"><div class="kpi-label">法律諮詢</div><div class="kpi-value" style="color:var(--gold);" id="lafKpiConsult">-</div><div class="kpi-sub" id="lafKpiConsultSub">-</div></div>
       </div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:14px;">
-        ※ 四張卡口徑與下方趨勢圖四條線一致，可逐年切換或看 2018–2024 加總；2024 准予扶助<strong>總計</strong>（含諮詢及受委託專案）約 18.4 萬件。下方類型結構／案由 TOP5／受扶助者身分等明細僅 2024 年報有整理，<strong>不隨年份切換</strong>。
+        ※ 卡片口徑與下方趨勢圖四條線一致，可逐年切換或看 2018–2024 加總；2024 准予扶助<strong>總計</strong>（含諮詢及受委託專案）約 18.4 萬件。「准予專案案件」＝律師承辦案 − 一般案件之<strong>推估值</strong>，內容為檢警偵訊陪同、原住民、勞工（勞動部委託）、身心障礙（衛福部委託）等專案及受委託案件——2024 決算書明細：偵訊陪同 4,716、原民專案 1,957、勞工 1,780、身障 1,107、原民中心 316（消債 12,343 已含在一般案件內）。下方類型結構／案由 TOP5／受扶助者身分等明細僅 2024 年報有整理，<strong>不隨年份切換</strong>。
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128200; 法扶市場量趨勢（2018–2024）</div>
@@ -8075,6 +8076,8 @@ async function loadLafOnce() {
     const d = await (await fetch('data/laf_stats.json?v=' + Date.now())).json();
     _lafData = d;
     const y = d.y2024, t = d.trend;
+    // 准予專案案件（推估）＝律師承辦案 − 一般案件；任一缺值則該年無資料
+    t.project = t.aid_cases.map((v, i) => (v != null && t.general[i] != null) ? v - t.general[i] : null);
     const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
     const PAL = [red, blue, gold, green, '#a06cd5'];
     document.getElementById('lafSrc').textContent = d.source;
@@ -8127,7 +8130,7 @@ window.lafSelectYear = function(sel) {
   if (!_lafData) return;
   document.querySelectorAll('#lafYearBar .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.lafYear === String(sel)));
   const t = _lafData.trend, ys = t.years;
-  const fields = [['apply', 'lafKpiApply'], ['general', 'lafKpiGeneral'], ['aid_cases', 'lafKpiAid'], ['consult', 'lafKpiConsult']];
+  const fields = [['apply', 'lafKpiApply'], ['general', 'lafKpiGeneral'], ['aid_cases', 'lafKpiAid'], ['project', 'lafKpiProject'], ['consult', 'lafKpiConsult']];
   if (sel === 'sum') {
     fields.forEach(([k, id]) => {
       const vals = t[k];
