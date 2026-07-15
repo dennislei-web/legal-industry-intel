@@ -153,6 +153,16 @@
   `tab-fam-lawyers/firm-map/cause-supply`，class 由 `tab-content` 改 `domain-subpanel`，
   `switchDomainTab()` 控制顯示、各 builder lazy-load 一次不變）。產業分析 6→3 tab
   （訴訟市場趨勢/領域版圖/人才流動）。
+- **2026-07-15 總覽拆分（律師區 6→7 子頁）**：`overview`=律師總覽（母體結構＋六張排行卡：
+  近5年出庭TOP10=lawyer_judgment_stats 直查、訴訟領域律師TOP10=`cause_top_lawyers` RPC
+  （mig 093，案類 chips＋案由種類下拉，種類清單借 cause_supply_stats 按件數排序、預設跳過
+  「其他」剩餘桶）、活動量成長榜（lawyer_growth，自訴訟市場移入，`renderMarketGrowth` 沿用）、
+  TIPO 代理人 TOP10、獨董席次榜=firm_indep_directorships client-side 聚合、政府標案榜=
+  `gov_top_lawyers` RPC（mig 093））；新增 `firm-overview`=事務所總覽（KPI 群自名錄頁移入、
+  規模分布+人數TOP10 自舊總覽移入、**事務所版圖整包自產業分析移入**（fm* ids/loader 不變，
+  `loadFirmMapOnce` 改由本頁觸發）、人才流動快照=firm_flow_ranking 前5、TIPO 事務所、
+  獨董/標案事務所榜）；`lawyers`/`offices` 改純名錄。訴訟市場剩 4 子分頁（市場趨勢已無
+  律師活動量卡）。共用 helper：`rankListHtml()`／`initTipoCard()`／`gotoTab(sec,tab)`。
 - **2026-07-15 人才流動併入異動追蹤**：原產業分析「人才流動」（`tab-firm-flow`，mig 083
   firm_flow_* RPC）4 區塊（累積 KPI／團隊出走矩陣／累積淨流排行／新血招募）整段搬進
   律師區「異動追蹤」（`tab-changes`）異動明細之後，內容完整保留、獨立 tab 已刪。
