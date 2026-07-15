@@ -466,7 +466,7 @@
     .sub-tab-btn { padding: 4px 10px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-muted); transition: all 0.15s; font-family: inherit; }
     .sub-tab-btn:hover { background: var(--bg-hover); color: var(--text); }
     .sub-tab-btn.active { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--tab-active-color); }
-    /* 領域版圖頂層切換（家事律師/事務所版圖/案由供需）：加大並用實心填色凸顯選中 */
+    /* 訴訟市場頂層切換（市場趨勢/地區供需/案由供需/事務所版圖/家事律師）：加大並用實心填色凸顯選中 */
     #domainTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
     #domainTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
     /* 章節索引（圖表分頁頁頂：一眼看到本頁有哪些區塊，點了捲到該段） */
@@ -1305,62 +1305,6 @@
       </div>
     </div>
 
-    <!-- ==================== TAB: 地區市場（供給×需求×活躍度，以選地區為主軸整併） ==================== -->
-    <div id="tab-region-market" class="tab-content">
-      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-        以<strong>地區</strong>為主軸整併律師供給與訴訟需求：律師公會執業人數（供給）× 地院一審新收案件（需求）× 供需比 × 該地區活躍訴訟律師。
-        供給口徑＝各地方律師公會執業會員（<code>lawyer_members</code>）；需求口徑＝<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a> 114 年（2025）地院民事訴訟／刑事第一審新收；<strong>新北</strong>律師多掛台北律師公會，其法院案件併入台北一併計。
-      </div>
-
-      <div class="kpi-grid" id="rm_kpiRow" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
-        <div class="kpi-card"><div class="kpi-label">公會執業律師</div><div class="kpi-value" id="rm_kpiLawyers">-</div><div class="kpi-sub" id="rm_kpiLawyersSub">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">民事訴訟供需比</div><div class="kpi-value" style="color:var(--blue);" id="rm_kpiCivil">-</div><div class="kpi-sub" id="rm_kpiCivilSub">件 / 每位律師</div></div>
-        <div class="kpi-card"><div class="kpi-label">刑事第一審供需比</div><div class="kpi-value" style="color:var(--red);" id="rm_kpiCrim">-</div><div class="kpi-sub" id="rm_kpiCrimSub">件 / 每位律師</div></div>
-        <div class="kpi-card"><div class="kpi-label">全國佔比</div><div class="kpi-value" style="color:var(--gold);" id="rm_kpiShare">-</div><div class="kpi-sub">佔全國公會執業律師</div></div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start;">
-        <div class="card">
-          <div class="card-title">&#128506;&#65039; 各地區供需總表 — 律師供給 × 案件需求</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">點任一列切換下方該地區的活躍律師分析。供需比＝該地區地院一審新收 ÷ 公會執業律師數，比值越高＝每位律師潛在案源越多（市場越不飽和）。依民訴供需比排序。</div>
-          <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
-            <table>
-              <thead><tr>
-                <th>地區</th>
-                <th style="text-align:right;">公會執業</th>
-                <th style="text-align:right;">民訴新收</th>
-                <th style="text-align:right;">民訴 件/人</th>
-                <th style="text-align:right;">刑一新收</th>
-                <th style="text-align:right;">刑事 件/人</th>
-              </tr></thead>
-              <tbody id="rm_tableBody"><tr><td colspan="6" class="loading">載入中</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="card">
-            <div class="card-title" id="rm_topTitle">最活躍律師</div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-              <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
-              <div id="rm_catTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
-            </div>
-            <div id="rm_yearTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
-            <div id="rm_topList" style="height:360px;overflow-y:auto;padding-right:4px;"><div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">請選擇地區</div></div>
-          </div>
-          <div class="card">
-            <div class="card-title">每年度活躍律師數（該地區年出庭 &#8805; 5 案）</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">反映該地區活躍訴訟律師人數的年度消長（最新年度為部分月份資料）</div>
-            <div class="chart-container"><canvas id="rm_chartActive"></canvas></div>
-          </div>
-        </div>
-      </div>
-
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:12px;">
-        ※ 供給＝各地方律師公會執業會員數（<code>lawyer_members</code>，登記地）；需求＝司法院開放資料地院一審新收（民事訴訟不含簡易/非訟/執行、刑事僅第一審）。地區＝判決法院所在縣市（<code>courts.region</code>）。公會執業律師 &lt; 10 之離島（澎湖/金門/連江）案件未列。最活躍律師與活躍度趨勢＝公開裁判書出現次數（下限估計、非唯一案件數、同名合併），<span style="color:var(--gold);">👑</span>＝事務所所長；供給與需求口徑不同，供需比僅供地區間相對比較。
-      </div>
-    </div>
-
     <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
     <div id="tab-family" class="tab-content">
       <div id="famBackfillNote" style="display:none;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:var(--orange);"></div>
@@ -2100,55 +2044,6 @@
                         <button class="sub-tab-btn" data-category="administrative">行政訴訟</button>
                     </div>
                     <div class="chart-container"><canvas id="jstat_chartGrowthRate"></canvas></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab: 訴訟市場趨勢（產業分析下；用 jstat class 取圖表樣式。DB 動態：court_case_stats 官方新收 + 律師活動變化）-->
-        <div class="tab-content jstat" id="tab-market">
-            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">
-              官方口徑：<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收件數」（民國 90–114／2001–2025，地院一審新收）｜律師活動口徑：公開裁判書出現次數（下限估計、非唯一案件數、同名合併）。兩者口徑不同，不可直接相比。
-            </div>
-            <div id="market_kpiRow" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px;"></div>
-            <div class="chart-grid">
-                <div class="chart-card full">
-                    <div class="chart-title">各案類「一審新收」年度趨勢（2001–2025）</div>
-                    <div class="sub-tabs" id="market_scaleTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
-                        <button class="sub-tab-btn active" data-scale="litigation">訴訟核心（民訴/刑訴/家事/行政）</button>
-                        <button class="sub-tab-btn" data-scale="all">全部（含非訟/執行）</button>
-                    </div>
-                    <div class="chart-container"><canvas id="market_chartTrend"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-title">訴訟案型結構變化（佔比）</div>
-                    <div class="chart-container"><canvas id="market_chartMix"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-title">律師活動量變化 · 近 3 年 vs 前 3 年</div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">公開裁判書出現次數，非唯一案件數；同名律師為合併值</div>
-                    <div id="market_growthList" style="max-height:360px;overflow-y:auto;"></div>
-                </div>
-            </div>
-
-            <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
-              <div style="font-size:1.05rem;font-weight:600;margin-bottom:2px;">各地區律師活動</div>
-              <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">地區＝判決法院所在縣市（court→courts.region，排除最高法院/最高行政）｜公開裁判書出現次數，非唯一案件數、同名合併。<span style="color:var(--gold);">👑</span>＝事務所所長；名字後為所屬事務所（依名冊，同名合併僅供參考）。點姓名可看該律師詳情。</div>
-              <div id="market_regionTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
-                <div id="market_catTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
-              </div>
-            </div>
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <div class="chart-title" id="market_topTitle">最活躍律師</div>
-                    <div id="market_yearTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
-                    <div id="market_topList" style="height:500px;overflow-y:auto;padding-right:4px;"></div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-title">每年度活躍律師數（該地區年出庭 ≥ 5 案）</div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">反映該地區活躍訴訟律師人數的年度消長（最新年度為部分月份資料）</div>
-                    <div class="chart-container"><canvas id="market_chartActive"></canvas></div>
                 </div>
             </div>
         </div>
@@ -3207,13 +3102,11 @@ const SECTIONS = {
     { tab: 'jstat-repcurve', label: '委任門檻' },
     { tab: 'jstat-topics', label: '案件專題' },
   ],
-  // 產業分析：律師人力（供給預測/領域版圖/人才流動）→ 訴訟（市場趨勢/地區）→ 法扶/調解/商標專利
+  // 產業分析：律師人力（供給預測/人才流動）→ 訴訟市場（5 子分頁）→ 法扶/調解/商標專利
   industry: [
     { tab: 'supply', label: '供給預測' },
-    { tab: 'domain', label: '領域版圖' },
     { tab: 'firm-flow', label: '人才流動' },
-    { tab: 'market', label: '訴訟市場趨勢' },
-    { tab: 'region-market', label: '地區市場' },
+    { tab: 'domain', label: '訴訟市場' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解市場' },
     { tab: 'nonlit', label: '商標專利' },
@@ -3260,7 +3153,6 @@ function showTab(tab) {
   if (tab === 'pros-offices') loadProsOffices();
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'firm-flow') loadFirmFlowOnce();
-  if (tab === 'region-market') loadRegionMarketOnce();
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
   if (tab === 'adr') loadAdrOnce();
@@ -3277,7 +3169,6 @@ function showTab(tab) {
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
-  if (tab === 'market') { loadMarketTrendOnce(); return; }
   if (tab === 'jstat-causes') loadCausesOnce();
   else if (tab === 'jstat-repcurve') loadRepCurveOnce();
   else if (tab.startsWith('jstat-')) loadJstatTab(tab);
@@ -5739,7 +5630,7 @@ async function showLawyerDetail(name, certNumber) {
 }
 
 // ============================================================
-// 訴訟市場趨勢（產業分析 tab=market）：官方新收(market_year_trend) + 律師活動變化(lawyer_growth)
+// 訴訟市場「市場趨勢」子分頁：官方新收(market_year_trend) + 律師活動變化(lawyer_growth)
 // ============================================================
 let _marketLoaded = false, _marketRows = null;
 const MKT_COLORS = { '民事訴訟': '#4f8ef7', '刑事訴訟': '#e05c5c', '家事': '#4caf82', '行政訴訟': '#c9a84c', '少年': '#45b7d1', '民事非訟': '#a06cd5', '民事執行': '#e0883c' };
@@ -5756,10 +5647,9 @@ async function loadMarketTrendOnce() {
   if (_marketLoaded) return;
   _marketLoaded = true;
   try {
-    const [mktRes, grRes, regRes] = await Promise.all([
+    const [mktRes, grRes] = await Promise.all([
       db.rpc('market_year_trend'),
       db.rpc('lawyer_growth', { p_anchor: 2025, p_min: 20, p_limit: 40 }),
-      db.rpc('region_list'),
     ]);
     _marketRows = mktRes.data || [];
     renderMarketKpis(_marketRows);
@@ -5773,121 +5663,11 @@ async function loadMarketTrendOnce() {
         renderMarketTrend(btn.dataset.scale);
       };
     });
-    // 地區律師活動
-    _mktRegions = regRes.data || [];
-    renderRegionTabs();
-    renderCatTabs();
-    renderYearTabs();
-    if (_mktRegions.length) selectRegion(_mktRegions[0].region);
   } catch (e) {
     _marketLoaded = false;
     const el = document.getElementById('market_growthList');
     if (el) el.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">載入失敗：${escHtml(e.message || '')}</div>`;
   }
-}
-
-// 各地區律師活動：地區 + 案類 + 年度選擇 + top 榜(可點) + 活躍律師數趨勢
-let _mktRegion = null, _mktRegionYear = null, _mktRegionCat = null, _mktRegions = [];
-// 案類（判決書原生分類，有實際量的；null=全部。懲戒/其他量極微不列）
-const MKT_CATS = [null, '民事', '刑事', '家事', '行政', '少年'];
-
-function renderRegionTabs() {
-  const box = document.getElementById('market_regionTabs');
-  if (!box) return;
-  box.innerHTML = `<button class="sub-tab-btn" data-region="全部" onclick="selectRegion('全部')">全部</button>`
-    + _mktRegions.slice(0, 16).map(r =>
-      `<button class="sub-tab-btn" data-region="${escHtml(r.region)}" onclick="selectRegion('${escHtml(r.region).replace(/'/g, "\\'")}')">${escHtml(r.region)}</button>`).join('');
-}
-
-function renderCatTabs() {
-  const box = document.getElementById('market_catTabs');
-  if (!box) return;
-  box.innerHTML = MKT_CATS.map(c =>
-    `<button class="sub-tab-btn${c === _mktRegionCat ? ' active' : ''}" onclick="selectRegionCat(${c === null ? 'null' : `'${c}'`})">${c === null ? '全部' : c}</button>`).join('');
-}
-
-function selectRegionCat(cat) {
-  _mktRegionCat = cat;
-  renderCatTabs();
-  renderRegionTopLawyers();
-  renderRegionActive();
-}
-
-function renderYearTabs() {
-  const box = document.getElementById('market_yearTabs');
-  if (!box) return;
-  const years = [null, 2026, 2025, 2024, 2023, 2022, 2021, 2020];
-  box.innerHTML = years.map(y =>
-    `<button class="sub-tab-btn${y === _mktRegionYear ? ' active' : ''}" onclick="selectRegionYear(${y === null ? 'null' : y})">${y === null ? '全期' : y}</button>`).join('');
-}
-
-function selectRegion(region) {
-  _mktRegion = region;
-  document.querySelectorAll('#market_regionTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.region === region));
-  renderRegionTopLawyers();
-  renderRegionActive();
-}
-
-function selectRegionYear(y) {
-  _mktRegionYear = y;
-  renderYearTabs();
-  renderRegionTopLawyers();
-}
-
-async function renderRegionTopLawyers() {
-  if (!_mktRegion) return;
-  const t = document.getElementById('market_topTitle');
-  if (t) t.textContent = `${_mktRegion === '全部' ? '全國' : _mktRegion} 最活躍律師 · ${_mktRegionYear || '全期'}${_mktRegionCat ? ' · ' + _mktRegionCat : ''}`;
-  const box = document.getElementById('market_topList');
-  if (box) box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">載入中…</div>';
-  const { data } = await db.rpc('region_top_lawyers', { p_region: _mktRegion === '全部' ? null : _mktRegion, p_year: _mktRegionYear, p_cat: _mktRegionCat, p_limit: 20 });
-  const rows = data || [];
-  if (!box) return;
-  if (!rows.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:10px;">此地區／案類無資料</div>'; return; }
-  // 批次撈事務所（同名可能多所，取第一筆；配 FIRM_LEADERS + 一人所自動認定標所長）
-  const firmMap = {};
-  try {
-    const { data: fr } = await db.from('lawyers_combined').select('name,firm_name').in('name', rows.map(r => r.name));
-    (fr || []).forEach(x => { if (x.firm_name && !firmMap[x.name]) firmMap[x.name] = x.firm_name; });
-  } catch (e) { /* 事務所撈失敗不影響排行 */ }
-  await ensureSoloFirms();
-  const max = Number(rows[0].cases) || 1;
-  box.innerHTML = rows.map((r, i) => {
-    const cases = Number(r.cases);
-    const w = Math.max(3, Math.round(cases / max * 100));
-    const linfo = leaderInfo(r.name, firmMap[r.name]);
-    const isLeader = !!linfo;
-    const notInMoj = !!(FIRM_LEADERS[r.name] && FIRM_LEADERS_NOT_IN_MOJ.has(r.name));
-    const crown = isLeader ? `<span title="${escHtml(linfo)}" style="cursor:help;">${notInMoj ? '⚠️' : '👑'}</span> ` : '';
-    const firm = firmMap[r.name] || (FIRM_LEADERS[r.name] ? (FIRM_LEADERS[r.name].split('｜')[0] || '') : '');
-    const firmHtml = firm ? `<span style="font-size:0.72rem;margin-left:5px;">${firmLink(firm, 'color:var(--text-muted);')}</span>` : '';
-    const nm = `<a href="#" onclick="showLawyerDetail('${escHtml(r.name).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;font-weight:${isLeader ? 600 : 400};">${escHtml(r.name)}</a>`;
-    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border);">
-      <span style="width:18px;color:var(--text-muted);font-size:0.75rem;text-align:right;flex-shrink:0;">${i + 1}</span>
-      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${crown}${nm}${firmHtml}</span>
-      <span style="width:88px;height:7px;background:var(--border);border-radius:4px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:rgba(79,142,247,0.78);"></span></span>
-      <span style="width:48px;text-align:right;color:var(--text-muted);flex-shrink:0;">${cases.toLocaleString()}</span>
-    </div>`;
-  }).join('');
-}
-
-async function renderRegionActive() {
-  if (!_mktRegion) return;
-  const { data } = await db.rpc('region_active_counts', { p_region: _mktRegion === '全部' ? null : _mktRegion, p_min: 5, p_cat: _mktRegionCat });
-  const rows = (data || []).filter(r => r.yr >= 2003);
-  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
-  if (chartInstances['mktActive']) chartInstances['mktActive'].destroy();
-  const ctx = document.getElementById('market_chartActive');
-  if (!ctx) return;
-  chartInstances['mktActive'] = new Chart(ctx.getContext('2d'), {
-    type: 'line',
-    data: { labels: rows.map(r => r.yr), datasets: [{ label: '活躍律師數', data: rows.map(r => Number(r.active_lawyers)), borderColor: '#4caf82', backgroundColor: 'rgba(76,175,130,0.15)', borderWidth: 2, pointRadius: 2, tension: 0.25, fill: true }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: muted, maxTicksLimit: 12 } }, y: { ticks: { color: muted }, beginAtZero: true } },
-    },
-  });
 }
 
 function renderMarketKpis(rows) {
@@ -8127,7 +7907,7 @@ async function loadFirmFlowOnce() {
   }
 }
 
-// ===== 地區市場（以選地區為主軸整併：公會供給 × 官方案件需求 × 活躍律師）=====
+// ===== 訴訟市場「地區供需」子分頁（以選地區為主軸整併：公會供給 × 官方案件需求 × 活躍律師）=====
 // 供給＝region_distribution（＝lawyer_members 各地公會執業，登記地）；需求＝court_case_stats 114 地院一審新收
 // 供需比口徑與「司法統計＞各法院比較」的律師供需比完全一致（同分母）
 let _rmLoaded = false, _rmRegion = null, _rmYear = null, _rmCat = null, _rmRows = [], _rmTotalLawyers = 0;
@@ -8745,16 +8525,18 @@ async function renderRmActive() {
 let _csLoaded = false, _csMarket = null;
 function loadCauseSupplyOnce() { if (_csLoaded) return; _csLoaded = true; initCauseSupply(); }
 
-// 領域版圖：家事律師 / 事務所版圖 / 案由供需 收攏為子分頁（builder 不動，各自 lazy-load 一次）
+// 訴訟市場：市場趨勢 / 地區供需 / 案由供需 / 事務所版圖 / 家事律師 收攏為子分頁（builder 不動，各自 lazy-load 一次）
 let _domainInit = false;
-function initDomainTab() { if (_domainInit) return; _domainInit = true; switchDomainTab('fam-lawyers'); }
+function initDomainTab() { if (_domainInit) return; _domainInit = true; switchDomainTab('mkt-trend'); }
 window.switchDomainTab = function(d) {
   document.querySelectorAll('#domainTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.domain === d));
-  ['fam-lawyers', 'firm-map', 'cause-supply'].forEach(t => {
+  ['mkt-trend', 'region-market', 'cause-supply', 'firm-map', 'fam-lawyers'].forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = (t === d) ? 'block' : 'none';
   });
-  if (d === 'fam-lawyers') loadFamLawyersOnce();
+  if (d === 'mkt-trend') loadMarketTrendOnce();
+  else if (d === 'region-market') loadRegionMarketOnce();
+  else if (d === 'fam-lawyers') loadFamLawyersOnce();
   else if (d === 'firm-map') loadFirmMapOnce();
   else if (d === 'cause-supply') loadCauseSupplyOnce();
   buildSectionIndex(document.getElementById('tab-' + d));
