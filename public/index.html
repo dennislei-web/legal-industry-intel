@@ -1067,6 +1067,24 @@
           </table>
         </div>
       </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128506;&#65039; 分會別律師承辦強度（扶助律師接案數）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          法扶案件量唯一有<strong>地區維度</strong>的官方統計：各分會扶助律師依年度接案數均分四組的分布。<strong>頭部中位數越高＝該地法扶案量越集中在少數律師身上</strong>（案多人少）——114 年計件案件，花蓮/台東前 25% 律師中位接案 44/43 件，台北/新北/士林僅 4–6 件：東部量能極度依賴頭部律師，北部則律師多、案量分散。
+        </div>
+        <div class="sub-tabs" id="lafBLYearTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;"></div>
+        <div class="sub-tabs" id="lafBLTypeTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+        <div class="chart-container" style="height:540px;"><canvas id="lafBranchChart"></canvas></div>
+        <div class="table-wrap" style="margin-top:12px;max-height:400px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>分會</th><th style="text-align:right;">前25%律師中位接案</th><th style="text-align:right;">單一律師最大</th><th style="text-align:right;">全體中位（近似）</th><th style="text-align:right;">頭部倍數</th></tr></thead>
+            <tbody id="lafBLBody"></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">
+          ※ 資料源：<a href="https://www.laf.org.tw/fotherReport/5" target="_blank" style="color:var(--blue);">法扶官網「全國及分會扶助律師接案數」</a>（scripts/laf_branch_load.py 解析 PDF）。口徑：各分會扶助律師依接案數排序均分四組，官方只公布各組最大/中位/最小值，<strong>非案件總量</strong>；「全體中位（近似）」取第 2、3 組交界均值；「頭部倍數」＝前 25% 組中位 ÷ 全體中位，越高＝越集中。「計件案件」為一般計件酬金案件；部分外島分會「陪偵後偵查中辯護」無案件。官網改版後僅重新上架 114 年度，歷史年度待官方補檔後可用同一腳本回填。
+        </div>
+      </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 資料為法扶會官方年報數字（年更、非即時）。「申請案件量」含法律諮詢；「扶助案件量」含專案及受委託案件；「一般案件」為經審查准予扶助之一般法律案件。法扶資力門檻依社會救助法中低收入標準逐年調整。2024 全國扶助律師 <strong id="lafLawyers">-</strong> 位。
       </div>
@@ -8009,6 +8027,68 @@ async function loadLafOnce() {
     const el = document.getElementById('lafKpiApply'); if (el) el.textContent = '載入失敗';
     console.error('法扶資料載入失敗', e);
   }
+  loadLafBranchLoad(); // 分會別律師承辦強度（獨立資料檔，失敗不影響主區塊）
+}
+// ===== 分會別律師承辦強度（官網「全國及分會扶助律師接案數」PDF 解析，data/laf_branch_load.json）=====
+let _lafBL = null, _lafBLYear = null, _lafBLType = '計件案件';
+async function loadLafBranchLoad() {
+  if (_lafBL) return;
+  try {
+    _lafBL = await (await fetch('data/laf_branch_load.json?v=' + Date.now())).json();
+    const years = Object.keys(_lafBL.years).sort((a, b) => Number(b) - Number(a));
+    _lafBLYear = years[0];
+    document.getElementById('lafBLYearTabs').innerHTML = years.map(yy =>
+      `<button class="sub-tab-btn" data-lafbl-year="${yy}" onclick="lafBLSelectYear('${yy}')">民國 ${yy} 年</button>`).join('');
+    const types = ['計件案件', '消債案件', '陪偵後偵查中辯護'];
+    document.getElementById('lafBLTypeTabs').innerHTML = types.map(t =>
+      `<button class="sub-tab-btn" data-lafbl-type="${t}" onclick="lafBLSelectType('${t}')">${t}</button>`).join('');
+    renderLafBranch();
+  } catch (e) { console.error('分會承辦強度資料載入失敗', e); }
+}
+window.lafBLSelectYear = function(yy) { _lafBLYear = yy; renderLafBranch(); };
+window.lafBLSelectType = function(t) { _lafBLType = t; renderLafBranch(); };
+function renderLafBranch() {
+  document.querySelectorAll('#lafBLYearTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.lafblYear === _lafBLYear));
+  document.querySelectorAll('#lafBLTypeTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.lafblType === _lafBLType));
+  const units = _lafBL.years[_lafBLYear].units;
+  // q = [[min,med,max]×4組]，組序：前25% / 26-50% / 51-75% / 76-100%
+  const rows = Object.entries(units).map(([name, types]) => {
+    const q = types[_lafBLType];
+    if (!q) return { name, none: true };
+    const topMed = q[0][1], topMax = q[0][2];
+    const medAll = (q[1][0] + q[2][2]) / 2; // 第2、3組交界 ≈ 全體中位數
+    return { name, topMed, topMax, medAll, ratio: medAll > 0 ? topMed / medAll : null };
+  });
+  const nation = rows.find(r => r.name === '全國');
+  const branches = rows.filter(r => r.name !== '全國').sort((a, b) => (b.topMed || 0) - (a.topMed || 0));
+  const plotted = branches.filter(r => !r.none);
+  const blue = _lafVar('--blue'), gold = _lafVar('--gold'), muted = _lafVar('--text-muted');
+  _lafChart('lafBranchChart', {
+    type: 'bar',
+    data: {
+      labels: plotted.map(r => r.name),
+      datasets: [
+        { label: '前25%律師中位接案', data: plotted.map(r => r.topMed), backgroundColor: blue, borderRadius: 3 },
+        { label: '全體中位（近似）', data: plotted.map(r => r.medAll), backgroundColor: gold, borderRadius: 3 }
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { afterBody: items => {
+          const r = plotted[items[0].dataIndex];
+          return [`單一律師最大：${r.topMax} 件`, r.ratio ? `頭部倍數：${r.ratio.toFixed(1)}×` : ''];
+        } } }
+      },
+      scales: { x: { beginAtZero: true, title: { display: true, text: `件／人（民國 ${_lafBLYear} 年・${_lafBLType}）`, font: { size: 11 }, color: muted } } }
+    }
+  });
+  const fmt = v => v == null ? '—' : (Number.isInteger(v) ? v : v.toFixed(1));
+  const tableRows = nation ? [nation, ...branches] : branches;
+  document.getElementById('lafBLBody').innerHTML = tableRows.map(r => r.none
+    ? `<tr><td>${escHtml(r.name)}</td><td colspan="4" style="text-align:right;color:var(--text-muted);">此類型無案件</td></tr>`
+    : `<tr${r.name === '全國' ? ' style="font-weight:600;"' : ''}><td>${escHtml(r.name)}</td><td style="text-align:right;color:var(--blue);font-weight:600;">${fmt(r.topMed)}</td><td style="text-align:right;">${fmt(r.topMax)}</td><td style="text-align:right;">${fmt(r.medAll)}</td><td style="text-align:right;color:var(--gold);">${r.ratio ? r.ratio.toFixed(1) + '×' : '—'}</td></tr>`).join('');
 }
 window.lafSelectYear = function(sel) {
   if (!_lafData) return;
