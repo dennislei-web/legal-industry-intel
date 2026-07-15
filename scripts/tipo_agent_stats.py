@@ -84,6 +84,23 @@ def build():
         print(f'  {kind} {yr}: {a:,}/{b:,} ({a/b*100:.0f}%)' if b else f'  {kind} {yr}: 0')
 
     rosters = load_rosters()
+
+    # 名簿姓名含 '?'：TIPO 匯出碰到罕用/異體字（如「啓」U+5553）會替換成半形問號，
+    # 導致與申請案端姓名 join 落空。把 '?' 當萬用字元回貼：在申請案端姓名中
+    # 唯一匹配才歸戶，多重匹配視為歧義不歸戶（避免錯併同名不同人）。
+    agg_names = defaultdict(set)
+    for (kind, name, _yr) in agg:
+        agg_names[kind].add(name)
+    for kind, m in rosters.items():
+        for wname in [n for n in m if '?' in n]:
+            pat = re.compile('^' + re.escape(wname).replace(r'\?', '.') + '$')
+            hits = [n for n in agg_names[kind] if '?' not in n and n not in m and pat.match(n)]
+            if len(hits) == 1:
+                m[hits[0]] = m[wname]
+                print(f'  名簿?回貼 {kind}: {wname} → {hits[0]}')
+            elif len(hits) > 1:
+                print(f'  名簿?歧義 {kind}: {wname} → {hits}（不歸戶）')
+
     agent_rows = []
     firm_agg = defaultdict(lambda: [0, set()])   # (kind, firm, yr) -> [cases, {agents}]
     for (kind, name, yr), n in agg.items():
