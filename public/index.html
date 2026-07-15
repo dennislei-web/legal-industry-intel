@@ -1136,7 +1136,7 @@
       </div>
     </div>
 
-    <!-- ==================== TAB: 非訟版圖（商標/專利代理 — 不打官司的律師市場，TIPO 名簿＋年報統計） ==================== -->
+    <!-- ==================== TAB: 商標專利（商標/專利代理 — 不打官司的律師市場，TIPO 名簿＋年報統計） ==================== -->
     <div id="tab-nonlit" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         律師市場不只訴訟——<strong>商標與專利代理</strong>是「不打官司的律師業務」：每年約 9.7 萬件商標申請＋7.2 萬件專利申請，8 成以上透過代理人送件。資料源：<a href="https://data.gov.tw/dataset/59717" target="_blank" style="color:var(--blue);">商標代理人登錄名簿</a>＋<a href="https://data.gov.tw/dataset/25642" target="_blank" style="color:var(--blue);">專利案件代理人資訊</a>（TIPO，月更）＋智慧財產局年報統計。
@@ -3121,16 +3121,16 @@ const SECTIONS = {
     { tab: 'jstat-repcurve', label: '委任門檻' },
     { tab: 'jstat-topics', label: '案件專題' },
   ],
-  // 產業分析：訴訟市場趨勢 / 領域版圖（家事律師+事務所版圖+案由供需 sub-tab）/ 人才流動
+  // 產業分析：律師人力（供給預測/領域版圖/人才流動）→ 訴訟（市場趨勢/地區）→ 法扶/調解/商標專利
   industry: [
-    { tab: 'market', label: '訴訟市場趨勢' },
-    { tab: 'region-market', label: '地區市場' },
     { tab: 'supply', label: '供給預測' },
-    { tab: 'laf', label: '法扶市場' },
-    { tab: 'adr', label: '調解市場' },
-    { tab: 'nonlit', label: '非訟版圖' },
     { tab: 'domain', label: '領域版圖' },
     { tab: 'firm-flow', label: '人才流動' },
+    { tab: 'market', label: '訴訟市場趨勢' },
+    { tab: 'region-market', label: '地區市場' },
+    { tab: 'laf', label: '法扶市場' },
+    { tab: 'adr', label: '調解市場' },
+    { tab: 'nonlit', label: '商標專利' },
   ],
   sources: [],
   admin: [],
@@ -6019,7 +6019,7 @@ function renderTipoAgencyCard(rows, opts = {}) {
           <tbody>${body}</tbody>
         </table>
       </div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">年份＝申請年（民國）；同一案多位代理人各記 1 件。專利＝發明公開＋新型/設計公告，<strong>發明公開滯後約 18 個月、114 年起不完整</strong>。詳見產業分析「非訟版圖」。</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">年份＝申請年（民國）；同一案多位代理人各記 1 件。專利＝發明公開＋新型/設計公告，<strong>發明公開滯後約 18 個月、114 年起不完整</strong>。詳見產業分析「商標專利」。</div>
     </div>`;
 }
 
@@ -8259,7 +8259,7 @@ async function loadAdrOnce() {
   }
 }
 
-// ===== 非訟版圖（TIPO 商標/專利代理，靜態 data/nonlit_stats.json）=====
+// ===== 商標專利（TIPO 商標/專利代理，靜態 data/nonlit_stats.json）=====
 let _nlLoaded = false;
 const _nlCharts = {};
 function _nlChart(id, cfg) {
@@ -8323,7 +8323,7 @@ async function loadNonlitOnce() {
   } catch (e) {
     _nlLoaded = false;
     const el = document.getElementById('nlKpiTm'); if (el) el.textContent = '載入失敗';
-    console.error('非訟版圖資料載入失敗', e);
+    console.error('商標專利資料載入失敗', e);
   }
 }
 // --- 代理件數排行（tipo_agent_stats / tipo_firm_stats）---
