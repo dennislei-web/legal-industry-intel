@@ -1175,6 +1175,44 @@
           <div class="chart-container" style="height:300px;"><canvas id="nlPtFirmChart"></canvas></div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127942; 代理件數排行（TIPO 逐案實數）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">依 TIPO 開放資料<strong>逐案</strong>統計每位代理人／事務所的實際代理件數（年份＝申請年民國）。商標 115 年為進行年；專利端＝發明公開＋新型/設計公告，<strong>發明有 18 個月公開滯後，114 年起不完整</strong>。</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <div class="sub-tabs" id="nlRankKind" style="display:flex;gap:6px;">
+            <button class="sub-tab-btn active" data-v="tm" onclick="nlSetRank('kind','tm')">商標</button>
+            <button class="sub-tab-btn" data-v="pt" onclick="nlSetRank('kind','pt')">專利</button>
+          </div>
+          <div class="sub-tabs" id="nlRankYear" style="display:flex;gap:6px;">
+            <button class="sub-tab-btn" data-v="112" onclick="nlSetRank('year',112)">112</button>
+            <button class="sub-tab-btn" data-v="113" onclick="nlSetRank('year',113)">113</button>
+            <button class="sub-tab-btn active" data-v="114" onclick="nlSetRank('year',114)">114</button>
+            <button class="sub-tab-btn" data-v="115" onclick="nlSetRank('year',115)">115</button>
+          </div>
+          <input id="nlRankSearch" placeholder="搜尋代理人／事務所…" oninput="nlRankSearchInput()" style="flex:1;min-width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:0.85rem;">
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;" id="nlAgentRankTitle">代理人 TOP 20</div>
+            <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+              <table>
+                <thead><tr><th>#</th><th>代理人</th><th>身分／執業處所</th><th style="text-align:right;">件數</th></tr></thead>
+                <tbody id="nlAgentRankBody"><tr><td colspan="4" style="color:var(--text-muted);">載入中…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">事務所 TOP 20（名簿可歸戶者）</div>
+            <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+              <table>
+                <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">代理人數</th><th style="text-align:right;">件數</th></tr></thead>
+                <tbody id="nlFirmRankBody"><tr><td colspan="4" style="color:var(--text-muted);">載入中…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">※ 同一案多位代理人各記 1 件；「身分／執業處所」為<strong>現行</strong>代理人名簿 join（現任口徑），名簿外（歷史／未登錄）代理人顯示「名簿外」且不計入事務所排行；同名者不歸戶。</div>
+      </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 商標代理人名簿＝登錄（商標代理人，須認證考試）＋備查（律師／會計師，免考試）口徑，每月 10 日更新；未登錄備查者不得以代理人名義招攬商標業務（商標法 98-1，罰 3–15 萬）。專利代理人名單僅含<strong>近 3 年有實際代理案件</strong>者（活動口徑，非全部證照持有人）。代理率（專利 93.8%／商標 84.1%）為 109 年 9 月經濟部新申請案統計快照，僅供量級參考。申請量為 TIPO 年報數字（年更）。
       </div>
@@ -8232,10 +8270,87 @@ async function loadNonlitOnce() {
     });
     mkBar('nlTmFirmChart', d.tm_agents.top_firms_lawyer, gold, '登錄律師數');
     mkBar('nlPtFirmChart', d.pt_agents.top_firms, blue, '近3年代理人數');
+    nlLoadRank();
   } catch (e) {
     _nlLoaded = false;
     const el = document.getElementById('nlKpiTm'); if (el) el.textContent = '載入失敗';
     console.error('非訟版圖資料載入失敗', e);
+  }
+}
+// --- 代理件數排行（tipo_agent_stats / tipo_firm_stats）---
+const _nlRank = { kind: 'tm', year: 114 };
+window.nlSetRank = function(key, val) {
+  _nlRank[key] = val;
+  const box = document.getElementById(key === 'kind' ? 'nlRankKind' : 'nlRankYear');
+  box.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.v == String(val)));
+  document.getElementById('nlRankSearch').value = '';
+  nlLoadRank();
+};
+async function nlLoadRank() {
+  const { kind, year } = _nlRank;
+  document.getElementById('nlAgentRankTitle').textContent = '代理人 TOP 20';
+  const agBody = document.getElementById('nlAgentRankBody');
+  const fmBody = document.getElementById('nlFirmRankBody');
+  try {
+    const [ag, fm] = await Promise.all([
+      db.from('tipo_agent_stats').select('agent_name,cases,firm,identity,is_lawyer').eq('kind', kind).eq('year_tw', year).order('cases', { ascending: false }).limit(20),
+      db.from('tipo_firm_stats').select('firm,cases,agents_n').eq('kind', kind).eq('year_tw', year).order('cases', { ascending: false }).limit(20)
+    ]);
+    if (ag.error || fm.error) throw (ag.error || fm.error);
+    agBody.innerHTML = (ag.data && ag.data.length) ? ag.data.map((r, i) =>
+      `<tr><td>${i + 1}</td><td>${escHtml(r.agent_name)}${r.is_lawyer ? ' <span style="color:var(--gold);font-size:0.72rem;">律師</span>' : ''}</td><td style="font-size:0.78rem;color:var(--text-muted);">${escHtml(r.identity && !r.is_lawyer ? r.identity : '') || (r.is_lawyer ? '' : '名簿外')}${r.firm ? '／' + escHtml(r.firm) : ''}</td><td style="text-align:right;font-weight:600;">${r.cases.toLocaleString()}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--text-muted);">此年份尚無資料</td></tr>';
+    fmBody.innerHTML = (fm.data && fm.data.length) ? fm.data.map((r, i) =>
+      `<tr><td>${i + 1}</td><td>${escHtml(r.firm)}</td><td style="text-align:right;">${r.agents_n}</td><td style="text-align:right;font-weight:600;">${r.cases.toLocaleString()}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--text-muted);">此年份尚無資料</td></tr>';
+  } catch (e) {
+    agBody.innerHTML = '<tr><td colspan="4" style="color:var(--red);">載入失敗</td></tr>';
+    fmBody.innerHTML = '<tr><td colspan="4" style="color:var(--red);">載入失敗</td></tr>';
+    console.error('代理排行載入失敗', e);
+  }
+}
+let _nlSearchTimer = null;
+window.nlRankSearchInput = function() {
+  clearTimeout(_nlSearchTimer);
+  _nlSearchTimer = setTimeout(nlRankSearch, 350);
+};
+async function nlRankSearch() {
+  const q = document.getElementById('nlRankSearch').value.trim();
+  if (!q) { nlLoadRank(); return; }
+  const { kind } = _nlRank;
+  const agBody = document.getElementById('nlAgentRankBody');
+  const fmBody = document.getElementById('nlFirmRankBody');
+  document.getElementById('nlAgentRankTitle').textContent = `「${q}」搜尋結果（跨年份合計）`;
+  try {
+    const [ag, fm] = await Promise.all([
+      db.from('tipo_agent_stats').select('agent_name,year_tw,cases,firm,identity,is_lawyer').eq('kind', kind).or(`agent_name.ilike.%${q}%,firm.ilike.%${q}%`).limit(400),
+      db.from('tipo_firm_stats').select('firm,year_tw,cases,agents_n').eq('kind', kind).ilike('firm', `%${q}%`).limit(400)
+    ]);
+    if (ag.error || fm.error) throw (ag.error || fm.error);
+    const byAgent = {};
+    (ag.data || []).forEach(r => {
+      const k = r.agent_name;
+      byAgent[k] = byAgent[k] || { total: 0, yrs: [], firm: r.firm, identity: r.identity, is_lawyer: r.is_lawyer };
+      byAgent[k].total += r.cases;
+      byAgent[k].yrs.push(`${r.year_tw}:${r.cases}`);
+    });
+    const rows = Object.entries(byAgent).sort((a, b) => b[1].total - a[1].total).slice(0, 20);
+    agBody.innerHTML = rows.length ? rows.map(([name, v], i) =>
+      `<tr><td>${i + 1}</td><td>${escHtml(name)}${v.is_lawyer ? ' <span style="color:var(--gold);font-size:0.72rem;">律師</span>' : ''}<div style="font-size:0.7rem;color:var(--text-muted);">${v.yrs.sort().join('　')}</div></td><td style="font-size:0.78rem;color:var(--text-muted);">${v.firm ? escHtml(v.firm) : '名簿外'}</td><td style="text-align:right;font-weight:600;">${v.total.toLocaleString()}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--text-muted);">查無結果</td></tr>';
+    const byFirm = {};
+    (fm.data || []).forEach(r => {
+      byFirm[r.firm] = byFirm[r.firm] || { total: 0, agents: 0 };
+      byFirm[r.firm].total += r.cases;
+      byFirm[r.firm].agents = Math.max(byFirm[r.firm].agents, r.agents_n);
+    });
+    const frows = Object.entries(byFirm).sort((a, b) => b[1].total - a[1].total).slice(0, 20);
+    fmBody.innerHTML = frows.length ? frows.map(([firm, v], i) =>
+      `<tr><td>${i + 1}</td><td>${escHtml(firm)}</td><td style="text-align:right;">${v.agents}</td><td style="text-align:right;font-weight:600;">${v.total.toLocaleString()}</td></tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--text-muted);">查無結果</td></tr>';
+  } catch (e) {
+    agBody.innerHTML = '<tr><td colspan="4" style="color:var(--red);">搜尋失敗</td></tr>';
+    console.error('代理搜尋失敗', e);
   }
 }
 
