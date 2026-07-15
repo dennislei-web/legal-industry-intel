@@ -624,10 +624,240 @@
           <div class="chart-container"><canvas id="chartSeniority"></canvas></div>
         </div>
         <div class="card">
+          <div class="card-title">&#127919; 近 5 年出庭 TOP 10 律師</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">公開裁判書出庭數（下限估計）；同名律師為合併值。</div>
+          <div id="lwTopActiveList"><div class="loading">載入中</div></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#9878;&#65039; 訴訟領域律師 TOP 10</div>
+          <div class="sub-tabs" id="ctlCatTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">
+            <button class="sub-tab-btn active" data-cat="民事">民事</button>
+            <button class="sub-tab-btn" data-cat="刑事">刑事</button>
+            <button class="sub-tab-btn" data-cat="家事">家事</button>
+            <button class="sub-tab-btn" data-cat="行政">行政</button>
+          </div>
+          <div class="search-bar" style="margin-bottom:8px;">
+            <select id="ctlGroupSel" onchange="ctlLoadRank()" style="min-width:200px;"></select>
+          </div>
+          <div id="ctlList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">近 5 年公開裁判書案由（下限估計、同名合併）；佔比＝該領域件數 ÷ 該律師全部出庭，可看出專攻或兼辦。</div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128200; 律師活動量變化 · 近 3 年 vs 前 3 年</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">公開裁判書出現次數，非唯一案件數；同名律師為合併值。各地區活躍律師見 產業分析＞訴訟市場＞地區供需。</div>
+          <div id="market_growthList" style="max-height:480px;overflow-y:auto;"></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#174;&#65039; 商標/專利代理人 TOP 10</div>
+          <div class="sub-tabs" id="lwTipoTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">
+            <button class="sub-tab-btn active" data-kind="tm">商標</button>
+            <button class="sub-tab-btn" data-kind="pt">專利</button>
+          </div>
+          <div id="lwTipoList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">TIPO 開放資料最新年度（民國 <span id="lwTipoYear">-</span> 年）申請案；含非律師代理人。完整排行與搜尋見 <a href="#" onclick="gotoTab('industry','nonlit');return false;" style="color:var(--blue);">產業分析＞商標專利</a>。</div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128142; 跨界影響力 — 獨董與政府標案</div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--gold);margin:6px 0 4px;">上市櫃獨立董事席次 TOP 10</div>
+          <div id="lwIndepList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--blue);margin:14px 0 4px;">政府標案得標 TOP 10</div>
+          <div id="lwGovList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次（含興櫃）；標案＝一人所＋個人名義投標歸戶，同名律師會合併。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: FIRM-OVERVIEW (事務所總覽) ==================== -->
+    <div id="tab-firm-overview" class="tab-content">
+      <!-- 第零列：律師身分結構（推估）（自「事務所」列表頁移入，2026-07-15） -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">律師身分結構（依名冊推估）</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
+        <div class="kpi-card">
+          <div class="kpi-label">所長人數（推估）</div>
+          <div class="kpi-value" id="kpiLeaderCount" style="color:var(--gold);">-</div>
+          <div class="kpi-sub" id="kpiLeaderCountSub">單人所＋掛所名＋多人所假定 1 位</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">受雇律師人數（推估）</div>
+          <div class="kpi-value" id="kpiEmployedCount" style="color:var(--green);">-</div>
+          <div class="kpi-sub">多人所且未掛名，已按無掛名所每所扣除 1 位假定所長（合夥未掛名者仍偏高估）</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">企業端律師人數</div>
+          <div class="kpi-value" id="kpiInhouseCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">執業於法人/公司</div>
+        </div>
+      </div>
+      <!-- 第一列：事務所 -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">事務所（法律/律師事務所）</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
+        <div class="kpi-card">
+          <div class="kpi-label">事務所數</div>
+          <div class="kpi-value" id="kpiOfficeFirmCount" style="color:var(--green);">-</div>
+          <div class="kpi-sub">法律/律師事務所</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">最大事務所</div>
+          <div class="kpi-value" id="kpiOfficeLargest" style="color:var(--gold);font-size:1.1rem;">-</div>
+          <div class="kpi-sub" id="kpiOfficeLargestSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均規模</div>
+          <div class="kpi-value" id="kpiOfficeAvgSize" style="color:var(--green);">-</div>
+          <div class="kpi-sub">律師/事務所</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年齡</div>
+          <div class="kpi-value" id="kpiFirmAvgAge" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="kpiFirmAvgAgeSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年資</div>
+          <div class="kpi-value" id="kpiFirmAvgSen" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="kpiFirmAvgSenSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">有官網</div>
+          <div class="kpi-value" id="kpiOfficeWebsite" style="color:var(--blue);">-</div>
+          <div class="kpi-sub">已搜尋到官網</div>
+        </div>
+      </div>
+      <!-- 第二列：法人/公司 -->
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">法人 / 公司</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px;">
+        <div class="kpi-card">
+          <div class="kpi-label">法人/公司數</div>
+          <div class="kpi-value" id="kpiOfficeCorpCount" style="color:var(--purple);">-</div>
+          <div class="kpi-sub" id="kpiOfficeCorpSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">最大法人</div>
+          <div class="kpi-value" id="kpiCorpLargest" style="color:var(--purple);font-size:1.1rem;">-</div>
+          <div class="kpi-sub" id="kpiCorpLargestSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均規模</div>
+          <div class="kpi-value" id="kpiCorpAvgSize" style="color:var(--purple);">-</div>
+          <div class="kpi-sub">律師/法人</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年齡</div>
+          <div class="kpi-value" id="kpiCorpAvgAge" style="color:var(--orange);">-</div>
+          <div class="kpi-sub" id="kpiCorpAvgAgeSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均年資</div>
+          <div class="kpi-value" id="kpiCorpAvgSen" style="color:var(--green);">-</div>
+          <div class="kpi-sub" id="kpiCorpAvgSenSub">-</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">全部單位</div>
+          <div class="kpi-value" id="kpiOfficeCount" style="color:var(--text-muted);">-</div>
+          <div class="kpi-sub">事務所+法人合計</div>
+        </div>
+      </div>
+      <!-- 隱藏的舊 KPI（供 JS 相容）-->
+      <div style="display:none;" id="kpiOfficeFirmSub"></div>
+      <div style="display:none;" id="kpiOfficeAvgAge"></div>
+      <div style="display:none;" id="kpiOfficeAvgSeniority"></div>
+      <div class="grid-2">
+        <div class="card">
           <div class="card-title">&#127970; 事務所規模分布</div>
           <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
           <div class="card-title" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">&#127942; 律師人數 TOP 10 事務所</div>
           <div id="topFirmsList"><div class="loading">載入中</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128260; 人才流動快照</div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--green);margin:6px 0 4px;">累積淨流入 TOP 5</div>
+          <div id="foFlowIn"><div class="loading">載入中</div></div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--red);margin:14px 0 4px;">累積淨流出 TOP 5</div>
+          <div id="foFlowOut"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">2026-07-03 起追蹤（分所歸戶、累積口徑）；完整挖角矩陣與新血招募見 <a href="#" onclick="gotoTab('lawyer','changes');return false;" style="color:var(--blue);">異動追蹤</a>。</div>
+        </div>
+      </div>
+      <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；ids/loader 不變） -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127963;&#65039; 事務所版圖 — 案類 × 法院競爭位置</div>
+        <div class="search-bar">
+          <select id="fmCatSel" onchange="loadFirmMap()">
+            <option value="">全部案類</option>
+            <option value="民事">民事</option>
+            <option value="刑事">刑事</option>
+            <option value="家事">家事</option>
+            <option value="行政">行政</option>
+            <option value="懲戒">懲戒</option>
+            <option value="其他">其他</option>
+          </select>
+          <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
+            <option value="">全部案由種類</option>
+          </select>
+          <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
+            <option value="">全部法院</option>
+          </select>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
+          <div class="kpi-card">
+            <div class="kpi-label">喆律排名</div>
+            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluRank">-</div>
+            <div class="kpi-sub">此案類×法院</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">喆律出庭數</div>
+            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluCases">-</div>
+            <div class="kpi-sub">近 5 年</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">第一名</div>
+            <div class="kpi-value" style="font-size:1.05rem;padding-top:8px;" id="fmKpiTop1">-</div>
+            <div class="kpi-sub" id="fmKpiTop1Sub">-</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">上榜事務所</div>
+            <div class="kpi-value" id="fmKpiFirms">-</div>
+            <div class="kpi-sub">此條件有出庭</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">TOP 20 事務所</div>
+        <div class="chart-container" style="height:480px;"><canvas id="fmChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">排行榜（前 100）</div>
+        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">出庭數(近5年)</th><th style="text-align:right;">出庭律師數</th></tr></thead>
+            <tbody id="fmTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0 16px;">
+        ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
+        事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
+        案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">&#174;&#65039; 商標/專利代理 TOP 10 事務所</div>
+          <div class="sub-tabs" id="foTipoTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">
+            <button class="sub-tab-btn active" data-kind="tm">商標</button>
+            <button class="sub-tab-btn" data-kind="pt">專利</button>
+          </div>
+          <div id="foTipoList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">TIPO 開放資料最新年度（民國 <span id="foTipoYear">-</span> 年）申請案；含專利商標事務所等非律師所。完整排行見 <a href="#" onclick="gotoTab('industry','nonlit');return false;" style="color:var(--blue);">產業分析＞商標專利</a>。</div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128142; 跨界影響力 — 獨董與政府標案</div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--gold);margin:6px 0 4px;">上市櫃獨董席次 TOP 10 事務所</div>
+          <div id="foIndepList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.78rem;font-weight:600;color:var(--blue);margin:14px 0 4px;">政府標案得標 TOP 10 事務所</div>
+          <div id="foGovList"><div class="loading">載入中</div></div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次歸戶現任所；標案＝投標名稱截到「事務所」歸戶（分所合併）。</div>
         </div>
       </div>
     </div>
@@ -638,14 +868,13 @@
         <button class="sub-tab-btn active" data-domain="mkt-trend" onclick="switchDomainTab('mkt-trend')">市場趨勢</button>
         <button class="sub-tab-btn" data-domain="region-market" onclick="switchDomainTab('region-market')">地區供需</button>
         <button class="sub-tab-btn" data-domain="cause-supply" onclick="switchDomainTab('cause-supply')">案由供需</button>
-        <button class="sub-tab-btn" data-domain="firm-map" onclick="switchDomainTab('firm-map')">事務所版圖</button>
         <button class="sub-tab-btn" data-domain="fam-lawyers" onclick="switchDomainTab('fam-lawyers')">家事律師</button>
       </div>
 
     <!-- ===== 子分頁: 市場趨勢（官方新收 court_case_stats + 律師活動變化） ===== -->
     <div id="tab-mkt-trend" class="domain-subpanel jstat">
             <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">
-              官方口徑：<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收件數」（民國 90–114／2001–2025，地院一審新收）｜律師活動口徑：公開裁判書出現次數（下限估計、非唯一案件數、同名合併）。兩者口徑不同，不可直接相比。
+              官方口徑：<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收件數」（民國 90–114／2001–2025，地院一審新收）。個別律師活動量榜已移至「律師＞律師總覽」。
             </div>
             <div id="market_kpiRow" style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px;"></div>
             <div class="chart-grid">
@@ -660,11 +889,6 @@
                 <div class="chart-card">
                     <div class="chart-title">訴訟案型結構變化（佔比）</div>
                     <div class="chart-container"><canvas id="market_chartMix"></canvas></div>
-                </div>
-                <div class="chart-card">
-                    <div class="chart-title">律師活動量變化 · 近 3 年 vs 前 3 年</div>
-                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">公開裁判書出現次數，非唯一案件數；同名律師為合併值。各地區活躍律師詳見「地區供需」子分頁。</div>
-                    <div id="market_growthList" style="max-height:360px;overflow-y:auto;"></div>
                 </div>
             </div>
     </div>
@@ -821,68 +1045,6 @@
     </div>
 
     <!-- ==================== TAB: FIRM MAP (事務所版圖) ==================== -->
-    <div id="tab-firm-map" class="domain-subpanel" style="display:none;">
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#127963;&#65039; 事務所版圖 — 案類 × 法院競爭位置</div>
-        <div class="search-bar">
-          <select id="fmCatSel" onchange="loadFirmMap()">
-            <option value="">全部案類</option>
-            <option value="民事">民事</option>
-            <option value="刑事">刑事</option>
-            <option value="家事">家事</option>
-            <option value="行政">行政</option>
-            <option value="懲戒">懲戒</option>
-            <option value="其他">其他</option>
-          </select>
-          <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
-            <option value="">全部案由種類</option>
-          </select>
-          <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
-            <option value="">全部法院</option>
-          </select>
-        </div>
-        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
-          <div class="kpi-card">
-            <div class="kpi-label">喆律排名</div>
-            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluRank">-</div>
-            <div class="kpi-sub">此案類×法院</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">喆律出庭數</div>
-            <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluCases">-</div>
-            <div class="kpi-sub">近 5 年</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">第一名</div>
-            <div class="kpi-value" style="font-size:1.05rem;padding-top:8px;" id="fmKpiTop1">-</div>
-            <div class="kpi-sub" id="fmKpiTop1Sub">-</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">上榜事務所</div>
-            <div class="kpi-value" id="fmKpiFirms">-</div>
-            <div class="kpi-sub">此條件有出庭</div>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">TOP 20 事務所</div>
-        <div class="chart-container" style="height:480px;"><canvas id="fmChart"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="card-title">排行榜（前 100）</div>
-        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">出庭數(近5年)</th><th style="text-align:right;">出庭律師數</th></tr></thead>
-            <tbody id="fmTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
-        ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
-        事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
-        案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
-      </div>
-    </div>
         <div id="tab-cause-supply" class="domain-subpanel" style="display:none;">
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#9878;&#65039; 案由供需地圖 — 市場量能 × 律師供給</div>
@@ -1367,97 +1529,7 @@
 
     <!-- ==================== TAB: OFFICES (事務所) ==================== -->
     <div id="tab-offices" class="tab-content">
-      <!-- 第零列：律師身分結構（推估） -->
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">律師身分結構（依名冊推估）</div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
-        <div class="kpi-card">
-          <div class="kpi-label">所長人數（推估）</div>
-          <div class="kpi-value" id="kpiLeaderCount" style="color:var(--gold);">-</div>
-          <div class="kpi-sub" id="kpiLeaderCountSub">單人所＋掛所名＋多人所假定 1 位</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">受雇律師人數（推估）</div>
-          <div class="kpi-value" id="kpiEmployedCount" style="color:var(--green);">-</div>
-          <div class="kpi-sub">多人所且未掛名，已按無掛名所每所扣除 1 位假定所長（合夥未掛名者仍偏高估）</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">企業端律師人數</div>
-          <div class="kpi-value" id="kpiInhouseCount" style="color:var(--purple);">-</div>
-          <div class="kpi-sub">執業於法人/公司</div>
-        </div>
-      </div>
-      <!-- 第一列：事務所 -->
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">事務所（法律/律師事務所）</div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px;">
-        <div class="kpi-card">
-          <div class="kpi-label">事務所數</div>
-          <div class="kpi-value" id="kpiOfficeFirmCount" style="color:var(--green);">-</div>
-          <div class="kpi-sub">法律/律師事務所</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">最大事務所</div>
-          <div class="kpi-value" id="kpiOfficeLargest" style="color:var(--gold);font-size:1.1rem;">-</div>
-          <div class="kpi-sub" id="kpiOfficeLargestSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均規模</div>
-          <div class="kpi-value" id="kpiOfficeAvgSize" style="color:var(--green);">-</div>
-          <div class="kpi-sub">律師/事務所</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均年齡</div>
-          <div class="kpi-value" id="kpiFirmAvgAge" style="color:var(--orange);">-</div>
-          <div class="kpi-sub" id="kpiFirmAvgAgeSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均年資</div>
-          <div class="kpi-value" id="kpiFirmAvgSen" style="color:var(--green);">-</div>
-          <div class="kpi-sub" id="kpiFirmAvgSenSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">有官網</div>
-          <div class="kpi-value" id="kpiOfficeWebsite" style="color:var(--blue);">-</div>
-          <div class="kpi-sub">已搜尋到官網</div>
-        </div>
-      </div>
-      <!-- 第二列：法人/公司 -->
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;">法人 / 公司</div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:16px;">
-        <div class="kpi-card">
-          <div class="kpi-label">法人/公司數</div>
-          <div class="kpi-value" id="kpiOfficeCorpCount" style="color:var(--purple);">-</div>
-          <div class="kpi-sub" id="kpiOfficeCorpSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">最大法人</div>
-          <div class="kpi-value" id="kpiCorpLargest" style="color:var(--purple);font-size:1.1rem;">-</div>
-          <div class="kpi-sub" id="kpiCorpLargestSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均規模</div>
-          <div class="kpi-value" id="kpiCorpAvgSize" style="color:var(--purple);">-</div>
-          <div class="kpi-sub">律師/法人</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均年齡</div>
-          <div class="kpi-value" id="kpiCorpAvgAge" style="color:var(--orange);">-</div>
-          <div class="kpi-sub" id="kpiCorpAvgAgeSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">平均年資</div>
-          <div class="kpi-value" id="kpiCorpAvgSen" style="color:var(--green);">-</div>
-          <div class="kpi-sub" id="kpiCorpAvgSenSub">-</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">全部單位</div>
-          <div class="kpi-value" id="kpiOfficeCount" style="color:var(--text-muted);">-</div>
-          <div class="kpi-sub">事務所+法人合計</div>
-        </div>
-      </div>
-      <!-- 隱藏的舊 KPI（供 JS 相容）-->
-      <div style="display:none;" id="kpiOfficeFirmSub"></div>
-      <div style="display:none;" id="kpiOfficeAvgAge"></div>
-      <div style="display:none;" id="kpiOfficeAvgSeniority"></div>
+      <!-- KPI 群已移至「事務所總覽」（2026-07-15），本頁為純名錄（搜尋＋排行列表） -->
       <div class="search-bar">
         <input type="text" id="officeSearch" placeholder="搜尋事務所名稱..." oninput="searchOffices()">
       </div>
@@ -3099,9 +3171,10 @@ async function loadOverviewFast() {
 // ============================================================
 const SECTIONS = {
   lawyer: [
-    { tab: 'overview', label: '總覽' },
-    { tab: 'lawyers', label: '律師' },
-    { tab: 'offices', label: '事務所' },
+    { tab: 'overview', label: '律師總覽' },
+    { tab: 'lawyers', label: '律師名錄' },
+    { tab: 'firm-overview', label: '事務所總覽' },
+    { tab: 'offices', label: '事務所名錄' },
     { tab: 'changes', label: '異動追蹤' },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
     { tab: 'law010', label: '010 合作律師', adminOnly: true },
@@ -3125,8 +3198,9 @@ const SECTIONS = {
     { tab: 'jstat-repcurve', label: '委任門檻' },
     { tab: 'jstat-topics', label: '案件專題' },
   ],
-  // 產業分析：律師人力（供給預測）→ 訴訟市場（5 子分頁）→ 法扶/調解/商標專利
-  // （原「人才流動」已併入 律師區＞異動追蹤，2026-07-15）
+  // 產業分析：律師人力（供給預測）→ 訴訟市場（4 子分頁）→ 法扶/調解/商標專利
+  // （「人才流動」已併入 律師區＞異動追蹤；「事務所版圖」已移至 律師區＞事務所總覽；
+  //  「律師活動量榜」已移至 律師區＞律師總覽 — 2026-07-15 總覽拆分）
   industry: [
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
@@ -3180,7 +3254,9 @@ function showTab(tab) {
   if (tab === 'adr') loadAdrOnce();
   if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'domain') initDomainTab();
+  if (tab === 'overview') loadLawyerRankCardsOnce();
   if (tab === 'lawyers') loadLawyers();
+  if (tab === 'firm-overview') loadFirmOverviewOnce();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); }
   if (tab === 'alumni' && isAdmin) loadAlumni();
@@ -3304,9 +3380,7 @@ async function loadOverview() {
 
   // 性別、年齡、年資分析（從 moj_lawyers 抓）
   loadDemographicCharts();
-
-  // 事務所規模分布
-  loadFirmSizeChart();
+  // 事務所規模分布已移至「事務所總覽」（loadFirmOverviewOnce 觸發 loadFirmSizeChart）
 }
 
 function renderRegionChart(data) {
@@ -3536,6 +3610,276 @@ async function loadFirmSizeChart() {
       </div>`;
     }).join('')}
   </div>`;
+}
+
+// ============================================================
+// 律師總覽排行卡 ＋ 事務所總覽（2026-07-15 總覽拆分）
+// ============================================================
+window.gotoTab = function(sec, tab) { showSection(sec); showTab(tab); };
+
+const lwNameLink = n => `<a href="#" onclick="showLawyerDetail('${escHtml(n).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(n)}</a>`;
+const rankFailMsg = e => `<div style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+
+// 通用排行清單（名次＋label＋mini bar＋右側數值；items 為任意陣列，取值由 fmt callback 決定）
+function rankListHtml(items, fmt) {
+  if (!items || !items.length) return '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">無資料</div>';
+  const max = Math.max(...items.map(it => Math.abs(fmt.value(it)))) || 1;
+  return items.map((it, i) => {
+    const v = fmt.value(it);
+    const barW = Math.max(2, Math.round(Math.abs(v) / max * 100));
+    const sub = fmt.sub ? fmt.sub(it) : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+      <span style="font-weight:700;color:${i < 3 ? 'var(--gold)' : 'var(--text-muted)'};min-width:20px;text-align:center;">${i + 1}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${fmt.label(it)}</div>
+        <div style="margin-top:3px;height:4px;border-radius:2px;background:var(--border);">
+          <div style="height:100%;width:${barW}%;border-radius:2px;background:${fmt.barColor || 'rgba(79,142,247,0.6)'};"></div>
+        </div>
+      </div>
+      ${sub ? `<span style="font-size:0.7rem;color:var(--text-muted);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;">${sub}</span>` : ''}
+      <span style="font-weight:600;min-width:44px;text-align:right;color:${fmt.valColor || 'var(--text)'};">${fmt.text ? fmt.text(it) : Number(v).toLocaleString()}</span>
+    </div>`;
+  }).join('');
+}
+const govAmtHtml = a => a >= 1e8 ? (a / 1e8).toFixed(1) + ' 億' : Math.round(a / 1e4).toLocaleString() + ' 萬';
+
+// ---- 律師總覽六張排行卡 ----
+let _lwRankLoaded = false;
+function loadLawyerRankCardsOnce() {
+  if (_lwRankLoaded) return;
+  _lwRankLoaded = true;
+  loadLwTopActive();
+  loadLwGrowth();
+  initCtlCard();
+  initTipoCard('lwTipoTabs', 'lwTipoList', 'lwTipoYear', false);
+  loadLwIndep();
+  loadLwGov();
+}
+
+// 近 5 年出庭 TOP 10（lawyer_judgment_stats，mig 046；同名合併值）
+async function loadLwTopActive() {
+  const box = document.getElementById('lwTopActiveList');
+  try {
+    const { data, error } = await db.from('lawyer_judgment_stats')
+      .select('name, cases_5yr, top_court_5yr, n_courts_5yr')
+      .order('cases_5yr', { ascending: false }).limit(10);
+    if (error) throw error;
+    const shortCourt = c => (c || '').replace('臺灣', '').replace('地方法院', '地院').replace('高等法院', '高院');
+    box.innerHTML = rankListHtml(data, {
+      value: r => r.cases_5yr,
+      label: r => lwNameLink(r.name),
+      sub: r => escHtml(shortCourt(r.top_court_5yr)) + (r.n_courts_5yr ? `｜${r.n_courts_5yr} 法院` : ''),
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
+}
+
+// 活動量成長/衰退榜（lawyer_growth RPC，自「訴訟市場＞市場趨勢」移入）
+async function loadLwGrowth() {
+  try {
+    const { data, error } = await db.rpc('lawyer_growth', { p_anchor: 2025, p_min: 20, p_limit: 40 });
+    if (error) throw error;
+    renderMarketGrowth(data || []);
+  } catch (e) {
+    const el = document.getElementById('market_growthList');
+    if (el) el.innerHTML = rankFailMsg(e);
+  }
+}
+
+// 訴訟領域律師 TOP 10（cause_top_lawyers RPC，mig 093；種類清單借 cause_supply_stats 依件數排序）
+let _ctlGroups = null, _ctlCat = '民事';
+async function initCtlCard() {
+  document.querySelectorAll('#ctlCatTabs .sub-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#ctlCatTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _ctlCat = btn.dataset.cat;
+      ctlFillGroups();
+    };
+  });
+  try {
+    const { data, error } = await db.rpc('cause_supply_stats', { p_cat: null }).range(0, 499);
+    if (error) throw error;
+    _ctlGroups = data || [];  // 已按 total_cases DESC
+    ctlFillGroups();
+  } catch (e) { document.getElementById('ctlList').innerHTML = rankFailMsg(e); }
+}
+function ctlFillGroups() {
+  const sel = document.getElementById('ctlGroupSel');
+  const list = (_ctlGroups || []).filter(g => g.cat === _ctlCat);
+  // 預設選件數最大的非「其他」剩餘桶（桶仍列在下拉可手動選）
+  const def = (list.find(g => !/^其他/.test(g.cause_group)) || list[0] || {}).cause_group || '';
+  sel.innerHTML = list.map(g =>
+    `<option value="${escHtml(g.cause_group)}"${g.cause_group === def ? ' selected' : ''}>${escHtml(g.cause_group)}（${Number(g.total_cases).toLocaleString()} 件）</option>`).join('');
+  ctlLoadRank();
+}
+window.ctlLoadRank = async function() {
+  const group = document.getElementById('ctlGroupSel').value;
+  const box = document.getElementById('ctlList');
+  if (!group) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">此案類無資料</div>'; return; }
+  box.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    const { data, error } = await db.rpc('cause_top_lawyers', { p_group: group, p_limit: 10 });
+    if (error) throw error;
+    box.innerHTML = rankListHtml(data || [], {
+      value: r => r.cases,
+      label: r => lwNameLink(r.name),
+      sub: r => '佔其出庭 ' + Math.round((r.share || 0) * 100) + '%',
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
+};
+
+// TIPO 代理排行卡（律師總覽＝個人、事務所總覽＝事務所；最新年度、tm/pt 切換）
+let _tipoYearCache = null;
+async function tipoLatestYear() {
+  if (_tipoYearCache) return _tipoYearCache;
+  const { data } = await db.from('tipo_agent_stats').select('year_tw').order('year_tw', { ascending: false }).limit(1);
+  _tipoYearCache = data && data[0] ? data[0].year_tw : null;
+  return _tipoYearCache;
+}
+function initTipoCard(tabsId, listId, yearId, isFirm) {
+  const load = async (kind) => {
+    const box = document.getElementById(listId);
+    box.innerHTML = '<div class="loading">載入中</div>';
+    try {
+      const year = await tipoLatestYear();
+      if (!year) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">無資料</div>'; return; }
+      document.getElementById(yearId).textContent = year;
+      const { data, error } = isFirm
+        ? await db.from('tipo_firm_stats').select('firm,cases,agents_n').eq('kind', kind).eq('year_tw', year).order('cases', { ascending: false }).limit(10)
+        : await db.from('tipo_agent_stats').select('agent_name,cases,firm,is_lawyer').eq('kind', kind).eq('year_tw', year).order('cases', { ascending: false }).limit(10);
+      if (error) throw error;
+      box.innerHTML = rankListHtml(data || [], isFirm ? {
+        value: r => r.cases,
+        label: r => escHtml(r.firm),
+        sub: r => r.agents_n + ' 位代理人',
+      } : {
+        value: r => r.cases,
+        label: r => (r.is_lawyer ? lwNameLink(r.agent_name) + ' <span style="color:var(--gold);font-size:0.72rem;">律師</span>' : escHtml(r.agent_name)),
+        sub: r => escHtml(r.firm || '名簿外'),
+      });
+    } catch (e) { box.innerHTML = rankFailMsg(e); }
+  };
+  document.querySelectorAll('#' + tabsId + ' .sub-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#' + tabsId + ' .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      load(btn.dataset.kind);
+    };
+  });
+  load('tm');
+}
+
+// 上市櫃獨董律師榜（firm_indep_directorships view＝簡歷覆核確認者，client-side 聚合 <1000 列）
+async function loadLwIndep() {
+  const box = document.getElementById('lwIndepList');
+  try {
+    const { data, error } = await db.from('firm_indep_directorships')
+      .select('person_name, office_normalized').range(0, 4999);
+    if (error) throw error;
+    const by = {};
+    (data || []).forEach(r => {
+      const e = by[r.person_name] = by[r.person_name] || { seats: 0, office: r.office_normalized };
+      e.seats++;
+    });
+    const top = Object.entries(by).sort((a, b) => b[1].seats - a[1].seats).slice(0, 10);
+    box.innerHTML = rankListHtml(top, {
+      value: p => p[1].seats,
+      label: p => lwNameLink(p[0]),
+      sub: p => escHtml(p[1].office || ''),
+      text: p => p[1].seats + ' 席',
+      barColor: 'rgba(201,168,76,0.6)',
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
+}
+
+// 政府標案得標律師榜（gov_top_lawyers RPC，mig 093）
+async function loadLwGov() {
+  const box = document.getElementById('lwGovList');
+  try {
+    const { data, error } = await db.rpc('gov_top_lawyers', { p_limit: 10 });
+    if (error) throw error;
+    box.innerHTML = rankListHtml(data || [], {
+      value: r => Number(r.wins),
+      label: r => lwNameLink(r.name),
+      sub: r => (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '') + (r.last_win_year ? `｜最近 ${r.last_win_year}` : ''),
+      text: r => Number(r.wins) + ' 標',
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
+}
+
+// ---- 事務所總覽 ----
+let _foLoaded = false;
+function loadFirmOverviewOnce() {
+  if (_foLoaded) return;
+  _foLoaded = true;
+  loadOffices();          // KPI 群元素已移到本頁；順帶暖「事務所名錄」的列表快取
+  loadFirmSizeChart();    // 規模分布圖＋律師人數 TOP 10（自舊總覽移入）
+  loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
+  loadFoFlowSnapshot();
+  initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
+  loadFoIndep();
+  loadFoGov();
+}
+
+// 人才流動快照（firm_flow_ranking RPC 前 5；完整版在異動追蹤）
+async function loadFoFlowSnapshot() {
+  const inBox = document.getElementById('foFlowIn'), outBox = document.getElementById('foFlowOut');
+  try {
+    const { data, error } = await db.rpc('firm_flow_ranking');
+    if (error) throw error;
+    const rank = data || [];
+    const sub = r => `入 ${r.moved_in || 0}／出 ${r.moved_out || 0}`;
+    inBox.innerHTML = rankListHtml(rank.filter(r => r.net > 0).slice(0, 5), {
+      value: r => r.net, label: r => firmCell(r.firm_key), sub,
+      text: r => '+' + r.net, valColor: 'var(--green)', barColor: 'rgba(76,175,130,0.6)',
+    });
+    outBox.innerHTML = rankListHtml(rank.filter(r => r.net < 0).slice(-5).reverse(), {
+      value: r => -r.net, label: r => firmCell(r.firm_key), sub,
+      text: r => String(r.net), valColor: 'var(--red)', barColor: 'rgba(224,90,90,0.55)',
+    });
+  } catch (e) { inBox.innerHTML = rankFailMsg(e); outBox.innerHTML = ''; }
+}
+
+// 上市櫃獨董席次 TOP 10 事務所（分所歸戶主所名，口徑同事務所列表徽章）
+async function loadFoIndep() {
+  const box = document.getElementById('foIndepList');
+  try {
+    const { data, error } = await db.from('firm_indep_directorships')
+      .select('person_name, office_normalized').range(0, 4999);
+    if (error) throw error;
+    const by = {};
+    (data || []).forEach(r => {
+      const base = (r.office_normalized || '').replace(/[（(][^（()）]*分所[）)]$/, '');
+      if (!base) return;
+      const e = by[base] = by[base] || { seats: 0, lawyers: new Set() };
+      e.seats++; e.lawyers.add(r.person_name);
+    });
+    const top = Object.entries(by).sort((a, b) => b[1].seats - a[1].seats).slice(0, 10);
+    box.innerHTML = rankListHtml(top, {
+      value: p => p[1].seats,
+      label: p => firmLink(p[0]),
+      sub: p => p[1].lawyers.size + ' 位律師',
+      text: p => p[1].seats + ' 席',
+      barColor: 'rgba(201,168,76,0.6)',
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
+}
+
+// 政府標案得標 TOP 10 事務所（gov_firm_stats view，mig 077）
+async function loadFoGov() {
+  const box = document.getElementById('foGovList');
+  try {
+    const { data, error } = await db.from('gov_firm_stats')
+      .select('firm_key, wins, total_amount, wins_5y').gt('wins', 0)
+      .order('wins', { ascending: false }).limit(10);
+    if (error) throw error;
+    box.innerHTML = rankListHtml(data || [], {
+      value: r => Number(r.wins),
+      label: r => firmLink(r.firm_key),
+      sub: r => (r.total_amount ? '共 ' + govAmtHtml(Number(r.total_amount)) : '') + (r.wins_5y ? `｜近5年 ${r.wins_5y}` : ''),
+      text: r => Number(r.wins) + ' 標',
+    });
+  } catch (e) { box.innerHTML = rankFailMsg(e); }
 }
 
 // ============================================================
@@ -5675,15 +6019,12 @@ async function loadMarketTrendOnce() {
   if (_marketLoaded) return;
   _marketLoaded = true;
   try {
-    const [mktRes, grRes] = await Promise.all([
-      db.rpc('market_year_trend'),
-      db.rpc('lawyer_growth', { p_anchor: 2025, p_min: 20, p_limit: 40 }),
-    ]);
+    const mktRes = await db.rpc('market_year_trend');
     _marketRows = mktRes.data || [];
     renderMarketKpis(_marketRows);
     renderMarketTrend('litigation');
     renderMarketMix(_marketRows);
-    renderMarketGrowth(grRes.data || []);
+    // 律師活動量成長/衰退榜已移至「律師總覽」（loadLawyerRankCardsOnce）
     document.querySelectorAll('#market_scaleTabs .sub-tab-btn').forEach(btn => {
       btn.onclick = () => {
         document.querySelectorAll('#market_scaleTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
@@ -5693,7 +6034,7 @@ async function loadMarketTrendOnce() {
     });
   } catch (e) {
     _marketLoaded = false;
-    const el = document.getElementById('market_growthList');
+    const el = document.getElementById('market_kpiRow');
     if (el) el.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">載入失敗：${escHtml(e.message || '')}</div>`;
   }
 }
@@ -8628,14 +8969,13 @@ let _domainInit = false;
 function initDomainTab() { if (_domainInit) return; _domainInit = true; switchDomainTab('mkt-trend'); }
 window.switchDomainTab = function(d) {
   document.querySelectorAll('#domainTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.domain === d));
-  ['mkt-trend', 'region-market', 'cause-supply', 'firm-map', 'fam-lawyers'].forEach(t => {
+  ['mkt-trend', 'region-market', 'cause-supply', 'fam-lawyers'].forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = (t === d) ? 'block' : 'none';
   });
   if (d === 'mkt-trend') loadMarketTrendOnce();
   else if (d === 'region-market') loadRegionMarketOnce();
   else if (d === 'fam-lawyers') loadFamLawyersOnce();
-  else if (d === 'firm-map') loadFirmMapOnce();
   else if (d === 'cause-supply') loadCauseSupplyOnce();
   buildSectionIndex(document.getElementById('tab-' + d));
 };
