@@ -152,7 +152,13 @@
   「家事律師/事務所版圖/案由供需」收攏成「**領域版圖**」（`tab-domain`，內部 3 個 `domain-subpanel`：
   `tab-fam-lawyers/firm-map/cause-supply`，class 由 `tab-content` 改 `domain-subpanel`，
   `switchDomainTab()` 控制顯示、各 builder lazy-load 一次不變）。產業分析 6→3 tab
-  （訴訟市場趨勢/領域版圖/人才流動）。⚠️ **未做**：「地區市場」（公會 tab＋總覽地區分布圖＋
+  （訴訟市場趨勢/領域版圖/人才流動）。
+- **2026-07-15 人才流動併入異動追蹤**：原產業分析「人才流動」（`tab-firm-flow`，mig 083
+  firm_flow_* RPC）4 區塊（累積 KPI／團隊出走矩陣／累積淨流排行／新血招募）整段搬進
+  律師區「異動追蹤」（`tab-changes`）異動明細之後，內容完整保留、獨立 tab 已刪。
+  `loadFirmFlowOnce()` 改由 `showTab('changes')` 觸發；累積口徑（分所歸戶、不受時間窗
+  篩選）已在 UI 標注與頁尾說明。`buildSectionIndex()` 不再跳過含 `.ff-toggle` 的分頁，
+  點索引 chip 會自動展開收合卡片。⚠️ **未做**：「地區市場」（公會 tab＋總覽地區分布圖＋
   訴訟市場趨勢內嵌 region_top 合併）——DB 驅動需登入才能驗渲染，待人工核；領域版圖內三面板的
   重複件數圖也待內容層去重
 
