@@ -1322,18 +1322,31 @@
     <!-- ==================== TAB: 公證市場（民間公證人 — 供給/價格雙管制的特許市場，司法院名冊全量＋統計月報） ==================== -->
     <div id="tab-notary" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-        2001 年公證法雙軌制後，公證業務由<strong>法院公證處＋民間公證人</strong>並行——這是一個<strong>供給管制</strong>（專技考試年錄取個位數）＋<strong>價格管制</strong>（公證法明定費率）的特許市場，也是強制執行、繼承、租賃等案件的<strong>訴訟前端入口</strong>。資料源：<a href="https://www.judicial.gov.tw/tw/lp-152-1.html" target="_blank" style="color:var(--blue);">司法院民間公證人名冊</a>（全量 518 筆登錄紀錄）＋司法院統計月報＋<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=B0010010" target="_blank" style="color:var(--blue);">公證法</a>費用章。
+        2001 年公證法雙軌制後，公證業務由<strong>法院公證處＋民間公證人</strong>並行——這是一個<strong>供給管制</strong>（專技考試年錄取個位數）＋<strong>價格管制</strong>（公證法明定費率）的特許市場，也是強制執行、繼承、租賃等案件的<strong>訴訟前端入口</strong>。資料源：<a href="https://www.judicial.gov.tw/tw/lp-152-1.html" target="_blank" style="color:var(--blue);">司法院民間公證人名冊</a>（全量 518 筆登錄紀錄）＋<a href="https://www.judicial.gov.tw/tw/lp-2475-1.html" target="_blank" style="color:var(--blue);">司法統計年報</a>（民間公證人表 54/55、法院表 49）＋<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=B0010010" target="_blank" style="color:var(--blue);">公證法</a>費用章。
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">現職民間公證人</div><div class="kpi-value" id="ntKpiActive">-</div><div class="kpi-sub" id="ntKpiActiveSub">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">臺北轄區佔比</div><div class="kpi-value" style="color:var(--blue);" id="ntKpiTaipei">-</div><div class="kpi-sub" id="ntKpiTaipeiSub">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">法院公證處事件</div><div class="kpi-value" style="color:var(--gold);" id="ntKpiCourt">-</div><div class="kpi-sub" id="ntKpiCourtSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">民間年辦理量</div><div class="kpi-value" style="color:var(--blue);" id="ntKpiPrivate">-</div><div class="kpi-sub" id="ntKpiPrivateSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">民間市佔</div><div class="kpi-value" style="color:var(--gold);" id="ntKpiShare">-</div><div class="kpi-sub" id="ntKpiShareSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">租賃公證佔比</div><div class="kpi-value" style="color:var(--red);" id="ntKpiLease">-</div><div class="kpi-sub" id="ntKpiLeaseSub">-</div></div>
         <div class="kpi-card"><div class="kpi-label">114 年考試錄取</div><div class="kpi-value" style="color:var(--green);" id="ntKpiExam">-</div><div class="kpi-sub" id="ntKpiExamSub">-</div></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128201; 法院公證處事件量（近 11 年）——量往民間移轉</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">地方法院公證處辦理事件（<strong>不含民間公證人</strong>）十年 <strong>-30%</strong>：109 年 COVID 谷底後回升又回落——雙軌制的設計目的就是把量移給民間，這條下行曲線就是移轉的證據。制度立法時全國法院年辦公認證約 60–70 萬件，如今法院端僅剩 6.7 萬件，<strong>大宗量體已在民間公證人手上</strong>。</div>
-        <div class="chart-container" style="height:300px;"><canvas id="ntCourtChart"></canvas></div>
+        <div class="card-title">&#9878;&#65039; 民間 vs 法院公認證辦結量——市場在成長、量在民間</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">司法統計年報官方數字：民間公證人年辦理量 6 年 <strong>+47%</strong>（108 年 27.8 萬 → 114 年 40.9 萬件），公證書件數<strong>翻倍</strong>；法院公證處同期從 8.4 萬掉到 6.7 萬——<strong>市佔 86% 在民間、且整體市場在擴大</strong>，不是零和移轉而是民間端把餅做大（居住租賃需求＋執行名義意識抬頭）。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="ntMarketChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#127968; 公證書業務結構（114 年）——租賃一枝獨大</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">民間公證書 20.3 萬件中<strong>租賃 16.4 萬件（81%）</strong>——本質是「租屋市場的執行名義工廠」；遺囑公證 5,456 件、離婚 834 件，高齡化與家事線量還很小、成長空間大。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="ntMixChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#9889; 逕受強制執行公證——6 年 2.3 倍的「免訴訟執行名義」</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">依公證法 §13 載明應逕受強制執行的公證書從 108 年 7.0 萬件成長到 114 年 <strong>16.4 萬件</strong>（佔公證書 8 成）——這些是「未來的強制執行案件」直接跳過訴訟；對律師業意味著：<strong>這 16 萬件糾紛預防做得越好，後端訴訟委任就越少</strong>，但執行階段與違約糾紛仍會回流。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="ntEnforceChart"></canvas></div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
         <div class="card">
@@ -1365,7 +1378,7 @@
         </div>
         <div class="card">
           <div class="card-title">&#127970; 個人所天花板——沒有規模化玩家</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><span id="ntOfficeStat">-</span>——最大聯合所也只有 6 位公證人。法定費率×個人產能＝單人天花板；以日辦 6–10 件、混合均價 800–1,500 元粗估，民間端年營收約 <strong>3–9 億元</strong>、人均 130–380 萬（推估，非官方數字）。</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><span id="ntOfficeStat">-</span>——最大聯合所也只有 6 位公證人。法定費率×個人產能＝單人天花板；以官方件量（114 年公證 20.3 萬件、認證 20.6 萬件）×法定費率粗估（公證均 1,500–2,500 元、認證均 500–1,000 元），民間端年營收約 <strong>4–7 億元</strong>、全職人均約 <strong>170–300 萬</strong>（件量為官方數字，單價為推估）。</div>
           <div class="table-wrap"><table>
             <thead><tr><th>聯合事務所（2 人以上）</th><th style="text-align:right;">公證人數</th></tr></thead>
             <tbody id="ntJointBody"></tbody>
@@ -1373,7 +1386,7 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 名冊為司法院登錄全量（<span id="ntRosterMeta">-</span>），「證書年度」含遷移轄區換證、非嚴格等於新任年。<strong>民間公證人年度事件量司法院僅於統計年報揭露、尚未取得公開表格</strong>，本頁民間端規模為推估；法院端為統計月報「地方法院辦理公證事件」口徑。公證書就強制執行事項有執行名義效力（拿到即可聲請強制執行、免訴訟）——公證是強制執行／繼承／租賃案件的上游入口。
+        ※ 名冊為司法院登錄全量（<span id="ntRosterMeta">-</span>），「證書年度」含遷移轄區換證、非嚴格等於新任年。件量為<strong>司法統計年報官方數字</strong>：民間端＝表 54/55「民間公證人辦理公認證事件終結情形」（108 年起逐年年報彙整）、法院端＝114 年報表 49「地方法院公認證事件收結情形－按年別分」辦結口徑；僅營收金額為推估。公證書就強制執行事項有執行名義效力（拿到即可聲請強制執行、免訴訟）——公證是強制執行／繼承／租賃案件的上游入口。
       </div>
     </div>
 
@@ -8679,31 +8692,55 @@ async function loadNotaryOnce() {
   _ntLoaded = true;
   try {
     const d = await (await fetch('data/notary_stats.json?v=' + Date.now())).json();
-    const s = d.supply, cn = d.court_notarization;
-    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    const s = d.supply, ps = d.private_series, cs = d.court_series;
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), purple = _lafVar('--purple') || '#9b59b6', muted = _lafVar('--text-muted');
     // KPI
     document.getElementById('ntKpiActive').textContent = s.active.toLocaleString();
     document.getElementById('ntKpiActiveSub').textContent = `全職 ${s.full}／兼職 ${s.part}`;
-    const tp = s.regions.find(r => r[0] === '臺北');
-    const tpN = tp[1] + tp[2];
-    document.getElementById('ntKpiTaipei').textContent = Math.round(tpN / s.active * 100) + '%';
-    document.getElementById('ntKpiTaipeiSub').textContent = `${tpN} 位（全職 ${tp[1]}）`;
-    const lastC = cn.counts[cn.counts.length - 1];
-    document.getElementById('ntKpiCourt').textContent = (lastC / 10000).toFixed(1) + ' 萬';
-    document.getElementById('ntKpiCourtSub').textContent = `${cn.years[cn.years.length - 1]} 年（十年 ${Math.round((lastC / cn.counts[0] - 1) * 100)}%）`;
+    const pLast = ps.total[ps.total.length - 1], pFirst = ps.total[0];
+    document.getElementById('ntKpiPrivate').textContent = (pLast / 10000).toFixed(1) + ' 萬';
+    document.getElementById('ntKpiPrivateSub').textContent = `${ps.years[ps.years.length - 1]} 年（6 年 +${Math.round((pLast / pFirst - 1) * 100)}%）`;
+    const cLast = cs.closed_total[cs.closed_total.length - 1];
+    document.getElementById('ntKpiShare').textContent = Math.round(pLast / (pLast + cLast) * 100) + '%';
+    document.getElementById('ntKpiShareSub').textContent = `法院端僅 ${(cLast / 10000).toFixed(1)} 萬件`;
+    const lease = d.mix114[0][1], notarLast = ps.notarize[ps.notarize.length - 1];
+    document.getElementById('ntKpiLease').textContent = Math.round(lease / notarLast * 100) + '%';
+    document.getElementById('ntKpiLeaseSub').textContent = `${(lease / 10000).toFixed(1)} 萬件／公證書 ${(notarLast / 10000).toFixed(1)} 萬`;
     const ex = d.exam[d.exam.length - 1];
     document.getElementById('ntKpiExam').textContent = ex.passed + ' 人';
     document.getElementById('ntKpiExamSub').textContent = `${ex.takers} 人到考（${d.exam[0].year} 年錄取 ${d.exam[0].passed}）`;
     document.getElementById('ntRosterMeta').textContent = `${d.meta.total_records} 筆、${d.meta.roster_date} 爬取`;
     document.getElementById('ntOfficeStat').textContent = `${s.full} 位全職分布在 ${s.offices_full} 間事務所，2 人以上聯合所僅 ${s.offices_multi} 間`;
-    // 1) 法院公證事件趨勢
-    _ntChart('ntCourtChart', {
-      type: 'bar',
+    // 1) 民間 vs 法院市場圖（民間堆疊 bar＋法院 line，共同年窗 108-114）
+    const cIdx0 = cs.years.indexOf(ps.years[0]);
+    _ntChart('ntMarketChart', {
       data: {
-        labels: cn.years.map(y => y + '年'),
-        datasets: [{ label: '地方法院辦理公證事件', data: cn.counts, backgroundColor: gold + '99', borderColor: gold, borderWidth: 1 }]
+        labels: ps.years.map(y => y + '年'),
+        datasets: [
+          { type: 'bar', label: '民間—公證書', data: ps.notarize, backgroundColor: blue, stack: 'p', order: 3 },
+          { type: 'bar', label: '民間—認證', data: ps.attest, backgroundColor: blue + '66', stack: 'p', order: 2 },
+          { type: 'line', label: '法院公證處（公＋認證辦結）', data: cs.closed_total.slice(cIdx0), borderColor: gold, tension: 0.2, pointRadius: 3, order: 1 }
+        ]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString() + ' 件' } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '萬' } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y.toLocaleString() + ' 件' } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '萬' } } } }
+    });
+    // 1b) 業務結構 doughnut
+    _ntChart('ntMixChart', {
+      type: 'doughnut',
+      data: { labels: d.mix114.map(r => r[0]), datasets: [{ data: d.mix114.map(r => r[1]), backgroundColor: [red, gold, green, blue, purple, muted] }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.parsed.toLocaleString() + ' 件（' + (ctx.parsed / notarLast * 100).toFixed(1) + '%）' } } } }
+    });
+    // 1c) 逕受強制執行序列
+    _ntChart('ntEnforceChart', {
+      type: 'line',
+      data: {
+        labels: ps.years.map(y => y + '年'),
+        datasets: [
+          { label: '載明逕受強制執行公證書', data: ps.enforce, borderColor: red, backgroundColor: red + '33', fill: true, tension: 0.2, pointRadius: 3 },
+          { label: '公證書總數', data: ps.notarize, borderColor: muted, borderDash: [5, 4], tension: 0.2, pointRadius: 2 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y.toLocaleString() + ' 件' } } }, scales: { y: { beginAtZero: true, ticks: { callback: v => (v / 10000) + '萬' } } } }
     });
     // 2) 地區分布（橫向堆疊）
     _ntChart('ntRegionChart', {
