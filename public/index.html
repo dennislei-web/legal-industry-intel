@@ -1385,6 +1385,25 @@
           </table></div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128218; 公證人事務所名錄（現職）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">司法院名冊全量歸戶：<strong id="ntDirCount">-</strong> 間事務所。兼職所多為律師事務所（僅辦文書認證）；「首證年」＝所內最早證書年度（民國），可當開業資歷下限。</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+          <input id="ntDirSearch" type="text" placeholder="搜尋事務所 / 公證人 / 地址..." style="flex:1;min-width:200px;padding:7px 12px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.8rem;">
+          <div id="ntDirTypeBtns" style="display:flex;gap:4px;">
+            <button class="tab-btn active" data-t="" onclick="ntDirSetType(this)" style="padding:5px 12px;font-size:0.75rem;">全部</button>
+            <button class="tab-btn" data-t="全職" onclick="ntDirSetType(this)" style="padding:5px 12px;font-size:0.75rem;">全職</button>
+            <button class="tab-btn" data-t="兼職" onclick="ntDirSetType(this)" style="padding:5px 12px;font-size:0.75rem;">兼職</button>
+          </div>
+          <select id="ntDirRegion" onchange="ntDirRender()" style="padding:6px 10px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.78rem;"><option value="">全部地區</option></select>
+        </div>
+        <div class="table-wrap" style="max-height:560px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>事務所</th><th>地區</th><th>職務</th><th>公證人</th><th>核定外文</th><th>首證年</th><th>聯絡電話</th><th>地址</th><th>官網</th></tr></thead>
+            <tbody id="ntDirBody"></tbody>
+          </table>
+        </div>
+      </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 名冊為司法院登錄全量（<span id="ntRosterMeta">-</span>），「證書年度」含遷移轄區換證、非嚴格等於新任年。件量為<strong>司法統計年報官方數字</strong>：民間端＝表 54/55「民間公證人辦理公認證事件終結情形」（108 年起逐年年報彙整）、法院端＝114 年報表 49「地方法院公認證事件收結情形－按年別分」辦結口徑；僅營收金額為推估。公證書就強制執行事項有執行名義效力（拿到即可聲請強制執行、免訴訟）——公證是強制執行／繼承／租賃案件的上游入口。
       </div>
@@ -8687,6 +8706,33 @@ function _ntChart(id, cfg) {
   _ntCharts[id] = new Chart(el.getContext('2d'), cfg);
   requestAnimationFrame(() => { if (_ntCharts[id]) _ntCharts[id].resize(); });
 }
+let _ntDir = [];
+let _ntDirType = '';
+window.ntDirSetType = function(btn) {
+  _ntDirType = btn.dataset.t;
+  document.querySelectorAll('#ntDirTypeBtns .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  ntDirRender();
+};
+window.ntDirRender = function() {
+  const q = (document.getElementById('ntDirSearch').value || '').trim().toLowerCase();
+  const reg = document.getElementById('ntDirRegion').value;
+  let rows = _ntDir;
+  if (_ntDirType) rows = rows.filter(x => x.t === _ntDirType);
+  if (reg) rows = rows.filter(x => x.r === reg);
+  if (q) rows = rows.filter(x =>
+    x.o.toLowerCase().includes(q) || x.n.join(' ').toLowerCase().includes(q) ||
+    (x.a || '').toLowerCase().includes(q) || (x.p || '').includes(q));
+  document.getElementById('ntDirCount').textContent = rows.length.toLocaleString();
+  document.getElementById('ntDirBody').innerHTML = rows.map((x, i) => {
+    const web = x.w ? `<a href="${escHtml(x.w.startsWith('http') ? x.w : 'https://' + x.w)}" target="_blank" style="color:var(--blue);">&#128279;</a>` : '';
+    const tColor = x.t === '全職' ? 'var(--green)' : 'var(--text-muted)';
+    return `<tr><td>${i + 1}</td><td style="font-weight:600;">${escHtml(x.o)}</td><td>${escHtml(x.r)}</td>` +
+      `<td style="color:${tColor};">${x.t}${x.n.length > 1 ? '×' + x.n.length : ''}</td>` +
+      `<td>${escHtml(x.n.join('、'))}</td><td style="font-size:0.72rem;color:var(--text-muted);">${escHtml(x.l || '-')}</td>` +
+      `<td>${x.y || '-'}</td><td style="white-space:nowrap;">${escHtml(x.p || '-')}</td>` +
+      `<td style="font-size:0.72rem;">${escHtml(x.a || '-')}</td><td>${web}</td></tr>`;
+  }).join('');
+};
 async function loadNotaryOnce() {
   if (_ntLoaded) return;
   _ntLoaded = true;
@@ -8776,6 +8822,14 @@ async function loadNotaryOnce() {
       `<tr><td>${r[0]}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${r[1]}</td></tr>`).join('');
     document.getElementById('ntJointBody').innerHTML = s.top_joint.map(r =>
       `<tr><td>${escHtml(r[0])}</td><td style="text-align:right;">${r[1]}</td></tr>`).join('');
+    // 7) 事務所名錄
+    _ntDir = d.directory || [];
+    const regs = [...new Set(_ntDir.map(x => x.r))];
+    document.getElementById('ntDirRegion').innerHTML = '<option value="">全部地區</option>' +
+      regs.map(g => `<option value="${g}">${g}</option>`).join('');
+    ntDirRender();
+    const si = document.getElementById('ntDirSearch');
+    si.oninput = () => { clearTimeout(si._t); si._t = setTimeout(ntDirRender, 200); };
   } catch (e) {
     _ntLoaded = false;
     const el = document.getElementById('ntKpiActive'); if (el) el.textContent = '載入失敗';
