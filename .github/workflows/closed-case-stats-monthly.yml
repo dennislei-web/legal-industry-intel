@@ -46,3 +46,13 @@ jobs:
           else
             python closed_case_stats.py run "$YM"
           fi
+
+      - name: Refresh business line stats（業務線量體拆解，migration 095）
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          curl -sf -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_business_line_stats" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -d '{}'

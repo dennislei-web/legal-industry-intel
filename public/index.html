@@ -902,6 +902,32 @@
                     <div class="chart-title">訴訟案型結構變化（佔比）</div>
                     <div class="chart-container"><canvas id="market_chartMix"></canvas></div>
                 </div>
+                <div class="chart-card full">
+                    <div class="chart-title">業務線量體拆解（2021–2025 地院終結案件）</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">
+                        把案由歸類成事務所視角的<strong>業務線</strong>（跨案類：繼承橫跨民訴＋家訴、智財橫跨民訴＋刑訴），看各業務線量體與 5 年消長。刑事計數單位為被告人次，與民事／家事案件數分開呈現、不可加總。
+                    </div>
+                    <div class="sub-tabs" id="bl_catTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+                        <button class="sub-tab-btn active" data-blcat="civ">民事＋家事（案件數）</button>
+                        <button class="sub-tab-btn" data-blcat="cri">刑事（被告人次）</button>
+                    </div>
+                    <div class="chart-container"><canvas id="bl_chart"></canvas></div>
+                    <div class="table-wrap" style="max-height:460px;overflow-y:auto;margin-top:14px;">
+                        <table>
+                            <thead><tr>
+                                <th>業務線</th><th>構成</th>
+                                <th style="text-align:right;">2021</th><th style="text-align:right;">2022</th>
+                                <th style="text-align:right;">2023</th><th style="text-align:right;">2024</th>
+                                <th style="text-align:right;">2025</th>
+                                <th style="text-align:right;">5年變化</th><th style="text-align:right;">2025佔比</th>
+                            </tr></thead>
+                            <tbody id="bl_tableBody"><tr><td colspan="9" class="loading">載入中</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;">
+                        ※ 資料源：司法院「終結案件微資料」（地院逐案，2021-01 起）× 本站業務線歸類。民事覆蓋官方終結約 82%、刑事約 92%；<strong>家事僅含家事「訴訟」終結</strong>（不含調解成立與非訟事件，量體遠小於官方家事事件總數，小類年間波動大）。支付命令／本票裁定／消債等非訟因微資料覆蓋率低<strong>未納入</strong>（非訟總量見上方「全部(含非訟/執行)」）。「車禍與侵權賠償」含未標明交通之一般侵權（明標「(交通)」約佔三成）；「交通刑事」＝酒駕肇逃＋過失致傷亡（§284/§276 含少量非車禍過失）。2026 為部分年度未列入。<strong>點任一列</strong>看該業務線的原始案由組成。
+                    </div>
+                </div>
             </div>
     </div>
 
@@ -6207,6 +6233,7 @@ async function loadMarketTrendOnce() {
     renderMarketKpis(_marketRows);
     renderMarketTrend('litigation');
     renderMarketMix(_marketRows);
+    loadBusinessLines().catch(e => console.log('business_line load error:', e));
     // 律師活動量成長/衰退榜已移至「律師總覽」（loadLawyerRankCardsOnce）
     document.querySelectorAll('#market_scaleTabs .sub-tab-btn').forEach(btn => {
       btn.onclick = () => {
@@ -6290,6 +6317,137 @@ function renderMarketMix(rows) {
       scales: { x: { stacked: true, ticks: { color: muted, maxTicksLimit: 13 } }, y: { stacked: true, max: 100, ticks: { color: muted, callback: v => v + '%' } } },
     },
   });
+}
+
+// 業務線量體拆解（business_line_yearly / business_line_causes，migration 095）
+// 刑事=被告人次、民/家=案件數，兩組分開呈現不可加總；2026 部分年度不列入
+let _blRows = null, _blCat = 'civ';
+const BL_YEARS = ['2021', '2022', '2023', '2024', '2025'];
+const BL_PALETTE = ['#4f8ef7', '#e05c5c', '#4caf82', '#c9a84c', '#a06cd5', '#e0883c', '#45b7d1', '#d56ca6', '#8fa84c', '#6c7fd5', '#5cc9b0', '#b0b0b8'];
+
+async function loadBusinessLines() {
+  const { data, error } = await db.from('business_line_yearly').select('*').limit(1000);
+  if (error) throw error;
+  _blRows = data || [];
+  renderBusinessLines(_blCat);
+  document.querySelectorAll('#bl_catTabs .sub-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#bl_catTabs .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _blCat = btn.dataset.blcat;
+      renderBusinessLines(_blCat);
+    };
+  });
+}
+
+const BL_FT_SHORT = { '民事訴訟': '民', '家事訴訟': '家', '刑事訴訟': '刑' };
+function blPivot(cat) {
+  const fts = cat === 'cri' ? ['刑事訴訟'] : ['民事訴訟', '家事訴訟'];
+  const map = {};
+  (_blRows || []).filter(r => fts.includes(r.file_type)).forEach(r => {
+    const m = map[r.line] = map[r.line] || { line: r.line, fts: new Set(), ys: {} };
+    m.fts.add(r.file_type);
+    m.ys[r.y] = (m.ys[r.y] || 0) + Number(r.n);
+  });
+  return Object.values(map).sort((a, b) => (b.ys['2025'] || 0) - (a.ys['2025'] || 0));
+}
+
+function renderBusinessLines(cat) {
+  const lines = blPivot(cat);
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  // 圖：2025 量體前 8 大業務線的年度趨勢
+  if (chartInstances['blChart']) chartInstances['blChart'].destroy();
+  const ctx = document.getElementById('bl_chart');
+  if (ctx) {
+    chartInstances['blChart'] = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: BL_YEARS,
+        datasets: lines.slice(0, 8).map((m, i) => ({
+          label: m.line, data: BL_YEARS.map(y => m.ys[y] ?? null),
+          borderColor: BL_PALETTE[i % BL_PALETTE.length], backgroundColor: BL_PALETTE[i % BL_PALETTE.length],
+          borderWidth: 2, pointRadius: 2, tension: 0.25, fill: false,
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+        scales: { x: { ticks: { color: muted } }, y: { ticks: { color: muted }, beginAtZero: true } },
+      },
+    });
+  }
+  // 表：全部業務線＋5 年變化＋2025 佔比
+  const body = document.getElementById('bl_tableBody');
+  if (!body) return;
+  const tot25 = lines.reduce((s, m) => s + (m.ys['2025'] || 0), 0);
+  body.innerHTML = lines.map(m => {
+    const v21 = m.ys['2021'] || 0, v25 = m.ys['2025'] || 0;
+    const pct = v21 ? Math.round((v25 - v21) * 100 / v21) : null;
+    const col = pct === null ? muted : pct > 0 ? 'var(--green)' : pct < 0 ? 'var(--red)' : 'var(--text-muted)';
+    const isOther = m.line.startsWith('其他');
+    return `<tr onclick="blDrill('${m.line}','${cat}')" style="cursor:pointer;">
+      <td style="${isOther ? 'color:var(--text-muted);' : 'font-weight:600;'}">${escHtml(m.line)}</td>
+      <td style="color:var(--text-muted);font-size:0.75rem;">${[...m.fts].sort().map(f => BL_FT_SHORT[f] || f).join('＋')}</td>
+      ${BL_YEARS.map(y => `<td style="text-align:right;">${(m.ys[y] || 0).toLocaleString()}</td>`).join('')}
+      <td style="text-align:right;color:${col};font-weight:600;">${pct === null ? '—' : (pct > 0 ? '+' : '') + pct + '%'}</td>
+      <td style="text-align:right;color:var(--text-muted);">${tot25 ? (v25 * 100 / tot25).toFixed(1) : '0.0'}%</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" class="loading">無資料</td></tr>';
+}
+
+// 業務線鑽取：重用 causeGroupModal，按檔型分段列原始案由 top 40
+const _blcCache = {};
+async function blDrill(line, cat) {
+  const fts = cat === 'cri' ? ['刑事訴訟'] : ['民事訴訟', '家事訴訟'];
+  const modal = document.getElementById('causeGroupModal');
+  modal.style.display = 'flex';
+  document.getElementById('causeGroupModalTitle').textContent = line + ' — 業務線案由組成';
+  const body = document.getElementById('causeGroupModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    if (!_blcCache[line]) {
+      const { data, error } = await db.from('business_line_causes').select('*').eq('line', line);
+      if (error) throw error;
+      _blcCache[line] = data || [];
+    }
+    const secs = _blcCache[line].filter(d => fts.includes(d.file_type));
+    if (!secs.length) { body.innerHTML = '<div class="empty-state"><div class="msg">無資料</div></div>'; return; }
+    body.innerHTML = `
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">
+        2021 年起地院終結案件累計（刑事＝被告人次、案由＝法名§條）；「等」結尾為裁判原始寫法（一案多請求）。
+      </div>` + secs.map(d => {
+      const top = d.top_causes || [];
+      const topSum = top.reduce((s, t) => s + Number(t[1]), 0);
+      const rest = Number(d.total) - topSum;
+      return `
+      <div style="margin-bottom:8px;font-size:0.85rem;">
+        <strong>${escHtml(d.file_type)}</strong>：累計 <strong style="color:var(--gold);">${Number(d.total).toLocaleString()}</strong>
+        ・${Number(d.distinct_causes).toLocaleString()} 種案由字串（顯示前 ${top.length} 大）
+      </div>
+      <div class="table-wrap" style="max-height:40vh;overflow-y:auto;margin-bottom:14px;">
+        <table>
+          <thead><tr><th style="width:40px;">#</th><th>案由</th>
+            <th style="text-align:right;">件數</th><th style="text-align:right;">佔比</th></tr></thead>
+          <tbody>
+            ${top.map((t, idx) => `<tr>
+              <td style="color:var(--text-muted);">${idx + 1}</td>
+              <td>${escHtml(t[0])}</td>
+              <td style="text-align:right;color:var(--gold);font-weight:600;">${Number(t[1]).toLocaleString()}</td>
+              <td style="text-align:right;">${(Number(t[1]) / Number(d.total) * 100).toFixed(1)}%</td>
+            </tr>`).join('')}
+            ${rest > 0 ? `<tr>
+              <td></td>
+              <td style="color:var(--text-muted);">…其餘 ${(Number(d.distinct_causes) - top.length).toLocaleString()} 種案由合計</td>
+              <td style="text-align:right;color:var(--text-muted);">${rest.toLocaleString()}</td>
+              <td style="text-align:right;color:var(--text-muted);">${(rest / Number(d.total) * 100).toFixed(1)}%</td>
+            </tr>` : ''}
+          </tbody>
+        </table>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = '<div class="empty-state"><div class="msg">載入失敗，請稍後再試</div></div>';
+  }
 }
 
 function renderMarketGrowth(rows) {
