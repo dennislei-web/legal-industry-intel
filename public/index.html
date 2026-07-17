@@ -1543,13 +1543,13 @@
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">開業地政士</div><div class="kpi-value" id="lgKpiTotal">-</div><div class="kpi-sub" id="lgKpiTotalSub">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">自 91 年高點萎縮</div><div class="kpi-value" style="color:var(--red);" id="lgKpiShrink">-</div><div class="kpi-sub">開業人數變化</div></div>
+        <div class="kpi-card"><div class="kpi-label">近 20 年供給</div><div class="kpi-value" style="color:var(--red);" id="lgKpiShrink">-</div><div class="kpi-sub">95 年換照大限後緩降</div></div>
         <div class="kpi-card"><div class="kpi-label">113 年移轉登記</div><div class="kpi-value" style="color:var(--blue);" id="lgKpiTransfer">-</div><div class="kpi-sub">建物所有權（棟）</div></div>
         <div class="kpi-card"><div class="kpi-label">繼承登記十年成長</div><div class="kpi-value" style="color:var(--gold);" id="lgKpiInherit">-</div><div class="kpi-sub" id="lgKpiInheritSub">-</div></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128201; 歷年開業人數（91–114）— 萎縮中的特許行業</div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">91 年 16,407 人一路下滑到 114 年約 1.06 萬人——業務量（移轉登記）十年成長 24% 的同時<strong>從業人數反而減少</strong>，人均業務量持續變厚；女性佔比同期從 41% 升到 45%。</div>
+        <div class="card-title">&#128201; 歷年開業人數（91–114）— 95 年制度斷點＋此後緩降</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><strong>95 年的斷崖（16,401→11,341，-31%）是制度清洗、非市場事件</strong>：地政士法 91 年 4 月施行，舊制「土地登記專業代理人」依第 53 條得續業四年，95 年 4 月換照大限一到，約 5 千位未換照者（多為不活躍的舊證持有人）一次性退出名冊。之後 20 年自 1.13 萬緩降至 1.06 萬（約 -6%）——同期業務量（移轉登記）十年成長 24%，<strong>人均業務量持續變厚</strong>；女性佔比從 41% 升到 45%。</div>
         <div class="chart-container" style="height:320px;"><canvas id="lgTrendChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
@@ -1573,7 +1573,7 @@
           <div style="font-size:0.82rem;line-height:1.8;" id="lgCross">
             <div style="margin-bottom:8px;">&#128220; <strong>繼承是共同成長線</strong>：繼承登記十年 +52%，律師端「繼承與遺產」業務線（市場趨勢頁）同步成長——地政士辦登記、律師辦遺產分割與特留分爭訟，同一波高齡化紅利的上下游。</div>
             <div style="margin-bottom:8px;">&#127970; <strong>零規模化的行業</strong>：<span id="lgTypeStat">-</span>——連「聯合事務所」都極少，沒有連鎖化玩家，轉介網絡是一家一家建的。</div>
-            <div>&#9888;&#65039; <strong>供給端在自然萎縮</strong>：開業人數 23 年 -35%、業務量反增——高齡化退場快於新血進場，未來繼承／不動產登記案源的「代辦缺口」可能外溢到律師與新型服務。</div>
+            <div>&#9888;&#65039; <strong>供給端在緩慢萎縮</strong>：撇開 95 年換照制度斷點，近 20 年開業人數仍緩降約 6%、業務量反增 24%——高齡退場略快於新血進場，未來繼承／不動產登記案源的「代辦缺口」可能外溢到律師與新型服務。</div>
           </div>
         </div>
       </div>
@@ -9272,10 +9272,13 @@ async function loadLandagentOnce() {
     const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
     const y = d.yearly, r = d.reg;
     // KPI
-    const first = y.total[0], last = y.total[y.total.length - 1];
+    const last = y.total[y.total.length - 1];
+    // 供給變化以 95 年（換照大限後的新基準）起算，避免把制度斷點當市場萎縮
+    const i95 = y.years.indexOf(95);
+    const base = i95 >= 0 ? y.total[i95] : y.total[0];
     document.getElementById('lgKpiTotal').textContent = last.toLocaleString();
     document.getElementById('lgKpiTotalSub').textContent = y.latest_year + ' 年底（名冊現時 ' + d.roster.total.toLocaleString() + '）';
-    document.getElementById('lgKpiShrink').textContent = Math.round((last - first) * 100 / first) + '%';
+    document.getElementById('lgKpiShrink').textContent = (Math.round((last - base) * 1000 / base) / 10) + '%';
     document.getElementById('lgKpiTransfer').textContent = (r.transfer[r.transfer.length - 1] / 10000).toFixed(1) + ' 萬';
     const ih0 = r.inherit[0], ihMax = Math.max(...r.inherit);
     document.getElementById('lgKpiInherit').textContent = '+' + Math.round((ihMax - ih0) * 100 / ih0) + '%';
