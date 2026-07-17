@@ -65,7 +65,7 @@
 - **官方案件統計管線**：`scripts/judicial_official_stats.py`（download/parse/upload/run）→ `court_case_stats` 表（migration 034/037）。來源：opendata datasetId 43994「各級法院各案類新收及終結件數統計」，**公開免會員**，單一 ODS（~18MB，content.xml ~600MB 要串流解析），民國 90 年起 月×法院×案類×程序別（保留至第 2 層），50 萬列聚合成 ~43 萬列。`judicial-official-stats.yml` 每月 5 日全量 upsert（冪等）
 - **來源怪癖（查詢必讀）**：最高法院新收件數恆 0（只填終結）；**地院「民事」的 proc_l1 只分 民事/民執**，「民事訴訟 vs 民事非訟（支付命令等）」要看 **proc_l2**（114 年地院：民事訴訟 18.9 萬、民事非訟 83.7 萬、民執執行 204.6 萬=月報強制執行）；刑事訴訟在 l1='訴訟'；114 地院家事新收 183,028 可當解析驗證基準
 - **終結案件微資料管線**：`scripts/closed_case_stats.py`（run/auto/backfill/backfill-criminal）→ `closed_case_month_stats`（migration 035/045）。月包每月 ~1MB 7z（搜「終結案件資料」，晚 1.5 個月），`!` 分隔 txt 每案一筆。解析**民事訴訟+家事訴訟**檔（每案一列）＋**地院刑事訴訟**檔（階層式：0!案件 1!被告 1.1!罪名。刑事列：defendant_rep=任一被告「選任律師辯護」含法扶的案件數、plaintiff_rep=自訴人有律師、defense jsonb=被告層辯護分布含公設/義務細分；高院/最高/智財刑事被告層辯護欄位置不同，不解析）→（月×法院×檔型）律師委任率/終結情形分布/標的金額，已回填 2021-01 起。`closed-case-stats-monthly.yml` 每月 20 日 auto 模式。**版式防呆**：民事欄 15-17／刑事欄 13-15 須為合理民國日期，不符跳過（最高法院民訴版式不同未納入）。**court_name 正規化**：202101~202506 月包資料夾名帶「民事/刑事」後綴，script 的 `norm_court()` 去後綴+去空格（migration 045 已清理歷史資料）。**202511 月包曾被官方重傳成殘缺版**（僅離島+簡易庭），2026-07-08 官方已修復、DB 已用完整包重跑補齊（月包可能事後重傳，回填異常月前先抽查檔數，正常 ~300 檔/22 地院）。法官名有值但尚未做 per-judge 聚合（合議庭歸屬待定義）
-- **案由細分（migration 064）**：同一管線加聚合 `closed_case_cause_stats`（月×法院×檔型×種類）＋`closed_case_cause_national`（月×檔型×正規化原始案由，供鑽取/mapping 稽核）。mapping 在 `scripts/cause_map.py`（民訴對齊官方 13 類標籤、家非對齊官方細項標籤、刑事用罪名層(法名,條,條之N)→罪章幾乎零歧義；民非/家訴為本站務實分組）。已回填 2021-01~2026-05 全 65 月（202511 曾殘缺，官方 2026-07-08 修復後已補齊）。RPC：`cause_group_yearly`/`cause_raw_top`/`cause_court_matrix`/`closed_case_cause_months`。前端「司法統計＞案由細分」tab（`loadCausesOnce`，不走 jstat 靜態 JSON）。**覆蓋率實測（官方113 vs 本表2024）**：民訴 82%（主要類別佔比差±1.5pp）、刑事科刑 92%（傷害類 63%）、民非 39%、家非僅 16%（保護令等不在檔內）——家非/民非佔比僅供結構參考，footnote 已標注。案由字串偶含 \x00，`norm_cause()` 已清（Postgres text 不收）
+- **案由細分（migration 064）**：同一管線加聚合 `closed_case_cause_stats`（月×法院×檔型×種類）＋`closed_case_cause_national`（月×檔型×正規化原始案由，供鑽取/mapping 稽核）。mapping 在 `scripts/cause_map.py`（民訴對齊官方 13 類標籤、家非對齊官方細項標籤、刑事用罪名層(法名,條,條之N)→罪章幾乎零歧義；民非/家訴為本站務實分組）。已回填 2021-01~2026-05 全 65 月（202511 曾殘缺，官方 2026-07-08 修復後已補齊）。RPC：`cause_group_yearly`/`cause_raw_top`/`cause_court_matrix`/`closed_case_cause_months`。前端「司法統計＞案由細分」tab（`loadCausesOnce`，不走 jstat 靜態 JSON）。**案由×委任（mig 099）**：`closed_case_cause_rep_stats`（月×檔型×種類×委任四格：雙方/僅原告/僅被告/皆無；種類用 `map_judgment()` 對齊供給面、與 cagg 的 map_cause 家事分桶不同），僅民事訴訟＋家事訴訟檔（刑事辯護口徑不同未做），已回填 202101~202605 全 65 月（`backfill-rep` 模式）；RPC `cause_rep_yearly(p_file_type)` 供前端案由供需「委任率」欄＋modal 委任分布。run_month 另加殘缺月包防呆（民訴 <15 法院即中止上傳）。**覆蓋率實測（官方113 vs 本表2024）**：民訴 82%（主要類別佔比差±1.5pp）、刑事科刑 92%（傷害類 63%）、民非 39%、家非僅 16%（保護令等不在檔內）——家非/民非佔比僅供結構參考，footnote 已標注。案由字串偶含 \x00，`norm_cause()` 已清（Postgres text 不收）
 - **整合呈現**：法院 tab 法院名可點 → `courtModal`（RPC `court_detail_stats`，migration 036/037：官方年度趨勢＋訴訟終結vs公開裁判書＋委任率＋終結情形）；司法統計>各法院比較有「律師供需比」圖（民事訴訟新收÷公會地區律師數，新北律師少時併台北），可切換「所有案件/有委任律師的案件」——後者=官方新收×地區委任率（closed_case_month_stats：民事任一造有律師、刑事任一被告選任律師含法扶），缺資料地區 fallback 全國率
 
 ## 爬蟲模式（moj-deep-backfill.yml）
@@ -108,6 +108,10 @@
   產業分析「案由供需」tab（民事有 Phase A 市場對照欄，刑事/家事分組口徑不同不硬對；
   點列開 modal 看桶內原始案由明細——`cause_group_causes` 表，migration 080，同掛 refresh 月更）。
   回填：`python judgment_stats.py causefill 202105 202604`（冪等跳過已帶 causes 的月）。
+  **年度下鑽（mig 098）**：`lawyer_cause_year_stats`（律師×年×種類，仿地區供需 mig 054 模式，
+  `refresh_lawyer_cause_stats()` 尾端自動重建）；`cause_top_lawyers`/`firm_cause_ranking` 加
+  `p_year` 參數（NULL=近5年滾動，簽名已變、舊 2 參數版已 DROP）＋`cause_year_list()`。
+  案由供需 modal「領域下鑽」用（TOP 律師/事務所可切年度）。
 - **律師官方統計（migration 046）**：`lawyer_judgment_stats`（按律師名彙總：cases_5yr
   滾動 60 月錨定資料最新月、cases_total、cats_5yr/cats_all、by_year、top_court_5yr），
   `refresh_lawyer_judgment_stats()` 全量重建（TRUNCATE+INSERT，`refresh_stats()` 月更一併呼叫）；

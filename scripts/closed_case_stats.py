@@ -35,6 +35,7 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   python closed_case_stats.py backfill-criminal  # 回填缺「刑事訴訟」列的月份（民事重跑 upsert 冪等）
   python closed_case_stats.py backfill-causes   # 回填 cause 表缺的月份（整月重跑，全部 upsert 冪等）
   python closed_case_stats.py backfill-amount   # 回填標的金額×委任表缺的月份（整月重跑，upsert 冪等）
+  python closed_case_stats.py backfill-rep      # 回填案由×委任表缺的月份（整月重跑，upsert 冪等）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full）。
 """
@@ -51,7 +52,7 @@ from collections import defaultdict, Counter
 import requests
 from dotenv import load_dotenv
 
-from cause_map import norm_cause, map_cause, map_criminal
+from cause_map import norm_cause, map_cause, map_criminal, map_judgment
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
@@ -269,6 +270,10 @@ def run_month(yyyymm, fileset_id):
     nagg = defaultdict(lambda: [0, 0])
     # 標的金額×委任交叉（migration 087）：(court, ft, bucket) → [n, repped_n]
     aragg = defaultdict(lambda: [0, 0])
+    # 案由種類×委任情形交叉（migration 099）：(ft, group) → [total, both, p_only, d_only, none]
+    # group 用 map_judgment()——跟供給面 lawyer_cause_stats 同一把尺（家事＝非訟細項優先），
+    # 與 cagg/nagg 的 map_cause() 民事同規則、家事分桶不同
+    repagg = defaultdict(lambda: [0, 0, 0, 0, 0])
 
     def add_cause(court, ft, cause, group, convicted=False):
         for k, d in ((( court, ft, group), cagg), ((ft, cause, group), nagg)):
@@ -316,6 +321,9 @@ def run_month(yyyymm, fileset_id):
                     ar[0] += 1
                     ar[1] += (p_rep or d_rep)
                 add_cause(court, ft, cause, map_cause(ft, cause))
+                rp = repagg[(ft, map_judgment('民事' if ft == '民事訴訟' else '家事', cause))]
+                rp[0] += 1
+                rp[1 if (p_rep and d_rep) else 2 if p_rep else 3 if d_rep else 4] += 1
     # 非訟檔（民事非訟/家事非訟）只做案由細分，不進 closed_case_month_stats
     for ft in NONLIT_TYPES:
         for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
@@ -332,6 +340,12 @@ def run_month(yyyymm, fileset_id):
                         skipped += 1
                     continue
                 add_cause(court, ft, cause, map_cause(ft, cause))
+
+    # 殘缺月包防呆（202511 曾被官方重傳成僅離島+簡易庭的殘缺版）：正常月包民事訴訟
+    # 覆蓋 20+ 法院，低於門檻代表包不完整，中止上傳避免 upsert 蓋掉既有完整資料
+    civil_courts = {court for (court, ft) in agg if ft == '民事訴訟'}
+    if len(civil_courts) < 15:
+        raise RuntimeError(f'{yyyymm} 月包疑似殘缺（民事訴訟僅 {len(civil_courts)} 法院），中止上傳')
 
     records = [
         {'yyyymm': yyyymm, 'court_name': court, 'file_type': ft,
@@ -384,6 +398,20 @@ def run_month(yyyymm, fileset_id):
             if resp.status_code not in (200, 201, 204):
                 raise RuntimeError(f'closed_case_amount_rep 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
     print(f'  標的金額×委任上傳 OK（{len(ar_rows)} 列）')
+
+    # 案由種類×委任情形交叉（migration 099）
+    rep_rows = [{'yyyymm': yyyymm, 'file_type': k[0], 'cause_group': k[1],
+                 'n_total': v[0], 'n_both': v[1], 'n_p_only': v[2],
+                 'n_d_only': v[3], 'n_none': v[4]}
+                for k, v in repagg.items()]
+    if rep_rows:
+        url = f'{SUPABASE_URL}/rest/v1/closed_case_cause_rep_stats?on_conflict=yyyymm,file_type,cause_group'
+        headers = {**HEADERS_SB, 'Content-Type': 'application/json',
+                   'Prefer': 'resolution=merge-duplicates,return=minimal'}
+        resp = requests.post(url, headers=headers, json=rep_rows, timeout=120)
+        if resp.status_code not in (200, 201, 204):
+            raise RuntimeError(f'closed_case_cause_rep_stats 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
+    print(f'  案由×委任上傳 OK（{len(rep_rows)} 列）')
     # 清理磁碟
     os.remove(arc)
     shutil.rmtree(ext, ignore_errors=True)
@@ -438,6 +466,18 @@ def main():
         # 重跑會把完整資料蓋成殘缺——回填前先抽查該月檔數（正常 ~300 檔/22 地院）
         todo = sorted(set(datasets) - have)
         print(f'待回填案由 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
+        for ym in todo:
+            run_month(ym, datasets[ym])
+            time.sleep(1)
+    elif cmd == 'backfill-rep':
+        # 回填案由×委任表缺的月份（重跑整月，全部 upsert 冪等）
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/closed_case_rep_months',
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          json={}, timeout=60)
+        r.raise_for_status()
+        have = set(r.json() or [])
+        todo = sorted(set(datasets) - have)
+        print(f'待回填案由×委任 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
             run_month(ym, datasets[ym])
             time.sleep(1)
