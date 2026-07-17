@@ -1553,6 +1553,13 @@
         <div class="chart-container" style="height:320px;"><canvas id="lgTrendChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127891; 供給端：地政士考試報考與及格（101–114）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          地政士考試為<strong>及格制</strong>（總成績滿 60 分即及格、無名額限制）→ 及格人數逐年波動大（<strong id="lgExamRange">-</strong>）。114 年報考 7,569 人（自 107 年谷底回升逾五成，房市熱帶動）、及格 490 人創新高。<strong>14 年僅產出約 <span id="lgExamSum">-</span> 張新照</strong>，且及格者未必開業——對照開業人數近 20 年淨減，新血進場速度追不上老代書退場，是供給緩降的直接機制。
+        </div>
+        <div class="chart-container" style="height:300px;"><canvas id="lgExamChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127968; 業務量：建物所有權移轉登記按原因（104–113）</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><strong>繼承登記 104 年 5.0 萬棟 → 112 年 7.7 萬棟（高齡化直接訊號）</strong>，與律師端「繼承與遺產」業務線同向成長——登記量是遺產爭訟的前緣指標。買賣 113 年 35.1 萬棟創十年新高，但 <strong id="lgSaleYtd">-</strong>。</div>
         <div class="chart-container" style="height:320px;"><canvas id="lgRegChart"></canvas></div>
@@ -1578,7 +1585,7 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 名冊＝地政司開放資料「執照有效且註冊開業」者（<span id="lgRosterMeta">-</span>）；歷年序列＝內政統計（各年底開業人數，91 年起）。業務量＝內政統計通報 114 年第 24 週「建物所有權登記」表 1/表 2（棟數口徑；移轉登記另含拍賣、信託等，圖中僅列買賣/繼承/贈與三大項，合占約 9 成；土地登記未含）。114 年 1–4 月買賣 -24.2% 為短期房市訊號，非結構變化。年更：名冊與序列可重跑 <code>scripts/landagent_stats.py</code>，通報表數字每年 6 月手動更新 script 內 REG_SERIES。
+        ※ 名冊＝地政司開放資料「執照有效且註冊開業」者（<span id="lgRosterMeta">-</span>）；歷年序列＝內政統計（各年底開業人數，91 年起）。業務量＝內政統計通報 114 年第 24 週「建物所有權登記」表 1/表 2（棟數口徑；移轉登記另含拍賣、信託等，圖中僅列買賣/繼承/贈與三大項，合占約 9 成；土地登記未含）。114 年 1–4 月買賣 -24.2% 為短期房市訊號，非結構變化。考試數字＝考選部歷年榜示（輔考機構彙整，112＝157／114＝490 已與考選部新聞交叉核對）。年更：名冊與序列可重跑 <code>scripts/landagent_stats.py</code>，通報表數字每年 6 月更新 REG_SERIES、考試數字放榜後更新 EXAM_SERIES（均在 script 內手動維護）。
       </div>
     </div>
 
@@ -9310,6 +9317,34 @@ async function loadLandagentOnce() {
           y2: { position: 'right', min: 30, max: 50, grid: { drawOnChartArea: false }, ticks: { color: muted, callback: v => v + '%' } } },
       },
     });
+    // 1b) 供給端：地政士考試（exam 序列，及格制波動大）
+    const ex = d.exam;
+    if (ex) {
+      const sum = ex.passers.reduce((a, b) => a + b, 0);
+      const rng = document.getElementById('lgExamRange');
+      if (rng) rng.textContent = Math.min(...ex.passers) + '–' + Math.max(...ex.passers) + ' 人、及格率約 4–12.5%';
+      const se = document.getElementById('lgExamSum');
+      if (se) se.textContent = sum.toLocaleString();
+      if (chartInstances['lgExam']) chartInstances['lgExam'].destroy();
+      const c1b = document.getElementById('lgExamChart');
+      if (c1b) chartInstances['lgExam'] = new Chart(c1b.getContext('2d'), {
+        data: {
+          labels: ex.years.map(x => x + '年'),
+          datasets: [
+            { type: 'bar', label: '及格人數', data: ex.passers, backgroundColor: '#c9a84c', yAxisID: 'y', order: 2 },
+            { type: 'line', label: '報考人數', data: ex.applicants, borderColor: '#4f8ef7', backgroundColor: '#4f8ef7',
+              borderWidth: 2, pointRadius: 2, tension: 0.25, fill: false, yAxisID: 'y2', order: 1 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+          scales: { x: { ticks: { color: muted } },
+            y: { beginAtZero: true, ticks: { color: muted }, title: { display: true, text: '及格人數', color: muted, font: { size: 10 } } },
+            y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: muted }, title: { display: true, text: '報考人數', color: muted, font: { size: 10 } } } },
+        },
+      });
+    }
     // 2) 業務量按原因
     if (chartInstances['lgReg']) chartInstances['lgReg'].destroy();
     const c2 = document.getElementById('lgRegChart');
