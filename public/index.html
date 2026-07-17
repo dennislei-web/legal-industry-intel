@@ -1882,6 +1882,38 @@
         </div>
       </div>
 
+      <!-- ===== 企業法務雷達（migration 096：inhouse_* RPC）===== -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--gold);">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127970; 企業法務雷達 — 非事務所登錄律師（in-house）
+        </div>
+        <div class="ff-body" style="display:none;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
+            從法務部名冊反查登錄在<strong>企業／金融／機構</strong>（而非事務所）的執業律師。⚠️ 僅計「保留執業登錄」者＝<strong>嚴重下限</strong>（多數企業法務不維持登錄）；價值在「誰在養登錄律師」的雇主雷達與世代結構訊號。雇主名已歸戶（統一(股)公司寫法、合併分公司/分會）。
+          </div>
+          <div class="kpi-grid" id="ihKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px;"></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">
+            <div>
+              <div class="card-title" style="font-size:0.95rem;">&#127942; 雇主排行（登錄律師數）</div>
+              <div id="ihKindTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+              <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+                <table>
+                  <thead><tr><th style="width:34px;">#</th><th>雇主</th><th>類型</th>
+                    <th style="text-align:right;">律師</th><th style="text-align:right;">平均取證</th></tr></thead>
+                  <tbody id="ihEmpBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="card-title" style="font-size:0.95rem;">&#128200; 各取證世代的非事務所登錄佔比</div>
+              <div id="ihCohort" style="margin-bottom:16px;"></div>
+              <div class="card-title" style="font-size:0.95rem;">&#8644; 近 90 天 事務所 &#8596; 企業/機構 異動</div>
+              <div id="ihMoves" style="max-height:300px;overflow-y:auto;padding-right:4px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
           追蹤機制：每日凌晨自動比對法務部律師登錄資料（一週完整刷新一輪全部律師），偵測事務所變更、新進律師與執業狀態變更。追蹤起始日 2026-07-03，此前的異動無法回溯；第一輪刷新會把 2026-04 以來累積的變動一次記入。<br>
@@ -3438,7 +3470,7 @@ function showTab(tab) {
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firm-overview') loadFirmOverviewOnce();
   if (tab === 'offices') loadOffices();
-  if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); }
+  if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); loadInhouseOnce(); }
   if (tab === 'alumni' && isAdmin) loadAlumni();
   if (tab === 'law010' && isAdmin) loadLaw010();
   if (tab === 'judges') loadJudges();
@@ -8577,6 +8609,136 @@ function firmCell(name) {
   const safe = escHtml(name).replace(/'/g, "\\'");
   return `<a href="#" onclick="showFirmDetail('${safe}');return false;" style="color:${z ? 'var(--green)' : 'var(--blue)'};${z ? 'font-weight:700;' : ''}text-decoration:none;">${escHtml(name)}${z ? ' 👑' : ''}</a>`;
 }
+// 企業法務雷達（inhouse_summary / inhouse_top_employers / inhouse_recent_moves，migration 096）
+// 口徑＝保留執業登錄的 in-house（下限）；雇主名 DB 端歸戶
+let _ihLoaded = false;
+const IH_KINDS = ['一般企業', '金融保險', '非營利與公協會', '政府與公職', '學研機構', '其他'];
+const IH_KIND_COLORS = { '一般企業': 'var(--blue)', '金融保險': 'var(--gold)', '非營利與公協會': 'var(--green)', '政府與公職': 'var(--purple, #a06cd5)', '學研機構': 'var(--orange)', '其他': 'var(--text-muted)' };
+
+async function loadInhouseOnce() {
+  if (_ihLoaded) return;
+  _ihLoaded = true;
+  try {
+    const [sRes, mRes] = await Promise.all([
+      db.rpc('inhouse_summary'),
+      db.rpc('inhouse_recent_moves', { p_days: 90, p_limit: 40 }),
+    ]);
+    if (sRes.error) throw sRes.error;
+    renderIhKpis(sRes.data, mRes.data || []);
+    renderIhCohort(sRes.data);
+    renderIhMoves(mRes.data || []);
+    // 類型 chips ＋ 首載全部
+    const tabs = document.getElementById('ihKindTabs');
+    tabs.innerHTML = ['全部', ...IH_KINDS].map((k, i) =>
+      `<button class="sub-tab-btn${i === 0 ? ' active' : ''}" data-ihkind="${k}">${k}</button>`).join('');
+    tabs.querySelectorAll('.sub-tab-btn').forEach(btn => {
+      btn.onclick = () => {
+        tabs.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ihLoadEmployers(btn.dataset.ihkind === '全部' ? null : btn.dataset.ihkind);
+      };
+    });
+    await ihLoadEmployers(null);
+  } catch (e) {
+    _ihLoaded = false;
+    const el = document.getElementById('ihKpis');
+    if (el) el.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+
+function renderIhKpis(s, moves) {
+  const box = document.getElementById('ihKpis');
+  if (!box) return;
+  const kinds = Object.fromEntries((s.by_kind || []).map(k => [k.kind, k.n]));
+  const totNonFirm = (s.by_kind || []).reduce((a, k) => a + k.n, 0);
+  const out90 = moves.filter(m => m.direction === 'out').length;
+  const in90 = moves.filter(m => m.direction === 'in').length;
+  const kpi = (label, val, sub, color) => `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value" style="color:${color};">${val}</div>
+    <div class="kpi-sub">${sub}</div></div>`;
+  box.innerHTML =
+    kpi('非事務所登錄', totNonFirm.toLocaleString(), `佔正常執業 ${(totNonFirm * 100 / s.total_active).toFixed(1)}%`, 'var(--gold)') +
+    kpi('一般企業', (kinds['一般企業'] || 0).toLocaleString(), '登錄在公司', 'var(--blue)') +
+    kpi('金融保險', (kinds['金融保險'] || 0).toLocaleString(), '銀行/保險/證券', 'var(--gold)') +
+    kpi('非營利與公協會', (kinds['非營利與公協會'] || 0).toLocaleString(), '法扶/基金會/公會', 'var(--green)') +
+    kpi('近90天 所→企業', out90, '離開事務所體系', 'var(--red)') +
+    kpi('近90天 企業→所', in90, '回流執業', 'var(--green)');
+}
+
+function renderIhCohort(s) {
+  const box = document.getElementById('ihCohort');
+  if (!box) return;
+  box.innerHTML = (s.by_cohort || []).map(c => {
+    const pct = c.total ? c.non_firm * 100 / c.total : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.82rem;">
+      <span style="width:64px;color:var(--text-muted);">${escHtml(c.bucket)}</span>
+      <div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;">
+        <div style="width:${Math.min(100, pct * 4).toFixed(1)}%;height:100%;background:var(--gold);opacity:0.85;"></div>
+      </div>
+      <span style="width:48px;text-align:right;font-weight:600;color:var(--gold);">${pct.toFixed(1)}%</span>
+      <span style="width:110px;text-align:right;color:var(--text-muted);font-size:0.72rem;">${c.non_firm.toLocaleString()} / ${c.total.toLocaleString()} 人</span>
+    </div>`;
+  }).join('') + `<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">取證世代＝證號民國年；條寬 4 倍放大以利比較。110 後偏低＝新科律師先進事務所歷練的常態。</div>`;
+}
+
+function renderIhMoves(moves) {
+  const box = document.getElementById('ihMoves');
+  if (!box) return;
+  if (!moves.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">近 90 天無異動</div>'; return; }
+  const nameLink = n => `<a href="#" onclick="showLawyerDetail('${escHtml(n).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(n)}</a>`;
+  box.innerHTML = moves.map(m => {
+    const isOut = m.direction === 'out';
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.8rem;">
+      <span style="color:var(--text-muted);font-size:0.72rem;">${escHtml(m.changed_on)}</span>
+      <span style="color:${isOut ? 'var(--red)' : 'var(--green)'};font-weight:600;margin:0 4px;">${isOut ? '所→企' : '企→所'}</span>
+      ${nameLink(m.name)}<br>
+      <span style="color:var(--text-muted);">${escHtml(m.old_office)} → ${escHtml(m.new_office)}</span>
+    </div>`;
+  }).join('');
+}
+
+async function ihLoadEmployers(kind) {
+  const body = document.getElementById('ihEmpBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="5" class="loading">載入中</td></tr>';
+  try {
+    const { data, error } = await db.rpc('inhouse_top_employers', { p_kind: kind, p_limit: 30 });
+    if (error) throw error;
+    _ihEmpRows = data || [];
+    body.innerHTML = _ihEmpRows.map((t, i) => `<tr onclick="ihEmpDrill(${i})" style="cursor:pointer;">
+      <td style="color:var(--text-muted);">${i + 1}</td>
+      <td style="font-weight:600;">${escHtml(t.emp)}</td>
+      <td style="font-size:0.75rem;color:${IH_KIND_COLORS[t.kind] || 'var(--text-muted)'};">${escHtml(t.kind)}</td>
+      <td style="text-align:right;color:var(--gold);font-weight:600;">${t.n}</td>
+      <td style="text-align:right;color:var(--text-muted);">民國${t.avg_lic_year ?? '—'}年</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="loading">無資料</td></tr>';
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="5" style="color:var(--red);">載入失敗：${escHtml(e.message || '')}</td></tr>`;
+  }
+}
+
+let _ihEmpRows = [];
+function ihEmpDrill(i) {
+  const t = _ihEmpRows[i];
+  if (!t) return;
+  const modal = document.getElementById('causeGroupModal');
+  modal.style.display = 'flex';
+  document.getElementById('causeGroupModalTitle').textContent = t.emp + ' — 登錄律師名單';
+  const nameLink = n => `<a href="#" onclick="showLawyerDetail('${escHtml(n).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(n)}</a>`;
+  document.getElementById('causeGroupModalBody').innerHTML = `
+    <div style="margin-bottom:10px;font-size:0.85rem;">
+      類型 <strong style="color:${IH_KIND_COLORS[t.kind] || 'var(--text)'};">${escHtml(t.kind)}</strong>
+      ・登錄律師 <strong style="color:var(--gold);">${t.n}</strong> 位・平均取證 民國 ${t.avg_lic_year ?? '—'} 年
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:0.85rem;">
+      ${(t.names || []).map(nameLink).join('')}
+    </div>
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">
+      ※ 名單＝法務部名冊現時登錄於該雇主（歸戶後）的正常執業律師${t.n > (t.names || []).length ? `，僅顯示前 ${(t.names || []).length} 位` : ''}。
+    </div>`;
+}
+
 async function loadFirmFlowOnce() {
   if (_ffLoaded) return;
   _ffLoaded = true;
