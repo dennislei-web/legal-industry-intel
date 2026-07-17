@@ -1536,6 +1536,52 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 地政士市場（代書 — 不動產移轉/繼承登記的法定代辦，律師鄰接職業） ==================== -->
+    <div id="tab-landagent" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        地政士（代書）是不動產<strong>移轉／繼承登記</strong>的法定代辦者——與律師在繼承、不動產案源上互為<strong>上下游</strong>（登記在地政士、爭訟在律師），也是重要的轉介網絡節點。資料源：<a href="https://data.gov.tw/dataset/25111" target="_blank" style="color:var(--blue);">內政部地政司開業名冊</a>＋<a href="https://statis.moi.gov.tw" target="_blank" style="color:var(--blue);">內政統計查詢網</a>（民國 91 年起）＋內政統計通報（登記業務量）。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">開業地政士</div><div class="kpi-value" id="lgKpiTotal">-</div><div class="kpi-sub" id="lgKpiTotalSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">自 91 年高點萎縮</div><div class="kpi-value" style="color:var(--red);" id="lgKpiShrink">-</div><div class="kpi-sub">開業人數變化</div></div>
+        <div class="kpi-card"><div class="kpi-label">113 年移轉登記</div><div class="kpi-value" style="color:var(--blue);" id="lgKpiTransfer">-</div><div class="kpi-sub">建物所有權（棟）</div></div>
+        <div class="kpi-card"><div class="kpi-label">繼承登記十年成長</div><div class="kpi-value" style="color:var(--gold);" id="lgKpiInherit">-</div><div class="kpi-sub" id="lgKpiInheritSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128201; 歷年開業人數（91–114）— 萎縮中的特許行業</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">91 年 16,407 人一路下滑到 114 年約 1.06 萬人——業務量（移轉登記）十年成長 24% 的同時<strong>從業人數反而減少</strong>，人均業務量持續變厚；女性佔比同期從 41% 升到 45%。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="lgTrendChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127968; 業務量：建物所有權移轉登記按原因（104–113）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><strong>繼承登記 104 年 5.0 萬棟 → 112 年 7.7 萬棟（高齡化直接訊號）</strong>，與律師端「繼承與遺產」業務線同向成長——登記量是遺產爭訟的前緣指標。買賣 113 年 35.1 萬棟創十年新高，但 <strong id="lgSaleYtd">-</strong>。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="lgRegChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#128506;&#65039; 縣市供需 — 每位地政士對應的登記量</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">棟/人＝113 年移轉登記棟數 ÷ 114 年開業人數。比值高＝每位地政士潛在業務越厚（市場越不飽和）。</div>
+          <div class="table-wrap" style="max-height:440px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>縣市</th><th style="text-align:right;">開業人數</th><th style="text-align:right;">移轉登記(棟)</th><th style="text-align:right;">棟/人</th></tr></thead>
+              <tbody id="lgRegionBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#129309; 與律師市場的交會</div>
+          <div style="font-size:0.82rem;line-height:1.8;" id="lgCross">
+            <div style="margin-bottom:8px;">&#128220; <strong>繼承是共同成長線</strong>：繼承登記十年 +52%，律師端「繼承與遺產」業務線（市場趨勢頁）同步成長——地政士辦登記、律師辦遺產分割與特留分爭訟，同一波高齡化紅利的上下游。</div>
+            <div style="margin-bottom:8px;">&#127970; <strong>零規模化的行業</strong>：<span id="lgTypeStat">-</span>——連「聯合事務所」都極少，沒有連鎖化玩家，轉介網絡是一家一家建的。</div>
+            <div>&#9888;&#65039; <strong>供給端在自然萎縮</strong>：開業人數 23 年 -35%、業務量反增——高齡化退場快於新血進場，未來繼承／不動產登記案源的「代辦缺口」可能外溢到律師與新型服務。</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 名冊＝地政司開放資料「執照有效且註冊開業」者（<span id="lgRosterMeta">-</span>）；歷年序列＝內政統計（各年底開業人數，91 年起）。業務量＝內政統計通報 114 年第 24 週「建物所有權登記」表 1/表 2（棟數口徑；移轉登記另含拍賣、信託等，圖中僅列買賣/繼承/贈與三大項，合占約 9 成；土地登記未含）。114 年 1–4 月買賣 -24.2% 為短期房市訊號，非結構變化。年更：名冊與序列可重跑 <code>scripts/landagent_stats.py</code>，通報表數字每年 6 月手動更新 script 內 REG_SERIES。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 商標專利（商標/專利代理 — 不打官司的律師市場，TIPO 名簿＋年報統計） ==================== -->
     <div id="tab-nonlit" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -3465,6 +3511,7 @@ const SECTIONS = {
     { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
     { tab: 'notary', label: '公證市場' },
+    { tab: 'landagent', label: '地政士市場' },
     { tab: 'nonlit', label: '商標專利' },
   ],
   sources: [],
@@ -3513,6 +3560,7 @@ function showTab(tab) {
   if (tab === 'adr') loadAdrOnce();
   if (tab === 'labor') loadLaborOnce();
   if (tab === 'notary') loadNotaryOnce();
+  if (tab === 'landagent') loadLandagentOnce();
   if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'overview') loadLawyerRankCardsOnce();
@@ -9211,6 +9259,93 @@ async function loadLaborOnce() {
     _lbLoaded = false;
     const el = document.getElementById('lbKpiCases'); if (el) el.textContent = '載入失敗';
     console.error('勞資爭議資料載入失敗', e);
+  }
+}
+
+// ===== 地政士市場（代書 — 地政司名冊＋內政統計，靜態 data/landagent_stats.json）=====
+let _lgLoaded = false;
+async function loadLandagentOnce() {
+  if (_lgLoaded) return;
+  _lgLoaded = true;
+  try {
+    const d = await (await fetch('data/landagent_stats.json?v=' + Date.now())).json();
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+    const y = d.yearly, r = d.reg;
+    // KPI
+    const first = y.total[0], last = y.total[y.total.length - 1];
+    document.getElementById('lgKpiTotal').textContent = last.toLocaleString();
+    document.getElementById('lgKpiTotalSub').textContent = y.latest_year + ' 年底（名冊現時 ' + d.roster.total.toLocaleString() + '）';
+    document.getElementById('lgKpiShrink').textContent = Math.round((last - first) * 100 / first) + '%';
+    document.getElementById('lgKpiTransfer').textContent = (r.transfer[r.transfer.length - 1] / 10000).toFixed(1) + ' 萬';
+    const ih0 = r.inherit[0], ihMax = Math.max(...r.inherit);
+    document.getElementById('lgKpiInherit').textContent = '+' + Math.round((ihMax - ih0) * 100 / ih0) + '%';
+    document.getElementById('lgKpiInheritSub').textContent = (ih0 / 10000).toFixed(1) + '→' + (ihMax / 10000).toFixed(1) + ' 萬棟（高齡化）';
+    const ytd = document.getElementById('lgSaleYtd'); if (ytd) ytd.textContent = r.sale_ytd_note;
+    const meta = document.getElementById('lgRosterMeta');
+    if (meta) meta.textContent = d.roster.total.toLocaleString() + ' 位、' + d.roster.offices_total.toLocaleString() + ' 間事務所';
+    const ts = document.getElementById('lgTypeStat');
+    if (ts) ts.textContent = '單獨執業 ' + (d.roster.by_type.find(t => t[0] === '單獨執業') || [0, 0])[1].toLocaleString() +
+      ' 位（93%）、共同執業僅 ' + (d.roster.by_type.find(t => t[0] === '共同執業') || [0, 0])[1].toLocaleString() +
+      ' 位；2 人以上事務所 ' + d.roster.multi_person_offices.toLocaleString() + ' 間';
+    // 1) 歷年開業人數 + 女性佔比
+    if (chartInstances['lgTrend']) chartInstances['lgTrend'].destroy();
+    const c1 = document.getElementById('lgTrendChart');
+    if (c1) chartInstances['lgTrend'] = new Chart(c1.getContext('2d'), {
+      data: {
+        labels: y.years.map(x => x + '年'),
+        datasets: [
+          { type: 'bar', label: '開業人數', data: y.total, backgroundColor: '#4f8ef7aa', yAxisID: 'y', order: 2 },
+          { type: 'line', label: '女性佔比(%)', data: y.total.map((t, i) => t ? Math.round(y.female[i] * 1000 / t) / 10 : null),
+            borderColor: '#c9a84c', backgroundColor: '#c9a84c', borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y2', order: 1 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+        scales: { x: { ticks: { color: muted, maxTicksLimit: 12 } },
+          y: { beginAtZero: true, ticks: { color: muted } },
+          y2: { position: 'right', min: 30, max: 50, grid: { drawOnChartArea: false }, ticks: { color: muted, callback: v => v + '%' } } },
+      },
+    });
+    // 2) 業務量按原因
+    if (chartInstances['lgReg']) chartInstances['lgReg'].destroy();
+    const c2 = document.getElementById('lgRegChart');
+    if (c2) chartInstances['lgReg'] = new Chart(c2.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: r.years.map(x => x + '年'),
+        datasets: [
+          { label: '移轉總棟數', data: r.transfer, borderColor: muted, borderWidth: 2, pointRadius: 2, tension: 0.25 },
+          { label: '買賣', data: r.sale, borderColor: '#4f8ef7', borderWidth: 2, pointRadius: 2, tension: 0.25 },
+          { label: '繼承', data: r.inherit, borderColor: '#c9a84c', borderWidth: 2, pointRadius: 2, tension: 0.25 },
+          { label: '贈與', data: r.gift, borderColor: '#4caf82', borderWidth: 2, pointRadius: 2, tension: 0.25 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y.toLocaleString() + ' 棟' } } },
+        scales: { x: { ticks: { color: muted } }, y: { beginAtZero: true, ticks: { color: muted } } },
+      },
+    });
+    // 3) 縣市供需表
+    const body = document.getElementById('lgRegionBody');
+    if (body) {
+      const regs = Object.entries(y.latest_by_region || {})
+        .filter(([k, v]) => v && d.reg_113_by_region[k])
+        .map(([k, v]) => ({ reg: k, n: v, t: d.reg_113_by_region[k], per: d.reg_113_by_region[k] / v }))
+        .sort((a, b) => b.per - a.per);
+      body.innerHTML = regs.map(x => `<tr>
+        <td>${escHtml(x.reg)}</td>
+        <td style="text-align:right;">${x.n.toLocaleString()}</td>
+        <td style="text-align:right;">${x.t.toLocaleString()}</td>
+        <td style="text-align:right;color:var(--gold);font-weight:600;">${x.per.toFixed(0)}</td>
+      </tr>`).join('');
+    }
+  } catch (e) {
+    _lgLoaded = false;
+    const el = document.getElementById('lgKpiTotal'); if (el) el.textContent = '載入失敗';
+    console.error('地政士市場載入失敗', e);
   }
 }
 
