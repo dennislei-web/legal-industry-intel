@@ -1191,6 +1191,16 @@
         <div class="chart-container" style="height:300px;"><canvas id="spIntakeChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127891; 考選部先行指標 — 司律考試報考與及格（民國 104–114）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          律師二試及格 → 職前訓練 → 執業登錄，比上圖「進場數」<strong>領先 1–2 年</strong>；報考人數則是更前緣的人才池溫度計。114 年律師及格 <strong style="color:var(--gold);">1,042 首度破千</strong>。
+        </div>
+        <div class="chart-container" style="height:320px;"><canvas id="spExamChart"></canvas></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">
+          ※ 資料源：考選部（114 官方統計表；104–113 輔考機構彙整、與考選部榜示新聞稿交叉核對 110/111/113 年均吻合）。一試為司律合考，兩考報考人數含大量重複報名者。律師及格＝二試（各選試組別加總）、司法官＝三試最終錄取。<strong>108–109 律師及格低谷</strong>＝當年二試 400 分門檻刷落較多，110 年調整後無人被門檻否決，屬制度因素非供給萎縮。年更：放榜後手動補一列 <code>exam_pipeline_stats</code>。
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128101; 現有人力年齡結構</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">中位數約 43 歲。<code>birth_year</code> 為民國年，年齡＝當年－(birth_year+1911)。</div>
         <div class="chart-container" style="height:300px;"><canvas id="spAgeChart"></canvas></div>
@@ -1216,7 +1226,7 @@
         <div class="chart-container" style="height:320px;"><canvas id="spProjChart"></canvas></div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ <strong>關鍵事實</strong>：律師<strong>不是 65 歲斷崖退休</strong>——現職名冊 65 歲(約126人)與 64 歲(約132人)相近、70 歲仍約 79 人、75 歲仍約 39 人在執業（<span id="spOver65Note">-</span>）。故本模型改採<strong>漸進退休</strong>（logistic hazard，退休率隨年齡上升），非「屆 65 全退」。因早年律師界較小、老齡人數本就偏低，實測年齡曲線為退休率<strong>上限</strong>，真實供給可能再高一些。考選部報考/及格數（更前緣領先指標）可後續接入。
+        ※ <strong>關鍵事實</strong>：律師<strong>不是 65 歲斷崖退休</strong>——現職名冊 65 歲(約126人)與 64 歲(約132人)相近、70 歲仍約 79 人、75 歲仍約 39 人在執業（<span id="spOver65Note">-</span>）。故本模型改採<strong>漸進退休</strong>（logistic hazard，退休率隨年齡上升），非「屆 65 全退」。因早年律師界較小、老齡人數本就偏低，實測年齡曲線為退休率<strong>上限</strong>，真實供給可能再高一些。考選部報考/及格數見上方「考選部先行指標」。
       </div>
     </div>
 
@@ -9448,6 +9458,45 @@ async function nlRankSearch() {
   }
 }
 
+// 考選部先行指標（exam_pipeline_stats，migration 097；律師=二試及格、司法官=三試錄取）
+async function loadExamStats() {
+  const { data, error } = await db.from('exam_pipeline_stats').select('*').order('year_roc');
+  if (error) throw error;
+  const rows = data || [];
+  const years = [...new Set(rows.map(r => r.year_roc))].sort((a, b) => a - b);
+  const pick = (exam, field) => years.map(y => {
+    const r = rows.find(x => x.year_roc === y && x.exam === exam);
+    return r ? r[field] : null;
+  });
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const ctx = document.getElementById('spExamChart');
+  if (!ctx) return;
+  if (chartInstances['spExam']) chartInstances['spExam'].destroy();
+  chartInstances['spExam'] = new Chart(ctx.getContext('2d'), {
+    data: {
+      labels: years.map(y => y + '年'),
+      datasets: [
+        { type: 'bar', label: '律師二試及格', data: pick('律師', 'final_pass'),
+          backgroundColor: '#c9a84c', yAxisID: 'y', order: 3 },
+        { type: 'bar', label: '司法官三試錄取', data: pick('司法官', 'final_pass'),
+          backgroundColor: '#4caf82', yAxisID: 'y', order: 3 },
+        { type: 'line', label: '律師一試報名', data: pick('律師', 'applicants'),
+          borderColor: '#4f8ef7', backgroundColor: '#4f8ef7', borderWidth: 2,
+          pointRadius: 2, tension: 0.25, fill: false, yAxisID: 'y1', order: 1 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: muted } },
+        y: { position: 'left', beginAtZero: true, ticks: { color: muted }, title: { display: true, text: '及格/錄取人數', color: muted, font: { size: 10 } } },
+        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: muted }, title: { display: true, text: '報名人數', color: muted, font: { size: 10 } } },
+      },
+    },
+  });
+}
+
 async function loadSupplyOnce() {
   if (_spLoaded) return;
   _spLoaded = true;
@@ -9457,6 +9506,7 @@ async function loadSupplyOnce() {
     _spData = data;
     _spAgeMap = {}; (data.age_hist || []).forEach(x => { _spAgeMap[x.age] = x.n; });
     renderSupply();
+    loadExamStats().catch(e => console.log('exam_pipeline_stats load error:', e));
     const s1 = document.getElementById('spIntakeSlider'), s2 = document.getElementById('spMidSlider');
     if (s1) s1.oninput = () => { document.getElementById('spIntakeVal').textContent = s1.value; renderSupplyProjection(); };
     if (s2) s2.oninput = () => { document.getElementById('spMidVal').textContent = s2.value; renderSupplyProjection(); };
