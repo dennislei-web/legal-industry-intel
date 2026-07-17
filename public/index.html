@@ -1315,7 +1315,55 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 鄉鎮市區調解為內政部統計通報之<strong>結案</strong>口徑（年更、非即時），全國 <strong id="adrDistricts">-</strong> 個鄉鎮市區、<strong id="adrMembers">-</strong> 位調解委員，平均每萬人口聲請 <strong id="adrPer10k">-</strong> 件。法院端為司法院官方 ODS <strong>新收</strong>口徑，僅涵蓋家事調解程序／調解裁定、高院移付調解與智商法院調解；<strong>地院民事聲請調解與勞動調解不在此份資料</strong>，法院端總量實際更高。成立之調解經法院核定後與民事確定判決有同一效力。
+        ※ 鄉鎮市區調解為內政部統計通報之<strong>結案</strong>口徑（年更、非即時），全國 <strong id="adrDistricts">-</strong> 個鄉鎮市區、<strong id="adrMembers">-</strong> 位調解委員，平均每萬人口聲請 <strong id="adrPer10k">-</strong> 件。法院端為司法院官方 ODS <strong>新收</strong>口徑，僅涵蓋家事調解程序／調解裁定、高院移付調解與智商法院調解；<strong>地院民事聲請調解與勞動調解不在此份資料</strong>，法院端總量實際更高。成立之調解經法院核定後與民事確定判決有同一效力。勞工局的勞資爭議行政調解另見「<a href="javascript:showTab('labor')" style="color:var(--blue);">勞資爭議</a>」子頁。
+      </div>
+    </div>
+
+    <!-- ==================== TAB: 勞資爭議（行政調解 — 勞動部開放資料月更，勞動紛爭的法定前端入口） ==================== -->
+    <div id="tab-labor" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        勞資爭議依<strong>勞資爭議處理法</strong>先進縣市勞工局<strong>調解</strong>（免費、多數案型為訴訟前的實質必經站），調解不成才走勞動法院——這裡是勞動紛爭市場的<strong>總量入口</strong>，法院看到的只是尖端。資料源：<a href="https://data.gov.tw/dataset/40149" target="_blank" style="color:var(--blue);">勞動部開放資料</a>（受理件數／類別／地區／行業，月更、滯後約 3 個月）＋本站裁判書終結檔（訴訟端對照）。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">年受理件數</div><div class="kpi-value" id="lbKpiCases">-</div><div class="kpi-sub" id="lbKpiCasesSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">涉及人數</div><div class="kpi-value" style="color:var(--blue);" id="lbKpiPersons">-</div><div class="kpi-sub">受集體爭議影響波動大</div></div>
+        <div class="kpi-card"><div class="kpi-label">工資＋資遣費</div><div class="kpi-value" style="color:var(--gold);" id="lbKpiWage">-</div><div class="kpi-sub" id="lbKpiWageSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">最新單月</div><div class="kpi-value" style="color:var(--green);" id="lbKpiLatest">-</div><div class="kpi-sub" id="lbKpiLatestSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 15 年受理趨勢——連兩年創歷史新高</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="lbTrendDesc">-</div>
+        <div class="chart-container" style="height:320px;"><canvas id="lbTrendChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129513; 爭議類別結構（近 10 年）——本質是「錢沒給足」的市場</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">工資（欠薪、加班費）＋資遣費常年合計約 <strong>2/3</strong>，加上退休金、職災補償等，金錢給付類爭議壓倒性多數；職災補償量不大但屬高金額、高複雜度案型。調整事項（要求調薪、變更工時等集體爭議）佔比極低——臺灣的勞資爭議幾乎全是<strong>個別權利事項</strong>。</div>
+        <div class="chart-container" style="height:320px;"><canvas id="lbCatChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#127961;&#65039; 縣市分布——六都 81%，高度都會化</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="lbRegionDesc">-</div>
+          <div class="chart-container" style="height:380px;"><canvas id="lbRegionChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#9878;&#65039; 漏斗對照：調解受理 vs 勞動訴訟終結</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">行政調解年受理 2.3–3.0 萬件，同期地院<strong>民事訴訟勞動案由終結僅約 2 千餘件</strong>（本站裁判書終結檔、下限口徑）——<strong>不到 1 成</strong>走完訴訟，中間是調解成立、和解與放棄。對律師業的意義：勞動案的主戰場在<strong>調解室與發函階段</strong>，能在調解端接住當事人的所，面對的是 10 倍大的漏斗上緣。</div>
+          <div class="chart-container" style="height:380px;"><canvas id="lbFunnelChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127981; 行業別分布——零售、製造、派遣是爭議溫床</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="lbIndDesc">-</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>行業</th><th style="text-align:right;">受理件數</th><th style="text-align:right;">佔比</th></tr></thead>
+            <tbody id="lbIndBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 勞動部開放資料為<strong>受理</strong>件數口徑（權利事項＋調整事項），非調解成立數；處理結果／成立率屬統計年報年資料，未納入本頁。地區含科技產業園區／科學園區（主管機關別）；中央（勞動部）自辦近乎 0，縣市圖未列。訴訟端為本站裁判書終結檔之民事訴訟勞動案由（工資／資遣費／退休金／僱傭關係／職業災害等關鍵字，覆蓋約 8 成、不含法院勞動調解成立即終結者），為<strong>下限估計</strong>。年份為民國年；來源月更、滯後約 3 個月。
       </div>
     </div>
 
@@ -3308,6 +3356,7 @@ const SECTIONS = {
     { tab: 'domain', label: '訴訟市場' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解市場' },
+    { tab: 'labor', label: '勞資爭議' },
     { tab: 'notary', label: '公證市場' },
     { tab: 'nonlit', label: '商標專利' },
   ],
@@ -3355,6 +3404,7 @@ function showTab(tab) {
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
   if (tab === 'adr') loadAdrOnce();
+  if (tab === 'labor') loadLaborOnce();
   if (tab === 'notary') loadNotaryOnce();
   if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'domain') initDomainTab();
@@ -8694,6 +8744,101 @@ async function loadAdrOnce() {
     _adrLoaded = false;
     const el = document.getElementById('adrKpiClosed'); if (el) el.textContent = '載入失敗';
     console.error('調解市場資料載入失敗', e);
+  }
+}
+
+// ===== 勞資爭議（行政調解 — 勞動部開放資料，靜態 data/labor_stats.json）=====
+let _lbLoaded = false;
+const _lbCharts = {};
+function _lbChart(id, cfg) {
+  if (_lbCharts[id]) _lbCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _lbCharts[id] = new Chart(el.getContext('2d'), cfg);
+  requestAnimationFrame(() => { if (_lbCharts[id]) _lbCharts[id].resize(); });
+}
+async function loadLaborOnce() {
+  if (_lbLoaded) return;
+  _lbLoaded = true;
+  try {
+    const d = await (await fetch('data/labor_stats.json?v=' + Date.now())).json();
+    const n = d.national, c = d.cats, ly = c.latest_year;
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    const lyCases = n.cases[n.years.indexOf(ly)], lyPersons = n.persons[n.years.indexOf(ly)];
+    const prevCases = n.cases[n.years.indexOf(ly) - 1];
+    // KPI
+    document.getElementById('lbKpiCases').textContent = (lyCases / 10000).toFixed(2) + ' 萬';
+    document.getElementById('lbKpiCasesSub').textContent = ly + ' 年（+' + ((lyCases / prevCases - 1) * 100).toFixed(1) + '%，歷史新高）';
+    document.getElementById('lbKpiPersons').textContent = (lyPersons / 10000).toFixed(1) + ' 萬';
+    const wageShare = (c.latest.find(x => x[0] === '工資')[2] + c.latest.find(x => x[0] === '資遣費')[2]).toFixed(1);
+    document.getElementById('lbKpiWage').textContent = wageShare + '%';
+    document.getElementById('lbKpiWageSub').textContent = ly + ' 年類別佔比';
+    const [lyy, lym] = d.latest.ym.split('-');
+    document.getElementById('lbKpiLatest').textContent = d.latest.cases.toLocaleString();
+    document.getElementById('lbKpiLatestSub').textContent = lyy + ' 年 ' + (+lym) + ' 月' + (d.latest.yoy_pct != null ? '（年增 ' + d.latest.yoy_pct + '%）' : '');
+    document.getElementById('lbTrendDesc').innerHTML =
+      '100 年 ' + (n.cases[0] / 10000).toFixed(2) + ' 萬 → ' + ly + ' 年 <strong>' + (lyCases / 10000).toFixed(2) + ' 萬件（+' +
+      ((lyCases / n.cases[0] - 1) * 100).toFixed(0) + '%）</strong>，113、114 連兩年創高，' + lyy + ' 年 ' + (+lym) + ' 月單月又年增 ' + d.latest.yoy_pct +
+      '%——勞動意識抬頭與關廠資遣潮雙驅動。涉及人數受大型集體爭議（罷工、關廠）呈脈衝尖峰（112 年 13.7 萬人）。';
+    // 1) 15 年趨勢：件數 bar + 人數 line（雙軸）
+    _lbChart('lbTrendChart', {
+      data: {
+        labels: n.years.map(x => x + '年'),
+        datasets: [
+          { type: 'bar', label: '受理件數', data: n.cases, backgroundColor: blue + 'cc', yAxisID: 'y', order: 2 },
+          { type: 'line', label: '涉及人數', data: n.persons, borderColor: gold, tension: 0.2, pointRadius: 2, yAxisID: 'y2', order: 1 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y.toLocaleString() } } }, scales: { y: { beginAtZero: true }, y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } }
+    });
+    // 2) 類別堆疊（近 10 年）
+    const cut = Math.max(0, c.years.length - 10);
+    const catColors = { '工資': blue, '資遣費': gold, '退休金': '#9b7ef7', '職災補償': red, '契約': green, '休假': '#5fc9e7', '勞保給付': '#e78fb3', '其他': muted };
+    _lbChart('lbCatChart', {
+      type: 'bar',
+      data: {
+        labels: c.years.slice(cut).map(x => x + '年'),
+        datasets: Object.keys(c.series).map(k => ({ label: k, data: c.series[k].slice(cut), backgroundColor: (catColors[k] || muted) + 'cc' }))
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y.toLocaleString() + ' 件' } } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+    });
+    // 3) 縣市分布（前 12，橫向）
+    const regs = d.regions.rows.slice(0, 12);
+    const sixShare = d.regions.rows.slice(0, 6).reduce((s, r) => s + r[2], 0).toFixed(0);
+    document.getElementById('lbRegionDesc').innerHTML =
+      d.regions.year + ' 年臺北 ' + d.regions.rows[0][1].toLocaleString() + ' 件全國最大（總部登記效應），六都合計 <strong>' + sixShare +
+      '%</strong>；科學園區獨立列計 ' + (d.regions.rows.find(r => r[0] === '科學園區') || [0, 0])[1] + ' 件。對照鄉鎮市調解「臺北量最低」，勞資爭議<strong>高度都會化</strong>——與律師供給地圖重疊。';
+    _lbChart('lbRegionChart', {
+      type: 'bar',
+      data: { labels: regs.map(r => r[0]), datasets: [{ label: d.regions.year + ' 年受理件數', data: regs.map(r => r[1]), backgroundColor: blue + 'cc' }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x.toLocaleString() + ' 件（' + regs[ctx.dataIndex][2] + '%）' } } }, scales: { x: { beginAtZero: true } } }
+    });
+    // 4) 漏斗對照：調解受理 vs 民訴勞動終結（西元→民國對齊）
+    if (d.lit && d.lit.years.length) {
+      const litYearsRoc = d.lit.years.map(y => y - 1911);
+      const medSeries = litYearsRoc.map(y => n.cases[n.years.indexOf(y)] ?? null);
+      _lbChart('lbFunnelChart', {
+        data: {
+          labels: litYearsRoc.map(x => x + '年'),
+          datasets: [
+            { type: 'bar', label: '行政調解受理', data: medSeries, backgroundColor: green + 'cc', order: 3 },
+            { type: 'bar', label: '民訴勞動案由終結（下限）', data: d.lit.cases, backgroundColor: red + 'cc', order: 2 },
+            { type: 'line', label: '訴訟終結／調解受理(%)', data: d.lit.cases.map((v, i) => medSeries[i] ? +(v / medSeries[i] * 100).toFixed(1) : null), borderColor: gold, tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 1 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + (ctx.dataset.yAxisID === 'y2' ? ctx.parsed.y + '%' : ctx.parsed.y.toLocaleString() + ' 件') } } }, scales: { y: { beginAtZero: true }, y2: { position: 'right', min: 0, max: 15, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } }
+      });
+    }
+    // 5) 行業表
+    const ind = d.industry.items;
+    document.getElementById('lbIndDesc').innerHTML =
+      d.industry.year + ' 年' + ind[0][0] + ' ' + ind[0][1].toLocaleString() + ' 件最大（' + ind[0][2] + '%）；<strong>支援服務業（含人力派遣）</strong>' +
+      (ind.find(x => x[0] === '支援服務業') || [0, 0])[1].toLocaleString() + ' 件——派遣勞動的爭議密度遠高於其就業占比；住宿餐飲、批發零售等低薪高流動行業是爭議溫床。';
+    document.getElementById('lbIndBody').innerHTML = ind.map(r =>
+      `<tr><td>${escHtml(r[0])}</td><td style="text-align:right;">${r[1].toLocaleString()}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${r[2]}%</td></tr>`).join('');
+  } catch (e) {
+    _lbLoaded = false;
+    const el = document.getElementById('lbKpiCases'); if (el) el.textContent = '載入失敗';
+    console.error('勞資爭議資料載入失敗', e);
   }
 }
 
