@@ -1788,6 +1788,33 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: INHOUSE (企業法務雷達，migration 096：inhouse_* RPC) ==================== -->
+    <div id="tab-inhouse" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        從法務部名冊反查登錄在<strong>企業／金融／機構</strong>（而非事務所）的執業律師。⚠️ 僅計「保留執業登錄」者＝<strong>嚴重下限</strong>（多數企業法務不維持登錄）；價值在「誰在養登錄律師」的雇主雷達與世代結構訊號。雇主名已歸戶（統一(股)公司寫法、合併分公司/分會）。
+      </div>
+      <div class="kpi-grid" id="ihKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;"></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">
+        <div class="card">
+          <div class="card-title">&#127942; 雇主排行（登錄律師數）</div>
+          <div id="ihKindTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
+            <table>
+              <thead><tr><th style="width:34px;">#</th><th>雇主</th><th>類型</th>
+                <th style="text-align:right;">律師</th><th style="text-align:right;">平均取證</th></tr></thead>
+              <tbody id="ihEmpBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128200; 各取證世代的非事務所登錄佔比</div>
+          <div id="ihCohort" style="margin-bottom:16px;"></div>
+          <div class="card-title">&#8644; 近 90 天 事務所 &#8596; 企業/機構 異動</div>
+          <div id="ihMoves" style="max-height:340px;overflow-y:auto;padding-right:4px;"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: CHANGES (異動追蹤) ==================== -->
     <div id="tab-changes" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -1931,38 +1958,6 @@
               <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">新進人數</th></tr></thead>
               <tbody id="ffIntakeBody"><tr><td colspan="3" class="loading">載入中</td></tr></tbody>
             </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 企業法務雷達（migration 096：inhouse_* RPC）===== -->
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--gold);">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127970; 企業法務雷達 — 非事務所登錄律師（in-house）
-        </div>
-        <div class="ff-body" style="display:none;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
-            從法務部名冊反查登錄在<strong>企業／金融／機構</strong>（而非事務所）的執業律師。⚠️ 僅計「保留執業登錄」者＝<strong>嚴重下限</strong>（多數企業法務不維持登錄）；價值在「誰在養登錄律師」的雇主雷達與世代結構訊號。雇主名已歸戶（統一(股)公司寫法、合併分公司/分會）。
-          </div>
-          <div class="kpi-grid" id="ihKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px;"></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;">
-            <div>
-              <div class="card-title" style="font-size:0.95rem;">&#127942; 雇主排行（登錄律師數）</div>
-              <div id="ihKindTabs" class="sub-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
-              <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
-                <table>
-                  <thead><tr><th style="width:34px;">#</th><th>雇主</th><th>類型</th>
-                    <th style="text-align:right;">律師</th><th style="text-align:right;">平均取證</th></tr></thead>
-                  <tbody id="ihEmpBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <div class="card-title" style="font-size:0.95rem;">&#128200; 各取證世代的非事務所登錄佔比</div>
-              <div id="ihCohort" style="margin-bottom:16px;"></div>
-              <div class="card-title" style="font-size:0.95rem;">&#8644; 近 90 天 事務所 &#8596; 企業/機構 異動</div>
-              <div id="ihMoves" style="max-height:300px;overflow-y:auto;padding-right:4px;"></div>
-            </div>
           </div>
         </div>
       </div>
@@ -3436,6 +3431,7 @@ const SECTIONS = {
     { tab: 'lawyers', label: '律師名錄' },
     { tab: 'firm-overview', label: '事務所總覽' },
     { tab: 'offices', label: '事務所名錄' },
+    { tab: 'inhouse', label: '企業法務雷達' },
     { tab: 'changes', label: '異動追蹤' },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
     { tab: 'law010', label: '010 合作律師', adminOnly: true },
@@ -3523,7 +3519,8 @@ function showTab(tab) {
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firm-overview') loadFirmOverviewOnce();
   if (tab === 'offices') loadOffices();
-  if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); loadInhouseOnce(); }
+  if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); }
+  if (tab === 'inhouse') loadInhouseOnce();
   if (tab === 'alumni' && isAdmin) loadAlumni();
   if (tab === 'law010' && isAdmin) loadLaw010();
   if (tab === 'judges') loadJudges();
