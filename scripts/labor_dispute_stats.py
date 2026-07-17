@@ -42,6 +42,13 @@ CAT_BUCKETS = [
 ]
 RE_YM = re.compile(r'(\d+)年\s*(\d+)月')
 
+# 勞動部委託法扶「勞工訴訟扶助專案」年度扶助（准予）件數——年報手工線，年更
+# 來源：法扶基金會年度報告書（laf.org.tw/publication，每年 4-5 月出前一年）
+# 各年報「勞動部委託辦理」節的「近三年勞工訴訟扶助專案扶助件數」表；
+# 2025 申請 4,246／准予比例 82.5%。2021 低點=疫情＋無集體訴訟（年報原文）。
+AID_SERIES = {2019: 3076, 2020: 3340, 2021: 1923, 2022: 3382,
+              2023: 1740, 2024: 1780, 2025: 3503}
+
 
 def fetch(url):
     req = urllib.request.Request(url, headers=UA)
@@ -194,6 +201,7 @@ def main():
         'regions': {'year': last_full_year, 'rows': region_rows},
         'industry': {'year': last_full_year, 'items': ind_items},
         'lit': lit,
+        'aid': {'years': sorted(AID_SERIES), 'cases': [AID_SERIES[y] for y in sorted(AID_SERIES)]},
     }
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'ok → {OUT}  最新 {latest["ym"]}（{latest["cases"]} 件）'

@@ -1373,8 +1373,8 @@
           <div class="chart-container" style="height:380px;"><canvas id="lbRegionChart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">&#9878;&#65039; 漏斗對照：調解受理 vs 勞動訴訟終結</div>
-          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">行政調解年受理 2.3–3.0 萬件，同期地院<strong>民事訴訟勞動案由終結僅約 2 千餘件</strong>（本站裁判書終結檔、下限口徑）——<strong>不到 1 成</strong>走完訴訟，中間是調解成立、和解與放棄。對律師業的意義：勞動案的主戰場在<strong>調解室與發函階段</strong>，能在調解端接住當事人的所，面對的是 10 倍大的漏斗上緣。</div>
+          <div class="card-title">&#9878;&#65039; 三層漏斗：調解受理 → 訴訟扶助核定 → 訴訟終結</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">行政調解年受理 2.3–3.0 萬件；中間層是勞動部委託法扶的<strong>勞工訴訟扶助專案</strong>年核定 1,700–3,500 件（＝有扶助律師代理的勞工，自費委任不在內、屬下限）；最下層地院<strong>民事訴訟勞動案由終結僅約 2 千餘件</strong>（本站裁判書終結檔、下限口徑）——<strong>不到 1 成</strong>走完訴訟，中間是調解成立、和解與放棄。對律師業的意義：勞動案的主戰場在<strong>調解室與發函階段</strong>，能在調解端接住當事人的所，面對的是 10 倍大的漏斗上緣。</div>
           <div class="chart-container" style="height:380px;"><canvas id="lbFunnelChart"></canvas></div>
         </div>
       </div>
@@ -1389,7 +1389,7 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 勞動部開放資料為<strong>受理</strong>件數口徑（權利事項＋調整事項），非調解成立數；處理結果／成立率屬統計年報年資料，未納入本頁。地區含科技產業園區／科學園區（主管機關別）；中央（勞動部）自辦近乎 0，縣市圖未列。訴訟端為本站裁判書終結檔之民事訴訟勞動案由（工資／資遣費／退休金／僱傭關係／職業災害等關鍵字，覆蓋約 8 成、不含法院勞動調解成立即終結者），為<strong>下限估計</strong>。年份為民國年；來源月更、滯後約 3 個月。
+        ※ 勞動部開放資料為<strong>受理</strong>件數口徑（權利事項＋調整事項），非調解成立數；處理結果／成立率屬統計年報年資料，未納入本頁。地區含科技產業園區／科學園區（主管機關別）；中央（勞動部）自辦近乎 0，縣市圖未列。訴訟端為本站裁判書終結檔之民事訴訟勞動案由（工資／資遣費／退休金／僱傭關係／職業災害等關鍵字，覆蓋約 8 成、不含法院勞動調解成立即終結者），為<strong>下限估計</strong>。扶助層＝勞動部委託法扶「<a href="https://www.laf.org.tw/service-project-detail/9" target="_blank" style="color:var(--blue);">勞工訴訟扶助專案</a>」年度扶助（准予）件數（法扶年度報告書，年更），涵蓋訴訟／法院勞動調解／裁決之律師代理等，<strong>限經濟弱勢勞工</strong>——自費委任不在內，故為「有律師的勞工」下限；2021 低點＝疫情＋無集體訴訟（年報原文）。行政調解階段另有勞動部補助各縣市的調解法律扶助（陪同／諮詢），無公開統計。年份為民國年；來源月更、滯後約 3 個月。
       </div>
     </div>
 
@@ -9132,17 +9132,19 @@ async function loadLaborOnce() {
       data: { labels: regs.map(r => r[0]), datasets: [{ label: d.regions.year + ' 年受理件數', data: regs.map(r => r[1]), backgroundColor: blue + 'cc' }] },
       options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x.toLocaleString() + ' 件（' + regs[ctx.dataIndex][2] + '%）' } } }, scales: { x: { beginAtZero: true } } }
     });
-    // 4) 漏斗對照：調解受理 vs 民訴勞動終結（西元→民國對齊）
+    // 4) 三層漏斗：調解受理 → 扶助核定 → 民訴勞動終結（西元→民國對齊）
     if (d.lit && d.lit.years.length) {
       const litYearsRoc = d.lit.years.map(y => y - 1911);
       const medSeries = litYearsRoc.map(y => n.cases[n.years.indexOf(y)] ?? null);
+      const aidSeries = d.lit.years.map(y => d.aid ? (d.aid.cases[d.aid.years.indexOf(y)] ?? null) : null);
       _lbChart('lbFunnelChart', {
         data: {
           labels: litYearsRoc.map(x => x + '年'),
           datasets: [
-            { type: 'bar', label: '行政調解受理', data: medSeries, backgroundColor: green + 'cc', order: 3 },
+            { type: 'bar', label: '行政調解受理', data: medSeries, backgroundColor: green + 'cc', order: 4 },
+            { type: 'bar', label: '勞工訴訟扶助核定（法扶）', data: aidSeries, backgroundColor: gold + 'cc', order: 3 },
             { type: 'bar', label: '民訴勞動案由終結（下限）', data: d.lit.cases, backgroundColor: red + 'cc', order: 2 },
-            { type: 'line', label: '訴訟終結／調解受理(%)', data: d.lit.cases.map((v, i) => medSeries[i] ? +(v / medSeries[i] * 100).toFixed(1) : null), borderColor: gold, tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 1 }
+            { type: 'line', label: '訴訟終結／調解受理(%)', data: d.lit.cases.map((v, i) => medSeries[i] ? +(v / medSeries[i] * 100).toFixed(1) : null), borderColor: muted, tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 1 }
           ]
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + (ctx.dataset.yAxisID === 'y2' ? ctx.parsed.y + '%' : ctx.parsed.y.toLocaleString() + ' 件') } } }, scales: { y: { beginAtZero: true }, y2: { position: 'right', min: 0, max: 15, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } } } }
