@@ -47,7 +47,10 @@ def load_rosters():
         rows = list(csv.DictReader(io.StringIO(r.content.decode('utf-8-sig'))))
         m = defaultdict(list)
         for row in rows:
-            m[row[name_col].strip()].append((row[id_col].strip(), (row[firm_col] or '').strip()))
+            firm = (row[firm_col] or '').strip()
+            if firm == '無':   # 名簿佔位值（未填執業處所），不可當事務所歸戶
+                firm = ''
+            m[row[name_col].strip()].append((row[id_col].strip(), firm))
         out[kind] = m
         print(f'名簿 {kind}: {len(rows)} 筆 / {len(m)} 唯一姓名')
     return out
