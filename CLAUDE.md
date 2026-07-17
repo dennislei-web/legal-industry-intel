@@ -131,6 +131,31 @@
   lawyer_judgment_stats.cases_5yr（MOJ 名冊姓名唯一者歸戶）÷ MOJ 人數，Lawsnote 案件數
   自此完全退出 UI 與統計鏈
 
+## 訴訟客戶集中度（migration 071）
+
+- `scripts/client_concentration.py` → `lawyer_client_concentration` 表（律師 modal「訴訟客戶集中度」卡）
+- 口徑：近 12 個月裁判書當事人欄、法人（公司/組織/機關）per 案去重、top1_share 分母含個人當事人案件；
+  分級 A（≥5 件且 Top1≥60%）/ B（≥3 件且 Top1≥50%）/ C 分散 / D（<3 件）
+- **2026-07-17 起涵蓋全體有出庭律師**（首發僅人名事務所 1,609 位）；`collect` 逐月產 `{ym}_clients.jsonl.gz`
+  快取（RAR 處理完即刪），`aggregate` 讀快取全量重建上傳——調法人判定/分級門檻只需重跑 aggregate
+- 視窗滾動更新：手動跑 `python client_concentration.py run <START> <END>`（新月份 collect 快取即可，
+  舊月快取還在就不會重下載）；無排程，資料月更後想更新再跑
+
+## 司法人力：書記官（migration 104）
+
+- 三表：`clerk_staff_stats`（審級×年 104–114）/ `clerk_court_snapshot`（114 年各法院 29 個）/
+  `clerk_exam_stats`（司法特考四等書記官 104–114）；前端＝產業分析＞供給預測 tab 尾端
+  「司法人力—書記官」區塊（KPI＋特考／審級趨勢／各法院三卡）
+- `scripts/clerk_staff_stats.py` 解析司法統計年報各機關「員工實有人數」ODS（年更：年報
+  6–7 月出，換 `CLERK_STATS_LP`（114 年報=2475）重跑，輸出 INSERT 貼進新 migration）
+- **解析陷阱**：欄位靠英文表頭分類（中文表頭跨列合併不可靠）——`Assist-ant Clerk`（錄事，
+  印刷斷字）與 `Clerk of the Accounting Office`（會計課員）都不是書記官；寬表會橫向分頁成
+  多張 sheet（地院機關別 4 張）；法院名藏在 `<text:s/>` 的 tail，要用 `itertext()`；
+  個別地院只有男/女列（無計列）、高院表法院名在第 1–2 欄巢狀
+- 特考數字＝公職王/高點彙整（108–114 兩源交叉一致；104–107 需用名額無公開資料留 NULL）；
+  書記官異動不經人審會，**無**法官 `judge_transfers` 式結構資料；缺額（2026-03 全國 353 人）
+  僅新聞/司法院說明，前端靜態引用
+
 ## 010 合作律師 tab（migration 073）
 
 - 律師區子頁 `law010`（喆律校友會旁）：法律010 平台合作律師 × MOJ 現職所 × 官方案量
