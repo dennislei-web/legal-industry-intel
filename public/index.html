@@ -562,6 +562,7 @@
     <button class="nav-btn active" id="navBtn_lawyer" onclick="showSection('lawyer')">&#9878;&#65039; 律師</button>
     <button class="nav-btn" id="navBtn_judge" onclick="showSection('judge')">&#127963;&#65039; 法官</button>
     <button class="nav-btn" id="navBtn_prosecutor" onclick="showSection('prosecutor')">&#9876;&#65039; 檢察官</button>
+    <button class="nav-btn" id="navBtn_clerk" onclick="showSection('clerk')">&#128203; 書記官</button>
     <button class="nav-btn" id="navBtn_jstat" onclick="showSection('jstat')">&#128202; 司法統計</button>
     <button class="nav-btn" id="navBtn_industry" onclick="showSection('industry')">&#128269; 產業分析</button>
     <button class="nav-btn" id="navBtn_sources" onclick="showSection('sources')">資料來源</button>
@@ -1232,11 +1233,12 @@
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ <strong>關鍵事實</strong>：律師<strong>不是 65 歲斷崖退休</strong>——現職名冊 65 歲(約126人)與 64 歲(約132人)相近、70 歲仍約 79 人、75 歲仍約 39 人在執業（<span id="spOver65Note">-</span>）。故本模型改採<strong>漸進退休</strong>（logistic hazard，退休率隨年齡上升），非「屆 65 全退」。因早年律師界較小、老齡人數本就偏低，實測年齡曲線為退休率<strong>上限</strong>，真實供給可能再高一些。考選部報考/及格數見上方「考選部先行指標」。
       </div>
+    </div>
 
-      <!-- ===== 司法人力：書記官（migration 104 — clerk_staff_stats / clerk_court_snapshot / clerk_exam_stats） ===== -->
-      <div style="border-top:1px solid var(--border);margin:24px 0 16px;"></div>
+    <!-- ==================== TAB: 書記官總覽（第一層「書記官」區 — mig 104；2026-07-17 自供給預測升級） ==================== -->
+    <div id="tab-clerk-overview" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-        <strong>司法人力 — 書記官</strong>：律師供給之外，司法<strong>量能</strong>的先行指標。開庭排程、筆錄、結案文書都卡書記官——人不夠，案件就塞車。114 年底全國法院書記官 <strong id="ckKpiTotal">-</strong> 人；司法院揭露 2026 年 3 月全國缺額 <strong style="color:var(--red);">353 人（缺額率 10.02%）</strong>，新北地院缺 71（正額報到僅 2 人）、士林 29、北院 23、高本院與中院各 24。
+        書記官是司法<strong>量能</strong>的先行指標——開庭排程、筆錄、結案文書都卡書記官，人不夠案件就塞車。114 年底全國法院書記官 <strong id="ckKpiTotal">-</strong> 人；司法院揭露 2026 年 3 月全國缺額 <strong style="color:var(--red);">353 人（缺額率 10.02%）</strong>，新北地院缺 71（正額報到僅 2 人）、士林 29、北院 23、高本院與中院各 24。資料源：司法統計年報「員工實有人數」＋司法特考四等（皆年更）；書記官<strong>無個人名冊與異動決議</strong>可查（不經人審會），本區為總量統計。
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">全國書記官（114 年底）</div><div class="kpi-value" id="ckKpiAll">-</div><div class="kpi-sub" id="ckKpiAllSub">-</div></div>
@@ -3622,6 +3624,11 @@ const SECTIONS = {
     { tab: 'prosecutors', label: '檢察官' },
     { tab: 'pros-offices', label: '檢察署' },
   ],
+  // 書記官（mig 104）：僅總量統計無個人名冊（年報員工實有人數＋四等特考），
+  // 2026-07-17 自 產業分析＞供給預測 升為第一層
+  clerk: [
+    { tab: 'clerk-overview', label: '總覽' },
+  ],
   jstat: [
     { tab: 'jstat-overview', label: '總覽' },
     { tab: 'jstat-organs', label: '各法院比較' },
@@ -3631,7 +3638,8 @@ const SECTIONS = {
   ],
   // 產業分析：律師人力（供給預測）→ 訴訟市場（4 子分頁）→ 法扶/調解/商標專利
   // （「人才流動」已併入 律師區＞異動追蹤；「事務所版圖」已移至 律師區＞事務所總覽；
-  //  「律師活動量榜」已移至 律師區＞律師總覽 — 2026-07-15 總覽拆分）
+  //  「律師活動量榜」已移至 律師區＞律師總覽 — 2026-07-15 總覽拆分；
+  //  「司法人力—書記官」已升為第一層「書記官」區 — 2026-07-17）
   industry: [
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
@@ -3682,6 +3690,7 @@ function showTab(tab) {
   // Lazy load data
   if (tab === 'judge-overview') loadJudgeOverviewOnce();
   if (tab === 'prosecutor-overview') loadProsecutorOverviewOnce();
+  if (tab === 'clerk-overview') loadClerkOnce();
   if (tab === 'pros-offices') loadProsOffices();
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'supply') loadSupplyOnce();
@@ -10059,7 +10068,19 @@ async function loadExamStats() {
   });
 }
 
-// 司法人力：書記官（migration 104；年報員工實有人數＋司法特考四等）
+// 書記官區（migration 104；年報員工實有人數＋司法特考四等）
+let _ckLoaded = false;
+async function loadClerkOnce() {
+  if (_ckLoaded) return;
+  _ckLoaded = true;
+  try {
+    await loadClerkStats();
+  } catch (e) {
+    _ckLoaded = false;
+    const el = document.getElementById('ckKpiAll'); if (el) el.textContent = '載入失敗';
+    console.error('書記官區載入失敗', e);
+  }
+}
 async function loadClerkStats() {
   const [staff, courts, exams] = await Promise.all([
     db.from('clerk_staff_stats').select('*').order('year_roc'),
@@ -10167,7 +10188,6 @@ async function loadSupplyOnce() {
     _spAgeMap = {}; (data.age_hist || []).forEach(x => { _spAgeMap[x.age] = x.n; });
     renderSupply();
     loadExamStats().catch(e => console.log('exam_pipeline_stats load error:', e));
-    loadClerkStats().catch(e => console.log('clerk_stats load error:', e));
     const s1 = document.getElementById('spIntakeSlider'), s2 = document.getElementById('spMidSlider');
     if (s1) s1.oninput = () => { document.getElementById('spIntakeVal').textContent = s1.value; renderSupplyProjection(); };
     if (s2) s2.oninput = () => { document.getElementById('spMidVal').textContent = s2.value; renderSupplyProjection(); };

@@ -144,8 +144,8 @@
 ## 司法人力：書記官（migration 104）
 
 - 三表：`clerk_staff_stats`（審級×年 104–114）/ `clerk_court_snapshot`（114 年各法院 29 個）/
-  `clerk_exam_stats`（司法特考四等書記官 104–114）；前端＝產業分析＞供給預測 tab 尾端
-  「司法人力—書記官」區塊（KPI＋特考／審級趨勢／各法院三卡）
+  `clerk_exam_stats`（司法特考四等書記官 104–114）；前端＝**第一層「書記官」區**（檢察官後）
+  單一總覽 tab（KPI＋特考／審級趨勢／各法院三卡；2026-07-17 自供給預測尾端升級，無個人名冊）
 - `scripts/clerk_staff_stats.py` 解析司法統計年報各機關「員工實有人數」ODS（年更：年報
   6–7 月出，換 `CLERK_STATS_LP`（114 年報=2475）重跑，輸出 INSERT 貼進新 migration）
 - **解析陷阱**：欄位靠英文表頭分類（中文表頭跨列合併不可靠）——`Assist-ant Clerk`（錄事，
