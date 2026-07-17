@@ -217,7 +217,8 @@ def parse_case(key, recs):
     tender = {
         'tender_key': key,
         'unit_id': unit_id,
-        'unit_name': rec.get('unit_name'),
+        # 定期彙送類公告的紀錄層級沒有 unit_name，但明細的機關資料區塊有
+        'unit_name': g('機關資料:機關名稱') or rec.get('unit_name'),
         'job_number': job_number,
         'title': g('採購資料:標案名稱') or rec['brief'].get('title'),
         'category': g('採購資料:標的分類'),

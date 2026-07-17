@@ -1479,7 +1479,7 @@
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 口徑限制：(1) 以「廠商名含<strong>法律／律師</strong>」搜尋聯集抓取——會計師事務所、管顧公司承攬的法制案不在內，屬律師業視角的<strong>下限口徑</strong>；(2) 10 萬元以下小額採購依法不強制公告，故「10 萬以下」桶接近空集合；(3) <strong>定期彙送</strong>類公告（約 3 成）缺機關名稱、招標／決標方式欄位，機關統計與競爭度僅涵蓋有明細的決標公告；(4) 部分案件決標金額依規定不公開（約 300 件），計件不計額；(5) 金額為決標總價，多年期常年顧問以總價一次計入決標年。年份為西元。
+        ※ 口徑限制：(1) 以「廠商名含<strong>法律／律師</strong>」搜尋聯集抓取——會計師事務所、管顧公司承攬的法制案不在內，屬律師業視角的<strong>下限口徑</strong>；(2) 10 萬元以下小額採購依法不強制公告，故「10 萬以下」桶接近空集合；(3) <strong>定期彙送</strong>類公告（約 3 成）機關名稱已自決標明細補回，惟部分案仍缺招標／決標方式欄位，競爭度統計僅涵蓋有明細的決標公告；(4) 部分案件決標金額依規定不公開（約 300 件），計件不計額；(5) 金額為決標總價，多年期常年顧問以總價一次計入決標年。年份為西元。
       </div>
     </div>
 
@@ -6784,7 +6784,7 @@ function renderCauseCard(cs, ambiguous) {
 }
 
 // 律師訴訟客戶集中度卡（lawyer_client_concentration：近 12 個月當事人欄法人客戶；
-// 目前僅涵蓋「人名事務所」律師，無資料時不顯示）
+// 涵蓋全體視窗內有出庭的律師（scripts/client_concentration.py 產出），無資料時不顯示）
 const CONC_TIERS = {
   A: { label: '高度集中｜推定專屬服務', color: 'var(--red)', desc: '出庭案件絕大多數代理同一法人，業務實質上服務單一客戶（可能為受僱法務開所或長期專屬顧問，判決無法區分聘僱形式）' },
   B: { label: '中度集中｜偏單一客戶', color: 'var(--orange)', desc: '半數以上案件代理同一法人，訴訟業務高度依賴單一客戶' },
@@ -6866,7 +6866,7 @@ function renderClientCard(cc, ambiguous) {
   const win = `${cc.window_start.slice(0, 4)}-${cc.window_start.slice(4)}～${cc.window_end.slice(0, 4)}-${cc.window_end.slice(4)}`;
   return `
     <div class="card" style="margin-bottom:16px;">
-      <div class="card-title">&#127970; 訴訟客戶集中度 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 12 個月（${win}）公開裁判書當事人欄，法人客戶 per 案去重；目前僅涵蓋人名事務所律師</span></div>
+      <div class="card-title">&#127970; 訴訟客戶集中度 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 12 個月（${win}）公開裁判書當事人欄，法人客戶 per 案去重；涵蓋視窗內有出庭之全體律師</span></div>
       ${ambiguous ? '<div style="font-size:0.75rem;color:var(--orange);margin-bottom:8px;">&#9888; 名冊中有同名律師，以下為同名合併數字</div>' : ''}
       <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;margin-bottom:10px;">
         <div>
@@ -9391,7 +9391,7 @@ async function loadGvUnits() {
     const { data, error } = await db.rpc('gov_tender_unit_top', { p_limit: 15 });
     if (error) throw error;
     document.getElementById('gvUnitDesc').innerHTML =
-      '大買家集中在<strong>國際訴訟／藥品食品爭訟（食藥署）、國營事業工程與商務爭議（中油、台電）、基金操作顧問（勞保局、勞動基金運用局）</strong>——都是需要長期專業團隊的機關，也是大案的來源。※ 定期彙送類公告無機關名，不在此表。';
+      '大買家集中在<strong>國際訴訟／藥品食品爭訟（食藥署）、國營事業工程與商務爭議（中油、台電）、基金操作顧問（勞保局、勞動基金運用局）</strong>——都是需要長期專業團隊的機關，也是大案的來源。';
     body.innerHTML = (data || []).map((r, i) => `<tr>
       <td>${i + 1}</td>
       <td>${escHtml(r.unit_name)}</td>
