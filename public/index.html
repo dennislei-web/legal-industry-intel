@@ -8732,9 +8732,10 @@ async function loadInhouseOnce() {
     renderIhKpis(sRes.data, mRes.data || []);
     renderIhCohort(sRes.data);
     renderIhMoves(mRes.data || []);
-    // 類型 chips ＋ 首載全部
+    // 類型 chips ＋ 首載全部（0 筆的類別不出按鈕，mig 100 修正後「其他」已清空）
     const tabs = document.getElementById('ihKindTabs');
-    tabs.innerHTML = ['全部', ...IH_KINDS].map((k, i) =>
+    const ihPresent = new Set((sRes.data.by_kind || []).filter(k => k.n > 0).map(k => k.kind));
+    tabs.innerHTML = ['全部', ...IH_KINDS.filter(k => ihPresent.has(k))].map((k, i) =>
       `<button class="sub-tab-btn${i === 0 ? ' active' : ''}" data-ihkind="${k}">${k}</button>`).join('');
     tabs.querySelectorAll('.sub-tab-btn').forEach(btn => {
       btn.onclick = () => {
@@ -8817,7 +8818,7 @@ async function ihLoadEmployers(kind) {
       <td style="font-size:0.75rem;color:${IH_KIND_COLORS[t.kind] || 'var(--text-muted)'};">${escHtml(t.kind)}</td>
       <td style="text-align:right;color:var(--gold);font-weight:600;">${t.n}</td>
       <td style="text-align:right;color:var(--text-muted);">民國${t.avg_lic_year ?? '—'}年</td>
-    </tr>`).join('') || '<tr><td colspan="5" class="loading">無資料</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:12px 0;">此類別目前無登錄雇主</td></tr>';
   } catch (e) {
     body.innerHTML = `<tr><td colspan="5" style="color:var(--red);">載入失敗：${escHtml(e.message || '')}</td></tr>`;
   }
