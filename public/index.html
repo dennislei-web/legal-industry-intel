@@ -1307,7 +1307,7 @@
     <!-- ==================== TAB: 調解市場（ADR — 鄉鎮市調解＋法院調解，訴訟市場旁的免費替代品） ==================== -->
     <div id="tab-adr" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-        鄉鎮市調解<strong>免費</strong>、成立經法院核定後<strong>與確定判決同一效力</strong>——是站在訴訟市場旁邊的替代品，不看這塊會誤判紛爭市場總量。資料源：<strong>內政統計通報</strong>（鄉鎮市區調解，年更）＋<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院官方收結件統計</a>（法院端調解）。
+        鄉鎮市調解<strong>免費</strong>、成立經法院核定後<strong>與確定判決同一效力</strong>——是站在訴訟市場旁邊的替代品，不看這塊會誤判紛爭市場總量；頁尾另有<strong>仲裁市場</strong>（量小額大的鏡像市場）。資料源：<strong>內政統計通報</strong>（鄉鎮市區調解，年更）＋<a href="https://opendata.judicial.gov.tw" target="_blank" style="color:var(--blue);">司法院官方收結件統計</a>（法院端調解）＋仲裁協會年度業務報告。
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">鄉鎮市調解結案</div><div class="kpi-value" id="adrKpiClosed">-</div><div class="kpi-sub">113 年（民國）</div></div>
@@ -1354,6 +1354,45 @@
           </div>
         </div>
       </div>
+      <!-- ===== 仲裁市場（機構仲裁 — 中華民國仲裁協會年度業務報告，靜態數字年更手動）===== -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 仲裁市場（機構仲裁）— 高標的商務紛爭的私法院</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">
+          仲裁判斷與法院確定判決<strong>同一效力</strong>、一審終局、程序不公開——工程與大型商務合約的主流爭議解決條款。件數少但單件標的以「億」計，是調解（量大額小）的鏡像市場。資料源：<a href="https://www.arbitration.org.tw/annulreport.php" target="_blank" style="color:var(--blue);">中華民國仲裁協會年度業務報告</a>（2025）。
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">2025 受理</div><div style="font-size:1.5rem;font-weight:700;color:var(--blue);">119 件</div><div style="font-size:0.75rem;color:var(--green);">▲ +19% vs 2024</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">標的金額</div><div style="font-size:1.5rem;font-weight:700;color:var(--gold);">141.6 億</div><div style="font-size:0.75rem;color:var(--green);">▲ +138%，重返百億</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">單件平均標的</div><div style="font-size:1.5rem;font-weight:700;color:var(--gold);">1.19 億</div><div style="font-size:0.75rem;color:var(--text-muted);">創新高（2024：0.59 億）</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">純民間 B2B 案件</div><div style="font-size:1.5rem;font-weight:700;color:var(--green);">84%</div><div style="font-size:0.75rem;color:var(--text-muted);">歷來公部門約佔 7 成</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">2025 案件類型分布（件）</div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:0.8rem;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">工程（42.8%）</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:100%;height:100%;background:var(--blue);opacity:0.85;"></div></div><span style="width:32px;text-align:right;font-weight:600;">51</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">其他（智財/勞資/信託…）</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:100%;height:100%;background:var(--text-muted);opacity:0.6;"></div></div><span style="width:32px;text-align:right;font-weight:600;">51</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">服務</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:21.6%;height:100%;background:var(--green);opacity:0.85;"></div></div><span style="width:32px;text-align:right;font-weight:600;">11</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">金融</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:5.9%;height:100%;background:var(--gold);opacity:0.85;"></div></div><span style="width:32px;text-align:right;font-weight:600;">3</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">促參</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:3.9%;height:100%;background:var(--red);opacity:0.85;"></div></div><span style="width:32px;text-align:right;font-weight:600;">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:150px;">貿易</span><div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:2%;height:100%;background:var(--orange,#e0883c);opacity:0.85;"></div></div><span style="width:32px;text-align:right;font-weight:600;">1</span></div>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;">
+              量體歷史錨點：2001 年高峰 <strong>237 件</strong>（標的約 230 億）→ 2015 年 103 件（約 660 億）→ 2016–2020 一度跌破百件 → 2024 年 100 件 → <strong>2025 年 119 件回升</strong>。
+            </div>
+          </div>
+          <div style="font-size:0.82rem;line-height:1.7;">
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">結構訊號（2025 年報）</div>
+            <div style="margin-bottom:6px;">&#128293; <strong>「黃金交叉」</strong>：工程案歷來佔 7–8 成，2025 首度與非工程案（智財、經紀、勞資、信託、家事、租賃）<strong>各佔 42.8% 並列</strong>——商務仲裁動能成形。</div>
+            <div style="margin-bottom:6px;">&#9889; 工程案內部轉型：傳統住宅/公共工程比例下降，<strong>綠能工程（離岸風電、儲能）與促參能源案</strong>成為高標的金額主要來源。</div>
+            <div>&#127970; 當事人結構翻轉：<strong>純民間 B2B 案件佔 84%</strong>（歷來公部門約 70%）、民間企業間爭議量年增 15%——仲裁從「公共工程專屬」走向私部門商務市場。</div>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:12px;">
+          ※ 口徑＝中華民國仲裁協會（國內最大仲裁機構）受理件數；另有台灣營建仲裁協會等其他機構仲裁與 ad hoc 仲裁未計，全市場總量略高於此。法院端「選任仲裁人及仲裁」民事非訟事件量極小（本站終結微資料近 5 年僅 168 件）。年更：協會年度業務報告發布後手動更新本卡數字。
+        </div>
+      </div>
+
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 鄉鎮市區調解為內政部統計通報之<strong>結案</strong>口徑（年更、非即時），全國 <strong id="adrDistricts">-</strong> 個鄉鎮市區、<strong id="adrMembers">-</strong> 位調解委員，平均每萬人口聲請 <strong id="adrPer10k">-</strong> 件。法院端為司法院官方 ODS <strong>新收</strong>口徑，僅涵蓋家事調解程序／調解裁定、高院移付調解與智商法院調解；<strong>地院民事聲請調解與勞動調解不在此份資料</strong>，法院端總量實際更高。成立之調解經法院核定後與民事確定判決有同一效力。勞工局的勞資爭議行政調解另見「<a href="javascript:showTab('labor')" style="color:var(--blue);">勞資爭議</a>」子頁。
       </div>
@@ -3427,7 +3466,7 @@ const SECTIONS = {
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
     { tab: 'laf', label: '法扶市場' },
-    { tab: 'adr', label: '調解市場' },
+    { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
     { tab: 'notary', label: '公證市場' },
     { tab: 'nonlit', label: '商標專利' },
