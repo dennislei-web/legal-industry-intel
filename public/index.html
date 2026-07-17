@@ -1398,6 +1398,91 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 政府標案（B2G 法律服務 — 政府電子採購網決標公告，市場最透明的買方） ==================== -->
+    <div id="tab-govtender" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        政府是法律服務市場<strong>最透明的買方</strong>——每筆委任的機關、金額、投標者、得標者全部公開，是唯一能看到「成交價」的法律市場切片。資料源：<a href="https://web.pcc.gov.tw" target="_blank" style="color:var(--blue);">政府電子採購網</a>決標公告（經 <a href="https://pcc.g0v.tw" target="_blank" style="color:var(--blue);">g0v 採購網鏡像</a> API 抓取，「廠商名含法律／律師」聯集口徑，2000 年起）。個別律師得標榜見「<a href="#" onclick="gotoTab('lawyer','overview');return false;" style="color:var(--blue);">律師區＞律師總覽</a>」，各事務所標案明細見事務所詳情。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">累計決標案</div><div class="kpi-value" id="gvKpiTotal">-</div><div class="kpi-sub" id="gvKpiTotalSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">累計決標金額</div><div class="kpi-value" style="color:var(--gold);" id="gvKpiAmt">-</div><div class="kpi-sub" id="gvKpiAmtSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label" id="gvKpiYearLabel">最新完整年</div><div class="kpi-value" style="color:var(--blue);" id="gvKpiYear">-</div><div class="kpi-sub" id="gvKpiYearSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">單一投標率（近5年）</div><div class="kpi-value" style="color:var(--red);" id="gvKpiSingle">-</div><div class="kpi-sub">僅 1 家投標即決標</div></div>
+        <div class="kpi-card"><div class="kpi-label">得標事務所/廠商</div><div class="kpi-value" style="color:var(--green);" id="gvKpiFirms">-</div><div class="kpi-sub">歷來至少得 1 標</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 年度決標趨勢——件數與金額</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvTrendDesc">-</div>
+        <div class="chart-container" style="height:320px;"><canvas id="gvTrendChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#129355; 競爭度——每案投標家數</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvBidDesc">-</div>
+          <div class="chart-container" style="height:300px;"><canvas id="gvBidChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128181; 單案金額分布——常態案 vs 大案</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvBucketDesc">-</div>
+          <div class="chart-container" style="height:300px;"><canvas id="gvBucketChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127963;&#65039; 哪些機關最花錢買法律服務——機關 TOP 15（按累計金額）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvUnitDesc">-</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>機關</th><th style="text-align:right;">決標案</th><th style="text-align:right;">累計金額</th><th style="text-align:right;">平均單案</th><th style="text-align:right;">最近決標</th></tr></thead>
+            <tbody id="gvUnitBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127942; 得標事務所排行 TOP 20</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <div id="gvFirmTabs" style="display:flex;gap:4px;">
+            <button class="sub-tab-btn active" data-sort="wins" style="padding:4px 12px;font-size:0.75rem;">按得標數</button>
+            <button class="sub-tab-btn" data-sort="amount" style="padding:4px 12px;font-size:0.75rem;">按金額</button>
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">分所已歸戶主所名；點所名看完整標案明細</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">得標數</th><th style="text-align:right;">累計金額</th><th style="text-align:right;">近5年標數</th><th style="text-align:right;">近5年金額</th><th style="text-align:right;">得標率</th><th style="text-align:right;">最近得標</th></tr></thead>
+            <tbody id="gvFirmBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128176; 歷史大案 TOP 10——單案決標金額</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">政府法律服務的天花板案型：基金操作法律顧問、國際訴訟／仲裁、大型工程爭議——都是<strong>多年期常年顧問或跨國案件</strong>，與常態 10–50 萬的單案委任是兩個市場。</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th style="text-align:right;">年度</th><th>機關</th><th>案名</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
+            <tbody id="gvBigBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128269; 標案明細查詢</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
+          <input id="gvSearch" type="text" placeholder="搜尋機關 / 案名關鍵字..." onkeydown="if(event.key==='Enter')gvSearchRun()" style="flex:1;min-width:200px;padding:7px 12px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.8rem;">
+          <select id="gvYearSel" onchange="gvSearchRun()" style="padding:6px 10px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.78rem;"><option value="">全部年度</option></select>
+          <button class="tab-btn" onclick="gvSearchRun()" style="padding:6px 14px;font-size:0.78rem;">查詢</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="gvListMeta">-</div>
+        <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>決標日</th><th>機關</th><th>案名</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
+            <tbody id="gvListBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 口徑限制：(1) 以「廠商名含<strong>法律／律師</strong>」搜尋聯集抓取——會計師事務所、管顧公司承攬的法制案不在內，屬律師業視角的<strong>下限口徑</strong>；(2) 10 萬元以下小額採購依法不強制公告，故「10 萬以下」桶接近空集合；(3) <strong>定期彙送</strong>類公告（約 3 成）缺機關名稱、招標／決標方式欄位，機關統計與競爭度僅涵蓋有明細的決標公告；(4) 部分案件決標金額依規定不公開（約 300 件），計件不計額；(5) 金額為決標總價，多年期常年顧問以總價一次計入決標年。年份為西元。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 勞資爭議（行政調解 — 勞動部開放資料月更，勞動紛爭的法定前端入口） ==================== -->
     <div id="tab-labor" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -3515,6 +3600,7 @@ const SECTIONS = {
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
     { tab: 'laf', label: '法扶市場' },
+    { tab: 'govtender', label: '政府標案' },
     { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
     { tab: 'notary', label: '公證市場' },
@@ -3564,6 +3650,7 @@ function showTab(tab) {
   if (tab === 'family') loadFamilyOnce();
   if (tab === 'supply') loadSupplyOnce();
   if (tab === 'laf') loadLafOnce();
+  if (tab === 'govtender') loadGovTenderOnce();
   if (tab === 'adr') loadAdrOnce();
   if (tab === 'labor') loadLaborOnce();
   if (tab === 'notary') loadNotaryOnce();
@@ -9171,6 +9258,231 @@ async function loadAdrOnce() {
     const el = document.getElementById('adrKpiClosed'); if (el) el.textContent = '載入失敗';
     console.error('調解市場資料載入失敗', e);
   }
+}
+
+// ===== 政府標案（B2G 法律服務 — gov_tenders/gov_tender_firms，mig 063/077/103）=====
+let _gvLoaded = false;
+function loadGovTenderOnce() {
+  if (_gvLoaded) return;
+  _gvLoaded = true;
+  loadGvOverview();
+  loadGvUnits();
+  loadGvFirms();
+  wireGovSortTabs('gvFirmTabs', loadGvFirms);
+  loadGvBig();
+  gvSearchRun();
+}
+
+async function loadGvOverview() {
+  try {
+    const [{ data: ys, error: e1 }, { data: bd, error: e2 }, { data: bk, error: e3 }, { count: nFirms }] = await Promise.all([
+      db.rpc('gov_tender_year_stats'),
+      db.rpc('gov_tender_bid_dist'),
+      db.rpc('gov_tender_amount_buckets'),
+      db.from('gov_firm_stats').select('firm_key', { count: 'exact', head: true }).gt('wins', 0),
+    ]);
+    if (e1 || e2 || e3) throw (e1 || e2 || e3);
+    const years = ys || [];
+    const nowY = new Date().getFullYear();
+    const full = years.filter(r => r.year < nowY);
+    const lastFull = full[full.length - 1];
+    const totCases = years.reduce((a, r) => a + Number(r.cases), 0);
+    const totAmt = years.reduce((a, r) => a + Number(r.total_amount || 0), 0);
+    // KPI
+    document.getElementById('gvKpiTotal').textContent = totCases.toLocaleString();
+    document.getElementById('gvKpiTotalSub').textContent = years[0].year + ' 年起累計';
+    document.getElementById('gvKpiAmt').textContent = (totAmt / 1e8).toFixed(0) + ' 億';
+    document.getElementById('gvKpiAmtSub').textContent = '年均約 ' + (totAmt / years.length / 1e8).toFixed(1) + ' 億';
+    document.getElementById('gvKpiYearLabel').textContent = lastFull.year + ' 年決標';
+    document.getElementById('gvKpiYear').textContent = Number(lastFull.cases).toLocaleString() + ' 件';
+    document.getElementById('gvKpiYearSub').textContent = govAmtHtml(Number(lastFull.total_amount || 0)) + '元';
+    const y5 = years.filter(r => r.year >= nowY - 4);
+    const s5 = y5.reduce((a, r) => a + Number(r.single_bid), 0), c5 = y5.reduce((a, r) => a + Number(r.cases), 0);
+    document.getElementById('gvKpiSingle').textContent = c5 ? Math.round(s5 * 100 / c5) + '%' : '-';
+    if (nFirms != null) document.getElementById('gvKpiFirms').textContent = nFirms.toLocaleString();
+    // 年度趨勢：件數 bar + 金額 line（雙軸）
+    const peak = full.reduce((a, r) => Number(r.cases) > Number(a.cases) ? r : a, full[0]);
+    const drop = Math.round((Number(peak.cases) - Number(lastFull.cases)) * 100 / Number(peak.cases));
+    document.getElementById('gvTrendDesc').innerHTML =
+      `件數 <strong>${peak.year} 年 ${Number(peak.cases).toLocaleString()} 件見頂</strong>後回落，${lastFull.year} 年 ${Number(lastFull.cases).toLocaleString()} 件（<strong>−${drop}%</strong>）；金額則維持 5–6 億量級——<strong>案子變少、單價變大</strong>，常態小案在萎縮、大案集中到少數機關與少數所。${nowY <= (years[years.length - 1] || {}).year ? nowY + ' 年進行中、非全年數。' : ''}`;
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+    if (chartInstances['gvTrend']) chartInstances['gvTrend'].destroy();
+    chartInstances['gvTrend'] = new Chart(document.getElementById('gvTrendChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: years.map(r => r.year === nowY ? r.year + '*' : String(r.year)),
+        datasets: [
+          { type: 'bar', label: '決標件數', data: years.map(r => Number(r.cases)), backgroundColor: 'rgba(79,142,247,0.55)', yAxisID: 'y', order: 2 },
+          { type: 'line', label: '決標金額（億）', data: years.map(r => +(Number(r.total_amount || 0) / 1e8).toFixed(2)), borderColor: '#c9a84c', backgroundColor: '#c9a84c', borderWidth: 2, pointRadius: 2, tension: 0.25, yAxisID: 'y2', order: 1 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: muted, maxTicksLimit: 14 } },
+          y: { ticks: { color: muted }, beginAtZero: true, title: { display: true, text: '件', color: muted } },
+          y2: { position: 'right', ticks: { color: muted }, beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '億元', color: muted } },
+        },
+      },
+    });
+    // 競爭度 doughnut
+    const bids = bd || [];
+    const bTot = bids.reduce((a, r) => a + Number(r.cases), 0);
+    const single = bids.find(r => r.sort === 1);
+    document.getElementById('gvBidDesc').innerHTML =
+      `<strong>${Math.round(Number(single.cases) * 100 / bTot)}% 的案子只有 1 家投標</strong>——限制性招標＋最低標是主流（多為機關直接邀標的常年顧問續約），真正的公開競價是少數；有 2 家以上到場的，多是金額較大或指標性案件。`;
+    if (chartInstances['gvBid']) chartInstances['gvBid'].destroy();
+    chartInstances['gvBid'] = new Chart(document.getElementById('gvBidChart').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: bids.map(r => r.bidders),
+        datasets: [{ data: bids.map(r => Number(r.cases)), backgroundColor: ['#e05c5c', '#e0883c', '#c9a84c', '#4caf82', '#4f8ef7'], borderWidth: 0 }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => ` ${c.label}：${c.parsed.toLocaleString()} 件（${Math.round(c.parsed * 100 / bTot)}%）` } },
+        },
+      },
+    });
+    // 金額分布：件數 bar + 金額 bar（雙軸）
+    const bks = bk || [];
+    const bkCase = bks.reduce((a, r) => a + Number(r.cases), 0);
+    const small = bks.filter(r => r.sort <= 2).reduce((a, r) => a + Number(r.cases), 0);
+    const bigAmt = bks.filter(r => r.sort >= 5).reduce((a, r) => a + Number(r.total_amount || 0), 0);
+    const allAmt = bks.reduce((a, r) => a + Number(r.total_amount || 0), 0);
+    document.getElementById('gvBucketDesc').innerHTML =
+      `<strong>${Math.round(small * 100 / bkCase)}% 的案子在 50 萬以下</strong>（常態單案委任、鑑定與諮詢），但 <strong>500 萬以上大案只佔 ${Math.round(bks.filter(r => r.sort >= 5).reduce((a, r) => a + Number(r.cases), 0) * 100 / bkCase)}% 件數、吃掉 ${Math.round(bigAmt * 100 / allAmt)}% 金額</strong>——量在小案、錢在大案。`;
+    if (chartInstances['gvBucket']) chartInstances['gvBucket'].destroy();
+    chartInstances['gvBucket'] = new Chart(document.getElementById('gvBucketChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: bks.map(r => r.bucket),
+        datasets: [
+          { type: 'bar', label: '件數', data: bks.map(r => Number(r.cases)), backgroundColor: 'rgba(79,142,247,0.55)', yAxisID: 'y' },
+          { type: 'bar', label: '金額（億）', data: bks.map(r => +(Number(r.total_amount || 0) / 1e8).toFixed(1)), backgroundColor: 'rgba(201,168,76,0.6)', yAxisID: 'y2' },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+        scales: {
+          x: { ticks: { color: muted, font: { size: 10 } } },
+          y: { ticks: { color: muted }, beginAtZero: true, title: { display: true, text: '件', color: muted } },
+          y2: { position: 'right', ticks: { color: muted }, beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: '億元', color: muted } },
+        },
+      },
+    });
+    // 年度下拉（明細查詢用）
+    const sel = document.getElementById('gvYearSel');
+    for (let i = years.length - 1; i >= 0; i--) {
+      const o = document.createElement('option');
+      o.value = years[i].year; o.textContent = years[i].year;
+      sel.appendChild(o);
+    }
+  } catch (e) { console.error('政府標案總覽載入失敗', e); }
+}
+
+async function loadGvUnits() {
+  const body = document.getElementById('gvUnitBody');
+  try {
+    const { data, error } = await db.rpc('gov_tender_unit_top', { p_limit: 15 });
+    if (error) throw error;
+    document.getElementById('gvUnitDesc').innerHTML =
+      '大買家集中在<strong>國際訴訟／藥品食品爭訟（食藥署）、國營事業工程與商務爭議（中油、台電）、基金操作顧問（勞保局、勞動基金運用局）</strong>——都是需要長期專業團隊的機關，也是大案的來源。※ 定期彙送類公告無機關名，不在此表。';
+    body.innerHTML = (data || []).map((r, i) => `<tr>
+      <td>${i + 1}</td>
+      <td>${escHtml(r.unit_name)}</td>
+      <td style="text-align:right;">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '-'}</td>
+      <td style="text-align:right;">${r.total_amount && r.cases ? Math.round(Number(r.total_amount) / Number(r.cases) / 1e4).toLocaleString() + ' 萬' : '-'}</td>
+      <td style="text-align:right;">${r.last_year || '-'}</td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+async function loadGvFirms(sort = 'wins') {
+  const body = document.getElementById('gvFirmBody');
+  body.innerHTML = '<tr><td colspan="8"><div class="loading">載入中</div></td></tr>';
+  try {
+    const byAmt = sort === 'amount';
+    const { data, error } = await db.from('gov_firm_stats')
+      .select('firm_key, wins, total_amount, wins_5y, amount_5y, bids, last_win_year')
+      .gt('wins', 0).like('firm_key', '%事務所%')
+      .order(byAmt ? 'total_amount' : 'wins', { ascending: false, nullsFirst: false })
+      .order(byAmt ? 'wins' : 'total_amount', { ascending: false, nullsFirst: false })
+      .limit(20);
+    if (error) throw error;
+    body.innerHTML = (data || []).map((r, i) => `<tr>
+      <td>${i + 1}</td>
+      <td>${firmLink(r.firm_key)}</td>
+      <td style="text-align:right;font-weight:600;">${Number(r.wins).toLocaleString()}</td>
+      <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開'}</td>
+      <td style="text-align:right;">${r.wins_5y || 0}</td>
+      <td style="text-align:right;">${r.amount_5y ? govAmtHtml(Number(r.amount_5y)) : '-'}</td>
+      <td style="text-align:right;">${r.bids ? Math.round(Number(r.wins) * 100 / Number(r.bids)) + '%' : '-'}</td>
+      <td style="text-align:right;">${r.last_win_year || '-'}</td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = `<tr><td colspan="8" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+async function loadGvBig() {
+  const body = document.getElementById('gvBigBody');
+  try {
+    const { data, error } = await db.from('gov_tenders')
+      .select('unit_name, title, award_year, total_amount, gov_tender_firms(firm_name, is_winner)')
+      .not('total_amount', 'is', null)
+      .order('total_amount', { ascending: false }).limit(10);
+    if (error) throw error;
+    body.innerHTML = (data || []).map((r, i) => `<tr>
+      <td>${i + 1}</td>
+      <td style="text-align:right;">${r.award_year || '-'}</td>
+      <td style="font-size:0.8rem;">${escHtml(r.unit_name || '（定期彙送，機關未載）')}</td>
+      <td style="font-size:0.8rem;max-width:320px;">${escHtml(r.title || '-')}</td>
+      <td style="text-align:right;color:var(--gold);font-weight:600;">${govAmtHtml(Number(r.total_amount))}</td>
+      <td style="font-size:0.8rem;">${gvWinnersHtml(r.gov_tender_firms)}</td>
+    </tr>`).join('');
+  } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+// 得標廠商 cell：事務所可點開 modal（截主所名），其餘純文字
+function gvWinnersHtml(firms) {
+  const w = (firms || []).filter(f => f.is_winner);
+  if (!w.length) return '<span style="color:var(--text-muted);">-</span>';
+  return w.map(f => {
+    const m = f.firm_name.match(/^.+?事務所/);
+    return m ? firmLink(m[0], '', escHtml(f.firm_name)) : escHtml(f.firm_name);
+  }).join('、');
+}
+
+async function gvSearchRun() {
+  const body = document.getElementById('gvListBody');
+  const meta = document.getElementById('gvListMeta');
+  body.innerHTML = '<tr><td colspan="5"><div class="loading">載入中</div></td></tr>';
+  try {
+    const kw = (document.getElementById('gvSearch').value || '').trim();
+    const yr = document.getElementById('gvYearSel').value;
+    let q = db.from('gov_tenders')
+      .select('unit_name, title, award_date, total_amount, gov_tender_firms(firm_name, is_winner)', { count: 'exact' })
+      .order('award_date', { ascending: false, nullsFirst: false }).limit(50);
+    if (kw) {
+      const esc = kw.replace(/[%_,()]/g, '');
+      q = q.or(`title.ilike.%${esc}%,unit_name.ilike.%${esc}%`);
+    }
+    if (yr) q = q.eq('award_year', yr);
+    const { data, count, error } = await q;
+    if (error) throw error;
+    meta.textContent = `共 ${(count || 0).toLocaleString()} 件符合，列出最近 ${Math.min(50, data ? data.length : 0)} 件（按決標日）`;
+    body.innerHTML = (data || []).map(r => `<tr>
+      <td style="white-space:nowrap;">${r.award_date || '-'}</td>
+      <td style="font-size:0.8rem;">${escHtml(r.unit_name || '（定期彙送）')}</td>
+      <td style="font-size:0.8rem;max-width:320px;">${escHtml(r.title || '-')}</td>
+      <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開'}</td>
+      <td style="font-size:0.8rem;">${gvWinnersHtml(r.gov_tender_firms)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-muted);">查無資料</td></tr>';
+  } catch (e) { body.innerHTML = `<tr><td colspan="5" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
 }
 
 // ===== 勞資爭議（行政調解 — 勞動部開放資料，靜態 data/labor_stats.json）=====
