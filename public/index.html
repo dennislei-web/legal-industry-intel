@@ -12657,5 +12657,21 @@ async function showCourtDetail(name) {
   </div>
 </div>
 
+<script>
+// modal 疊層修正：z-index 原本全是 1000，疊層順序由 DOM 順序決定，
+// 從領域下鑽（causeGroupModal）點事務所會讓 firmModal（DOM 較前）開在底下。
+// 這裡監聽每個 overlay 的 display 切換，後開的一律墊高蓋在最上面。
+(function () {
+  let z = 1000;
+  document.querySelectorAll('.modal-overlay').forEach(el => {
+    new MutationObserver(() => {
+      const open = el.style.display !== 'none';
+      if (open && !el._onTop) { el._onTop = true; el.style.zIndex = ++z; }
+      else if (!open && el._onTop) { el._onTop = false; }
+    }).observe(el, { attributes: true, attributeFilter: ['style'] });
+  });
+})();
+</script>
+
 </body>
 </html>
