@@ -6239,6 +6239,9 @@ async function showLawyerDetail(name, certNumber) {
   modal.style.display = 'flex';
   titleEl.textContent = name;
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
+  // modal 內互跳（配對卡點其他律師）時捲回頂部
+  bodyEl.scrollTop = 0;
+  if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
 
   // 查 lawyers_with_stats（MOJ + 全聯會 + Lawsnote + 官方裁判書統計）
   let query = db.from('lawyers_with_stats').select('*').eq('name', name);
@@ -6755,6 +6758,12 @@ function renderMarketGrowth(rows) {
 }
 
 // 律師配對關係卡：對到的法官 / 協同律師 / 對造律師（近 5 年 rolling，lawyer_pair_summary RPC）
+// 律師姓名 → 可點連結（modal 內互跳；名冊查無者由 fallback 顯示歷史統計）
+function lawyerNameLink(name, style) {
+  if (!name) return '';
+  return `<a href="#" onclick="showLawyerDetail('${escHtml(name).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;${style || ''}">${escHtml(name)}</a>`;
+}
+
 function renderPairCard(pairs) {
   if (!pairs) return '';
   const judges = pairs.judges || [], co = pairs.cocounsel || [], op = pairs.opposing || [];
@@ -6793,9 +6802,9 @@ function renderPairCard(pairs) {
           list(judges, j => `${escHtml(j.judge)} <span style="color:var(--text-muted);font-size:0.75rem;">${escHtml(shortCourt(j.court))}</span>`,
                'rgba(79,142,247,0.7)', '無資料'))}
         ${col('常協同律師', '同案同造（含同所同僚、共同代理）',
-          list(co, c => escHtml(c.peer), 'rgba(76,175,130,0.7)', '無協同紀錄'))}
+          list(co, c => lawyerNameLink(c.peer), 'rgba(76,175,130,0.7)', '無協同紀錄'))}
         ${col('常對造律師', '民/家/行政、兩造皆委任時',
-          list(op, o => escHtml(o.peer), 'rgba(224,92,92,0.7)', '無對造紀錄（多數案件對造未委任律師）'))}
+          list(op, o => lawyerNameLink(o.peer), 'rgba(224,92,92,0.7)', '無對造紀錄（多數案件對造未委任律師）'))}
       </div>
     </div>`;
 }
