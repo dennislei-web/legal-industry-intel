@@ -6245,11 +6245,18 @@ async function showLawyerDetail(name, certNumber) {
   if (certNumber) query = query.eq('cert_number', certNumber);
   const { data: combined, error } = await query.limit(1);
 
-  if (error || !combined || !combined.length) {
-    bodyEl.innerHTML = `<div style="color:var(--red);padding:20px;">查詢失敗: ${error?.message || '找不到資料'}</div>`;
-    return;
+  let l;
+  if (combined && combined.length) {
+    l = combined[0];
+  } else {
+    // 名冊查無（已停止執業/轉任公職等）→ 若官方裁判書統計有紀錄，改渲染精簡版歷史 profile
+    const { data: js } = await db.from('lawyer_judgment_stats').select('name').eq('name', name).maybeSingle();
+    if (!js) {
+      bodyEl.innerHTML = `<div style="color:var(--red);padding:20px;">查詢失敗: ${error?.message || '找不到資料'}</div>`;
+      return;
+    }
+    l = { name, not_in_roster: true };
   }
-  const l = combined[0];
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
   let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [];
@@ -6316,6 +6323,7 @@ async function showLawyerDetail(name, certNumber) {
   if (l.has_twba) sources.push('<span class="badge badge-blue" title="全國律師聯合會全國執業名冊有登錄" style="cursor:help;">全聯會</span>');
   if (l.has_lawsnote) sources.push('<span class="badge badge-orange">Lawsnote</span>');
   if (l.is_historical) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);" title="僅見於歷史裁判書資料，現行名冊查無且近 5 年無官方案件（推定已離開執業）">歷史名冊</span>');
+  if (l.not_in_roster) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--orange) 18%, transparent);color:var(--orange);cursor:help;" title="法務部/全聯會現行律師名冊查無此人，推定已停止執業或轉任公職、司法官等；以下為官方裁判書之歷史出庭統計">已不在現行名冊</span>');
 
   // 負責人標記（人工白名單優先，否則一人所自動認定）
   const linfo = leaderInfo(name, l.firm_name);
@@ -6357,6 +6365,14 @@ async function showLawyerDetail(name, certNumber) {
       ${leaderBadge}
     </div>
 
+    ${l.not_in_roster ? `
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--orange);">
+      <div style="font-size:0.85rem;line-height:1.7;">
+        此律師<b style="color:var(--orange);">不在現行律師名冊</b>（法務部／全聯會皆查無登錄），推定已停止執業或轉任公職、司法官等。<br>
+        基本資料（事務所、證號、公會）無法提供；以下呈現司法院公開裁判書中的<b>歷史出庭統計</b>。
+      </div>
+    </div>
+    ` : `
     <div class="card" style="margin-bottom:16px;padding:0;">
       <table style="width:100%;font-size:0.9rem;">
         <tbody>
@@ -6378,6 +6394,7 @@ async function showLawyerDetail(name, certNumber) {
         </tbody>
       </table>
     </div>
+    `}
 
     ${renderIndepDirCard(indepDirs)}
 
