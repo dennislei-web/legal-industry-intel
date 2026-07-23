@@ -4972,8 +4972,9 @@ function renderLeaderBadge(name, inline = false) {
 }
 
 // ============================================================
-// 一人所自動推定所長（migration 060：moj_solo_firm_lawyers view）
-// 口徑：名稱含「事務所」、分所合併（同 firmKeyRe）後全所僅 1 位且狀態「正常」
+// 一人所自動推定所長（migration 060 → 106：moj_solo_firm_lawyers view）
+// 口徑：名稱含「事務所」、分所合併（同 firmKeyRe）後全所僅 1 位且狀態「正常」；
+//       另含「登記名稱＝本人姓名（＋律師）」的個人執業者（mig 106，約 60 位）
 // 系統一律視同所長，與人工 FIRM_LEADERS 白名單同等顯示（白名單優先）
 // ============================================================
 const SOLO_FIRM_KEY_RE = /^(.+?(?:法律|律師)事務所)/;
@@ -5088,7 +5089,7 @@ function leaderInfo(name, firmName) {
   const ov = LEADER_OVERRIDES && LEADER_OVERRIDES.get(name);
   if (ov) return ov;
   if (FIRM_LEADERS[name]) return FIRM_LEADERS[name];
-  if (!SOLO_FIRM_MAP || !name || !firmName || !/事務所/.test(firmName)) return null;
+  if (!SOLO_FIRM_MAP || !name || !firmName) return null; // 個人姓名登錄也可能在 map（mig 106），不再限定含「事務所」
   return SOLO_FIRM_MAP.get(soloFirmKey(firmName)) === name ? `${firmName}｜所長` : null;
 }
 
@@ -5364,9 +5365,11 @@ async function loadOfficeAgeSeniority() {
   const currentRocYear = currentYear - 1911;
 
   // 分開計算事務所 vs 法人的平均年齡和年資
+  // 「登記名稱＝本人姓名（＋律師）」視同個人執業一人所（mig 106 口徑），不算企業法務
   const isFirmOffice = o => /事務所/.test(o || '');
-  const firmRows = rows.filter(r => isFirmOffice(r.office_normalized));
-  const corpRows = rows.filter(r => r.office_normalized && !isFirmOffice(r.office_normalized));
+  const isOwnNameOffice = r => !!(r.name && r.office_normalized && (r.office_normalized === r.name || r.office_normalized === r.name + '律師'));
+  const firmRows = rows.filter(r => isFirmOffice(r.office_normalized) || isOwnNameOffice(r));
+  const corpRows = rows.filter(r => r.office_normalized && !isFirmOffice(r.office_normalized) && !isOwnNameOffice(r));
 
   // 律師身分結構（推估）：firm_key 正規化與 moj_firm_statistics() 同構（migration 048）
   // 所長 = 單人所律師 or 姓名出現在所名；多人所若無人掛名，仍假定每所有 1 位所長（自受雇數移轉）
@@ -5464,8 +5467,8 @@ async function loadOfficeAgeSeniority() {
     const senArr = firmSenMap[o.firm_name];
     o._avg_age = ageArr ? +(ageArr.reduce((a, b) => a + b, 0) / ageArr.length).toFixed(1) : null;
     o._avg_sen = senArr ? +(senArr.reduce((a, b) => a + b, 0) / senArr.length).toFixed(1) : null;
-    // 一人所推定所長：口徑統一走 moj_solo_firm_lawyers view（mig 060）
-    o._solo_name = (SOLO_FIRM_MAP && /事務所/.test(o.firm_name)) ? (SOLO_FIRM_MAP.get(soloFirmKey(o.firm_name)) || null) : null;
+    // 一人所推定所長：口徑統一走 moj_solo_firm_lawyers view（mig 060 → 106，含個人姓名登錄）
+    o._solo_name = SOLO_FIRM_MAP ? (SOLO_FIRM_MAP.get(soloFirmKey(o.firm_name)) || null) : null;
   }
   renderOffices();
 }
@@ -5512,7 +5515,7 @@ function renderOffices() {
       <td style="font-size:0.82rem;">${(() => {
         const ls = getFirmLeaders(o.firm_name);
         if (ls.length) return ls.map(n => `${renderLeaderBadge(n)} ${lawyerLink(n)}`).join('<br>');
-        if (o._solo_name) return `<span title="一人所：全所僅此一位執業律師，系統認定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${lawyerLink(o._solo_name)}</span>`;
+        if (o._solo_name) return `<span title="一人所／個人執業登錄：全所僅此一位執業律師，系統認定為所長" style="cursor:help;"><span style="color:var(--gold);">👑</span> ${lawyerLink(o._solo_name)}</span>`;
         return '<span style="color:var(--text-muted);">-</span>';
       })()}</td>
       <td style="text-align:center;">${o.avg_cases != null ? Number(o.avg_cases).toLocaleString() : '-'}</td>
@@ -5790,8 +5793,10 @@ async function showFirmDetail(firmName) {
             <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th>地區</th><th>聯繫</th>
           </tr></thead>
           <tbody>${(() => {
-            // 一人所：唯一「正常」狀態律師即所長（口徑同 mig 060 view，這裡用手上名單直接判）
-            const soloName = (/事務所/.test(firmName) && total === 1 && allLawyers[0].state_desc === '正常') ? allLawyers[0].name : null;
+            // 一人所：唯一「正常」狀態律師即所長（口徑同 mig 106 view，這裡用手上名單直接判；含個人姓名登錄）
+            const soloName = (total === 1 && allLawyers[0].state_desc === '正常'
+              && (/事務所/.test(firmName) || firmName === allLawyers[0].name || firmName === allLawyers[0].name + '律師'))
+              ? allLawyers[0].name : null;
             // 手動標註（前台 override 優先於硬編碼白名單）
             const manualLeader = n => (LEADER_OVERRIDES && LEADER_OVERRIDES.get(n)) || FIRM_LEADERS[n] || null;
             return [...allLawyers].sort((a, b) => {
