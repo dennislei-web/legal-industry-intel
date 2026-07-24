@@ -211,6 +211,17 @@ def query_lic_status(lic_no):
     return None, ('gone' if status in ('empty', 'notfound') else 'flaky')
 
 
+def guild_to_region(guilds):
+    """從第一個公會名推斷 main_region（與 moj_lawyer_scraper 的地區慣例一致）"""
+    if not guilds:
+        return None
+    s = guilds[0].replace('社團法人', '').strip()
+    if '全國' in s or '聯合會' in s:
+        return '全國'
+    m = re.match(r'^(.+?)律師公會', s)
+    return m.group(1) if m else None
+
+
 def to_lawyer_record(lic_no, data):
     """轉換為 moj_lawyers 表格式"""
     # guild_name 可能是字串或 list
@@ -233,6 +244,7 @@ def to_lawyer_record(lic_no, data):
         'office': data.get('office'),
         'office_normalized': normalize_office(data.get('office')),
         'guild_names': guilds,
+        'main_region': guild_to_region(guilds),
         'court': court,
         'birth_year': data.get('birthsday') if isinstance(data.get('birthsday'), int) else None,
         'state': data.get('state'),
