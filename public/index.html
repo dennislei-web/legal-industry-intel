@@ -5055,6 +5055,7 @@ function renderExJudicialCard(exJud, jMonths, pros) {
         ${kpi(Number(p.case_count_total || 0).toLocaleString(), '具名案件（起訴/到庭）', 'var(--purple)')}
         ${kpi(offices.length || '-', '任職地檢署', 'var(--purple)')}
       </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">※ 起訴檢察官在卸任後數年仍會具名於審理中案件的裁判書，期間尾端有遞延，實際卸任時點通常早於此。</div>
       ${offices.length ? `<table style="width:100%;font-size:0.82rem;"><thead><tr><th style="text-align:left;font-weight:400;color:var(--text-muted);">地檢署</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">期間</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">具名案件</th></tr></thead><tbody>
         ${offices.map(o => `<tr><td style="padding:3px 0;">${escHtml(o.office_name || '-')}</td><td style="text-align:right;color:var(--text-muted);white-space:nowrap;">${ym(o.first_yyyymm)} ～ ${ym(o.last_yyyymm)}</td><td style="text-align:right;font-weight:600;">${Number(o.case_count_total || 0).toLocaleString()}</td></tr>`).join('')}
       </tbody></table>` : ''}
