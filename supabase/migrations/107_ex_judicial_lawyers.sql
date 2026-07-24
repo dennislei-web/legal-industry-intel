@@ -1,10 +1,12 @@
 -- 107: 前法官/前檢察官 × 現行律師名冊比對（ex_judicial_lawyers）
 --
 -- 口徑：judge_month_stats（裁判書法官欄逐月）與 prosecutor_stats（起訴/到庭檢察官）
--- 的姓名 × moj_lawyers 現行名冊交集。純姓名比對，同名風險用兩道訊號剔除：
+-- 的姓名 × moj_lawyers 現行名冊交集。純姓名比對，同名風險用三道訊號剔除：
 --   1. overlap_years：司法官任期「中段」年份（頭尾轉換年不算）該姓名仍以律師身分
 --      出庭的年數 ≥2 → 視為同名兩人（conflict）
 --   2. 律師證號民國年落在任期中段（現職司法官不可能中途新領律師證）→ conflict
+--   3. 律師首次入冊月（min(scraped_at)，upsert 不覆蓋≈首見）≤ 司法官最後具名月
+--      → 司法官還在任時律師已同時在冊（交易型律師無出庭、訊號1測不到的同名）→ conflict
 -- 前端只顯示 confidence in ('high','medium')，並在 tooltip 註明為姓名比對推定。
 
 CREATE TABLE IF NOT EXISTS ex_judicial_lawyers (
@@ -39,7 +41,8 @@ AS $fn$
 
   -- 法官側
   WITH ml AS (
-    SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year
+    SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year,
+           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym
     FROM moj_lawyers
     GROUP BY name
   ),
@@ -74,6 +77,7 @@ AS $fn$
            WHEN ml.lic_year IS NOT NULL
                 AND (1911 + ml.lic_year) > left(jm.f, 4)::int
                 AND (1911 + ml.lic_year) < left(jm.l, 4)::int THEN 'conflict'
+           WHEN ml.first_seen_ym <= jm.l THEN 'conflict'
            WHEN jm.months < 6 OR jm.total < 10 THEN 'uncertain'
            WHEN COALESCE(ov.n, 0) = 1 THEN 'medium'
            ELSE 'high'
@@ -89,7 +93,8 @@ AS $fn$
 
   -- 檢察官側
   WITH ml AS (
-    SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year
+    SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year,
+           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym
     FROM moj_lawyers
     GROUP BY name
   ),
@@ -120,6 +125,7 @@ AS $fn$
            WHEN ml.lic_year IS NOT NULL
                 AND (1911 + ml.lic_year) > left(pm.f, 4)::int
                 AND (1911 + ml.lic_year) < left(pm.l, 4)::int THEN 'conflict'
+           WHEN ml.first_seen_ym <= pm.l THEN 'conflict'
            WHEN pm.total < 10 THEN 'uncertain'
            WHEN COALESCE(ov.n, 0) = 1 THEN 'medium'
            ELSE 'high'
