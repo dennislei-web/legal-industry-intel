@@ -7,6 +7,9 @@
 --   2. 律師證號民國年落在任期中段（現職司法官不可能中途新領律師證）→ conflict
 --   3. 律師首次入冊月（min(scraped_at)，upsert 不覆蓋≈首見）≤ 司法官最後具名月
 --      → 司法官還在任時律師已同時在冊（交易型律師無出庭、訊號1測不到的同名）→ conflict
+--   4. 年齡檢核：司法官任期起始年時該律師未滿 25 歲（司法官最年輕約 26-27）→ conflict
+--      （案例：林敬修，民國 89 年生，被比對到 2000-2012 高院同名法官）
+--   5. 領證間隔：律師證號年比司法官最後具名年晚 >5 年（真轉任幾乎 1-2 年內領證）→ uncertain
 -- 前端只顯示 confidence in ('high','medium')，並在 tooltip 註明為姓名比對推定。
 
 CREATE TABLE IF NOT EXISTS ex_judicial_lawyers (
@@ -42,7 +45,8 @@ AS $fn$
   -- 法官側
   WITH ml AS (
     SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year,
-           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym
+           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym,
+           max(birth_year) AS byr  -- 同名取最年輕（任一同名者年齡不合即視為 ambiguous）
     FROM moj_lawyers
     GROUP BY name
   ),
@@ -78,6 +82,10 @@ AS $fn$
                 AND (1911 + ml.lic_year) > left(jm.f, 4)::int
                 AND (1911 + ml.lic_year) < left(jm.l, 4)::int THEN 'conflict'
            WHEN ml.first_seen_ym <= jm.l THEN 'conflict'
+           WHEN ml.byr IS NOT NULL AND ml.byr < 200
+                AND left(jm.f, 4)::int - (1911 + ml.byr) < 25 THEN 'conflict'
+           WHEN ml.lic_year IS NOT NULL
+                AND (1911 + ml.lic_year) > left(jm.l, 4)::int + 5 THEN 'uncertain'
            WHEN jm.months < 6 OR jm.total < 10 THEN 'uncertain'
            WHEN COALESCE(ov.n, 0) = 1 THEN 'medium'
            ELSE 'high'
@@ -94,7 +102,8 @@ AS $fn$
   -- 檢察官側
   WITH ml AS (
     SELECT name, min(NULLIF(substring(lic_no from '^\(?(\d{2,3})'), '')::int) AS lic_year,
-           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym
+           to_char(min(scraped_at), 'YYYYMM') AS first_seen_ym,
+           max(birth_year) AS byr  -- 同名取最年輕（任一同名者年齡不合即視為 ambiguous）
     FROM moj_lawyers
     GROUP BY name
   ),
@@ -126,6 +135,10 @@ AS $fn$
                 AND (1911 + ml.lic_year) > left(pm.f, 4)::int
                 AND (1911 + ml.lic_year) < left(pm.l, 4)::int THEN 'conflict'
            WHEN ml.first_seen_ym <= pm.l THEN 'conflict'
+           WHEN ml.byr IS NOT NULL AND ml.byr < 200
+                AND left(pm.f, 4)::int - (1911 + ml.byr) < 25 THEN 'conflict'
+           WHEN ml.lic_year IS NOT NULL
+                AND (1911 + ml.lic_year) > left(pm.l, 4)::int + 5 THEN 'uncertain'
            WHEN pm.total < 10 THEN 'uncertain'
            WHEN COALESCE(ov.n, 0) = 1 THEN 'medium'
            ELSE 'high'
