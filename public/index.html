@@ -4461,7 +4461,7 @@ async function loadLawyers() {
 
     const linfo = leaderInfo(l.name, l.firm_name);
     return `<tr>
-      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${linfo ? ' <span title="' + escHtml(linfo) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${INDEP_LIC_MAP && l.moj_lic_no && INDEP_LIC_MAP.get(l.moj_lic_no) ? ` <span title="上市櫃/興櫃獨立董事 ×${INDEP_LIC_MAP.get(l.moj_lic_no)} 席" style="font-size:0.62rem;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 3px;vertical-align:middle;cursor:help;">董</span>` : ''}${GOV_LAWYER_MAP && GOV_LAWYER_MAP.get(l.name) ? ` <span title="政府標案得標 ${GOV_LAWYER_MAP.get(l.name)} 件（一人所/個人名義歸戶${l.name_ambiguous ? '；名冊有同名律師，可能為同名合併' : ''}）" style="font-size:0.62rem;color:var(--teal,#3fb6a8);border:1px solid var(--teal,#3fb6a8);border-radius:4px;padding:1px 3px;vertical-align:middle;cursor:help;">標</span>` : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
+      <td><a href="#" onclick="showLawyerDetail('${escHtml(l.name).replace(/'/g, "\\'")}','${escHtml(l.cert_number || '').replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;"${tooltip ? ' title="' + escHtml(tooltip) + '"' : ''}>${escHtml(l.name)}</a>${linfo ? ' <span title="' + escHtml(linfo) + '" style="color:var(--gold);font-size:0.7rem;cursor:help;">👑</span>' : ''}${INDEP_LIC_MAP && l.moj_lic_no && INDEP_LIC_MAP.get(l.moj_lic_no) ? ` <span title="上市櫃/興櫃獨立董事 ×${INDEP_LIC_MAP.get(l.moj_lic_no)} 席" style="font-size:0.62rem;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:1px 3px;vertical-align:middle;cursor:help;">董</span>` : ''}${GOV_LAWYER_MAP && GOV_LAWYER_MAP.get(l.name) ? ` <span title="政府標案得標 ${GOV_LAWYER_MAP.get(l.name)} 件（一人所/個人名義歸戶${l.name_ambiguous ? '；名冊有同名律師，可能為同名合併' : ''}）" style="font-size:0.62rem;color:var(--teal,#3fb6a8);border:1px solid var(--teal,#3fb6a8);border-radius:4px;padding:1px 3px;vertical-align:middle;cursor:help;">標</span>` : ''}${EX_JUDICIAL_MAP && EX_JUDICIAL_MAP.get(l.name) ? EX_JUDICIAL_MAP.get(l.name).map(r => ` <span title="${escHtml(exJudicialTip(r))}" style="font-size:0.62rem;color:${r.kind === 'judge' ? 'var(--blue)' : 'var(--purple)'};border:1px solid currentColor;border-radius:4px;padding:1px 3px;vertical-align:middle;cursor:help;">${r.kind === 'judge' ? '前法官' : '前檢察官'}</span>`).join('') : ''}${l.moj_birth_year ? ` <span style="font-size:0.7rem;color:var(--text-muted);">(${1911 + l.moj_birth_year})</span>` : ''}</td>
       <td style="font-size:0.8rem;" title="${escHtml(l.moj_address || l.firm_name || '')}">${l.firm_name ? firmLink(l.firm_name.replace(/(法律事務所|律師事務所|聯合律師事務所|國際法律事務所|聯合法律事務所).*$/, '$1')) : '-'}</td>
       <td>${escHtml((l.bar_association || l.region || '-').replace('社團法人', '').replace('律師公會', '').replace('臺', '台').trim() || '-')}</td>
       <td style="text-align:center;">${seniority !== '-' ? seniority + ' 年' : '-'}</td>
@@ -4990,7 +4990,14 @@ function fmtGovAmt(v) {
 // 律師列表姓名旁標記對照表：「董」獨董（按證號，無同名問題）、「標」政府標案得標（姓名歸戶）
 let INDEP_LIC_MAP = null;   // lic_no -> 席次數
 let GOV_LAWYER_MAP = null;  // 姓名 -> 得標件數
+let EX_JUDICIAL_MAP = null; // 姓名 -> [{kind, first_yyyymm, last_yyyymm, case_count_total, main_org, confidence}]（mig 107，僅 high/medium）
 let _lawyerFlagsLoading = null;
+// 前法官/前檢察官 tooltip（ex_judicial_lawyers；姓名比對推定）
+function exJudicialTip(r) {
+  const ym = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+  const role = r.kind === 'judge' ? '法官' : '檢察官';
+  return `裁判書比對：${ym(r.first_yyyymm)} ～ ${ym(r.last_yyyymm)} 任職${role}\n主要在${r.main_org || '-'}，具名${r.kind === 'judge' ? '裁判' : '案件'} ${Number(r.case_count_total || 0).toLocaleString()} 件\n姓名比對推定${r.confidence === 'medium' ? '（同名風險中等）' : ''}，任期內同名律師活動已剔除，供參考`;
+}
 function ensureLawyerFlags() {
   if (!_lawyerFlagsLoading) {
     _lawyerFlagsLoading = (async () => {
@@ -5009,7 +5016,15 @@ function ensureLawyerFlags() {
           (data || []).forEach(r => gov.set(r.lawyer_name, (gov.get(r.lawyer_name) || 0) + 1));
           if (!data || data.length < 1000) break;
         }
-        INDEP_LIC_MAP = lic; GOV_LAWYER_MAP = gov;
+        const exj = new Map();
+        for (let from = 0; ; from += 1000) {
+          const { data } = await db.from('ex_judicial_lawyers')
+            .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,confidence')
+            .in('confidence', ['high', 'medium']).range(from, from + 999);
+          (data || []).forEach(r => { const a = exj.get(r.name) || []; a.push(r); exj.set(r.name, a); });
+          if (!data || data.length < 1000) break;
+        }
+        INDEP_LIC_MAP = lic; GOV_LAWYER_MAP = gov; EX_JUDICIAL_MAP = exj;
       } catch (e) { console.log('lawyer flags load error:', e); _lawyerFlagsLoading = null; }
     })();
   }
@@ -6275,11 +6290,13 @@ async function showLawyerDetail(name, certNumber) {
   }
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [];
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [], exJud = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { stat = r.data; }),
+    db.from('ex_judicial_lawyers').select('*').eq('name', name).in('confidence', ['high', 'medium'])
+      .then(r => { exJud = r.data || []; }),
     db.from('tipo_agent_stats').select('kind,year_tw,cases').eq('agent_name', name)
       .then(r => { tipoAg = r.data || []; }),
     db.from('gov_lawyer_tenders').select('*').eq('lawyer_name', name)
@@ -6319,6 +6336,7 @@ async function showLawyerDetail(name, certNumber) {
     const m = licNo.match(/^\(?(\d+)\)?/);
     if (m) { const y = currentRocYear - parseInt(m[1]); if (y >= 0) seniority = y + ' 年'; }
   }
+  if (seniority !== '-' && exJud.length) seniority += ' <span style="font-size:0.72rem;color:var(--text-muted);" title="年資以律師證號年份起算，此律師曾任司法官，實際執業年資較短">（含司法官任期）</span>';
 
   // 年齡
   const birthYear = moj?.birth_year;
@@ -6333,6 +6351,7 @@ async function showLawyerDetail(name, certNumber) {
 
   // 來源標籤
   const sources = [];
+  exJud.forEach(r => sources.push(`<span class="badge" style="background:color-mix(in srgb, ${r.kind === 'judge' ? 'var(--blue)' : 'var(--purple)'} 20%, transparent);color:${r.kind === 'judge' ? 'var(--blue)' : 'var(--purple)'};cursor:help;" title="${escHtml(exJudicialTip(r))}">⚖️ ${r.kind === 'judge' ? '前法官' : '前檢察官'}</span>`));
   if (indepDirs.length) sources.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">上市櫃獨董 ×${indepDirs.length}</span>`);
   if (govWinsL.length) sources.push(`<span class="badge" style="background:rgba(63,182,168,0.2);color:var(--teal,#3fb6a8);">政府標案 ×${govWinsL.length}</span>`);
   if (l.has_moj) sources.push('<span class="badge" style="background:color-mix(in srgb, var(--purple) 20%, transparent);color:var(--purple);">法務部</span>');
