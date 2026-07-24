@@ -4998,6 +4998,75 @@ function exJudicialTip(r) {
   const role = r.kind === 'judge' ? '法官' : '檢察官';
   return `裁判書比對：${ym(r.first_yyyymm)} ～ ${ym(r.last_yyyymm)} 任職${role}\n主要在${r.main_org || '-'}，具名${r.kind === 'judge' ? '裁判' : '案件'} ${Number(r.case_count_total || 0).toLocaleString()} 件\n姓名比對推定${r.confidence === 'medium' ? '（同名風險中等）' : ''}，任期內同名律師活動已剔除，供參考`;
 }
+// 律師 modal 的司法官經歷卡（法官用 judge_month_stats 逐月、檢察官用 prosecutor_stats）
+function renderExJudicialCard(exJud, jMonths, pros) {
+  if (!exJud || !exJud.length) return '';
+  const ym = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+  const span = (f, l) => {
+    if (!f || !l) return '-';
+    const mo = (parseInt(l.slice(0, 4)) - parseInt(f.slice(0, 4))) * 12 + (parseInt(l.slice(4)) - parseInt(f.slice(4))) + 1;
+    return mo >= 12 ? `${Math.floor(mo / 12)} 年${mo % 12 ? ' ' + (mo % 12) + ' 個月' : ''}` : `${mo} 個月`;
+  };
+  const yearBars = (byYear, color) => {
+    const years = Object.keys(byYear).sort();
+    if (years.length < 2) return '';
+    const maxY = Math.max(1, ...Object.values(byYear));
+    return `<div style="display:flex;align-items:flex-end;gap:2px;height:58px;margin-top:6px;">${years.map(y =>
+      `<div title="${y}: ${byYear[y].toLocaleString()} 件" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px;cursor:help;">
+        <div style="width:100%;background:color-mix(in srgb, ${color} 55%, transparent);border-radius:2px 2px 0 0;height:${Math.max(2, Math.round(byYear[y] / maxY * 42))}px;"></div>
+        <div style="font-size:0.55rem;color:var(--text-muted);">${y.slice(2)}</div>
+      </div>`).join('')}</div>`;
+  };
+  const kpi = (v, label, color) => `<div><div style="font-size:1.35rem;font-weight:700;color:${color};">${v}</div><div style="font-size:0.75rem;color:var(--text-muted);">${label}</div></div>`;
+  const blocks = [];
+  const j = exJud.find(r => r.kind === 'judge');
+  if (j) {
+    const byCourt = new Map();
+    const byYear = {};
+    (jMonths || []).forEach(r => {
+      const c = byCourt.get(r.court_name) || { f: r.yyyymm, l: r.yyyymm, n: 0 };
+      if (r.yyyymm < c.f) c.f = r.yyyymm;
+      if (r.yyyymm > c.l) c.l = r.yyyymm;
+      c.n += r.case_count || 0;
+      byCourt.set(r.court_name, c);
+      const y = r.yyyymm.slice(0, 4);
+      byYear[y] = (byYear[y] || 0) + (r.case_count || 0);
+    });
+    const courts = [...byCourt.entries()].sort((a, b) => a[1].f.localeCompare(b[1].f));
+    blocks.push(`
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
+        ${kpi(span(j.first_yyyymm, j.last_yyyymm), `法官任期（${ym(j.first_yyyymm)} ～ ${ym(j.last_yyyymm)}）`, 'var(--blue)')}
+        ${kpi(Number(j.case_count_total || 0).toLocaleString(), '具名裁判', 'var(--blue)')}
+        ${kpi(courts.length || '-', '歷任法院', 'var(--blue)')}
+      </div>
+      ${courts.length ? `<table style="width:100%;font-size:0.82rem;"><thead><tr><th style="text-align:left;font-weight:400;color:var(--text-muted);">法院</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">期間</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">具名裁判</th></tr></thead><tbody>
+        ${courts.map(([c, v]) => `<tr><td style="padding:3px 0;">${escHtml(c)}</td><td style="text-align:right;color:var(--text-muted);white-space:nowrap;">${ym(v.f)} ～ ${ym(v.l)}</td><td style="text-align:right;font-weight:600;">${v.n.toLocaleString()}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${yearBars(byYear, 'var(--blue)')}`);
+  }
+  const p = exJud.find(r => r.kind === 'prosecutor');
+  if (p) {
+    const offices = (pros || []).slice().sort((a, b) => (b.case_count_total || 0) - (a.case_count_total || 0));
+    const byYear = {};
+    offices.forEach(o => Object.entries(o.case_count_by_year || {}).forEach(([y, n]) => { byYear[y] = (byYear[y] || 0) + (n || 0); }));
+    blocks.push(`
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px;">
+        ${kpi(span(p.first_yyyymm, p.last_yyyymm), `檢察官期間（${ym(p.first_yyyymm)} ～ ${ym(p.last_yyyymm)}）`, 'var(--purple)')}
+        ${kpi(Number(p.case_count_total || 0).toLocaleString(), '具名案件（起訴/到庭）', 'var(--purple)')}
+        ${kpi(offices.length || '-', '任職地檢署', 'var(--purple)')}
+      </div>
+      ${offices.length ? `<table style="width:100%;font-size:0.82rem;"><thead><tr><th style="text-align:left;font-weight:400;color:var(--text-muted);">地檢署</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">期間</th><th style="text-align:right;font-weight:400;color:var(--text-muted);">具名案件</th></tr></thead><tbody>
+        ${offices.map(o => `<tr><td style="padding:3px 0;">${escHtml(o.office_name || '-')}</td><td style="text-align:right;color:var(--text-muted);white-space:nowrap;">${ym(o.first_yyyymm)} ～ ${ym(o.last_yyyymm)}</td><td style="text-align:right;font-weight:600;">${Number(o.case_count_total || 0).toLocaleString()}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${yearBars(byYear, 'var(--purple)')}`);
+  }
+  if (!blocks.length) return '';
+  return `
+  <div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px;">
+    <div class="card-title" style="color:var(--blue);">&#9878; 司法官經歷 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書具名統計（姓名比對推定，下限估計）；裁判書未公開的早年任期不計入</span></div>
+    ${blocks.join('<hr style="border:none;border-top:1px solid rgba(128,128,128,0.25);margin:12px 0;">')}
+  </div>`;
+}
 function ensureLawyerFlags() {
   if (!_lawyerFlagsLoading) {
     _lawyerFlagsLoading = (async () => {
@@ -5707,9 +5776,21 @@ async function showFirmDetail(firmName) {
   </div>` : '';
 
   // 渲染
-  // 前司法官資料（從 allOffices cache）
+  // 前司法官資料：官網彙整（firm_profiles）＋ 裁判書自動比對（ex_judicial_lawyers, mig 107）合併
   const currentOffice = (typeof allOffices !== 'undefined' ? allOffices : []).find(o => o.firm_name === firmName);
-  const exJudicial = currentOffice?.ex_judicial_officers || [];
+  const exJudicial = (currentOffice?.ex_judicial_officers || []).slice();
+  await ensureLawyerFlags();
+  if (EX_JUDICIAL_MAP) {
+    const curatedNames = new Set(exJudicial.map(s => (s.split('｜')[0] || '').trim()));
+    const ymf = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+    for (const lw of allLawyers) {
+      if (curatedNames.has(lw.name)) continue;
+      (EX_JUDICIAL_MAP.get(lw.name) || []).forEach(r => {
+        exJudicial.push(`${lw.name}｜前${r.kind === 'judge' ? '法官' : '檢察官'}｜${ymf(r.first_yyyymm)}～${ymf(r.last_yyyymm)} 主要在${r.main_org || '-'}，具名 ${Number(r.case_count_total || 0).toLocaleString()} 件`);
+        curatedNames.add(lw.name);
+      });
+    }
+  }
 
   bodyEl.innerHTML = `
     ${blHtml}
@@ -5726,7 +5807,7 @@ async function showFirmDetail(firmName) {
     <!-- 前司法官 -->
     <div class="card" style="border-left:3px solid var(--purple);margin-bottom:16px;">
       <div class="card-title" style="color:var(--purple);">⚖️ 前司法官（${exJudicial.length} 位）</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">前法官／前檢察官背景的律師 — 通常帶來法庭公信力、判決傾向洞察、實務人脈等競爭優勢</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">前法官／前檢察官背景的律師 — 通常帶來法庭公信力、判決傾向洞察、實務人脈等競爭優勢（官網彙整＋裁判書姓名自動比對，後者為推定供參考）</div>
       <ul style="margin:0;padding-left:20px;font-size:0.88rem;line-height:1.6;">
         ${exJudicial.map(o => {
           const parts = o.split('｜');
@@ -6328,6 +6409,18 @@ async function showLawyerDetail(name, certNumber) {
   tasks.push(ensureSoloFirms()); // 一人所所長判定
   await Promise.all(tasks);
 
+  // 司法官經歷明細（有前法官/前檢察官徽章者才查）
+  let exJudJMonths = [], exJudPros = [];
+  if (exJud.some(r => r.kind === 'judge')) {
+    const { data: jm } = await db.from('judge_month_stats')
+      .select('yyyymm,court_name,case_count').eq('name', name).order('yyyymm').limit(1000);
+    exJudJMonths = jm || [];
+  }
+  if (exJud.some(r => r.kind === 'prosecutor')) {
+    const { data: pr } = await db.from('prosecutor_stats').select('*').eq('name', name);
+    exJudPros = pr || [];
+  }
+
   // 年資計算
   const currentRocYear = new Date().getFullYear() - 1911;
   let seniority = '-';
@@ -6430,6 +6523,8 @@ async function showLawyerDetail(name, certNumber) {
       </table>
     </div>
     `}
+
+    ${renderExJudicialCard(exJud, exJudJMonths, exJudPros)}
 
     ${renderIndepDirCard(indepDirs)}
 
