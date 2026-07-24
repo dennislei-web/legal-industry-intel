@@ -42,7 +42,9 @@
 
 - `scripts/moj_office_refresh.py` — 逐位比對 MOJ API 的事務所/執業狀態，只 PATCH 有變動的律師，trigger 自動記到 `moj_lawyer_changes`
 - MOJ API 每筆 ~3-5 秒，全量要 ~15 小時 → `moj-office-refresh.yml` 每日凌晨 1 點按證號 hash 分 7 片跑（`--shard k 7`），一週刷完一輪
-- `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號（發現新進律師，INSERT 也會被 trigger 記錄）
+- `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號 112~115（發現新進律師，INSERT 也會被 trigger 記錄）；
+  另每月 2 日凌晨 2 點**全年份洞補掃**（92~最新、無 years 參數，~5,000 查詢 3~5.5 小時、跳過 detail fetch）——
+  抓「早年掃描時查無（停業/未入會）、之後回役」的律師（例：廣于霙 95臺檢證字第7043號，2026-07 補入）
 - 注意：`moj_lawyer_detail_fetch.py` **不會**更新 office 欄位（只補 detail），別誤以為它能偵測異動
 - **除名偵測（mig 079）**：MOJ「確定查無」（200 空 data / 404，`query_lic_status()` 已排除網路抖動）
   兩段確認——首輪記 `dereg_candidate_at`，下輪（≥3 天）仍查無才標 `deregistered_at` +

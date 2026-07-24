@@ -2,7 +2,9 @@ name: MOJ 律師補掃（證號遍歷）
 
 on:
   schedule:
-    - cron: '0 18 * * 6'  # 每週六 UTC 18:00 = 台灣週日凌晨 2:00（發現新律師）
+    - cron: '0 18 * * 6'  # 每週六 UTC 18:00 = 台灣週日凌晨 2:00（發現新律師，只掃近年）
+    - cron: '0 18 1 * *'  # 每月 1 日 UTC 18:00 = 台灣 2 日凌晨 2:00（全年份洞補掃 92~最新，
+                          # 抓「早年掃描時查無、之後回役」的律師；約 5,000 查詢、3~5.5 小時）
   workflow_dispatch:
     inputs:
       years:
@@ -13,6 +15,11 @@ on:
         description: '掃完後是否補抓詳細資料'
         required: false
         default: 'true'
+
+# 兩條 cron 可能同日觸發（每月 1 日恰為週六時）；排隊不並行，避免同時打 MOJ API + 重複掃描
+concurrency:
+  group: moj-licno-scan
+  cancel-in-progress: false
 
 jobs:
   scrape:
@@ -35,8 +42,9 @@ jobs:
         working-directory: scripts
         run: |
           YEARS="${{ github.event.inputs.years }}"
-          # schedule 觸發時 inputs 為空，預設跑 112~115
-          if [ -z "$YEARS" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+          # 每週 cron 只掃近年（發現新律師）；每月 1 日 cron 保持 YEARS 空 → 全年份洞補掃
+          if [ -z "$YEARS" ] && [ "${{ github.event_name }}" = "schedule" ] \
+             && [ "${{ github.event.schedule }}" != "0 18 1 * *" ]; then
             YEARS="112,113,114,115"
           fi
           if [ -z "$YEARS" ]; then
@@ -76,14 +84,16 @@ jobs:
             [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries (non-fatal, 下次爬蟲會重刷)" || true
           done
 
+      # 每月全掃（schedule 且 cron 為 0 18 1 * *）跳過 detail fetch：
+      # 全掃本身要 3~5.5 小時，runner 上限 6 小時；新發現律師的 detail 由每週 job 補
       - name: Wait for cache refresh to settle
-        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
+        if: github.event.inputs.detail_fetch == 'true' || (github.event_name == 'schedule' && github.event.schedule != '0 18 1 * *')
         run: |
           echo "Sleep 90s 讓 refresh_firm_stats_cache 在 Supabase 跑完，避免下個 step 撞鎖"
           sleep 90
 
       - name: Fetch lawyer details
-        if: github.event.inputs.detail_fetch == 'true' || github.event_name == 'schedule'
+        if: github.event.inputs.detail_fetch == 'true' || (github.event_name == 'schedule' && github.event.schedule != '0 18 1 * *')
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
