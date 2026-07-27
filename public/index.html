@@ -3898,10 +3898,27 @@ async function loadExJudFirmChart() {
             },
           },
         },
-        onClick: (evt, els) => { if (els.length) showFirmDetail(top[els[0].index][0]); },
+        onClick: (evt, els, chart) => {
+          if (els.length) { showFirmDetail(top[els[0].index][0]); return; }
+          const i = exJudLabelIndex(evt, chart);           // 點 y 軸事務所名稱也可開啟
+          if (i != null) showFirmDetail(top[i][0]);
+        },
+        onHover: (evt, els, chart) => {
+          evt.native.target.style.cursor = (els.length || exJudLabelIndex(evt, chart) != null) ? 'pointer' : 'default';
+        },
       },
     });
   } catch (e) { console.log('exjud firm chart error:', e); }
+}
+
+// 判斷滑鼠是否落在法檢轉任圖 y 軸標籤區，回傳對應列 index（否則 null）
+function exJudLabelIndex(evt, chart) {
+  const area = chart.chartArea;
+  if (!area || evt.x == null) return null;
+  if (evt.x >= area.left || evt.y < area.top || evt.y > area.bottom) return null;
+  const idx = Math.round(chart.scales.y.getValueForPixel(evt.y));
+  const n = chart.data.labels.length;
+  return (idx >= 0 && idx < n) ? idx : null;
 }
 
 function renderRegionChart(data) {
