@@ -676,12 +676,6 @@
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">獨董＝簡歷覆核確認之律師席次（含興櫃）；標案＝一人所＋個人名義投標歸戶，同名律師會合併；金額僅計已公開決標者。</div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">&#9878;&#65039; 法檢轉任 — 前法官/前檢察官聚集的事務所</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="exJudFirmNote">載入中…</div>
-        <div class="chart-container" style="height:420px;"><canvas id="chartExJudFirms"></canvas></div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">裁判書具名 × 現行律師名冊姓名比對（同名已剔除、檢察官具名有審理期遞延），下限估計；點長條可開啟該所詳情，完整個人經歷見律師名錄「前法官/前檢察官」標記。</div>
-      </div>
     </div>
 
     <!-- ==================== TAB: FIRM-OVERVIEW (事務所總覽) ==================== -->
@@ -792,6 +786,12 @@
           <div id="foFlowOut"><div class="loading">載入中</div></div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">2026-07-03 起追蹤（分所歸戶、累積口徑）；完整挖角矩陣與新血招募見 <a href="#" onclick="gotoTab('lawyer','changes');return false;" style="color:var(--blue);">異動追蹤</a>。</div>
         </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 法檢轉任 — 前法官/前檢察官聚集的事務所</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="exJudFirmNote">載入中…</div>
+        <div class="chart-container" style="height:420px;"><canvas id="chartExJudFirms"></canvas></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑＝官網彙整名單 ∪ 裁判書具名自動比對（同名已剔除、檢察官具名有審理期遞延），同一人跨身分只計一次，下限估計；點長條或事務所名稱可開啟該所詳情。</div>
       </div>
       <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；ids/loader 不變） -->
       <div class="card" style="margin-bottom:16px;">
@@ -3878,46 +3878,63 @@ async function loadOverview() {
 
   // 性別、年齡、年資分析（從 moj_lawyers 抓）
   loadDemographicCharts();
-  // 法檢轉任 × 事務所
-  loadExJudFirmChart();
-  // 事務所規模分布已移至「事務所總覽」（loadFirmOverviewOnce 觸發 loadFirmSizeChart）
+  // 事務所規模分布與法檢轉任圖已移至「事務所總覽」（loadFirmOverviewOnce 觸發）
 }
 
-// 法檢轉任 × 事務所堆疊長條（ex_judicial_lawyers, mig 107-109；僅 high/medium）
+// 法檢轉任 × 事務所堆疊長條。口徑＝allOffices 的前司法官聯集（官網彙整 ∪ 裁判書自動比對，
+// loadOffices 內已合併去重），同一人跨身分（檢轉判）只計一次、前法官優先。
 async function loadExJudFirmChart() {
   try {
-    const rows = [];
+    await loadOffices();  // 等 allOffices 與前司法官聯集 merge 完成（已載過會直接返回）
+    // 全國 KPI：自動比對依「人」去重（同人判＋檢只計前法官）
+    const persons = new Map();
     for (let from = 0; ; from += 1000) {
-      const { data } = await db.from('ex_judicial_lawyers')
-        .select('name,kind,firm_name')
+      const { data } = await db.from('ex_judicial_lawyers').select('name,kind')
         .in('confidence', ['high', 'medium']).range(from, from + 999);
-      rows.push(...(data || []));
+      (data || []).forEach(r => {
+        if (r.kind === 'judge' || !persons.has(r.name)) persons.set(r.name, r.kind);
+      });
       if (!data || data.length < 1000) break;
     }
-    const judges = rows.filter(r => r.kind === 'judge').length;
-    const pros = rows.filter(r => r.kind === 'prosecutor').length;
-    const byFirm = new Map();
-    rows.forEach(r => {
-      if (!r.firm_name) return;
-      const o = byFirm.get(r.firm_name) || { j: 0, p: 0, names: [] };
-      if (r.kind === 'judge') o.j++; else o.p++;
-      o.names.push(`${r.name}（前${r.kind === 'judge' ? '法官' : '檢察官'}）`);
-      byFirm.set(r.firm_name, o);
-    });
-    const top = [...byFirm.entries()]
-      .sort((a, b) => (b[1].j + b[1].p) - (a[1].j + a[1].p) || b[1].j - a[1].j)
+    const judges = [...persons.values()].filter(k => k === 'judge').length;
+    const pros = persons.size - judges;
+    // 各所：解析聯集字串判斷身分（職稱含「檢」→前檢察官；含法官/審判長→前法官；其他略過）
+    const classify = t => /檢/.test(t) ? 'p' : (/法官|審判長|司法官/.test(t) ? 'j' : null);
+    const firms = [];
+    for (const o of (typeof allOffices !== 'undefined' ? allOffices : [])) {
+      const list = o.ex_judicial_officers || [];
+      if (!list.length) continue;
+      const byName = new Map();
+      for (const s of list) {
+        const parts = s.split('｜');
+        const n = (parts[0] || '').trim();
+        // 身分判定：自動比對有此人（同所口徑）以其為準（官網職稱常寫統稱「前司法官」）；
+        // 純官網彙整者才從職稱文字分類
+        const k = persons.has(n) ? (persons.get(n) === 'judge' ? 'j' : 'p') : classify(parts[1] || '');
+        if (!n || !k) continue;
+        if (!byName.has(n) || k === 'j') byName.set(n, k);  // 同人多列 → 前法官優先
+      }
+      if (!byName.size) continue;
+      const j = [...byName.values()].filter(k => k === 'j').length;
+      firms.push({
+        firm: o.firm_name, j, p: byName.size - j,
+        names: [...byName.entries()].map(([n, k]) => `${n}（前${k === 'j' ? '法官' : '檢察官'}）`),
+      });
+    }
+    const top = firms
+      .sort((a, b) => (b.j + b.p) - (a.j + a.p) || b.j - a.j)
       .slice(0, 12);
     const noteEl = document.getElementById('exJudFirmNote');
-    if (noteEl) noteEl.innerHTML = `全國現行名冊比對出 <b style="color:var(--blue);">${judges}</b> 位前法官、<b style="color:var(--purple);">${pros}</b> 位前檢察官執業中；下圖為聚集人數最多的事務所（含企業法務）。`;
+    if (noteEl) noteEl.innerHTML = `全國現行名冊自動比對出 <b style="color:var(--blue);">${judges}</b> 位前法官、<b style="color:var(--purple);">${pros}</b> 位前檢察官執業中；下圖另併官網彙整之資深司法官（檢察總長、審判長等，判決書具名少、自動比對抓不到），依「人」去重。`;
     if (chartInstances.exJudFirms) chartInstances.exJudFirms.destroy();
     const ctx = document.getElementById('chartExJudFirms').getContext('2d');
     chartInstances.exJudFirms = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: top.map(([f]) => f.length > 14 ? f.slice(0, 13) + '…' : f),
+        labels: top.map(t => t.firm.length > 14 ? t.firm.slice(0, 13) + '…' : t.firm),
         datasets: [
-          { label: '前法官', data: top.map(([, v]) => v.j), backgroundColor: 'rgba(96,150,246,0.75)', borderRadius: 3 },
-          { label: '前檢察官', data: top.map(([, v]) => v.p), backgroundColor: 'rgba(168,120,246,0.75)', borderRadius: 3 },
+          { label: '前法官', data: top.map(t => t.j), backgroundColor: 'rgba(96,150,246,0.75)', borderRadius: 3 },
+          { label: '前檢察官', data: top.map(t => t.p), backgroundColor: 'rgba(168,120,246,0.75)', borderRadius: 3 },
         ],
       },
       options: {
@@ -3928,15 +3945,15 @@ async function loadExJudFirmChart() {
         plugins: {
           tooltip: {
             callbacks: {
-              title: items => top[items[0].dataIndex][0],
-              afterBody: items => top[items[0].dataIndex][1].names.join('、'),
+              title: items => top[items[0].dataIndex].firm,
+              afterBody: items => top[items[0].dataIndex].names.join('、'),
             },
           },
         },
         onClick: (evt, els, chart) => {
-          if (els.length) { showFirmDetail(top[els[0].index][0]); return; }
+          if (els.length) { showFirmDetail(top[els[0].index].firm); return; }
           const i = exJudLabelIndex(evt, chart);           // 點 y 軸事務所名稱也可開啟
-          if (i != null) showFirmDetail(top[i][0]);
+          if (i != null) showFirmDetail(top[i].firm);
         },
         onHover: (evt, els, chart) => {
           evt.native.target.style.cursor = (els.length || exJudLabelIndex(evt, chart) != null) ? 'pointer' : 'default';
@@ -4404,7 +4421,7 @@ let _foLoaded = false;
 function loadFirmOverviewOnce() {
   if (_foLoaded) return;
   _foLoaded = true;
-  loadOffices();          // KPI 群元素已移到本頁；順帶暖「事務所名錄」的列表快取
+  loadOffices().then(loadExJudFirmChart);  // KPI 群元素已移到本頁；聯集 merge 完成後畫法檢轉任圖
   loadFirmSizeChart();    // 規模分布圖＋律師人數 TOP 10（自舊總覽移入）
   loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
   loadFoFlowSnapshot();
