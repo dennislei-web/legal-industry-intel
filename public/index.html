@@ -1490,6 +1490,41 @@
         </div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128257; 機關黏著度——標案回到同一所手上的比例</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;" id="gvStickyDesc">-</div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">回鍋率（第 2 案起）</div><div style="font-size:1.5rem;font-weight:700;color:var(--blue);" id="gvStKpiRep">-</div><div style="font-size:0.75rem;color:var(--text-muted);">決標給曾用過的所</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">直接續用上一案</div><div style="font-size:1.5rem;font-weight:700;" id="gvStKpiPrev">-</div><div style="font-size:0.75rem;color:var(--text-muted);">與前一案同所</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">近 5 年回鍋率</div><div style="font-size:1.5rem;font-weight:700;color:var(--green);" id="gvStKpi5y">-</div><div style="font-size:0.75rem;" id="gvStKpi5ySub">-</div></div>
+          <div><div style="font-size:0.75rem;color:var(--text-muted);">單一所包辦的機關</div><div style="font-size:1.5rem;font-weight:700;color:var(--gold);" id="gvStKpiMono">-</div><div style="font-size:0.75rem;color:var(--text-muted);" id="gvStKpiMonoSub">-</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">機關越大越黏——按機關歷來案量分層的回鍋率</div>
+            <div id="gvStickyTiers" style="display:flex;flex-direction:column;gap:6px;font-size:0.8rem;"></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;">
+              發案 10 件以上的大買家（食藥署、中油、台電、民航局等）配合慣性最強，新進者最難切入；小機關反而<strong>一半機率換新所</strong>——首標機會在長尾。
+            </div>
+          </div>
+          <div style="font-size:0.82rem;line-height:1.7;">
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">結構訊號</div>
+            <div style="margin-bottom:6px;">&#128272; <strong>單一所吃過半</strong>：<span id="gvStHalf">-</span> 的機關（≥2 案）有單一所拿走過半案件——政府市場本質是<strong>關係財</strong>。</div>
+            <div style="margin-bottom:6px;">&#128275; <strong>常年顧問其實是流動缺口</strong>：同機關下一次「常年／法律顧問」案由同一所續任的比例僅 <span id="gvStAdvisor">-</span>——超過一半會換人，多為最低標小額案，現任優勢不如直覺牢固，是<strong>可主動投標的切入點</strong>。</div>
+            <div>&#128100; <strong>最黏的配對多是一人所</strong>：得標主體是事務所，大所內部承辦律師不可見；下表榜上的一人所（如林信和、劉秀真、柯莉娟）等於<strong>同一位律師</strong>綁定同一機關十餘年——個人層級的黏著比事務所層級更強。</div>
+          </div>
+        </div>
+        <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">最黏配對榜——機關 &times; 事務所（限機關歷來 &ge;10 案）</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>機關</th><th>事務所</th><th style="text-align:right;">得標／機關總案</th><th style="text-align:right;">佔比</th><th style="text-align:right;">累計金額</th><th style="text-align:right;">最近得標</th></tr></thead>
+            <tbody id="gvStickyBody"></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">
+          ※ 口徑：僅計有機關名與決標日之案；「回鍋」＝該機關第 2 案起，得標所曾得過同機關較早的標（多得標者案任一重疊即算）；分所與異體字（啓／啟、臺／台）已歸戶同所。
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127942; 得標事務所排行 TOP 20</div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
           <div id="gvFirmTabs" style="display:flex;gap:4px;">
@@ -9548,6 +9583,7 @@ function loadGovTenderOnce() {
   _gvLoaded = true;
   loadGvOverview();
   loadGvUnits();
+  loadGvSticky();
   loadGvFirms();
   wireGovSortTabs('gvFirmTabs', loadGvFirms);
   loadGvBig();
@@ -9682,6 +9718,52 @@ async function loadGvUnits() {
       <td style="text-align:right;">${r.last_year || '-'}</td>
     </tr>`).join('');
   } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+// 機關黏著度（gov_agency_stickiness / gov_sticky_pairs RPC，mig 110）
+async function loadGvSticky() {
+  const body = document.getElementById('gvStickyBody');
+  try {
+    const [{ data: k, error: e1 }, { data: pairs, error: e2 }] = await Promise.all([
+      db.rpc('gov_agency_stickiness'),
+      db.rpc('gov_sticky_pairs', { p_min_cases: 10, p_limit: 15 }),
+    ]);
+    if (e1 || e2) throw (e1 || e2);
+    const pct = (a, b) => b ? Math.round(a * 1000 / b) / 10 + '%' : '-';
+    document.getElementById('gvStickyDesc').innerHTML =
+      `發過 2 件以上標案的 <strong>${Number(k.agencies_multi).toLocaleString()} 個機關</strong>，其第 2 案起共 ${Number(k.next_cases).toLocaleString()} 件決標中，<strong>${pct(k.rep_any, k.next_cases)} 回到曾用過的事務所手上</strong>（金額加權 ${pct(k.amt_rep, k.amt_next)}）——政府法律服務是典型的<strong>回頭客市場</strong>，且近 5 年還在變黏。`;
+    document.getElementById('gvStKpiRep').textContent = pct(k.rep_any, k.next_cases);
+    document.getElementById('gvStKpiPrev').textContent = pct(k.rep_prev, k.next_cases);
+    document.getElementById('gvStKpi5y').textContent = pct(k.rep_any_5y, k.next_5y);
+    document.getElementById('gvStKpi5ySub').innerHTML = '<span style="color:var(--green);">▲ 高於全期，市場趨黏</span>';
+    document.getElementById('gvStKpiMono').textContent = Number(k.mono).toLocaleString() + ' 家';
+    document.getElementById('gvStKpiMonoSub').textContent = `佔 ≥2 案機關 ${pct(k.mono, k.agencies_multi)}（100% 同一所）`;
+    document.getElementById('gvStHalf').innerHTML = `<strong>${pct(k.half, k.agencies_multi)}</strong>`;
+    document.getElementById('gvStAdvisor').innerHTML = `<strong>${pct(k.advisor_kept, k.advisor_pairs)}</strong>（${k.advisor_kept}/${k.advisor_pairs} 件）`;
+    // 分層 HTML bars
+    const tiers = [['2-4', '2–4 案（小機關）'], ['5-9', '5–9 案'], ['10+', '10 案以上（大買家）']];
+    document.getElementById('gvStickyTiers').innerHTML = tiers.map(([key, lab]) => {
+      const t = (k.tiers || {})[key] || { next: 0, rep: 0 };
+      const r = t.next ? t.rep / t.next : 0;
+      return `<div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:150px;">${lab}</span>
+        <div style="flex:1;height:14px;background:var(--ghost-bg);border-radius:4px;overflow:hidden;"><div style="width:${Math.round(r * 100)}%;height:100%;background:var(--blue);opacity:0.85;"></div></div>
+        <span style="width:52px;text-align:right;font-weight:600;">${Math.round(r * 1000) / 10}%</span>
+      </div>`;
+    }).join('');
+    body.innerHTML = (pairs || []).map((r, i) => `<tr>
+      <td>${i + 1}</td>
+      <td style="font-size:0.8rem;">${escHtml(r.unit_name)}</td>
+      <td style="font-size:0.8rem;">${r.firm_key && r.firm_key.includes('事務所') ? firmLink(r.firm_key) : escHtml(r.firm_key)}</td>
+      <td style="text-align:right;">${Number(r.wins)} / ${Number(r.agency_cases)}</td>
+      <td style="text-align:right;font-weight:600;color:var(--blue);">${Math.round(Number(r.ratio) * 100)}%</td>
+      <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '-'}</td>
+      <td style="text-align:right;">${r.last_year || '-'}</td>
+    </tr>`).join('');
+  } catch (e) {
+    console.error('機關黏著度載入失敗', e);
+    if (body) body.innerHTML = `<tr><td colspan="7" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`;
+  }
 }
 
 async function loadGvFirms(sort = 'wins') {
