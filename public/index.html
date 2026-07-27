@@ -5541,6 +5541,38 @@ async function loadOffices() {
     }
   } catch(e) { console.warn('firm gov tender badge error:', e); }
 
+  // 前司法官徽章：併入裁判書自動比對（ex_judicial_lawyers, mig 107；僅 high/medium），
+  // 與 modal「前司法官」卡同口徑 — 只靠 firm_profiles 策展清單會漏掉未收錄的所（如理律）
+  try {
+    const exjRows = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await db.from('ex_judicial_lawyers')
+        .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,firm_name')
+        .in('confidence', ['high', 'medium']).not('firm_name', 'is', null).range(from, from + 999);
+      exjRows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    const exjByFirm = new Map();
+    for (const r of exjRows) {
+      const m = exjByFirm.get(r.firm_name) || new Map();
+      const a = m.get(r.name) || [];
+      a.push(r); m.set(r.name, a); exjByFirm.set(r.firm_name, m);
+    }
+    const ymf = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+    for (const o of allOffices) {
+      const byName = exjByFirm.get(o.firm_name);
+      if (!byName) continue;
+      const list = (o.ex_judicial_officers || []).slice();
+      const seen = new Set(list.map(s => (s.split('｜')[0] || '').trim()));
+      for (const [n, recs] of byName) {
+        if (seen.has(n)) continue;
+        recs.forEach(r => list.push(`${n}｜前${r.kind === 'judge' ? '法官' : '檢察官'}｜${ymf(r.first_yyyymm)}～${ymf(r.last_yyyymm)} 主要在${r.main_org || '-'}，具名 ${Number(r.case_count_total || 0).toLocaleString()} 件`));
+        seen.add(n);
+      }
+      if (list.length) o.ex_judicial_officers = list;
+    }
+  } catch(e) { console.warn('firm ex-judicial badge merge error:', e); }
+
   // 註：先前這裡會再從原始 firm_websites 表用模糊匹配補官網，但該表夾帶大量
   // 黃頁/公會/媒合平台/共用落地頁雜訊，會在顯示層抵銷 DB 端清洗（migration 042
   // 的 firm_website_blocklist + 共用 URL 過濾）。官網來源現以清洗後的
