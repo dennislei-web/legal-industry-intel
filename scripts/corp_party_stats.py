@@ -20,6 +20,10 @@ import sys
 import time
 from collections import defaultdict
 
+# Avast/AVG 會把 SSLKEYLOGFILE 指到 \\.\aswMonFltProxy\... 裝置，Python 開不了
+# → ssl context 建立即 PermissionError(13)、下載連線中斷。直接拔掉。
+os.environ.pop('SSLKEYLOGFILE', None)
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from judgment_stats import (  # noqa: E402
     WORK_DIR, SEVENZ, RE_COURT, normalize_court, classify,
@@ -213,17 +217,25 @@ def backfill(a, b):
         if os.path.exists(os.path.join(WORK_DIR, f'{ym}_corp.json')):
             print(f'[{i}/{len(months)}] {ym} 已完成，跳過', flush=True)
             continue
-        try:
-            print(f'[{i}/{len(months)}] {ym} ...', flush=True)
-            download(ym)
-            parse_corp(ym)
-            purge_month(ym)
-        except Exception as e:
-            print(f'[{i}/{len(months)}] {ym} 失敗：{e}', flush=True)
-            failed.append(ym)
-            purge_month(ym)
+        for attempt in range(1, 4):
+            try:
+                print(f'[{i}/{len(months)}] {ym} (try {attempt}) ...', flush=True)
+                download(ym)
+                parse_corp(ym)
+                purge_month(ym)
+                break
+            except Exception as e:
+                print(f'[{i}/{len(months)}] {ym} 失敗：{e}', flush=True)
+                purge_month(ym)
+                if attempt == 3:
+                    failed.append(ym)
+                else:
+                    time.sleep(90)
+        time.sleep(5)
     print(f'backfill 完成：{len(months)-len(failed)}/{len(months)} 成功，'
           f'{(time.time()-t0)/60:.0f} 分鐘；失敗：{failed}', flush=True)
+    if failed:
+        sys.exit(1)  # 部分失敗 → 不觸發後續 chained upload
 
 
 def _sb():
