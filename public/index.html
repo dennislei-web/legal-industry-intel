@@ -812,6 +812,9 @@
           <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
             <option value="">全部法院</option>
           </select>
+          <select id="fmYearSel" onchange="loadFirmMap()" style="min-width:150px;">
+            <option value="">近 5 年總計</option>
+          </select>
         </div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
           <div class="kpi-card">
@@ -822,7 +825,7 @@
           <div class="kpi-card">
             <div class="kpi-label">喆律出庭數</div>
             <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluCases">-</div>
-            <div class="kpi-sub">近 5 年</div>
+            <div class="kpi-sub" id="fmKpiCasesSub">近 5 年</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">第一名</div>
@@ -844,7 +847,7 @@
         <div class="card-title">排行榜（前 100）</div>
         <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
           <table>
-            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">出庭數(近5年)</th><th style="text-align:right;">出庭律師數</th></tr></thead>
+            <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;" id="fmCasesTh">出庭數(近5年)</th><th style="text-align:right;">出庭律師數</th></tr></thead>
             <tbody id="fmTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
@@ -9085,6 +9088,15 @@ async function initFirmMap() {
     _fmGroups = groups || [];
     renderFmGroupOptions();
   } catch (e) { console.log('cause_group_list error:', e); }
+  try {
+    // 年度下拉（近 5 年滾動窗內的西元年；首尾為部分年，標注月份範圍）
+    const { data: yrs } = await db.rpc('lms_year_list');
+    const ysel = document.getElementById('fmYearSel');
+    if (yrs?.length) {
+      ysel.innerHTML = '<option value="">近 5 年總計</option>' +
+        yrs.map(y => `<option value="${y.yr}">${y.yr}${(y.mm_min === '01' && y.mm_max === '12') ? '' : `（${+y.mm_min}-${+y.mm_max}月）`}</option>`).join('');
+    }
+  } catch (e) { console.log('lms_year_list error:', e); }
   loadFirmMap();
 }
 
@@ -9103,15 +9115,20 @@ async function loadFirmMap() {
   const cat = document.getElementById('fmCatSel').value || null;
   const group = document.getElementById('fmGroupSel').value || null;
   const court = document.getElementById('fmCourtSel').value || null;
+  const year = Number(document.getElementById('fmYearSel').value) || null;
   const body = document.getElementById('fmTableBody');
   renderFmGroupOptions();
   body.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
 
+  // 年度標籤連動（KPI 副標＋排行榜表頭）
+  document.getElementById('fmKpiCasesSub').textContent = year ? `${year} 年` : '近 5 年';
+  document.getElementById('fmCasesTh').textContent = year ? `出庭數(${year})` : '出庭數(近5年)';
+
   // 選了案由種類 → 走 Phase B firm_cause_ranking（全國口徑，法院篩選不適用）
   document.getElementById('fmCourtSel').disabled = !!group;
   const { data: rows, error } = group
-    ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000 }).range(0, 999)
-    : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court }).range(0, 999);
+    ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000, p_year: year }).range(0, 999)
+    : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court, p_year: year }).range(0, 999);
   if (error || !rows?.length) {
     console.log('firm_court_ranking error:', error);
     body.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
