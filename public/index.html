@@ -2093,6 +2093,70 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: CORPMAP (企業客戶版圖，mig 112/113：corp_* 表＋MV＋RPC) ==================== -->
+    <div id="tab-corpmap" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        從裁判書（<strong>2020-01 ～ 2026-04</strong>，民事＋行政）反推「哪些事務所手上有最多<strong>企業客戶</strong>」——公司當事人歸戶 × 具名代理律師 × 現職事務所。另附<strong>無代理缺口榜</strong>：常訟卻幾乎不請律師的公司＝法顧／委任滲透率缺口的 BD 訊號。點事務所、律師、公司名都可下鑽。
+      </div>
+      <div class="card" style="margin-bottom:16px;border-left:3px solid var(--gold);">
+        <div class="card-title">&#9888;&#65039; 口徑警語（讀榜前必看）</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+          1. <strong>同名律師混同</strong>：裁判書只有律師姓名，以法務部名冊歸戶到「<strong>現職</strong>」事務所——同名同姓者會被算在一起，且律師歷年案件全數計入現職所（轉所前接的案也算進現在的所）。<br>
+          2. <strong>訴訟代理 ≠ 法顧關係</strong>：本榜是「出庭代理」口徑，訴訟量大的催收／債權回收型事務所會排在前面；理律、萬國型的<strong>企業深度關係</strong>（非訟、法顧、交易）大多不進裁判書，這裡只看得到其訴訟端切面。<br>
+          3. <strong>「無代理」定義</strong>：指該公司一方在裁判書上<strong>無律師具名出庭</strong>（含法務自理、批量支付命令等程序）；不代表該公司沒有法律顧問。
+        </div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">常訟企業（≥10 件）</div><div class="kpi-value" style="color:var(--blue);" id="cmKpiCompanies">-</div><div class="kpi-sub">公司當事人歸戶後家數</div></div>
+        <div class="kpi-card"><div class="kpi-label">企業客戶最多</div><div class="kpi-value" style="color:var(--gold);font-size:1.05rem;" id="cmKpiTopFirm">-</div><div class="kpi-sub" id="cmKpiTopFirmSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">喆律排名</div><div class="kpi-value" style="color:var(--green);" id="cmKpiZhelu">-</div><div class="kpi-sub" id="cmKpiZheluSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">缺口榜首</div><div class="kpi-value" style="color:var(--red);font-size:1.05rem;" id="cmKpiTopGap">-</div><div class="kpi-sub" id="cmKpiTopGapSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127942; 事務所 × 不重複企業客戶排行</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span>點<strong>事務所</strong>看該所律師的企業客戶結構；點<strong>企業</strong>看誰在服務這家公司。</span>
+          <label>顯示前
+            <select id="cmFirmLimit" onchange="renderCorpFirmRanking()" style="font-size:0.78rem;padding:2px 6px;">
+              <option value="30" selected>30</option><option value="50">50</option><option value="100">100</option>
+            </select> 名
+          </label>
+        </div>
+        <div class="table-wrap" style="max-height:640px;overflow-y:auto;">
+          <table>
+            <thead><tr><th style="width:38px;">#</th><th>事務所</th>
+              <th style="text-align:right;" title="不重複企業客戶家數（該所現職律師曾代理過的公司，去重）">企業客戶</th>
+              <th style="text-align:right;">代理案件</th>
+              <th style="text-align:right;" title="案件數 ÷ 企業客戶數：偏高＝少數客戶的批量訴訟（催收型），偏低＝客戶分散">件/客戶</th>
+              <th>代表企業客戶（依案件量）</th></tr></thead>
+            <tbody id="cmFirmBody"><tr><td colspan="6" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128680; 無代理缺口榜——常訟但幾乎不請律師的公司</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span>依「缺口件數＝總案件 − 有代理案件」排序；點公司名看年度量與現有服務律師。</span>
+          <label>最低案件數
+            <select id="cmGapMin" onchange="reloadCorpGap()" style="font-size:0.78rem;padding:2px 6px;">
+              <option value="10">10</option><option value="100" selected>100</option><option value="500">500</option><option value="1000">1,000</option>
+            </select>
+          </label>
+        </div>
+        <div class="table-wrap" style="max-height:640px;overflow-y:auto;">
+          <table>
+            <thead><tr><th style="width:38px;">#</th><th>公司</th><th>類型</th>
+              <th style="text-align:right;">總案件</th><th style="text-align:right;">有代理</th>
+              <th style="text-align:right;">代理率</th><th style="text-align:right;">缺口件數</th></tr></thead>
+            <tbody id="cmGapBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 資料源：本站裁判書月包（scripts/corp_party_stats.py 解析，2020-01～2026-04 民事＋行政），公司名已正規化歸戶（去空白／括號註記、臺→台）；「代表企業客戶」取各所案件量前 5。排行以 materialized view 預聚合（mig 113），資料回填後需執行 refresh_corp_ranking() 更新。企業當事人 128 萬「公司×期間」列、公司×律師配對 205 萬列；裁判書未具名的程序（和解、調解、未公開裁判）不在內，屬<strong>下限口徑</strong>。
+      </div>
+    </div>
+
     <!-- ==================== TAB: INHOUSE (企業法務雷達，migration 096：inhouse_* RPC) ==================== -->
     <div id="tab-inhouse" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -3736,6 +3800,7 @@ const SECTIONS = {
     { tab: 'lawyers', label: '律師名錄' },
     { tab: 'firm-overview', label: '事務所總覽' },
     { tab: 'offices', label: '事務所名錄' },
+    { tab: 'corpmap', label: '企業客戶版圖' },
     { tab: 'inhouse', label: '企業法務雷達' },
     { tab: 'changes', label: '異動追蹤' },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
@@ -3839,6 +3904,7 @@ function showTab(tab) {
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') { loadChanges(); loadFirmFlowOnce(); }
   if (tab === 'inhouse') loadInhouseOnce();
+  if (tab === 'corpmap') loadCorpmapOnce();
   if (tab === 'alumni' && isAdmin) loadAlumni();
   if (tab === 'law010' && isAdmin) loadLaw010();
   if (tab === 'judges') loadJudges();
@@ -9286,6 +9352,234 @@ let _ihLoaded = false;
 const IH_KINDS = ['一般企業', '金融保險', '非營利與公協會', '政府與公職', '學研機構', '其他'];
 const IH_KIND_COLORS = { '一般企業': 'var(--blue)', '金融保險': 'var(--gold)', '非營利與公協會': 'var(--green)', '政府與公職': 'var(--purple, #a06cd5)', '學研機構': 'var(--orange)', '其他': 'var(--text-muted)' };
 
+// ============================================================
+// 企業客戶版圖（mig 112/113：corp_litigants / corp_lawyer_pairs / corp_*_mv）
+// ============================================================
+let _cmLoaded = false, _cmFirms = [];
+const cmQ = s => escHtml(s).replace(/'/g, "\\'");
+const cmFirmLink = f => `<a href="#" onclick="showCorpFirm('${cmQ(f)}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(f)}</a>`;
+const cmCoLink = c => `<a href="#" onclick="showCorpCompany('${cmQ(c)}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(c)}</a>`;
+const cmLwLink = n => `<a href="#" onclick="showCorpLawyer('${cmQ(n)}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(n)}</a>`;
+const cmKindBadge = k => k === 'org'
+  ? '<span style="font-size:0.72rem;color:var(--purple,#9b7ef7);border:1px solid var(--purple,#9b7ef7);border-radius:10px;padding:1px 6px;">法人</span>'
+  : '<span style="font-size:0.72rem;color:var(--blue);border:1px solid var(--blue);border-radius:10px;padding:1px 6px;">企業</span>';
+
+async function loadCorpmapOnce() {
+  if (_cmLoaded) return;
+  _cmLoaded = true;
+  try {
+    const [rank, gap, unrep] = await Promise.all([
+      db.rpc('corp_firm_ranking', { p_limit: 100 }),
+      db.rpc('corp_unrepresented_top', { p_min_cases: 100, p_limit: 50 }),
+      db.from('corp_unrepresented_mv').select('company', { count: 'exact', head: true }),
+    ]);
+    if (rank.error) throw rank.error;
+    if (gap.error) throw gap.error;
+    _cmFirms = rank.data || [];
+    // KPI
+    if (unrep.count != null) document.getElementById('cmKpiCompanies').textContent = unrep.count.toLocaleString();
+    if (_cmFirms.length) {
+      document.getElementById('cmKpiTopFirm').textContent = _cmFirms[0].firm;
+      document.getElementById('cmKpiTopFirmSub').textContent = _cmFirms[0].n_companies.toLocaleString() + ' 家不重複企業客戶';
+      const zi = _cmFirms.findIndex(f => f.firm.includes('喆律'));
+      if (zi >= 0) {
+        document.getElementById('cmKpiZhelu').textContent = '第 ' + (zi + 1);
+        document.getElementById('cmKpiZheluSub').textContent = _cmFirms[zi].n_companies.toLocaleString() + ' 家企業客戶／' + _cmFirms[zi].n_cases.toLocaleString() + ' 件';
+      } else {
+        document.getElementById('cmKpiZhelu').textContent = '100 名外';
+      }
+    }
+    const g0 = (gap.data || [])[0];
+    if (g0) {
+      document.getElementById('cmKpiTopGap').textContent = g0.company;
+      document.getElementById('cmKpiTopGapSub').textContent = (g0.n / 10000).toFixed(1) + ' 萬件・代理率 ' + g0.repr_rate + '%';
+    }
+    renderCorpFirmRanking();
+    renderCorpGap(gap.data || []);
+  } catch (e) {
+    console.log('corpmap load error:', e);
+    document.getElementById('cmFirmBody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</td></tr>`;
+    document.getElementById('cmGapBody').innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</td></tr>`;
+  }
+}
+
+function renderCorpFirmRanking() {
+  const limit = +(document.getElementById('cmFirmLimit')?.value || 30);
+  const rows = _cmFirms.slice(0, limit);
+  document.getElementById('cmFirmBody').innerHTML = rows.map((f, i) => `<tr>
+    <td style="color:var(--text-muted);">${i + 1}</td>
+    <td>${cmFirmLink(f.firm)}</td>
+    <td style="text-align:right;font-weight:600;">${f.n_companies.toLocaleString()}</td>
+    <td style="text-align:right;">${f.n_cases.toLocaleString()}</td>
+    <td style="text-align:right;color:var(--text-muted);">${(f.n_cases / f.n_companies).toFixed(1)}</td>
+    <td style="font-size:0.78rem;">${(f.top_companies || []).slice(0, 5).map(cmCoLink).join('、')}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="loading">無資料</td></tr>';
+}
+
+function renderCorpGap(rows) {
+  document.getElementById('cmGapBody').innerHTML = (rows || []).map((r, i) => `<tr>
+    <td style="color:var(--text-muted);">${i + 1}</td>
+    <td>${cmCoLink(r.company)}</td>
+    <td>${cmKindBadge(r.kind)}</td>
+    <td style="text-align:right;">${r.n.toLocaleString()}</td>
+    <td style="text-align:right;">${r.n_repr.toLocaleString()}</td>
+    <td style="text-align:right;color:${r.repr_rate < 10 ? 'var(--red)' : 'var(--text)'};">${r.repr_rate != null ? r.repr_rate + '%' : '-'}</td>
+    <td style="text-align:right;font-weight:600;color:var(--red);">${(r.n - r.n_repr).toLocaleString()}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="loading">無符合條件的公司</td></tr>';
+}
+
+async function reloadCorpGap() {
+  const min = +document.getElementById('cmGapMin').value;
+  document.getElementById('cmGapBody').innerHTML = '<tr><td colspan="7" class="loading">載入中</td></tr>';
+  const { data, error } = await db.rpc('corp_unrepresented_top', { p_min_cases: min, p_limit: 50 });
+  if (error) {
+    document.getElementById('cmGapBody').innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(error.message || '')}</td></tr>`;
+  } else renderCorpGap(data || []);
+}
+
+// ---- 事務所下鑽：該所現職律師的企業客戶結構 ----
+async function showCorpFirm(firm) {
+  document.getElementById('corpFirmModal').style.display = 'flex';
+  document.getElementById('corpFirmModalTitle').textContent = firm + '｜企業客戶';
+  const body = document.getElementById('corpFirmModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    let f = _cmFirms.find(x => x.firm === firm);
+    if (!f) {
+      const r = await db.from('corp_firm_ranking_mv').select('*').eq('firm', firm).maybeSingle();
+      f = r.data;
+    }
+    const lw = await db.from('moj_lawyers').select('name').eq('office', firm).is('deregistered_at', null).range(0, 999);
+    const names = [...new Set((lw.data || []).map(x => x.name))];
+    const rows = [];
+    for (let i = 0; i < names.length; i += 100) {
+      const { data } = await db.from('corp_lawyer_ranking_mv').select('*').in('lawyer', names.slice(i, i + 100));
+      rows.push(...(data || []));
+    }
+    rows.sort((a, b) => b.n_companies - a.n_companies);
+    body.innerHTML = `
+      ${f ? `<div style="font-size:0.85rem;margin-bottom:10px;">全所不重複企業客戶 <strong>${f.n_companies.toLocaleString()}</strong> 家／代理案件 <strong>${f.n_cases.toLocaleString()}</strong> 件（現職律師 ${names.length} 位，其中 ${rows.length} 位有企業代理紀錄）</div>` : ''}
+      <div class="table-wrap" style="max-height:60vh;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:34px;">#</th><th>律師</th>
+            <th style="text-align:right;">企業客戶</th><th style="text-align:right;">案件數</th>
+            <th>代表企業客戶</th></tr></thead>
+          <tbody>${rows.map((r, i) => `<tr>
+            <td style="color:var(--text-muted);">${i + 1}</td>
+            <td>${cmLwLink(r.lawyer)}</td>
+            <td style="text-align:right;font-weight:600;">${r.n_companies.toLocaleString()}</td>
+            <td style="text-align:right;">${r.n_cases.toLocaleString()}</td>
+            <td style="font-size:0.78rem;">${(r.top_companies || []).slice(0, 4).map(cmCoLink).join('、')}</td>
+          </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-muted);">該所現職律師無企業代理紀錄</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">⚠️ 個人數字含該律師<strong>轉所前</strong>的案件（依姓名歸戶），同名同姓者會混同；各律師企業客戶數加總 ≠ 全所去重數。</div>`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+function closeCorpFirmModal() { document.getElementById('corpFirmModal').style.display = 'none'; }
+
+// ---- 律師下鑽：個人企業客戶清單（corp_lawyer_pairs 前 1000 列聚合） ----
+async function showCorpLawyer(name) {
+  document.getElementById('corpLawyerModal').style.display = 'flex';
+  document.getElementById('corpLawyerModalTitle').textContent = name + ' 律師｜企業客戶';
+  const body = document.getElementById('corpLawyerModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    const [mv, pairs] = await Promise.all([
+      db.from('corp_lawyer_ranking_mv').select('*').eq('lawyer', name).maybeSingle(),
+      db.from('corp_lawyer_pairs').select('period,company,camp,n').eq('lawyer', name).order('n', { ascending: false }).range(0, 999),
+    ]);
+    const by = {};
+    (pairs.data || []).forEach(r => {
+      const o = by[r.company] = by[r.company] || { n: 0, atk: 0, def: 0, ys: new Set() };
+      o.n += r.n;
+      if (r.camp === 'P') o.atk += r.n; else if (r.camp === 'D') o.def += r.n;
+      o.ys.add(String(r.period).slice(0, 4));
+    });
+    const list = Object.entries(by).sort((a, b) => b[1].n - a[1].n).slice(0, 150);
+    const trunc = (pairs.data || []).length === 1000;
+    body.innerHTML = `
+      ${mv.data ? `<div style="font-size:0.85rem;margin-bottom:10px;">企業客戶 <strong>${mv.data.n_companies.toLocaleString()}</strong> 家／代理案件 <strong>${mv.data.n_cases.toLocaleString()}</strong> 件</div>` : ''}
+      <div class="table-wrap" style="max-height:60vh;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:34px;">#</th><th>企業</th>
+            <th style="text-align:right;">件數</th><th style="text-align:right;" title="P=為公司方起訴/聲請（攻），D=為公司方應訴（守）">攻/守</th><th>年份</th></tr></thead>
+          <tbody>${list.map(([co, o], i) => {
+            const ys = [...o.ys].sort();
+            return `<tr>
+              <td style="color:var(--text-muted);">${i + 1}</td>
+              <td>${cmCoLink(co)}</td>
+              <td style="text-align:right;font-weight:600;">${o.n.toLocaleString()}</td>
+              <td style="text-align:right;font-size:0.78rem;color:var(--text-muted);">${o.atk}/${o.def}</td>
+              <td style="font-size:0.78rem;color:var(--text-muted);">${ys[0]}${ys.length > 1 ? '–' + ys[ys.length - 1] : ''}</td>
+            </tr>`;
+          }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);">無企業代理紀錄</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">${trunc ? '⚠️ 明細僅取案件量前 1,000 筆配對聚合（總數以上方為準）。' : ''}依姓名歸戶，同名同姓律師會混同；含轉所前案件。攻/守＝該公司為原告（聲請）方／被告方時之件數。</div>`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+function closeCorpLawyerModal() { document.getElementById('corpLawyerModal').style.display = 'none'; }
+
+// ---- 公司下鑽：年度訟量＋現有服務律師 ----
+async function showCorpCompany(company) {
+  document.getElementById('corpCompanyModal').style.display = 'flex';
+  document.getElementById('corpCompanyModalTitle').textContent = company;
+  const body = document.getElementById('corpCompanyModalBody');
+  body.innerHTML = '<div class="loading">載入中</div>';
+  try {
+    const [lit, pairs] = await Promise.all([
+      db.from('corp_litigants').select('period,n,n_repr').eq('company', company).range(0, 999),
+      db.from('corp_lawyer_pairs').select('lawyer,camp,n').eq('company', company).order('n', { ascending: false }).range(0, 999),
+    ]);
+    const yr = {};
+    (lit.data || []).forEach(r => {
+      const y = String(r.period).slice(0, 4);
+      const o = yr[y] = yr[y] || { n: 0, r: 0 };
+      o.n += r.n; o.r += r.n_repr;
+    });
+    const years = Object.keys(yr).sort();
+    const totN = years.reduce((s, y) => s + yr[y].n, 0), totR = years.reduce((s, y) => s + yr[y].r, 0);
+    const byLw = {};
+    (pairs.data || []).forEach(r => {
+      const o = byLw[r.lawyer] = byLw[r.lawyer] || { n: 0 };
+      o.n += r.n;
+    });
+    const lws = Object.entries(byLw).sort((a, b) => b[1].n - a[1].n).slice(0, 50);
+    body.innerHTML = `
+      <div style="font-size:0.85rem;margin-bottom:10px;">2020-01～2026-04 案件 <strong>${totN.toLocaleString()}</strong> 件，其中有律師代理 <strong>${totR.toLocaleString()}</strong> 件（代理率 <strong style="color:${totN && totR / totN < 0.1 ? 'var(--red)' : 'var(--green)'};">${totN ? (100 * totR / totN).toFixed(1) : '-'}%</strong>）</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+        <div>
+          <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">年度案件量</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>年</th><th style="text-align:right;">案件</th><th style="text-align:right;">有代理</th><th style="text-align:right;">代理率</th></tr></thead>
+            <tbody>${years.map(y => `<tr><td>${y}</td>
+              <td style="text-align:right;">${yr[y].n.toLocaleString()}</td>
+              <td style="text-align:right;">${yr[y].r.toLocaleString()}</td>
+              <td style="text-align:right;color:var(--text-muted);">${yr[y].n ? (100 * yr[y].r / yr[y].n).toFixed(1) : '-'}%</td></tr>`).join('')}</tbody>
+          </table></div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">服務過這家公司的律師（依件數）</div>
+          <div class="table-wrap" style="max-height:46vh;overflow-y:auto;"><table>
+            <thead><tr><th style="width:34px;">#</th><th>律師</th><th style="text-align:right;">件數</th></tr></thead>
+            <tbody>${lws.map(([n, o], i) => `<tr>
+              <td style="color:var(--text-muted);">${i + 1}</td><td>${cmLwLink(n)}</td>
+              <td style="text-align:right;font-weight:600;">${o.n.toLocaleString()}</td></tr>`).join('') || '<tr><td colspan="3" style="color:var(--text-muted);">查無具名代理律師</td></tr>'}</tbody>
+          </table></div>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">「有代理」＝該公司一方有律師具名出庭；律師件數為為該公司出庭之件數（依姓名歸戶）。</div>`;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+function closeCorpCompanyModal() { document.getElementById('corpCompanyModal').style.display = 'none'; }
+
 async function loadInhouseOnce() {
   if (_ihLoaded) return;
   _ihLoaded = true;
@@ -13910,6 +14204,35 @@ async function showCourtDetail(name) {
     <div class="modal-body" id="lawyerModalBody">
       <div class="loading">載入中</div>
     </div>
+  </div>
+</div>
+
+<!-- 企業客戶版圖 Modals（事務所/律師/公司下鑽） -->
+<div id="corpFirmModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCorpFirmModal();">
+  <div class="modal-content" style="max-width:860px;">
+    <div class="modal-header">
+      <h2 id="corpFirmModalTitle">載入中...</h2>
+      <button onclick="closeCorpFirmModal()">✕</button>
+    </div>
+    <div class="modal-body" id="corpFirmModalBody"><div class="loading">載入中</div></div>
+  </div>
+</div>
+<div id="corpLawyerModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCorpLawyerModal();">
+  <div class="modal-content" style="max-width:720px;">
+    <div class="modal-header">
+      <h2 id="corpLawyerModalTitle">載入中...</h2>
+      <button onclick="closeCorpLawyerModal()">✕</button>
+    </div>
+    <div class="modal-body" id="corpLawyerModalBody"><div class="loading">載入中</div></div>
+  </div>
+</div>
+<div id="corpCompanyModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCorpCompanyModal();">
+  <div class="modal-content" style="max-width:760px;">
+    <div class="modal-header">
+      <h2 id="corpCompanyModalTitle">載入中...</h2>
+      <button onclick="closeCorpCompanyModal()">✕</button>
+    </div>
+    <div class="modal-body" id="corpCompanyModalBody"><div class="loading">載入中</div></div>
   </div>
 </div>
 
