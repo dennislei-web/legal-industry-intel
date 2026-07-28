@@ -1574,6 +1574,83 @@
     </div>
 
     <!-- ==================== TAB: 勞資爭議（行政調解 — 勞動部開放資料月更，勞動紛爭的法定前端入口） ==================== -->
+    <!-- ==================== TAB: 產值與法顧市場（工商普查「錢」的維度 — 法律服務業收入總額＋企業法顧 TAM 推估器） ==================== -->
+    <div id="tab-value" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        本站其他頁面都是「量」（案件、人數、席次），這一頁補上<strong>「錢」的維度</strong>——法律服務業的官方產值錨點與企業法顧市場推估。核心資料源：<a href="https://www.stat.gov.tw/News_Content.aspx?n=2740&s=233299" target="_blank" style="color:var(--blue);">主計總處工業及服務業普查</a>（每 5 年，行業 691「法律服務業」，最近一次 110 年＝2021 資料）。律師業<strong>沒有</strong>年度官方營收統計——律師是執行業務者免辦營業登記，<strong>財政部營業稅銷售額完全不涵蓋律師業</strong>（本站實測 112 年稅籍「律師事務服務」僅 5 家）；執行業務者所得也無公開業別統計。普查是唯一全面官方錨點。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">法律服務業年收入</div><div class="kpi-value">409 億</div><div class="kpi-sub">110 年普查（105 年 342 億，+19.6%）</div></div>
+        <div class="kpi-card"><div class="kpi-label">企業單位家數</div><div class="kpi-value" style="color:var(--blue);">9,364</div><div class="kpi-sub">含律師／地政士／專利商標等</div></div>
+        <div class="kpi-card"><div class="kpi-label">從業員工</div><div class="kpi-value" style="color:var(--green);">26,156 人</div><div class="kpi-sub">5 年 +22.0%（擴大聘助理）</div></div>
+        <div class="kpi-card"><div class="kpi-label">附加價值率</div><div class="kpi-value" style="color:var(--gold);">73.6%</div><div class="kpi-sub">專業服務各行業之冠</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128176; 近 4 次普查：法律服務業收入／家數／從業員工（95→110 年）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          收入 15 年 249 → 409 億（+64%），但<strong>家數（+38%）與人力（+63%）幾乎同步成長</strong>——平均每家、每人產值 15 年間近乎原地踏步（勞動生產力 5 年僅 +0.79%）。這是一個<strong>靠增加人力擴張、單位效率停滯</strong>的行業。
+        </div>
+        <div class="chart-container" style="height:320px;"><canvas id="vlTrendChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128201; 對照組：法律服務業是專業服務中<strong>成長最慢</strong>的行業</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          15 年收入成長：專門設計 +128%、廣告 +86%、會計 +75%、管顧 +67%、<strong>法律 +64% 墊底</strong>；佔專業服務業收入比重 15 年停在 5% 上下。解讀：<strong>高毛利（附加價值率最高）＋低成長（供給管制限制量能）</strong>——市場天花板不在需求端，在律師人力與計費模式。
+        </div>
+        <div class="chart-container" style="height:300px;"><canvas id="vlPeerChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129518; 企業法顧市場推估器（模型透明、參數可調）</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;">
+          從普查錨點（110 年 409 億）出發，三層拆解到「常年法顧」市場。<strong>三個比例都沒有官方統計</strong>——預設值是本站推估（依人力結構與業務結構），拉桿看敏感度區間即可，不要把單一數字當事實。
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:0.8rem;margin-bottom:12px;">
+          <label>年成長率（外推至 115 年）：<strong id="vlGrowVal">3.6</strong>%
+            <input type="range" id="vlGrowSlider" min="0" max="8" step="0.2" value="3.6" style="vertical-align:middle;width:130px;">
+          </label>
+          <label>律師業佔法律服務業收入：<strong id="vlShareVal">70</strong>%
+            <input type="range" id="vlShareSlider" min="40" max="90" step="5" value="70" style="vertical-align:middle;width:130px;">
+          </label>
+          <label>企業客戶佔律師業收入：<strong id="vlCorpVal">40</strong>%
+            <input type="range" id="vlCorpSlider" min="10" max="80" step="5" value="40" style="vertical-align:middle;width:130px;">
+          </label>
+          <label>常年法顧佔企業法務支出：<strong id="vlRetVal">30</strong>%
+            <input type="range" id="vlRetSlider" min="10" max="70" step="5" value="30" style="vertical-align:middle;width:130px;">
+          </label>
+        </div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px;">
+          <div class="kpi-card"><div class="kpi-label">法律服務業（115 年外推）</div><div class="kpi-value" id="vlEstTotal">-</div><div class="kpi-sub">普查 409 億 × 成長率</div></div>
+          <div class="kpi-card"><div class="kpi-label">其中律師業產值</div><div class="kpi-value" style="color:var(--blue);" id="vlEstLawyer">-</div><div class="kpi-sub" id="vlEstPerLawyer">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">企業法務外包市場</div><div class="kpi-value" style="color:var(--gold);" id="vlEstCorp">-</div><div class="kpi-sub">訴訟＋非訟＋法顧</div></div>
+          <div class="kpi-card"><div class="kpi-label">常年法顧（retainer）</div><div class="kpi-value" style="color:var(--green);" id="vlEstRet">-</div><div class="kpi-sub">企業法務支出中的固定合約層</div></div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);" id="vlEstNote">-</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#9878;&#65039; 官方擬制單價：執行業務者收入／費用標準</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+            律師不設帳時，國稅局按「部頒標準」擬制課稅——這是官方對律師單價與成本率的<strong>制度性定價</strong>，可當 bottom-up 估算參數：<br>
+            ・<strong>收入標準</strong>：民事／刑事訴訟<strong>每一程序（審級）</strong>：直轄市及市 <strong>4 萬元</strong>、縣 3.5 萬元（<a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL011720" target="_blank" style="color:var(--blue);">114 年度收入標準</a>）<br>
+            ・<strong>費用標準</strong>：一般案件費用率 <strong>30%</strong>；法扶／義務辯護案件 <strong>50%</strong>（<a href="https://law-out.mof.gov.tw/LawContent.aspx?id=GL011721" target="_blank" style="color:var(--blue);">114 年度費用標準</a>）<br>
+            擬制口徑是<strong>下限性質</strong>（實際市場行情高於部頒標準），但「每程序 4 萬 × 官方費用率 3 成」提供了訴訟業務單位經濟的官方底價。
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#9888;&#65039; 口徑警示：讀這頁數字前必看</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.7;">
+            1. 普查行業 691「法律服務業」＝律師＋<strong>地政士＋專利商標代理＋公證人</strong>事務所的合計，「律師業佔比」無官方拆分（本頁用拉桿處理）。<br>
+            2. <strong>營業稅資料不適用</strong>：律師為執行業務者免辦營業登記，財政部稅籍「律師事務服務」細類 112 年僅 5 家、年銷售額 4,400 萬——那是極少數公司化登記的法律服務公司，不是律師業。<br>
+            3. 執行業務者（9A）所得統計<strong>不分業別公開</strong>，無法從報稅資料直接得出律師業總收入。<br>
+            4. 需求端對照：全國 13,000+ 執業登錄律師中約 1,400 位登錄在企業／機構內（見 律師區＞企業法務雷達）——金融業 in-house 化最深，一般產業絕大多數企業無內部律師，法務需求必然外包。
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 普查數字＝主計總處「工業及服務業普查」行業別統計表（專業、科學及技術服務業分冊）：110 年收入總額 408.69 億／家數 9,364／從業員工 26,156／勞動生產力 114.2 萬元／附加價值率 73.64%；95／100 年收入與家數取自同分冊近 4 次普查比較圖（249 億／280 億、6,771 家／6,901 家）。對照行業同源。<strong>年更</strong>：下一次普查為 115 年資料（預計 117 年發布），屆時更新本頁 VL_CENSUS 常數即可；推估器之律師人數由 lawyer_supply_stats／inhouse_summary RPC 即時載入。
+      </div>
+    </div>
+
     <div id="tab-labor" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         勞資爭議依<strong>勞資爭議處理法</strong>先進縣市勞工局<strong>調解</strong>（免費、多數案型為訴訟前的實質必經站），調解不成才走勞動法院——這裡是勞動紛爭市場的<strong>總量入口</strong>，法院看到的只是尖端。資料源：<a href="https://data.gov.tw/dataset/40149" target="_blank" style="color:var(--blue);">勞動部開放資料</a>（受理件數／類別／地區／行業，月更、滯後約 3 個月）＋本站裁判書終結檔（訴訟端對照）。
@@ -3695,6 +3772,7 @@ const SECTIONS = {
   industry: [
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
+    { tab: 'value', label: '產值與法顧' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
@@ -3750,6 +3828,7 @@ function showTab(tab) {
   if (tab === 'govtender') loadGovTenderOnce();
   if (tab === 'adr') loadAdrOnce();
   if (tab === 'labor') loadLaborOnce();
+  if (tab === 'value') loadValueOnce();
   if (tab === 'notary') loadNotaryOnce();
   if (tab === 'landagent') loadLandagentOnce();
   if (tab === 'nonlit') loadNonlitOnce();
@@ -9942,6 +10021,100 @@ function _lbChart(id, cfg) {
   _lbCharts[id] = new Chart(el.getContext('2d'), cfg);
   requestAnimationFrame(() => { if (_lbCharts[id]) _lbCharts[id].resize(); });
 }
+// ===== 產值與法顧市場（工商普查 691 法律服務業 — 靜態普查錨點＋TAM 推估器，年更改 VL_CENSUS）=====
+// 資料源：主計總處 110 年工業及服務業普查行業別統計表「專業、科學及技術服務業」分冊
+// （表1 家數／表2 從業員工／表3 收入總額／表5 經營績效；95/100 年取自分冊圖1/圖3 資料標籤）
+const VL_CENSUS = {
+  years: ['95年', '100年', '105年', '110年'],
+  revenue: [24900, 28000, 34176, 40869],          // 百萬元
+  firms: [6771, 6901, 7656, 9364],
+  workers: [16000, 17000, 21435, 26156],          // 95/100 為圖 2 千人級約值
+  peers: {                                         // 對照行業收入（百萬元）
+    '會計服務業': [26700, 34500, 38267, 46796],
+    '管理顧問業': [61100, 58800, 75572, 102323],
+    '廣告業': [101400, 139100, 155008, 189142],
+    '專門設計業': [32100, 64100, 73859, 73306],
+  },
+  anchorYearRoc: 110, targetYearRoc: 115,
+};
+let _vlLoaded = false, _vlCharts = {}, _vlLawyerN = null; // _vlLawyerN = 事務所端執業律師數
+function _vlVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function _vlChart(id, cfg) {
+  if (_vlCharts[id]) _vlCharts[id].destroy();
+  _vlCharts[id] = new Chart(document.getElementById(id), cfg);
+}
+async function loadValueOnce() {
+  if (_vlLoaded) return;
+  _vlLoaded = true;
+  const blue = _vlVar('--blue'), gold = _vlVar('--gold'), green = _vlVar('--green'), red = _vlVar('--red'), muted = _vlVar('--text-muted');
+  const C = VL_CENSUS;
+  // 1) 法律服務業三序列（收入 bar ＋家數/員工 line 雙軸）
+  _vlChart('vlTrendChart', {
+    data: {
+      labels: C.years,
+      datasets: [
+        { type: 'bar', label: '收入總額（億元）', data: C.revenue.map(x => x / 100), backgroundColor: blue + 'cc', yAxisID: 'y', order: 3 },
+        { type: 'line', label: '企業家數', data: C.firms, borderColor: gold, tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 1 },
+        { type: 'line', label: '從業員工（人）', data: C.workers, borderColor: green, borderDash: [5, 3], tension: 0.2, pointRadius: 3, yAxisID: 'y2', order: 2 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: '億元' } }, y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } } } }
+  });
+  // 2) 對照行業（指數化 95年=100）
+  const idx = a => a.map(x => +(100 * x / a[0]).toFixed(1));
+  const peerColors = { '會計服務業': gold, '管理顧問業': '#9b7ef7', '廣告業': red, '專門設計業': '#5fc9e7' };
+  _vlChart('vlPeerChart', {
+    type: 'line',
+    data: {
+      labels: C.years,
+      datasets: [
+        { label: '法律服務業', data: idx(C.revenue), borderColor: blue, borderWidth: 3, tension: 0.2, pointRadius: 3 },
+        ...Object.entries(C.peers).map(([k, v]) => ({ label: k, data: idx(v), borderColor: peerColors[k], tension: 0.2, pointRadius: 2, borderWidth: 1.5 })),
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + '：' + ctx.parsed.y + '（95年=100）' } } },
+      scales: { y: { title: { display: true, text: '收入指數（95年=100）' } } } }
+  });
+  // 3) 推估器：slider 綁定＋律師人數即時載入（事務所端＝執業總數−機構內）
+  [['vlGrowSlider', 'vlGrowVal'], ['vlShareSlider', 'vlShareVal'], ['vlCorpSlider', 'vlCorpVal'], ['vlRetSlider', 'vlRetVal']].forEach(([s, v]) => {
+    const el = document.getElementById(s);
+    if (el) el.oninput = () => { document.getElementById(v).textContent = el.value; renderValueEstimate(); };
+  });
+  renderValueEstimate();
+  try {
+    const [sup, inh] = await Promise.all([db.rpc('lawyer_supply_stats'), db.rpc('inhouse_summary')]);
+    const total = sup.data && sup.data.total_active;
+    const nonFirm = inh.data && (inh.data.by_kind || []).reduce((s, x) => s + x.n, 0);
+    if (total) { _vlLawyerN = total - (nonFirm || 0); renderValueEstimate(); }
+  } catch (e) { console.log('value tab lawyer count load error:', e); }
+}
+function renderValueEstimate() {
+  const C = VL_CENSUS;
+  const g = +(document.getElementById('vlGrowSlider') || {}).value || 3.6;
+  const share = +(document.getElementById('vlShareSlider') || {}).value || 70;
+  const corp = +(document.getElementById('vlCorpSlider') || {}).value || 40;
+  const ret = +(document.getElementById('vlRetSlider') || {}).value || 30;
+  const yrs = C.targetYearRoc - C.anchorYearRoc;
+  const totalM = C.revenue[3] * Math.pow(1 + g / 100, yrs);   // 百萬元
+  const lawyerM = totalM * share / 100;
+  const corpM = lawyerM * corp / 100;
+  const retM = corpM * ret / 100;
+  const fmt = m => (m / 100).toFixed(0) + ' 億';
+  document.getElementById('vlEstTotal').textContent = fmt(totalM);
+  document.getElementById('vlEstLawyer').textContent = fmt(lawyerM);
+  document.getElementById('vlEstCorp').textContent = fmt(corpM);
+  document.getElementById('vlEstRet').textContent = fmt(retM);
+  document.getElementById('vlEstPerLawyer').textContent = _vlLawyerN
+    ? '人均 ' + (lawyerM * 100 / _vlLawyerN).toFixed(0) + ' 萬／年（÷ 事務所端 ' + _vlLawyerN.toLocaleString() + ' 位執業律師）'
+    : '人均驗證載入中…';
+  document.getElementById('vlEstNote').innerHTML =
+    '讀法：115 年法律服務業外推 <strong>' + fmt(totalM) + '</strong> → 律師業 ' + share + '% ＝ <strong>' + fmt(lawyerM) +
+    '</strong> → 企業客戶 ' + corp + '% ＝ <strong>' + fmt(corpM) + '</strong> → 常年法顧 ' + ret + '% ＝ <strong>' + fmt(retM) +
+    '</strong>。人均產值是最好的合理性檢查——若拉到明顯偏離常識（例如人均 &gt;500 萬或 &lt;150 萬），代表參數組合不合理。';
+}
+
 async function loadLaborOnce() {
   if (_lbLoaded) return;
   _lbLoaded = true;
