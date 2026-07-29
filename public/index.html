@@ -2166,6 +2166,29 @@
         <div class="kpi-card"><div class="kpi-label">缺口榜首</div><div class="kpi-value" style="color:var(--red);font-size:1.05rem;" id="cmKpiTopGap">-</div><div class="kpi-sub" id="cmKpiTopGapSub">-</div></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128269; 搜尋查詢</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;">
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">用事務所找法人客戶</div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="cmFirmSearch" placeholder="輸入事務所名稱（如：理律）" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card,transparent);color:var(--text);" onkeydown="if(event.key==='Enter')cmSearchFirm()">
+              <button class="tab-btn" onclick="cmSearchFirm()" style="white-space:nowrap;">搜尋</button>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">羅列該所（現職律師歸戶）代理過的全部法人客戶</div>
+            <div id="cmFirmSearchResults" style="margin-top:8px;"></div>
+          </div>
+          <div>
+            <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">用法人找合作事務所</div>
+            <div style="display:flex;gap:6px;">
+              <input type="text" id="cmCoSearch" placeholder="輸入公司／法人名稱（如：和潤）" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card,transparent);color:var(--text);" onkeydown="if(event.key==='Enter')cmSearchCompany()">
+              <button class="tab-btn" onclick="cmSearchCompany()" style="white-space:nowrap;">搜尋</button>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">找出該法人最常委任的事務所與律師</div>
+            <div id="cmCoSearchResults" style="margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127942; 事務所 × 不重複企業客戶排行</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <span>點<strong>事務所</strong>看該所律師的企業客戶結構；點<strong>企業</strong>看誰在服務這家公司。</span>
@@ -9538,6 +9561,58 @@ async function reloadCorpGap() {
   } else renderCorpGap(data || []);
 }
 
+// ---- 搜尋：事務所→法人客戶／法人→合作事務所 ----
+const cmCandBtn = (label, sub, onclick) =>
+  `<button class="tab-btn" onclick="${onclick}" style="display:block;width:100%;text-align:left;margin-bottom:4px;">${label}` +
+  (sub ? ` <span style="font-size:0.72rem;color:var(--text-muted);">${sub}</span>` : '') + '</button>';
+
+async function cmSearchFirm() {
+  const q = (document.getElementById('cmFirmSearch').value || '').trim();
+  const box = document.getElementById('cmFirmSearchResults');
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading">搜尋中</div>';
+  try {
+    const { data, error } = await db.from('corp_firm_ranking_mv').select('firm,n_companies,n_cases')
+      .ilike('firm', '%' + q + '%').order('n_companies', { ascending: false }).limit(15);
+    if (error) throw error;
+    const hits = data || [];
+    if (!hits.length) {
+      box.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">查無符合的事務所（口徑：現職律師有法人出庭代理紀錄的所才會出現）</div>';
+      return;
+    }
+    if (hits.length === 1) { box.innerHTML = ''; showCorpFirm(hits[0].firm); return; }
+    box.innerHTML = hits.map(h =>
+      cmCandBtn(escHtml(h.firm), `${h.n_companies.toLocaleString()} 家法人客戶／${h.n_cases.toLocaleString()} 件`,
+        `showCorpFirm('${cmQ(h.firm)}')`)).join('');
+  } catch (e) {
+    box.innerHTML = `<div style="color:var(--red);font-size:0.78rem;">搜尋失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+
+async function cmSearchCompany() {
+  const q = (document.getElementById('cmCoSearch').value || '').trim();
+  const box = document.getElementById('cmCoSearchResults');
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading">搜尋中</div>';
+  try {
+    const { data, error } = await db.from('corp_litigants').select('company,n')
+      .ilike('company', '%' + q + '%').order('n', { ascending: false }).range(0, 199);
+    if (error) throw error;
+    const by = {};
+    (data || []).forEach(r => { by[r.company] = (by[r.company] || 0) + r.n; });
+    const hits = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 15);
+    if (!hits.length) {
+      box.innerHTML = '<div style="font-size:0.78rem;color:var(--text-muted);">查無符合的法人（口徑：2020-01 後民事/行政裁判書出現過的公司當事人）</div>';
+      return;
+    }
+    if (hits.length === 1) { box.innerHTML = ''; showCorpCompany(hits[0][0]); return; }
+    box.innerHTML = hits.map(([nm, n]) =>
+      cmCandBtn(escHtml(nm), `${n.toLocaleString()} 件`, `showCorpCompany('${cmQ(nm)}')`)).join('');
+  } catch (e) {
+    box.innerHTML = `<div style="color:var(--red);font-size:0.78rem;">搜尋失敗：${escHtml(e.message || '')}</div>`;
+  }
+}
+
 // ---- 事務所下鑽：該所現職律師的企業客戶結構 ----
 async function showCorpFirm(firm) {
   document.getElementById('corpFirmModal').style.display = 'flex';
@@ -9558,9 +9633,35 @@ async function showCorpFirm(firm) {
       rows.push(...(data || []));
     }
     rows.sort((a, b) => b.n_companies - a.n_companies);
+    // 全所法人客戶清單（RPC，PostgREST 單頁 1000 列上限 → 逐頁）
+    const clients = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.rpc('corp_firm_clients', { p_firm: firm }).range(from, from + 999);
+      if (error) throw error;
+      clients.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
     body.innerHTML = `
       ${f ? `<div style="font-size:0.85rem;margin-bottom:10px;">全所不重複企業客戶 <strong>${f.n_companies.toLocaleString()}</strong> 家／代理案件 <strong>${f.n_cases.toLocaleString()}</strong> 件（現職律師 ${names.length} 位，其中 ${rows.length} 位有企業代理紀錄）</div>` : ''}
-      <div class="table-wrap" style="max-height:60vh;overflow-y:auto;">
+      <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">&#127970; 全所法人客戶清單（${clients.length.toLocaleString()} 家）</div>
+      <div class="table-wrap" style="max-height:42vh;overflow-y:auto;margin-bottom:14px;">
+        <table>
+          <thead><tr><th style="width:34px;">#</th><th>法人</th>
+            <th style="text-align:right;">件數</th>
+            <th style="text-align:right;" title="P=為該法人起訴/聲請（攻），D=為該法人應訴（守）">攻/守</th>
+            <th style="text-align:right;">經手律師</th><th>年份</th></tr></thead>
+          <tbody>${clients.map((c, i) => `<tr>
+            <td style="color:var(--text-muted);">${i + 1}</td>
+            <td>${cmCoLink(c.company)}</td>
+            <td style="text-align:right;font-weight:600;">${c.n.toLocaleString()}</td>
+            <td style="text-align:right;font-size:0.78rem;color:var(--text-muted);">${c.n_p}/${c.n_d}</td>
+            <td style="text-align:right;">${c.n_lawyers}</td>
+            <td style="font-size:0.78rem;color:var(--text-muted);">${c.y_min}${c.y_max !== c.y_min ? '–' + c.y_max : ''}</td>
+          </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-muted);">無法人代理紀錄</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">&#9878;&#65039; 所內律師結構</div>
+      <div class="table-wrap" style="max-height:36vh;overflow-y:auto;">
         <table>
           <thead><tr><th style="width:34px;">#</th><th>律師</th>
             <th style="text-align:right;">企業客戶</th><th style="text-align:right;">案件數</th>
@@ -9633,10 +9734,12 @@ async function showCorpCompany(company) {
   const body = document.getElementById('corpCompanyModalBody');
   body.innerHTML = '<div class="loading">載入中</div>';
   try {
-    const [lit, pairs] = await Promise.all([
+    const [lit, pairs, firmsR] = await Promise.all([
       db.from('corp_litigants').select('period,n,n_repr').eq('company', company).range(0, 999),
       db.from('corp_lawyer_pairs').select('lawyer,camp,n').eq('company', company).order('n', { ascending: false }).range(0, 999),
+      db.rpc('corp_company_firms', { p_company: company }).range(0, 199),
     ]);
+    const firms = firmsR.data || [];
     const yr = {};
     (lit.data || []).forEach(r => {
       const y = String(r.period).slice(0, 4);
@@ -9662,6 +9765,17 @@ async function showCorpCompany(company) {
               <td style="text-align:right;">${yr[y].n.toLocaleString()}</td>
               <td style="text-align:right;">${yr[y].r.toLocaleString()}</td>
               <td style="text-align:right;color:var(--text-muted);">${yr[y].n ? (100 * yr[y].r / yr[y].n).toFixed(1) : '-'}%</td></tr>`).join('')}</tbody>
+          </table></div>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">最常合作的事務所（依件數）</div>
+          <div class="table-wrap" style="max-height:46vh;overflow-y:auto;"><table>
+            <thead><tr><th style="width:34px;">#</th><th>事務所</th><th style="text-align:right;">件數</th><th style="text-align:right;">律師</th><th>年份</th></tr></thead>
+            <tbody>${firms.map((fr, i) => `<tr>
+              <td style="color:var(--text-muted);">${i + 1}</td><td>${cmFirmLink(fr.firm)}</td>
+              <td style="text-align:right;font-weight:600;">${fr.n.toLocaleString()}</td>
+              <td style="text-align:right;">${fr.n_lawyers}</td>
+              <td style="font-size:0.78rem;color:var(--text-muted);">${fr.y_min}${fr.y_max !== fr.y_min ? '–' + fr.y_max : ''}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-muted);">查無合作事務所（無具名代理）</td></tr>'}</tbody>
           </table></div>
         </div>
         <div>
