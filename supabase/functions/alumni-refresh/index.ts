@@ -25,9 +25,11 @@ Deno.serve(async (req: Request) => {
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const name = (body.name || '').trim();
 
-    const repo = Deno.env.get('GITHUB_REPO');
-    const token = Deno.env.get('GITHUB_TOKEN');
-    if (!repo || !token) return errorResponse('GITHUB_REPO / GITHUB_TOKEN secret 未設定', 500);
+    // GITHUB_REPO/GITHUB_TOKEN 被同一 Supabase project 的 lawyer-dashboard 佔用（指向該 repo），
+    // 本 function 必須用 INTEL_ 前綴的專屬 secret
+    const repo = Deno.env.get('INTEL_GITHUB_REPO') || 'dennislei-web/legal-industry-intel';
+    const token = Deno.env.get('INTEL_GITHUB_TOKEN') || Deno.env.get('GITHUB_TOKEN');
+    if (!token) return errorResponse('INTEL_GITHUB_TOKEN secret 未設定', 500);
 
     const res = await fetch(
       `https://api.github.com/repos/${repo}/actions/workflows/alumni-refresh.yml/dispatches`,
