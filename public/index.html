@@ -469,6 +469,23 @@
     /* 訴訟市場頂層切換（市場趨勢/地區供需/案由供需/事務所版圖/家事律師）：加大並用實心填色凸顯選中 */
     #domainTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
     #domainTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
+    #valueTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
+    #valueTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
+    /* 市場規模拆解（vt-market） */
+    .ms-badge { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 10.5px; font-weight: 700; margin-left: 4px; vertical-align: 1px; }
+    .ms-a { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
+    .ms-b { background: color-mix(in srgb, var(--blue) 18%, transparent); color: var(--blue); }
+    .ms-c { background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); }
+    .ms-in { width: 58px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-row); color: var(--text); font-size: 12px; text-align: right; font-family: inherit; }
+    .ms-in:focus { outline: none; border-color: var(--blue); }
+    .ms-in.dirty { border-color: var(--gold); }
+    .ms-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 12px; }
+    .ms-btn { padding: 4px 12px; border: 1px solid var(--border); background: var(--bg-row); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text); font-family: inherit; }
+    .ms-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .ms-bar-row { display: grid; grid-template-columns: 150px 1fr 150px; gap: 10px; align-items: center; padding: 5px 0; font-size: 12.5px; }
+    .ms-bar-track { position: relative; height: 16px; background: var(--bg-row); border-radius: 8px; overflow: hidden; }
+    .ms-bar-range { position: absolute; top: 0; bottom: 0; border-radius: 8px; opacity: 0.55; }
+    .ms-bar-mid { position: absolute; top: -1px; bottom: -1px; width: 3px; border-radius: 2px; }
     /* 章節索引（圖表分頁頁頂：一眼看到本頁有哪些區塊，點了捲到該段） */
     .sec-index { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:14px; padding:8px 12px; background:var(--bg-row); border:1px solid var(--border); border-radius:8px; }
     .sec-index-label { font-size:12px; color:var(--text-muted); margin-right:2px; white-space:nowrap; }
@@ -1576,6 +1593,11 @@
     <!-- ==================== TAB: 勞資爭議（行政調解 — 勞動部開放資料月更，勞動紛爭的法定前端入口） ==================== -->
     <!-- ==================== TAB: 產值與法顧市場（工商普查「錢」的維度 — 法律服務業收入總額＋企業法顧 TAM 推估器） ==================== -->
     <div id="tab-value" class="tab-content">
+      <div class="sub-tabs" id="valueTabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="sub-tab-btn active" data-vt="census" onclick="switchValueTab('census')">官方產值</button>
+        <button class="sub-tab-btn" data-vt="market" onclick="switchValueTab('market')">市場規模拆解</button>
+      </div>
+      <div id="vt-census">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         本站其他頁面都是「量」（案件、人數、席次），這一頁補上<strong>「錢」的維度</strong>——法律服務業的官方產值錨點與企業法顧市場推估。核心資料源：<a href="https://www.stat.gov.tw/News_Content.aspx?n=2740&s=233299" target="_blank" style="color:var(--blue);">主計總處工業及服務業普查</a>（每 5 年，行業 691「法律服務業」，最近一次 110 年＝2021 資料）。律師業<strong>沒有</strong>年度官方營收統計——律師是執行業務者免辦營業登記，<strong>財政部營業稅銷售額完全不涵蓋律師業</strong>（本站實測 112 年稅籍「律師事務服務」僅 5 家）；執行業務者所得也無公開業別統計。普查是唯一全面官方錨點。
       </div>
@@ -1649,6 +1671,37 @@
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 普查數字＝主計總處「工業及服務業普查」行業別統計表（專業、科學及技術服務業分冊）：110 年收入總額 408.69 億／家數 9,364／從業員工 26,156／勞動生產力 114.2 萬元／附加價值率 73.64%；95／100 年收入與家數取自同分冊近 4 次普查比較圖（249 億／280 億、6,771 家／6,901 家）。對照行業同源。<strong>年更</strong>：下一次普查為 115 年資料（預計 117 年發布），屆時更新本頁 VL_CENSUS 常數即可；推估器之律師人數由 lawyer_supply_stats／inhouse_summary RPC 即時載入。
       </div>
+      </div><!-- /vt-census -->
+
+      <!-- ==== 市場規模拆解（bottom-up 量×委任率×行情，mig 114 market_assumptions 可調參數）==== -->
+      <div id="vt-market" style="display:none;">
+        <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+          由下而上（bottom-up）把各法律服務市場拆成「<strong>量（官方統計）× 委任率 × 單價（行情假設）</strong>」推估年規模，並與「官方產值」頁的普查錨點（110 年 409 億）互相對帳。信心分級：<span class="ms-badge ms-a">A 官方金額</span><span class="ms-badge ms-b">B 法定費率</span><span class="ms-badge ms-c">C 行情推估</span>。<strong>行情數字（含刑事委任率）都可以直接改</strong>——改完按該卡「儲存」寫回資料庫（全站共用、跨裝置一致），「還原預設」可回到本站初始假設。
+        </div>
+        <div class="kpi-grid" id="msKpis" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr));margin-bottom:16px;"></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">&#128202; 各市場年規模總覽（億元，低—高區間，│＝中位）</div>
+          <div id="msOverview" style="padding:4px 0;"><div class="loading">載入中</div></div>
+        </div>
+        <div class="card" style="margin-bottom:16px;" id="msLitCard">
+          <div class="card-title">&#9878;&#65039; 訴訟市場——19 條業務線 <span class="ms-badge ms-c">C 行情推估</span><span class="ms-badge ms-b">委任率多為實測</span></div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="msLitDesc"></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>業務線</th><th style="text-align:right;">年案件量</th><th style="text-align:right;">委任率</th><th style="text-align:right;">一審委任費（萬）</th><th style="text-align:right;">年市場（億，中位）</th></tr></thead>
+            <tbody id="msLitBody"></tbody>
+          </table></div>
+          <div id="msLitFoot" style="font-size:0.82rem;margin-top:10px;"></div>
+          <div class="ms-actions" id="msLitActions"></div>
+        </div>
+        <div id="msSegGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:16px;"></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">&#129518; 對帳：bottom-up 合計 vs 普查錨點</div>
+          <div id="msRecon" style="font-size:0.82rem;line-height:1.9;"><div class="loading">載入中</div></div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+          ※ 訴訟量＝business_line_yearly 最新完整年（隨終結檔月更自動刷新）；民事/家事委任率＝終結案件微資料實測（樣本 ≥1,000 件才採用，不足以可調假設代入並標「推估」）；刑事無案由級委任率統計，一律為可調假設。量體類參數（TIPO 申請量、登記棟數、公證件數等）為年更手動值，也可在卡內直接修正後儲存。政府標案為官方決標金額（A 級），因與非訟/法顧收入重疊，僅列對照、不計入合計。
+        </div>
+      </div><!-- /vt-market -->
     </div>
 
     <div id="tab-labor" class="tab-content">
@@ -3837,7 +3890,7 @@ const SECTIONS = {
   industry: [
     { tab: 'supply', label: '供給預測' },
     { tab: 'domain', label: '訴訟市場' },
-    { tab: 'value', label: '產值與法顧' },
+    { tab: 'value', label: '產值與市場' },
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
@@ -10407,6 +10460,329 @@ function renderValueEstimate() {
     '讀法：115 年法律服務業外推 <strong>' + fmt(totalM) + '</strong> → 律師業 ' + share + '% ＝ <strong>' + fmt(lawyerM) +
     '</strong> → 企業客戶 ' + corp + '% ＝ <strong>' + fmt(corpM) + '</strong> → 常年法顧 ' + ret + '% ＝ <strong>' + fmt(retM) +
     '</strong>。人均產值是最好的合理性檢查——若拉到明顯偏離常識（例如人均 &gt;500 萬或 &lt;150 萬），代表參數組合不合理。';
+}
+
+// ===== 市場規模拆解（vt-market — mig 114：market_assumptions 可調行情 × market_line_stats 實測量/委任率）=====
+let _msLoaded = false, _msAssump = {}, _msLines = null, _msGov = null, _msDirty = {};
+const MS_REP_MIN = 1000;   // 實測委任率最低樣本數，不足 fallback 到可調假設
+window.switchValueTab = function (t) {
+  document.querySelectorAll('#valueTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.vt === t));
+  document.getElementById('vt-census').style.display = t === 'census' ? '' : 'none';
+  document.getElementById('vt-market').style.display = t === 'market' ? '' : 'none';
+  if (t === 'market') { if (_msLoaded) msRecalc(); else loadMarketOnce(); }  // 已載入時重算（法顧模型引用官方產值 tab 拉桿）
+};
+async function loadMarketOnce() {
+  if (_msLoaded) return;
+  _msLoaded = true;
+  try {
+    const [a, l, g] = await Promise.all([
+      db.from('market_assumptions').select('*').order('sort'),
+      db.rpc('market_line_stats'),
+      db.rpc('gov_tender_yearly_amount'),
+    ]);
+    if (a.error) throw a.error;
+    if (l.error) throw l.error;
+    (a.data || []).forEach(r => { _msAssump[r.key] = r; });
+    _msLines = l.data || { lines: [] };
+    _msGov = (g && g.data) || [];
+    renderMarket();
+  } catch (e) {
+    document.getElementById('msOverview').innerHTML = '<span style="color:var(--red);">載入失敗：' + escHtml(e.message || String(e)) + '</span>';
+  }
+}
+function _msV(k) {
+  const r = _msAssump[k];
+  return r ? { lo: +r.low, hi: +r.high, mid: (+r.low + +r.high) / 2 } : { lo: 0, hi: 0, mid: 0 };
+}
+function _msFmtE(v) { return v >= 100 ? Math.round(v).toLocaleString() + ' 億' : (v >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' 億'; }
+function _msIn(key, side, val, step) {
+  return '<input type="number" class="ms-in" data-key="' + key + '" data-side="' + side + '" value="' + val + '"' + (step ? ' step="' + step + '"' : ' step="any"') + '>';
+}
+// 訴訟：每線 量 ×委任率×費用；委任率優先實測（樣本足夠），否則可調假設
+function msLitRows() {
+  return ((_msLines && _msLines.lines) || []).map(x => {
+    const n = (+x.n_civ || 0) + (+x.n_cri || 0);
+    const measured = x.rep_total >= MS_REP_MIN ? x.rep_lawyer / x.rep_total : null;
+    const ra = _msV('lit_rate_' + x.line);
+    const rate = measured != null
+      ? { lo: measured, hi: measured, mid: measured, measured: true, sample: +x.rep_total }
+      : { lo: ra.lo / 100, hi: ra.hi / 100, mid: ra.mid / 100, measured: false };
+    const fee = _msV('lit_fee_' + x.line);
+    return { line: x.line, n, rate, fee,
+      lo: n * rate.lo * fee.lo, hi: n * rate.hi * fee.hi, mid: n * rate.mid * fee.mid };  // 萬元
+  }).filter(r => r.n > 0);
+}
+function msLitTotal() {
+  const f = _msV('lit_appeal_factor'), rows = msLitRows();
+  const s = k => rows.reduce((a, r) => a + r[k], 0);
+  return { lo: s('lo') * f.lo / 1e4, hi: s('hi') * f.hi / 1e4, mid: s('mid') * f.mid / 1e4 };  // 億
+}
+// 量×價配對型 segment（ip / landagent / notary）
+const MS_PAIR_SEGS = [
+  { seg: 'ip', icon: '&#8482;', title: '商標專利（進台灣 prosecution）', badge: 'C', badgeCls: 'ms-c',
+    desc: '不含出國申請（outbound handling）與智財爭訟（後者已在訴訟市場的智慧財產線）。',
+    pairs: [['ip_vol_tm', 'ip_fee_tm'], ['ip_vol_inv', 'ip_fee_inv'], ['ip_vol_um', 'ip_fee_um'], ['ip_vol_ds', 'ip_fee_ds']] },
+  { seg: 'landagent', icon: '&#127968;', title: '地政士', badge: 'C', badgeCls: 'ms-c',
+    desc: '量＝內政統計登記量（年更約值，棟/件口徑混用屬近似）。',
+    pairs: [['la_vol_sale', 'la_fee_sale'], ['la_vol_inherit', 'la_fee_inherit'], ['la_vol_gift', 'la_fee_gift'], ['la_vol_mortgage', 'la_fee_mortgage']] },
+  { seg: 'notary', icon: '&#128221;', title: '公證市場（民間公證人）', badge: 'B', badgeCls: 'ms-b',
+    desc: '單價＝公證法法定費率之件均近似（公證書按標的額級距，租賃＋逕受強制執行為大宗）。',
+    pairs: [['no_vol_attest', 'no_fee_attest'], ['no_vol_notarize', 'no_fee_notarize']] },
+];
+function msPairTotal(seg) {
+  const def = MS_PAIR_SEGS.find(d => d.seg === seg);
+  let lo = 0, hi = 0, mid = 0;
+  def.pairs.forEach(([vk, fk]) => {
+    const v = _msV(vk), f = _msV(fk);
+    lo += v.lo * f.lo / 1e4; hi += v.hi * f.hi / 1e4; mid += v.mid * f.mid / 1e4;  // 億
+  });
+  return { lo, hi, mid };
+}
+function msLaborTotal() {
+  const mv = _msV('lb_vol_mediation'), mr = _msV('lb_rate_mediation'), mf = _msV('lb_fee_mediation');
+  const lv = _msV('lb_vol_lawsuit'), lr = _msV('lb_rate_lawsuit'), lf = _msV('lb_fee_lawsuit');
+  return {
+    med: { lo: mv.lo * mr.lo / 100 * mf.lo / 1e4, hi: mv.hi * mr.hi / 100 * mf.hi / 1e4, mid: mv.mid * mr.mid / 100 * mf.mid / 1e4 },
+    law: { lo: lv.lo * lr.lo / 100 * lf.lo / 1e4, hi: lv.hi * lr.hi / 100 * lf.hi / 1e4, mid: lv.mid * lr.mid / 100 * lf.mid / 1e4 },
+  };
+}
+function msArbTotal() {
+  const c = _msV('ar_vol_cases'), amt = _msV('ar_vol_amount'), ir = _msV('ar_rate_inst'), cf = _msV('ar_fee_counsel');
+  const inst = { lo: amt.lo * ir.lo / 100, hi: amt.hi * ir.hi / 100, mid: amt.mid * ir.mid / 100 };
+  const coun = { lo: c.lo * cf.lo * 2 / 1e4, hi: c.hi * cf.hi * 2 / 1e4, mid: c.mid * cf.mid * 2 / 1e4 };
+  return { inst, coun, total: { lo: inst.lo + coun.lo, hi: inst.hi + coun.hi, mid: inst.mid + coun.mid } };
+}
+function msRetainer() {  // 常年法顧＝官方產值 tab 推估器之模型引用（±20% 敏感度帶）
+  const g = +((document.getElementById('vlGrowSlider') || {}).value || 3.6);
+  const share = +((document.getElementById('vlShareSlider') || {}).value || 70);
+  const corp = +((document.getElementById('vlCorpSlider') || {}).value || 40);
+  const ret = +((document.getElementById('vlRetSlider') || {}).value || 30);
+  const totalM = VL_CENSUS.revenue[3] * Math.pow(1 + g / 100, VL_CENSUS.targetYearRoc - VL_CENSUS.anchorYearRoc);
+  const v = totalM * share / 100 * corp / 100 * ret / 100 / 100;  // 億
+  return { lo: v * 0.8, hi: v * 1.2, mid: v, params: { g, share, corp, ret } };
+}
+function msGovLatest() {  // 政府標案：最近完整年（排除進行中年度）
+  const nowY = 2026;
+  const full = (_msGov || []).filter(r => r.award_year && r.award_year < nowY && r.amount);
+  return full.length ? full[full.length - 1] : null;
+}
+function msSegList() {
+  const lb = msLaborTotal(), ar = msArbTotal();
+  return [
+    { name: '訴訟市場（含上訴審）', cls: 'ms-c', v: msLitTotal(), include: true },
+    { name: '商標專利', cls: 'ms-c', v: msPairTotal('ip'), include: true },
+    { name: '地政士', cls: 'ms-c', v: msPairTotal('landagent'), include: true },
+    { name: '常年法顧（模型引用）', cls: 'ms-c', v: msRetainer(), include: true },
+    { name: '公證', cls: 'ms-b', v: msPairTotal('notary'), include: true },
+    { name: '勞資爭議—調解端', cls: 'ms-c', v: lb.med, include: true },
+    { name: '仲裁（機構費＋代理）', cls: 'ms-b', v: ar.total, include: true },
+  ];
+}
+function msGrandTotal() {
+  const segs = msSegList().filter(s => s.include);
+  return {
+    lo: segs.reduce((a, s) => a + s.v.lo, 0),
+    hi: segs.reduce((a, s) => a + s.v.hi, 0),
+    mid: segs.reduce((a, s) => a + s.v.mid, 0),
+  };
+}
+function renderMarket() {
+  const L = msLitRows();
+  // --- 訴訟卡 ---
+  document.getElementById('msLitDesc').innerHTML =
+    '量＝' + escHtml(String(_msLines.year || '-')) + ' 年地院訴訟終結（民/家事＝案件、刑事＝被告人次）；委任率標 <span class="ms-badge ms-b">實測</span> 者來自 ' +
+    escHtml(String(_msLines.rep_year || '-')) + ' 年終結案件微資料（任一造有律師、含法扶），標 <span class="ms-badge ms-c">推估</span> 者可直接修改。';
+  document.getElementById('msLitBody').innerHTML = L.map((r, i) => {
+    const rateCell = r.rate.measured
+      ? (r.rate.mid * 100).toFixed(1) + '%<span class="ms-badge ms-b" title="樣本 ' + r.rate.sample.toLocaleString() + ' 件">實測</span>'
+      : _msIn('lit_rate_' + r.line, 'low', _msAssump['lit_rate_' + r.line].low, '1') + '–' +
+        _msIn('lit_rate_' + r.line, 'high', _msAssump['lit_rate_' + r.line].high, '1') + '%<span class="ms-badge ms-c">推估</span>';
+    return '<tr><td>' + escHtml(r.line) + '</td>' +
+      '<td style="text-align:right;">' + r.n.toLocaleString() + '</td>' +
+      '<td style="text-align:right;white-space:nowrap;">' + rateCell + '</td>' +
+      '<td style="text-align:right;white-space:nowrap;">' + _msIn('lit_fee_' + r.line, 'low', _msAssump['lit_fee_' + r.line].low, '1') + '–' +
+        _msIn('lit_fee_' + r.line, 'high', _msAssump['lit_fee_' + r.line].high, '1') + '</td>' +
+      '<td style="text-align:right;color:var(--gold);font-weight:600;" id="msLitMid' + i + '">' + _msFmtE(r.mid / 1e4) + '</td></tr>';
+  }).join('');
+  document.getElementById('msLitFoot').innerHTML =
+    '上訴審係數 ' + _msIn('lit_appeal_factor', 'low', _msAssump['lit_appeal_factor'].low, '0.05') + '–' +
+    _msIn('lit_appeal_factor', 'high', _msAssump['lit_appeal_factor'].high, '0.05') +
+    ' 倍　→　訴訟市場合計 <strong id="msLitSum" style="color:var(--gold);"></strong>';
+  document.getElementById('msLitActions').innerHTML = msActionsHtml('lit');
+  // --- 配對型 segment 卡 + 勞資/仲裁/法顧/標案卡 ---
+  document.getElementById('msSegGrid').innerHTML =
+    MS_PAIR_SEGS.map(d => {
+      const rows = d.pairs.map(([vk, fk]) => {
+        const vr = _msAssump[vk], fr = _msAssump[fk];
+        return '<tr><td>' + escHtml(fr.label) + '</td>' +
+          '<td style="text-align:right;white-space:nowrap;">' + _msIn(vk, 'both', vr.low) + ' <span style="color:var(--text-muted);font-size:11px;">' + escHtml(vr.unit || '') + '</span></td>' +
+          '<td style="text-align:right;white-space:nowrap;">' + _msIn(fk, 'low', fr.low, '0.1') + '–' + _msIn(fk, 'high', fr.high, '0.1') +
+          ' <span style="color:var(--text-muted);font-size:11px;">' + escHtml(fr.unit || '') + '</span></td></tr>';
+      }).join('');
+      return '<div class="card"><div class="card-title">' + d.icon + ' ' + d.title +
+        ' <span class="ms-badge ' + d.badgeCls + '">' + d.badge + '</span></div>' +
+        '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">' + d.desc + '</div>' +
+        '<div class="table-wrap"><table><thead><tr><th>項目</th><th style="text-align:right;">量</th><th style="text-align:right;">單價</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        '<div style="font-size:0.85rem;margin-top:8px;">年規模 <strong id="msSub_' + d.seg + '" style="color:var(--gold);"></strong></div>' +
+        '<div class="ms-actions">' + msActionsHtml(d.seg) + '</div></div>';
+    }).join('') + msLaborCardHtml() + msArbCardHtml() + msRetCardHtml() + msGovCardHtml();
+  msBindInputs();
+  msRecalc();
+}
+function msLaborCardHtml() {
+  const A = _msAssump;
+  const row = (vk, rk, fk) => '<tr><td>' + escHtml(A[fk].label.replace('每件', '')) + '</td>' +
+    '<td style="text-align:right;white-space:nowrap;">' + _msIn(vk, 'both', A[vk].low) + ' 件</td>' +
+    '<td style="text-align:right;white-space:nowrap;">' + _msIn(rk, 'low', A[rk].low, '1') + '–' + _msIn(rk, 'high', A[rk].high, '1') + '%</td>' +
+    '<td style="text-align:right;white-space:nowrap;">' + _msIn(fk, 'low', A[fk].low, '0.5') + '–' + _msIn(fk, 'high', A[fk].high, '0.5') + ' 萬</td></tr>';
+  return '<div class="card"><div class="card-title">&#129309; 勞資爭議 <span class="ms-badge ms-c">C</span></div>' +
+    '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">調解端＝漏斗上緣主戰場；<strong>訴訟端已含於訴訟市場勞動僱傭線，不計入合計</strong>（避免重複）。</div>' +
+    '<div class="table-wrap"><table><thead><tr><th>階段</th><th style="text-align:right;">量</th><th style="text-align:right;">代理率</th><th style="text-align:right;">單價</th></tr></thead><tbody>' +
+    row('lb_vol_mediation', 'lb_rate_mediation', 'lb_fee_mediation') +
+    row('lb_vol_lawsuit', 'lb_rate_lawsuit', 'lb_fee_lawsuit') +
+    '</tbody></table></div>' +
+    '<div style="font-size:0.85rem;margin-top:8px;">調解端 <strong id="msSub_labor_med" style="color:var(--gold);"></strong>' +
+    '　<span style="color:var(--text-muted);">訴訟端 <span id="msSub_labor_law"></span>（對照）</span></div>' +
+    '<div class="ms-actions">' + msActionsHtml('labor') + '</div></div>';
+}
+function msArbCardHtml() {
+  const A = _msAssump;
+  return '<div class="card"><div class="card-title">&#9878;&#65039; 仲裁 <span class="ms-badge ms-b">B/C</span></div>' +
+    '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;"><strong>標的總額≠市場營收</strong>——機構仲裁費（費率表累退）＋雙方代理費才是市場。</div>' +
+    '<div class="table-wrap"><table><tbody>' +
+    '<tr><td>年受理件數</td><td style="text-align:right;">' + _msIn('ar_vol_cases', 'both', A['ar_vol_cases'].low) + ' 件</td></tr>' +
+    '<tr><td>標的總額</td><td style="text-align:right;">' + _msIn('ar_vol_amount', 'both', A['ar_vol_amount'].low, '0.1') + ' 億</td></tr>' +
+    '<tr><td>機構費占標的（有效費率）</td><td style="text-align:right;">' + _msIn('ar_rate_inst', 'low', A['ar_rate_inst'].low, '0.1') + '–' + _msIn('ar_rate_inst', 'high', A['ar_rate_inst'].high, '0.1') + '%</td></tr>' +
+    '<tr><td>每造代理費</td><td style="text-align:right;">' + _msIn('ar_fee_counsel', 'low', A['ar_fee_counsel'].low, '10') + '–' + _msIn('ar_fee_counsel', 'high', A['ar_fee_counsel'].high, '10') + ' 萬</td></tr>' +
+    '</tbody></table></div>' +
+    '<div style="font-size:0.85rem;margin-top:8px;">年規模 <strong id="msSub_arb" style="color:var(--gold);"></strong> <span style="color:var(--text-muted);font-size:12px;" id="msSub_arb_split"></span></div>' +
+    '<div class="ms-actions">' + msActionsHtml('arb') + '</div></div>';
+}
+function msRetCardHtml() {
+  return '<div class="card"><div class="card-title">&#129518; 常年法顧 <span class="ms-badge ms-c">C·模型引用</span></div>' +
+    '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">直接引用「官方產值」頁企業法顧推估器的參數（在該頁拉桿調整），此處帶 ±20% 敏感度區間。</div>' +
+    '<div style="font-size:0.85rem;" id="msRetBody"></div></div>';
+}
+function msGovCardHtml() {
+  const g = msGovLatest();
+  const recent = (_msGov || []).filter(r => r.award_year >= 2021 && r.award_year < 2026 && r.amount);
+  const avg = recent.length ? recent.reduce((a, r) => a + +r.amount, 0) / recent.length / 1e8 : null;
+  return '<div class="card"><div class="card-title">&#127974; 政府標案（對照） <span class="ms-badge ms-a">A 官方金額</span></div>' +
+    '<div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">官方決標金額直加（法律服務標案）；屬機關法律需求的可見部分，<strong>與非訟/法顧收入重疊，不計入合計</strong>。</div>' +
+    '<div style="font-size:0.85rem;line-height:1.9;">' +
+    (g ? '最近完整年（' + g.award_year + '）決標 <strong style="color:var(--gold);">' + _msFmtE(+g.amount / 1e8) + '</strong>（' + (+g.n).toLocaleString() + ' 件）' : '無資料') +
+    (avg != null ? '<br>近 5 年（2021–2025）年均 <strong>' + _msFmtE(avg) + '</strong>' : '') +
+    '</div></div>';
+}
+function msActionsHtml(seg) {
+  return '<button class="ms-btn" onclick="msSave(\'' + seg + '\')">&#128190; 儲存變更</button>' +
+    '<button class="ms-btn" onclick="msResetSeg(\'' + seg + '\')">還原預設</button>' +
+    '<span id="msStatus_' + seg + '" style="color:var(--text-muted);"></span>';
+}
+function msBindInputs() {
+  document.querySelectorAll('#vt-market .ms-in').forEach(inp => {
+    inp.oninput = () => {
+      const k = inp.dataset.key, side = inp.dataset.side, v = parseFloat(inp.value);
+      if (!_msAssump[k] || isNaN(v) || v < 0) return;
+      if (side === 'both') { _msAssump[k].low = v; _msAssump[k].high = v; }
+      else _msAssump[k][side === 'low' ? 'low' : 'high'] = v;
+      _msDirty[k] = true;
+      inp.classList.add('dirty');
+      msRecalc();
+    };
+  });
+}
+function msRecalc() {
+  // 訴訟每線中位 + 合計
+  msLitRows().forEach((r, i) => {
+    const el = document.getElementById('msLitMid' + i);
+    if (el) el.textContent = _msFmtE(r.mid / 1e4);
+  });
+  const lt = msLitTotal();
+  const litSum = document.getElementById('msLitSum');
+  if (litSum) litSum.textContent = _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '（中位 ' + _msFmtE(lt.mid) + '）';
+  // 配對型 subtotal
+  MS_PAIR_SEGS.forEach(d => {
+    const el = document.getElementById('msSub_' + d.seg);
+    if (el) { const t = msPairTotal(d.seg); el.textContent = _msFmtE(t.lo) + ' – ' + _msFmtE(t.hi) + '（中位 ' + _msFmtE(t.mid) + '）'; }
+  });
+  const lb = msLaborTotal();
+  const eMed = document.getElementById('msSub_labor_med'), eLaw = document.getElementById('msSub_labor_law');
+  if (eMed) eMed.textContent = _msFmtE(lb.med.lo) + ' – ' + _msFmtE(lb.med.hi);
+  if (eLaw) eLaw.textContent = _msFmtE(lb.law.lo) + ' – ' + _msFmtE(lb.law.hi);
+  const ar = msArbTotal();
+  const eArb = document.getElementById('msSub_arb'), eArbS = document.getElementById('msSub_arb_split');
+  if (eArb) eArb.textContent = _msFmtE(ar.total.lo) + ' – ' + _msFmtE(ar.total.hi);
+  if (eArbS) eArbS.textContent = '（機構費 ' + _msFmtE(ar.inst.mid) + '＋代理 ' + _msFmtE(ar.coun.mid) + '）';
+  const ret = msRetainer();
+  const eRet = document.getElementById('msRetBody');
+  if (eRet) eRet.innerHTML = '年規模 <strong style="color:var(--gold);">' + _msFmtE(ret.lo) + ' – ' + _msFmtE(ret.hi) + '（中位 ' + _msFmtE(ret.mid) + '）</strong>' +
+    '<br><span style="color:var(--text-muted);font-size:12px;">參數：成長 ' + ret.params.g + '%／律師業占 ' + ret.params.share + '%／企業客戶 ' + ret.params.corp + '%／法顧占 ' + ret.params.ret + '%</span>';
+  // 總覽 bar
+  const segs = msSegList();
+  const gov = msGovLatest();
+  const bars = segs.map(s => ({ name: s.name, cls: s.cls, lo: s.v.lo, hi: s.v.hi, mid: s.v.mid }))
+    .concat(gov ? [{ name: '政府標案（對照，不計入）', cls: 'ms-a', lo: +gov.amount / 1e8, hi: +gov.amount / 1e8, mid: +gov.amount / 1e8 }] : [])
+    .sort((a, b) => b.mid - a.mid);
+  const maxHi = Math.max(...bars.map(b => b.hi), 1);
+  const colorOf = c => c === 'ms-a' ? 'var(--green)' : (c === 'ms-b' ? 'var(--blue)' : 'var(--gold)');
+  document.getElementById('msOverview').innerHTML = bars.map(b => {
+    const l = b.lo / maxHi * 100, w = Math.max((b.hi - b.lo) / maxHi * 100, 0.8), m = b.mid / maxHi * 100;
+    return '<div class="ms-bar-row"><div style="text-align:right;color:var(--text-muted);">' + escHtml(b.name) + '</div>' +
+      '<div class="ms-bar-track"><div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;background:' + colorOf(b.cls) + ';"></div>' +
+      '<div class="ms-bar-mid" style="left:' + m.toFixed(2) + '%;background:' + colorOf(b.cls) + ';"></div></div>' +
+      '<div style="white-space:nowrap;">' + _msFmtE(b.lo) + ' – ' + _msFmtE(b.hi) + '</div></div>';
+  }).join('');
+  // KPI + 對帳
+  const gt = msGrandTotal();
+  const topLine = msLitRows().sort((a, b) => b.mid - a.mid)[0];
+  document.getElementById('msKpis').innerHTML =
+    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(gt.mid) + '</div><div class="kpi-sub">區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);">' + (gt.mid / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟市場（中位）</div><div class="kpi-value">' + _msFmtE(lt.mid) + '</div><div class="kpi-sub">最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>';
+  document.getElementById('msRecon').innerHTML =
+    'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
+    '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，行業年成長約 3–4%，比較時心裡先打個折。<br>' +
+    '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶酬金不另立市場（訴訟委任率口徑「含法扶」，已在訴訟市場內）。<br>' +
+    '・<strong>缺口＝沒被案件統計看見的市場</strong>：非訟文件與意見書、盡職調查、契約審閱、家事非訟（監護/繼承非訟）、強制執行代理、刑事偵查階段辯護、談判與法遵顧問——bottom-up 與普查的差額大致就是這一塊加上單價假設的誤差。<br>' +
+    '・訴訟微資料委任率「任一造」口徑對市場規模是保守的：雙方都委任時是兩份委任費，本模型只算一份——訴訟市場實際規模比表列估計再高一截。';
+}
+async function msSave(seg) {
+  const st = document.getElementById('msStatus_' + seg);
+  const keys = Object.keys(_msDirty).filter(k => _msAssump[k] && _msAssump[k].segment === seg);
+  if (!keys.length) { if (st) st.textContent = '沒有變更'; return; }
+  if (st) st.textContent = '儲存中…';
+  try {
+    for (const k of keys) {
+      const { error } = await db.from('market_assumptions')
+        .update({ low: _msAssump[k].low, high: _msAssump[k].high, updated_at: new Date().toISOString() })
+        .eq('key', k);
+      if (error) throw error;
+      delete _msDirty[k];
+    }
+    document.querySelectorAll('#vt-market .ms-in.dirty').forEach(i => { if (_msAssump[i.dataset.key] && _msAssump[i.dataset.key].segment === seg) i.classList.remove('dirty'); });
+    if (st) st.textContent = '已儲存 ✓（' + keys.length + ' 項）';
+  } catch (e) { if (st) st.textContent = '儲存失敗：' + (e.message || e); }
+}
+async function msResetSeg(seg) {
+  const st = document.getElementById('msStatus_' + seg);
+  const keys = Object.keys(_msAssump).filter(k => _msAssump[k].segment === seg &&
+    (+_msAssump[k].low !== +_msAssump[k].def_low || +_msAssump[k].high !== +_msAssump[k].def_high));
+  if (!keys.length) { if (st) st.textContent = '已是預設值'; return; }
+  if (st) st.textContent = '還原中…';
+  try {
+    for (const k of keys) {
+      const r = _msAssump[k];
+      const { error } = await db.from('market_assumptions')
+        .update({ low: r.def_low, high: r.def_high, updated_at: new Date().toISOString() }).eq('key', k);
+      if (error) throw error;
+      r.low = r.def_low; r.high = r.def_high; delete _msDirty[k];
+    }
+    renderMarket();
+    const st2 = document.getElementById('msStatus_' + seg);
+    if (st2) st2.textContent = '已還原預設（' + keys.length + ' 項）';
+  } catch (e) { if (st) st.textContent = '還原失敗：' + (e.message || e); }
 }
 
 async function loadLaborOnce() {
