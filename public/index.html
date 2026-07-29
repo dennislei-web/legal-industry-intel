@@ -10518,13 +10518,15 @@ function msLitRows() {
     const priceMid = (1 - pMid) * fee.mid + pMid * lf.mid;
     const priceHi = (1 - pLo) * fee.hi + pLo * lf.hi;
     return { line: x.line, n, rate, fee,
-      lo: n * rate.lo * priceLo, hi: n * rate.hi * priceHi, mid: n * rate.mid * priceMid };  // 萬元
+      lo: n * rate.lo * priceLo, hi: n * rate.hi * priceHi, mid: n * rate.mid * priceMid,  // 萬元
+      lafLo: n * rate.lo * pHi * lf.lo, lafHi: n * rate.hi * pLo * lf.hi, lafMid: n * rate.mid * pMid * lf.mid };  // 法扶酬金貢獻（各情境口徑一致）
   }).filter(r => r.n > 0);
 }
 function msLitTotal() {
   const f = _msV('lit_appeal_factor'), rows = msLitRows();
   const s = k => rows.reduce((a, r) => a + r[k], 0);
-  return { lo: s('lo') * f.lo / 1e4, hi: s('hi') * f.hi / 1e4, mid: s('mid') * f.mid / 1e4 };  // 億
+  return { lo: s('lo') * f.lo / 1e4, hi: s('hi') * f.hi / 1e4, mid: s('mid') * f.mid / 1e4,
+    laf: { lo: s('lafLo') * f.lo / 1e4, hi: s('lafHi') * f.hi / 1e4, mid: s('lafMid') * f.mid / 1e4 } };  // 億
 }
 // 量×價配對型 segment（ip / landagent / notary）
 const MS_PAIR_SEGS = [
@@ -10713,7 +10715,8 @@ function msRecalc() {
   });
   const lt = msLitTotal();
   const litSum = document.getElementById('msLitSum');
-  if (litSum) litSum.textContent = _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '（中位 ' + _msFmtE(lt.mid) + '）';
+  if (litSum) litSum.innerHTML = _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '（中位 ' + _msFmtE(lt.mid) +
+    '，其中<span style="color:#5fc9e7;">法扶酬金 ' + _msFmtE(lt.laf.mid) + '</span>／自費 ' + _msFmtE(lt.mid - lt.laf.mid) + '）';
   // 配對型 subtotal
   MS_PAIR_SEGS.forEach(d => {
     const el = document.getElementById('msSub_' + d.seg);
@@ -10737,13 +10740,17 @@ function msRecalc() {
   const bars = segs.map(s => ({ name: s.name, cls: s.cls, lo: s.v.lo, hi: s.v.hi, mid: s.v.mid }))
     .concat(gov ? [{ name: '政府標案（對照，不計入）', cls: 'ms-a', lo: +gov.amount / 1e8, hi: +gov.amount / 1e8, mid: +gov.amount / 1e8 }] : [])
     .sort((a, b) => b.mid - a.mid);
+  // 訴訟市場列後插入法扶酬金子列（不同色凸顯，屬訴訟市場的一部分、不重複計入）
+  const litIdx = bars.findIndex(b => b.name.indexOf('訴訟市場') === 0);
+  if (litIdx >= 0) bars.splice(litIdx + 1, 0,
+    { name: '└ 其中法扶酬金', color: '#5fc9e7', lo: lt.laf.lo, hi: lt.laf.hi, mid: lt.laf.mid });
   const maxHi = Math.max(...bars.map(b => b.hi), 1);
-  const colorOf = c => c === 'ms-a' ? 'var(--green)' : (c === 'ms-b' ? 'var(--blue)' : 'var(--gold)');
+  const colorOf = b => b.color || (b.cls === 'ms-a' ? 'var(--green)' : (b.cls === 'ms-b' ? 'var(--blue)' : 'var(--gold)'));
   document.getElementById('msOverview').innerHTML = bars.map(b => {
     const l = b.lo / maxHi * 100, w = Math.max((b.hi - b.lo) / maxHi * 100, 0.8), m = b.mid / maxHi * 100;
     return '<div class="ms-bar-row"><div style="text-align:right;color:var(--text-muted);">' + escHtml(b.name) + '</div>' +
-      '<div class="ms-bar-track"><div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;background:' + colorOf(b.cls) + ';"></div>' +
-      '<div class="ms-bar-mid" style="left:' + m.toFixed(2) + '%;background:' + colorOf(b.cls) + ';"></div></div>' +
+      '<div class="ms-bar-track"><div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;background:' + colorOf(b) + ';"></div>' +
+      '<div class="ms-bar-mid" style="left:' + m.toFixed(2) + '%;background:' + colorOf(b) + ';"></div></div>' +
       '<div style="white-space:nowrap;">' + _msFmtE(b.lo) + ' – ' + _msFmtE(b.hi) + '</div></div>';
   }).join('');
   // KPI + 對帳

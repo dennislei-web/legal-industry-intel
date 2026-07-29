@@ -6,5 +6,5 @@
 INSERT INTO market_assumptions (key, segment, label, kind, unit, low, high, def_low, def_high, note, sort) VALUES
 ('lit_laf_share_civ','lit','民事/家事線法扶佔委任案比','rate','%',5,10,5,10,'法扶年報結構推估',71),
 ('lit_laf_share_cri','lit','刑事線法扶＋指定辯護佔委任案比','rate','%',25,40,25,40,'刑事強制辯護為法扶大宗，推估',72),
-('lit_laf_fee','lit','法扶酬金每件','price','萬元',3,5,3,5,'法扶酬金計付辦法約值（每審級）',73)
+('lit_laf_fee','lit','法扶酬金每件','price','萬元',1.5,3,1.5,3,'法扶酬金計付辦法：每審級 15–50 基數×1,000 元（法定 1.5–5 萬），常見核定 2–3 萬',73)
 ON CONFLICT (key) DO NOTHING;
