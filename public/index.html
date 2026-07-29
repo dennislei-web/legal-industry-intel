@@ -10498,18 +10498,27 @@ function _msFmtE(v) { return v >= 100 ? Math.round(v).toLocaleString() + ' 億' 
 function _msIn(key, side, val, step) {
   return '<input type="number" class="ms-in" data-key="' + key + '" data-side="' + side + '" value="' + val + '"' + (step ? ' step="' + step + '"' : ' step="any"') + '>';
 }
-// 訴訟：每線 量 ×委任率×費用；委任率優先實測（樣本足夠），否則可調假設
+// 訴訟：每線 量 ×委任率×計價；委任率優先實測（樣本足夠），否則可調假設
+// 計價含法扶修正（mig 115）：(1−法扶佔比)×行情費＋法扶佔比×法扶酬金，民/刑佔比分開、混合線按量加權
 function msLitRows() {
+  const pc = _msV('lit_laf_share_civ'), pk = _msV('lit_laf_share_cri'), lf = _msV('lit_laf_fee');
   return ((_msLines && _msLines.lines) || []).map(x => {
-    const n = (+x.n_civ || 0) + (+x.n_cri || 0);
+    const nCiv = +x.n_civ || 0, nCri = +x.n_cri || 0, n = nCiv + nCri;
     const measured = x.rep_total >= MS_REP_MIN ? x.rep_lawyer / x.rep_total : null;
     const ra = _msV('lit_rate_' + x.line);
     const rate = measured != null
       ? { lo: measured, hi: measured, mid: measured, measured: true, sample: +x.rep_total }
       : { lo: ra.lo / 100, hi: ra.hi / 100, mid: ra.mid / 100, measured: false };
     const fee = _msV('lit_fee_' + x.line);
+    const pLo = n ? (nCiv * pc.lo + nCri * pk.lo) / n / 100 : 0;
+    const pMid = n ? (nCiv * pc.mid + nCri * pk.mid) / n / 100 : 0;
+    const pHi = n ? (nCiv * pc.hi + nCri * pk.hi) / n / 100 : 0;
+    // 低情境＝法扶佔比取高、酬金取低；高情境反之
+    const priceLo = (1 - pHi) * fee.lo + pHi * lf.lo;
+    const priceMid = (1 - pMid) * fee.mid + pMid * lf.mid;
+    const priceHi = (1 - pLo) * fee.hi + pLo * lf.hi;
     return { line: x.line, n, rate, fee,
-      lo: n * rate.lo * fee.lo, hi: n * rate.hi * fee.hi, mid: n * rate.mid * fee.mid };  // 萬元
+      lo: n * rate.lo * priceLo, hi: n * rate.hi * priceHi, mid: n * rate.mid * priceMid };  // 萬元
   }).filter(r => r.n > 0);
 }
 function msLitTotal() {
@@ -10591,7 +10600,7 @@ function renderMarket() {
   // --- 訴訟卡 ---
   document.getElementById('msLitDesc').innerHTML =
     '量＝' + escHtml(String(_msLines.year || '-')) + ' 年地院訴訟終結（民/家事＝案件、刑事＝被告人次）；委任率標 <span class="ms-badge ms-b">實測</span> 者來自 ' +
-    escHtml(String(_msLines.rep_year || '-')) + ' 年終結案件微資料（任一造有律師、含法扶），標 <span class="ms-badge ms-c">推估</span> 者可直接修改。';
+    escHtml(String(_msLines.rep_year || '-')) + ' 年終結案件微資料（任一造有律師、含法扶），標 <span class="ms-badge ms-c">推估</span> 者可直接修改；法扶件以法扶酬金計價（參數見表下）。';
   document.getElementById('msLitBody').innerHTML = L.map((r, i) => {
     const rateCell = r.rate.measured
       ? (r.rate.mid * 100).toFixed(1) + '%<span class="ms-badge ms-b" title="樣本 ' + r.rate.sample.toLocaleString() + ' 件">實測</span>'
@@ -10605,6 +10614,10 @@ function renderMarket() {
       '<td style="text-align:right;color:var(--gold);font-weight:600;" id="msLitMid' + i + '">' + _msFmtE(r.mid / 1e4) + '</td></tr>';
   }).join('');
   document.getElementById('msLitFoot').innerHTML =
+    '<div style="margin-bottom:6px;">法扶修正（法扶件以法扶酬金計價）：民事/家事線佔委任案 ' +
+    _msIn('lit_laf_share_civ', 'low', _msAssump['lit_laf_share_civ'].low, '1') + '–' + _msIn('lit_laf_share_civ', 'high', _msAssump['lit_laf_share_civ'].high, '1') +
+    '%、刑事線（含指定辯護） ' + _msIn('lit_laf_share_cri', 'low', _msAssump['lit_laf_share_cri'].low, '1') + '–' + _msIn('lit_laf_share_cri', 'high', _msAssump['lit_laf_share_cri'].high, '1') +
+    '%、法扶酬金 ' + _msIn('lit_laf_fee', 'low', _msAssump['lit_laf_fee'].low, '0.5') + '–' + _msIn('lit_laf_fee', 'high', _msAssump['lit_laf_fee'].high, '0.5') + ' 萬/件</div>' +
     '上訴審係數 ' + _msIn('lit_appeal_factor', 'low', _msAssump['lit_appeal_factor'].low, '0.05') + '–' +
     _msIn('lit_appeal_factor', 'high', _msAssump['lit_appeal_factor'].high, '0.05') +
     ' 倍　→　訴訟市場合計 <strong id="msLitSum" style="color:var(--gold);"></strong>';
@@ -10744,7 +10757,7 @@ function msRecalc() {
   document.getElementById('msRecon').innerHTML =
     'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
     '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，行業年成長約 3–4%，比較時心裡先打個折。<br>' +
-    '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶酬金不另立市場（訴訟委任率口徑「含法扶」，已在訴訟市場內）。<br>' +
+    '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶不另立市場——訴訟委任率口徑「含法扶」，且法扶件已改按<strong>法扶酬金</strong>計價（非市場行情），計價與普查口徑一致。<br>' +
     '・<strong>缺口＝沒被案件統計看見的市場</strong>：非訟文件與意見書、盡職調查、契約審閱、家事非訟（監護/繼承非訟）、強制執行代理、刑事偵查階段辯護、談判與法遵顧問——bottom-up 與普查的差額大致就是這一塊加上單價假設的誤差。<br>' +
     '・訴訟微資料委任率「任一造」口徑對市場規模是保守的：雙方都委任時是兩份委任費，本模型只算一份——訴訟市場實際規模比表列估計再高一截。';
 }
