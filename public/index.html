@@ -2410,6 +2410,7 @@
         <input type="text" id="alumniSearch" placeholder="搜尋姓名、事務所或部門..." oninput="renderAlumniTable()">
         <select id="alumniCat" onchange="renderAlumniTable()"></select>
         <button id="alumniAddBtn" onclick="toggleAlumniAddForm()" style="display:none;padding:8px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.85rem;white-space:nowrap;">＋ 新增校友</button>
+        <button id="alumniRefreshAllBtn" onclick="refreshAlumniAll()" style="display:none;padding:8px 14px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.85rem;white-space:nowrap;" title="重爬全部校友的 MOJ 現職並更新去向分類（約 3 分鐘）">🔄 全部重爬</button>
       </div>
       <div class="card" id="alumniAddCard" style="margin-bottom:16px;display:none;">
         <div class="card-title">＋ 手動新增校友</div>
@@ -7922,6 +7923,51 @@ async function refreshAlumnusOne(id, name, skipConfirm) {
   }
 }
 
+// 校友全量重爬（admin）：不帶 name dispatch → workflow 跑全部 52 位（約 3 分鐘）
+let _alumniFullRefreshing = false;
+async function refreshAlumniAll() {
+  if (_alumniFullRefreshing) return;
+  if (!confirm('重新查詢「全部校友」的 MOJ 現職並更新去向分類？\n（觸發 GitHub Actions 全量模式，約 3 分鐘，完成後頁面自動更新）')) return;
+  const btn = document.getElementById('alumniRefreshAllBtn');
+  const baseline = (_alumniRows || []).reduce((m, r) => (r.updated_at > m ? r.updated_at : m), '');
+  _alumniFullRefreshing = true;
+  btn.disabled = true;
+  btn.textContent = '⏳ 重爬中…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/alumni-refresh`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (await db.auth.getSession()).data.session.access_token,
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({}),
+    });
+    const out = await res.json();
+    if (!out.success) throw new Error(out.error || `HTTP ${res.status}`);
+    // 輪詢 max(updated_at)（最長 8 分鐘）；只有現職有變動的列才會動 updated_at
+    let changed = false;
+    for (let k = 0; k < 32; k++) {
+      await new Promise(r => setTimeout(r, 15000));
+      const { data } = await db.from('zhelu_alumni')
+        .select('updated_at').order('updated_at', { ascending: false }).limit(1);
+      if (data && data[0] && data[0].updated_at > baseline) { changed = true; break; }
+    }
+    if (changed) await new Promise(r => setTimeout(r, 30000)); // 偵測到首筆變動後再等半分鐘讓其餘列寫完
+    _alumniRows = null;
+    await loadAlumni();
+    alert(changed
+      ? '全量重爬完成，資料已更新。'
+      : '全量重爬完成但未偵測到資料變動。\n可能大家現職都沒變；也可能 MOJ 查詢偶發失敗，結果不如預期可再跑一次。');
+  } catch (e) {
+    alert('觸發全量重爬失敗：' + e.message);
+  } finally {
+    _alumniFullRefreshing = false;
+    btn.disabled = false;
+    btn.textContent = '🔄 全部重爬';
+  }
+}
+
 // 手動新增校友（admin；mig 062 開 RLS 寫入 + is_manual 欄）
 function toggleAlumniAddForm(show) {
   const card = document.getElementById('alumniAddCard');
@@ -8013,6 +8059,8 @@ async function loadAlumni() {
   if (_alumniRows) return;
   const addBtn = document.getElementById('alumniAddBtn');
   if (addBtn) addBtn.style.display = isAdmin ? '' : 'none';
+  const refreshAllBtn = document.getElementById('alumniRefreshAllBtn');
+  if (refreshAllBtn) refreshAllBtn.style.display = isAdmin ? '' : 'none';
   const { data, error } = await db.from('zhelu_alumni').select('*');
   if (error || !data) {
     document.getElementById('alumniTableBody').innerHTML =
