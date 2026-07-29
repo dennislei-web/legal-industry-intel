@@ -39,6 +39,37 @@ RE_ORG = re.compile(r'財團法人|社團法人|基金會|協會|公會|工會|�
 RE_SKIP_LINE = re.compile(r'法定代理人|送達代收|代表人|統一編號')
 RE_PAREN = re.compile(r'[（(][^）)]*[）)]?')
 
+# 2026-07-29 雜訊防線（與 DB 端清洗規則同步）：
+# 判決「事實及理由」段落文字曾被續行邏輯誤抓成公司名（公示催告主文、本票裁定樣板句…），
+# 且內文提及的對造公司會繼承錯誤造別、誤配對到對造律師——雙保險：
+# 1) _header_segment 只取當事人欄（進「上列…／裁定判決如下／主文」即停）
+# 2) is_valid_company 名稱驗證（標點/句式黑名單＋corp 字尾白名單）
+RE_HEADER_STOP = re.compile(r'^上列|^主文$|(裁定|判決|命令)如下')
+RE_NOISE_CHAR = re.compile(r'[，。、；：？！「」『』()（）0-9│┼─┤├]')
+RE_NOISE_TOKEN = re.compile(r'本院|裁定|如附表|催告|申報|翌日|之日起|兩造|被告|原告|聲請|相對人'
+                            r'|訴訟|判決|主文|辯論|到場|陳述|經查|所示|無效|抗告|強制執行'
+                            r'|利息|清償|給付|上列|要保人|存摺|影本|契約書')
+RE_CORP_SUFFIX = re.compile(r'(公司|銀行|合作社|農會|漁會|金庫|工會|局|署|處|中心|會|基金|廠|社|所|行|部)$')
+
+
+def _header_segment(jfull):
+    """裁判書當事人欄（主文之前）；公司與律師抽取一律只吃這段。"""
+    out = []
+    for line in jfull[:4000].splitlines():
+        flat = re.sub(r'[\s　]', '', line)
+        if flat and RE_HEADER_STOP.search(flat):
+            break
+        out.append(line)
+    return '\n'.join(out)
+
+
+def is_valid_company(nm, kind):
+    if RE_NOISE_CHAR.search(nm) or RE_NOISE_TOKEN.search(nm):
+        return False
+    if kind == 'corp' and not RE_CORP_SUFFIX.search(nm):
+        return False
+    return True
+
 
 # 複合標籤剝離：「聲請人即債權人○○」→ 依序剝掉所有前導身分詞與即/兼，歸營取交集
 _LABEL_TOKENS = sorted(PARTY_CAMP.keys(), key=len, reverse=True)
@@ -101,7 +132,7 @@ def extract_corp_parties(jfull):
             if nm_raw and not RE_SKIP_LINE.search(nm_raw):
                 nm = norm_company(nm_raw)
                 kind = company_kind(nm)
-                if kind and 5 <= len(nm) <= 60 and nm not in out:
+                if kind and 5 <= len(nm) <= 60 and nm not in out and is_valid_company(nm, kind):
                     out[nm] = (kind, true_camp, cur_camp)
             continue
         if has_role or '代理人' in flat:
@@ -114,7 +145,7 @@ def extract_corp_parties(jfull):
             nm_raw, tc2 = strip_party_labels(flat)
             nm = norm_company(nm_raw)
             kind = company_kind(nm)
-            if kind and 5 <= len(nm) <= 60 and nm not in out:
+            if kind and 5 <= len(nm) <= 60 and nm not in out and is_valid_company(nm, kind):
                 tc = tc2 if tc2 in ('P', 'D') else (cur_camp if cur_camp in ('P', 'D') else 'X')
                 out[nm] = (kind, tc, cur_camp)
     return [(nm, k, tc, ac) for nm, (k, tc, ac) in out.items()]
@@ -158,11 +189,12 @@ def parse_corp(yyyymm):
             if cat not in ('民事', '行政'):
                 continue
             n_civil += 1
-            corps = extract_corp_parties(jfull)
+            head = _header_segment(jfull)
+            corps = extract_corp_parties(head)
             if not corps:
                 continue
             n_corp_cases += 1
-            sided = extract_lawyers_sided(jfull)
+            sided = extract_lawyers_sided(head)
             by_camp = defaultdict(list)
             for lname, lcamp in sided.items():
                 by_camp[lcamp].append(lname)
@@ -268,11 +300,15 @@ def upload(a, b, min_n=1, dry=False):
         d = json.load(open(p, encoding='utf-8'))
         yr = ym[:4]
         for nm, k, n, rp in d['litigant']:
+            if not is_valid_company(nm, k):   # 舊 json 殘留雜訊在上傳端再擋一次
+                continue
             li = lit[(yr, nm)]
             li['kind'] = k
             li['n'] += n
             li['repr'] += rp
         for nm, ln, c, n in d['pairs']:
+            if not is_valid_company(nm, company_kind(nm) or 'corp'):
+                continue
             pairs[(yr, nm, ln, c)] += n
     lit_rows = [{'period': yr, 'company': nm, 'kind': v['kind'], 'n': v['n'], 'n_repr': v['repr']}
                 for (yr, nm), v in lit.items() if v['n'] >= min_n or v['repr'] > 0]
