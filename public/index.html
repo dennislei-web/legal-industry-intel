@@ -10549,6 +10549,13 @@ function msPairTotal(seg) {
   });
   return { lo, hi, mid };
 }
+function msIpSplit() {  // 商標 vs 專利（發明+新型+設計）拆分，總覽雙色堆疊用
+  const one = (vk, fk) => { const v = _msV(vk), f = _msV(fk); return { lo: v.lo * f.lo / 1e4, hi: v.hi * f.hi / 1e4, mid: v.mid * f.mid / 1e4 }; };
+  const tm = one('ip_vol_tm', 'ip_fee_tm');
+  const pts = [one('ip_vol_inv', 'ip_fee_inv'), one('ip_vol_um', 'ip_fee_um'), one('ip_vol_ds', 'ip_fee_ds')];
+  const pt = { lo: pts.reduce((a, x) => a + x.lo, 0), hi: pts.reduce((a, x) => a + x.hi, 0), mid: pts.reduce((a, x) => a + x.mid, 0) };
+  return { tm, pt };
+}
 function msLaborTotal() {
   const mv = _msV('lb_vol_mediation'), mr = _msV('lb_rate_mediation'), mf = _msV('lb_fee_mediation');
   const lv = _msV('lb_vol_lawsuit'), lr = _msV('lb_rate_lawsuit'), lf = _msV('lb_fee_lawsuit');
@@ -10720,7 +10727,15 @@ function msRecalc() {
   // 配對型 subtotal
   MS_PAIR_SEGS.forEach(d => {
     const el = document.getElementById('msSub_' + d.seg);
-    if (el) { const t = msPairTotal(d.seg); el.textContent = _msFmtE(t.lo) + ' – ' + _msFmtE(t.hi) + '（中位 ' + _msFmtE(t.mid) + '）'; }
+    if (!el) return;
+    const t = msPairTotal(d.seg);
+    if (d.seg === 'ip') {
+      const sp = msIpSplit();
+      el.innerHTML = _msFmtE(t.lo) + ' – ' + _msFmtE(t.hi) + '（中位 ' + _msFmtE(t.mid) +
+        '＝專利 ' + _msFmtE(sp.pt.mid) + '＋<span style="color:#9b7ef7;">商標 ' + _msFmtE(sp.tm.mid) + '</span>）';
+    } else {
+      el.textContent = _msFmtE(t.lo) + ' – ' + _msFmtE(t.hi) + '（中位 ' + _msFmtE(t.mid) + '）';
+    }
   });
   const lb = msLaborTotal();
   const eMed = document.getElementById('msSub_labor_med'), eLaw = document.getElementById('msSub_labor_law');
@@ -10737,22 +10752,38 @@ function msRecalc() {
   // 總覽 bar
   const segs = msSegList();
   const gov = msGovLatest();
+  const ip = msIpSplit();
   const bars = segs.map(s => ({ name: s.name, cls: s.cls, lo: s.v.lo, hi: s.v.hi, mid: s.v.mid }))
     .concat(gov ? [{ name: '政府標案（對照，不計入）', cls: 'ms-a', lo: +gov.amount / 1e8, hi: +gov.amount / 1e8, mid: +gov.amount / 1e8 }] : [])
     .sort((a, b) => b.mid - a.mid);
-  // 訴訟市場列後插入法扶酬金子列（不同色凸顯，屬訴訟市場的一部分、不重複計入）
-  const litIdx = bars.findIndex(b => b.name.indexOf('訴訟市場') === 0);
-  if (litIdx >= 0) bars.splice(litIdx + 1, 0,
-    { name: '└ 其中法扶酬金', color: '#5fc9e7', lo: lt.laf.lo, hi: lt.laf.hi, mid: lt.laf.mid });
+  // 同條雙色堆疊：訴訟＝自費｜法扶酬金、商標專利＝專利｜商標（依中位占比切分色帶）
+  const litBar = bars.find(b => b.name.indexOf('訴訟市場') === 0);
+  if (litBar) litBar.parts = [
+    { label: '自費', mid: lt.mid - lt.laf.mid, color: 'var(--gold)' },
+    { label: '法扶酬金', mid: lt.laf.mid, color: '#5fc9e7' }];
+  const ipBar = bars.find(b => b.name.indexOf('商標專利') === 0);
+  if (ipBar) ipBar.parts = [
+    { label: '專利', mid: ip.pt.mid, color: 'var(--gold)' },
+    { label: '商標', mid: ip.tm.mid, color: '#9b7ef7' }];
   const maxHi = Math.max(...bars.map(b => b.hi), 1);
   const colorOf = b => b.color || (b.cls === 'ms-a' ? 'var(--green)' : (b.cls === 'ms-b' ? 'var(--blue)' : 'var(--gold)'));
   document.getElementById('msOverview').innerHTML = bars.map(b => {
     const l = b.lo / maxHi * 100, w = Math.max((b.hi - b.lo) / maxHi * 100, 0.8), m = b.mid / maxHi * 100;
+    let range;
+    if (b.parts && b.parts.length) {
+      const tot = b.parts.reduce((a, p) => a + p.mid, 0) || 1;
+      range = '<div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;display:flex;" title="' +
+        escHtml(b.parts.map(p => p.label + ' ' + _msFmtE(p.mid)).join('｜')) + '">' +
+        b.parts.map(p => '<div style="width:' + (p.mid / tot * 100).toFixed(1) + '%;background:' + p.color + ';"></div>').join('') + '</div>';
+    } else {
+      range = '<div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;background:' + colorOf(b) + ';"></div>';
+    }
     return '<div class="ms-bar-row"><div style="text-align:right;color:var(--text-muted);">' + escHtml(b.name) + '</div>' +
-      '<div class="ms-bar-track"><div class="ms-bar-range" style="left:' + l.toFixed(2) + '%;width:' + w.toFixed(2) + '%;background:' + colorOf(b) + ';"></div>' +
+      '<div class="ms-bar-track">' + range +
       '<div class="ms-bar-mid" style="left:' + m.toFixed(2) + '%;background:' + colorOf(b) + ';"></div></div>' +
       '<div style="white-space:nowrap;">' + _msFmtE(b.lo) + ' – ' + _msFmtE(b.hi) + '</div></div>';
-  }).join('');
+  }).join('') +
+  '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">雙色列（懸停看金額）：訴訟市場＝自費｜<span style="color:#5fc9e7;">■ 法扶酬金</span>；商標專利＝專利｜<span style="color:#9b7ef7;">■ 商標</span>（依中位占比切分）。</div>';
   // KPI + 對帳
   const gt = msGrandTotal();
   const topLine = msLitRows().sort((a, b) => b.mid - a.mid)[0];
