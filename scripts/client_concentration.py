@@ -49,6 +49,13 @@ RE_ADDR_CUT = re.compile(r'[住居設](?=[一-鿿]{0,4}[縣市])')
 # 公司名跨行斷尾：上行以這些片段結尾表示還沒寫完
 RE_DANGLING = re.compile(r'(股份有限?|有限|股份|商業|財團法人|社團法人|工業|保險)$')
 
+# 複合身分殘尾：_party_label 只切掉第一段標籤（如「被上訴人」），
+# 「被上訴人即附帶上訴人新光…」剩下的「即附帶上訴人」會黏進當事人名 → 開頭連續剝除
+RE_ROLE_PREFIX = re.compile(
+    r'^(?:[即兼](?:附帶|反訴|再審|再)?'
+    r'(?:被?上訴人|被?抗告人|被告|原告|聲請人|相對人|債權人|債務人|參加人|'
+    r'受刑人|自訴人|告訴人|異議人|被害人|選定當事人|法定代理人|代表人))+')
+
 # ── 法人判定（沿用 phase_c）──
 CORP_RE = re.compile(r'公司|商行|企業社|商號|工作室|有限合夥|銀行|農會|漁會|合作社')
 ORG_RE = re.compile(r'基金會|協會|工會|公會|寺$|宮$|廟$|教會|學校|大學|醫院|管理委員會|社區|促進會|聯誼會')
@@ -59,6 +66,7 @@ MASK_RE = re.compile(r'[○●Ｏｏx X甲乙丙丁]')
 
 def clean_party(seg):
     seg = RE_ANNOT.sub('', seg)
+    seg = RE_ROLE_PREFIX.sub('', seg)
     return RE_ADDR_CUT.split(seg)[0]
 
 
@@ -242,7 +250,7 @@ def aggregate(start, end):
                     a['titles'][r['title']] += 1
                 ents = set()
                 for p in r['parties']:
-                    p = fold(p)
+                    p = RE_ROLE_PREFIX.sub('', fold(p))  # 舊快取已含殘尾，aggregate 端也剝
                     if len(p) < 4 or MASK_RE.search(p):
                         continue
                     if entity_type(p):
