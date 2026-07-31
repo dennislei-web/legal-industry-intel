@@ -33,3 +33,18 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         working-directory: scripts
         run: python -u gov_tenders.py run-shard ${{ matrix.shard }} 4
+
+  mark-updated:
+    needs: crawl
+    runs-on: ubuntu-latest
+    steps:
+      - name: 回寫資料來源最後爬取時間
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          curl -sf -X PATCH "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.gov_tenders" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}"

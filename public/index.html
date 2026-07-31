@@ -7690,8 +7690,8 @@ async function loadSources() {
       <tr>
         <td><strong>${escHtml(s.name)}</strong>${s.url ? ` <a href="${escHtml(s.url)}" target="_blank" style="color:var(--blue);font-size:0.8rem;">&#8599;</a>` : ''}${s.notes ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escHtml(s.notes)}</div>` : ''}</td>
         <td>${escHtml(s.data_type || '-')}</td>
-        <td>${escHtml(s.update_frequency || '-')}</td>
-        <td>${s.last_scraped_at ? formatDate(s.last_scraped_at) : '尚未執行'}</td>
+        <td>${escHtml({ daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年', manual: '手動' }[s.update_frequency] || s.update_frequency || '-')}</td>
+        <td>${s.last_scraped_at ? formatDate(s.last_scraped_at) : (s.update_frequency === 'manual' || s.scraper_name === 'manual' ? '—（人工維護）' : '尚未執行')}</td>
         <td>${status}</td>
       </tr>`;
     }).join('');

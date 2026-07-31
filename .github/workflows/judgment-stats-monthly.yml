@@ -76,3 +76,14 @@ jobs:
           curl -sf -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_judge_change_transfers" \
             -H "apikey: $SUPABASE_SERVICE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" -d '{}'
+
+      - name: 回寫資料來源最後爬取時間
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          curl -sf -X PATCH "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.judgment_stats" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}"
