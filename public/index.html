@@ -3600,6 +3600,24 @@
     <!-- ==================== TAB: SOURCES ==================== -->
     <div id="tab-sources" class="tab-content">
       <div class="card">
+        <div class="card-title">&#128506;&#65039; 前端頁面 × 資料來源</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:220px;">前端頁面</th>
+                <th>使用的資料來源（爬蟲・更新頻率・最後爬取）</th>
+              </tr>
+            </thead>
+            <tbody id="pageSourcesBody">
+              <tr><td colspan="2" class="loading">載入中</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">實線標籤＝排程爬蟲（狀態同下方「資料來源狀態」表）；虛線標籤＝靜態／人工更新資料，更新時點以各頁內標示為準。點頁面名稱可直接跳轉。</div>
+      </div>
+
+      <div class="card">
         <div class="card-title">&#128279; 資料來源狀態</div>
         <div class="table-wrap">
           <table>
@@ -7693,6 +7711,7 @@ const SOURCE_PAGES = {
     { sec: 'lawyer', tab: 'lawyers', label: '律師＞律師名錄（名冊主源）' },
     { sec: 'lawyer', tab: 'offices', label: '律師＞事務所名錄' },
     { sec: 'lawyer', tab: 'changes', label: '律師＞異動追蹤' },
+    { sec: 'lawyer', tab: 'inhouse', label: '律師＞企業法務雷達' },
     { sec: 'lawyer', tab: 'alumni', label: '律師＞喆律校友會' },
   ],
   '全聯會律師名單': [
@@ -7760,9 +7779,70 @@ function renderSourcePages(name) {
   ).join('');
 }
 
+// 反向視角：前端頁面 → 資料來源。爬蟲來源由 SOURCE_PAGES 反轉，靜態／人工更新資料在此補列。
+const STATIC_PAGE_SOURCES = {
+  'lawyer/overview': ['公開資訊觀測站 獨董簡歷（年更手動）', 'TIPO 代理名簿（年更手動）'],
+  'lawyer/alumni': ['喆律校友 MOJ 刷新（每週一凌晨自動）'],
+  'lawyer/law010': ['010 總表每日同步（lawyer-dashboard 管線）'],
+  'clerk/clerk-overview': ['司法院年報 ODS（年更手動）', '考選部四等特考（年更手動）'],
+  'industry/supply': ['考選部司律考試序列（年更手動）'],
+  'industry/value': ['財政部營業稅・工商普查（年更手動）'],
+  'industry/laf': ['法扶基金會年報 PDF（年更手動）'],
+  'industry/adr': ['內政統計通報 鄉鎮市調解（年更手動）', '仲裁機構統計（年更手動）'],
+  'industry/labor': ['勞動部開放資料（月更）'],
+  'industry/notary': ['司法院年報 公證統計（年更手動）'],
+  'industry/landagent': ['內政部地政統計（每年6月手動）'],
+  'industry/nonlit': ['TIPO 名簿 CSV＋FTPS 逐案件數（年更手動）'],
+};
+const SECTION_LABELS = { lawyer: '律師', judge: '法官', prosecutor: '檢察官', clerk: '書記官', jstat: '司法統計', industry: '產業分析' };
+
+function renderPageSources(sources) {
+  const body = document.getElementById('pageSourcesBody');
+  if (!body) return;
+  const byName = Object.fromEntries((sources || []).map(s => [s.name, s]));
+  // 反轉 SOURCE_PAGES：`sec/tab` → [{name, note}]
+  const pageMap = {};
+  for (const [srcName, pages] of Object.entries(SOURCE_PAGES)) {
+    for (const p of pages) {
+      const key = `${p.sec}/${p.tab}`;
+      (pageMap[key] = pageMap[key] || []).push({ name: srcName, note: (p.label.match(/（(.+)）$/) || [])[1] || '' });
+    }
+  }
+  const freqLabel = f => ({ daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年', manual: '手動' }[f] || f || '-');
+  const rows = [];
+  for (const [sec, tabs] of Object.entries(SECTIONS)) {
+    if (!SECTION_LABELS[sec] || !tabs.length) continue;
+    rows.push(`<tr><td colspan="2" style="background:var(--bg-row);font-weight:600;color:var(--gold-light);font-size:0.78rem;">${SECTION_LABELS[sec]}</td></tr>`);
+    for (const t of tabs) {
+      const key = `${sec}/${t.tab}`;
+      const chips = [];
+      for (const c of (pageMap[key] || [])) {
+        const s = byName[c.name];
+        const dot = !s ? '' : !s.is_active
+          ? '<span style="color:var(--red);">&#9679;</span> '
+          : c.name.includes('Lawsnote')
+            ? '<span style="color:var(--orange);">&#9679;</span> '
+            : '<span style="color:var(--green);">&#9679;</span> ';
+        const meta = s ? `｜${freqLabel(s.update_frequency)}${s.last_scraped_at ? '｜' + formatDate(s.last_scraped_at).split(' ')[0] : ''}` : '';
+        chips.push(`<span title="${escHtml(c.note || c.name)}" style="display:inline-block;background:var(--bg-row);border:1px solid var(--border);border-radius:4px;padding:1px 7px;margin:1px 2px;font-size:0.72rem;color:var(--text);white-space:nowrap;">${dot}${escHtml(c.name)}${escHtml(meta)}</span>`);
+      }
+      for (const label of (STATIC_PAGE_SOURCES[key] || [])) {
+        chips.push(`<span style="display:inline-block;border:1px dashed var(--border-light);border-radius:4px;padding:1px 7px;margin:1px 2px;font-size:0.72rem;color:var(--text-muted);white-space:nowrap;">${escHtml(label)}</span>`);
+      }
+      if (!chips.length) chips.push('<span style="color:var(--text-muted);font-size:0.72rem;">—（頁內自算/靜態）</span>');
+      rows.push(`<tr>
+        <td><a href="#" onclick="gotoTab('${sec}','${t.tab}');return false;" style="color:var(--blue);">${SECTION_LABELS[sec]}＞${escHtml(t.label)}</a></td>
+        <td>${chips.join('')}</td>
+      </tr>`);
+    }
+  }
+  body.innerHTML = rows.join('');
+}
+
 async function loadSources() {
   // Data sources
   const { data: sources } = await db.from('data_sources').select('*').order('name');
+  renderPageSources(sources || []);
   const srcBody = document.getElementById('sourcesTableBody');
   if (sources?.length) {
     srcBody.innerHTML = sources.map(s => {
