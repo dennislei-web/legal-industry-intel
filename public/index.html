@@ -1975,6 +1975,15 @@
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 商標代理人名簿＝登錄（商標代理人，須認證考試）＋備查（律師／會計師，免考試）口徑，每月 10 日更新；未登錄備查者不得以代理人名義招攬商標業務（商標法 98-1，罰 3–15 萬）。專利代理人名單僅含<strong>近 3 年有實際代理案件</strong>者（活動口徑，非全部證照持有人）。代理率（專利 93.8%／商標 84.1%）為 109 年 9 月經濟部新申請案統計快照，僅供量級參考。申請量為 TIPO 年報數字（年更）。
       </div>
+      <!-- 併購觀察名單（admin 限定：名單在 ip_watchlist admin-only 表，指標由 tipo_* 即時計算） -->
+      <div class="card" id="nlWatchCard" style="display:none;margin-top:16px;border:1px solid var(--gold);">
+        <div class="card-title">&#128274; 專利事務所併購觀察名單 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;" id="nlWatchIntro">載入中…</div>
+        <div id="nlWatchBody"></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">
+          ※ 判讀口徑：<strong>依賴%</strong>＝案量中由「專利代理人」（2008 專利師法前祖父條款世代，執業 ≥18 年、多 60 歲以上）經手比例，越高＝退休釋出機率越高；<strong>動能</strong>＝次年件數÷基準年件數，因發明 18 個月公開時滯以同儕中位數校正——<span style="color:var(--red);">↓弱（&lt;中位×0.75）＝真實下滑，可能收攤前兆＝接觸時機</span>、<span style="color:var(--green);">↑強（&gt;中位×1.15）＝真實成長，早卡位但溢價高</span>。指標隨 TIPO 資料年更自動更新。件數→營收粗估：代理費 6–12 萬/件，另有年金維護 recurring 未計。接觸前 DD：勞保人數（工程師團隊）、客戶集中度（captive 排查）、年金存量、外國代理網絡、轉委任條款（deal 預設 earn-out＋原代理人過渡掛名 2–3 年）。
+        </div>
+      </div>
     </div>
 
     <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
@@ -3973,7 +3982,7 @@ function showTab(tab) {
   if (tab === 'value') loadValueOnce();
   if (tab === 'notary') loadNotaryOnce();
   if (tab === 'landagent') loadLandagentOnce();
-  if (tab === 'nonlit') loadNonlitOnce();
+  if (tab === 'nonlit') { loadNonlitOnce(); if (isAdmin) loadNlWatchlist(); }
   if (tab === 'domain') initDomainTab();
   if (tab === 'overview') loadLawyerRankCardsOnce();
   if (tab === 'lawyers') loadLawyers();
@@ -11485,6 +11494,82 @@ async function nlRankSearch() {
   } catch (e) {
     agBody.innerHTML = '<tr><td colspan="4" style="color:var(--red);">搜尋失敗</td></tr>';
     console.error('代理搜尋失敗', e);
+  }
+}
+
+// --- 併購觀察名單（ip_watchlist admin-only 表＋tipo_* 即時指標，migration 117）---
+let _nlWatchLoaded = false;
+async function loadNlWatchlist() {
+  if (_nlWatchLoaded) return;
+  _nlWatchLoaded = true;
+  const card = document.getElementById('nlWatchCard');
+  try {
+    const wl = await db.from('ip_watchlist').select('firm,tier,note,sort').order('sort');
+    if (wl.error || !wl.data || !wl.data.length) return; // 非 admin（RLS 回空）或未建表：卡片不現身
+    const names = wl.data.map(r => r.firm);
+    // 最新資料年 → 基準年 B = 最新完整年（latest-2，避開發明 18 個月公開時滯）
+    const latest = await db.from('tipo_firm_stats').select('year_tw').eq('kind', 'pt').order('year_tw', { ascending: false }).limit(1);
+    if (latest.error || !latest.data.length) throw (latest.error || new Error('no tipo data'));
+    const L = latest.data[0].year_tw, B = L - 2;
+    const yr = y => db.from('tipo_firm_stats').select('firm,cases').eq('kind', 'pt').eq('year_tw', y).limit(1000);
+    const [p0, p1, p2, tmq, agq] = await Promise.all([
+      yr(B - 1), yr(B), yr(B + 1),
+      db.from('tipo_firm_stats').select('firm,year_tw,cases').eq('kind', 'tm').in('firm', names).in('year_tw', [B, B + 1]),
+      db.from('tipo_agent_stats').select('firm,agent_name,identity,cases').eq('kind', 'pt').eq('year_tw', B).in('firm', names)
+    ]);
+    const err = [p0, p1, p2, tmq, agq].find(r => r.error); if (err) throw err.error;
+    const m0 = {}, m1 = {}, m2 = {}, tm = {};
+    p0.data.forEach(r => m0[r.firm] = r.cases);
+    p1.data.forEach(r => m1[r.firm] = r.cases);
+    p2.data.forEach(r => m2[r.firm] = r.cases);
+    tmq.data.forEach(r => { (tm[r.firm] = tm[r.firm] || {})[r.year_tw] = r.cases; });
+    const rank = {}; p1.data.slice().sort((a, b) => b.cases - a.cases).forEach((r, i) => rank[r.firm] = i + 1);
+    // 同儕中位動能（基準年 ≥100 件者）
+    const ratios = p1.data.filter(r => r.cases >= 100).map(r => (m2[r.firm] || 0) / r.cases).sort((a, b) => a - b);
+    const med = ratios.length ? ratios[Math.floor(ratios.length / 2)] : 0.57;
+    const agByFirm = {};
+    agq.data.forEach(r => (agByFirm[r.firm] = agByFirm[r.firm] || []).push(r));
+    const TIERS = { '1': 'Tier 1｜核心標的（中型＋高齡依賴，書可整買）', '2': 'Tier 2｜體量級（大書在高齡代理人手上）', '3': 'Tier 3｜商標交叉型（契合商標先行）', '4': 'Tier 4｜小書後備', 'X': '已排除／captive 疑慮' };
+    let alerts = 0;
+    const rowHtml = w => {
+      const c0 = m0[w.firm] || 0, c1 = m1[w.firm] || 0, c2 = m2[w.firm] || 0;
+      const r = c1 ? c2 / c1 : 0;
+      let mom = '<span style="color:var(--text-muted);">＝</span>';
+      if (c1 && r < med * 0.75) { mom = `<span style="color:var(--red);font-weight:700;">↓弱 ${r.toFixed(2)}</span>`; if (w.tier !== 'X') alerts++; }
+      else if (c1 && r > med * 1.15) mom = `<span style="color:var(--green);font-weight:600;">↑強 ${r.toFixed(2)}</span>`;
+      else if (c1) mom = `<span style="color:var(--text-muted);">＝ ${r.toFixed(2)}</span>`;
+      const al = (agByFirm[w.firm] || []).sort((a, b) => b.cases - a.cases);
+      const tot = al.reduce((s, a) => s + a.cases, 0);
+      const dai = tot ? al.filter(a => a.identity === '專利代理人').reduce((s, a) => s + a.cases, 0) / tot : 0;
+      const pr = al.slice(0, 3).map(a => `${escHtml(a.agent_name)}<span style="color:var(--text-muted);">(${escHtml(a.identity || '?')},${a.cases.toLocaleString()})</span>`).join('、');
+      const t1 = (tm[w.firm] || {})[B] || 0, t2 = (tm[w.firm] || {})[B + 1] || 0;
+      return `<tr>
+        <td style="white-space:nowrap;">${escHtml(w.firm)}<div style="font-size:0.7rem;color:var(--text-muted);">排名 ${rank[w.firm] || '-'}</div></td>
+        <td style="text-align:right;white-space:nowrap;font-size:0.78rem;">${c0.toLocaleString()} → <strong>${c1.toLocaleString()}</strong> → ${c2.toLocaleString()}</td>
+        <td style="text-align:center;white-space:nowrap;">${mom}</td>
+        <td style="text-align:right;${dai >= 0.8 ? 'color:var(--gold);font-weight:700;' : ''}">${tot ? (dai * 100).toFixed(0) + '%' : '-'}</td>
+        <td style="font-size:0.76rem;">${pr || '<span style="color:var(--text-muted);">名簿外</span>'}</td>
+        <td style="text-align:right;font-size:0.78rem;white-space:nowrap;">${t1 || t2 ? `${t1.toLocaleString()} → ${t2.toLocaleString()}` : '-'}</td>
+        <td style="font-size:0.76rem;color:var(--text-muted);min-width:180px;">${escHtml(w.note || '')}</td>
+      </tr>`;
+    };
+    const order = ['1', '2', '3', '4', 'X'];
+    document.getElementById('nlWatchBody').innerHTML = order.map(t => {
+      const rows = wl.data.filter(w => w.tier === t);
+      if (!rows.length) return '';
+      return `<div style="font-size:0.8rem;font-weight:600;margin:12px 0 6px;${t === 'X' ? 'color:var(--text-muted);' : ''}">${TIERS[t]}</div>
+        <div class="table-wrap"><table>
+        <thead><tr><th>事務所</th><th style="text-align:right;">專利 ${B - 1}→${B}→${B + 1}</th><th style="text-align:center;">動能</th><th style="text-align:right;">依賴%</th><th>主事者（${B} 年）</th><th style="text-align:right;">商標 ${B}→${B + 1}</th><th>備註</th></tr></thead>
+        <tbody>${rows.map(rowHtml).join('')}</tbody></table></div>`;
+    }).join('');
+    document.getElementById('nlWatchIntro').innerHTML =
+      `祖父條款世代（專利代理人）仍握全市場約 23% 案量，退休釋出＝併購窗口。基準年民國 <strong>${B}</strong> 年、同儕中位動能 <strong>${med.toFixed(2)}</strong>（發明公開時滯校正基準）；` +
+      (alerts ? `目前 <strong style="color:var(--red);">${alerts} 家亮燈（↓弱＝接觸時機）</strong>。` : '目前無亮燈標的。') +
+      ' 名單人工維護（ip_watchlist），指標隨 TIPO 年更自動重算。';
+    card.style.display = '';
+  } catch (e) {
+    _nlWatchLoaded = false;
+    console.error('觀察名單載入失敗', e);
   }
 }
 
