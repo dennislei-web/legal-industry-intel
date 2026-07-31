@@ -727,23 +727,28 @@ def main():
         if args.limit:
             courts_to_scrape = dict(list(courts_to_scrape.items())[:args.limit])
 
-        log(f'將爬取 {len(courts_to_scrape)} 個法院')
+        # 高密度的 HTML 地院（每院 10+ 次導航）排前面，趁來源 IP 未被 WAF 累積封鎖先跑；
+        # 低密度 PDF 院（1 頁+1 PDF）放後面，較耐封鎖。
+        ordered = sorted(courts_to_scrape.items(),
+                         key=lambda kv: 0 if kv[1][1] == 'html' else 1)
 
-        for court_name, (subdomain, mode, paths) in courts_to_scrape.items():
+        log(f'將爬取 {len(ordered)} 個法院（HTML 地院優先）')
+
+        def scrape_one(court_name, subdomain, mode, paths):
+            if mode == 'html':
+                return scrape_html_judges(page, court_name, subdomain)
+            return scrape_pdf_court(page, court_name, subdomain, paths)
+
+        for court_name, (subdomain, mode, paths) in ordered:
             log(f'\n--- {court_name} ({mode} 模式) ---')
-
             try:
-                if mode == 'html':
-                    judges = scrape_html_judges(page, court_name, subdomain)
-                else:
-                    judges = scrape_pdf_court(page, court_name, subdomain, paths)
-
+                judges = scrape_one(court_name, subdomain, mode, paths)
                 log(f'  解析出 {len(judges)} 位法官')
                 if judges:
                     all_judges.extend(judges)
                 else:
                     failed_courts.append(court_name)
-                polite_delay(3)
+                polite_delay(15)  # 院間冷卻，降低 WAF 累積封鎖
 
             except PlaywrightTimeout:
                 log(f'  ⚠ 超時，跳過')
@@ -752,6 +757,25 @@ def main():
                 log(f'  ⚠ 錯誤: {e}')
                 failed_courts.append(court_name)
                 continue
+
+        # 第二輪：對失敗法院冷卻後重試一次（封鎖窗口通常數分鐘會恢復）
+        if failed_courts:
+            retry_list = list(failed_courts)
+            log(f'\n=== 冷卻 90s 後重試 {len(retry_list)} 個失敗法院 ===')
+            time.sleep(90)
+            for court_name in retry_list:
+                subdomain, mode, paths = COURT_PAGES[court_name]
+                log(f'\n--- [重試] {court_name} ({mode} 模式) ---')
+                try:
+                    judges = scrape_one(court_name, subdomain, mode, paths)
+                    log(f'  解析出 {len(judges)} 位法官')
+                    if judges:
+                        all_judges.extend(judges)
+                        failed_courts.remove(court_name)
+                    polite_delay(15)
+                except Exception as e:
+                    log(f'  ⚠ 重試仍失敗: {e}')
+                    continue
 
         # 儲存到 DB
         log(f'\n=== 共 {len(all_judges)} 位法官，開始儲存 ===')
