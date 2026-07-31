@@ -58,8 +58,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          curl -sf -X PATCH "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.labor_stats" \
+          # secrets 可能帶尾端空白/換行，curl 不像 Python 會 strip，會讓 PostgREST 回 400
+          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
+          http_code=$(curl -s -o /tmp/resp.txt -w "%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.labor_stats" \
             -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" \
-            -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}"
+            -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}")
+          echo "PATCH data_sources: HTTP $http_code"
+          [ "$http_code" = "204" ] || { echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; }
