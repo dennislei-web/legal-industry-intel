@@ -11504,7 +11504,7 @@ async function loadNlWatchlist() {
   _nlWatchLoaded = true;
   const card = document.getElementById('nlWatchCard');
   try {
-    const wl = await db.from('ip_watchlist').select('firm,tier,note,sort').order('sort');
+    const wl = await db.from('ip_watchlist').select('firm,tier,note,law_firm,sort').order('sort');
     if (wl.error || !wl.data || !wl.data.length) return; // 非 admin（RLS 回空）或未建表：卡片不現身
     const names = wl.data.map(r => r.firm);
     // 最新資料年 → 基準年 B = 最新完整年（latest-2，避開發明 18 個月公開時滯）
@@ -11550,6 +11550,7 @@ async function loadNlWatchlist() {
         <td style="text-align:right;${dai >= 0.8 ? 'color:var(--gold);font-weight:700;' : ''}">${tot ? (dai * 100).toFixed(0) + '%' : '-'}</td>
         <td style="font-size:0.76rem;">${pr || '<span style="color:var(--text-muted);">名簿外</span>'}</td>
         <td style="text-align:right;font-size:0.78rem;white-space:nowrap;">${t1 || t2 ? `${t1.toLocaleString()} → ${t2.toLocaleString()}` : '-'}</td>
+        <td style="font-size:0.76rem;min-width:160px;${!w.law_firm || w.law_firm.includes('推定無關聯') ? 'color:var(--text-muted);' : ''}">${w.law_firm ? escHtml(w.law_firm) : '—'}</td>
         <td style="font-size:0.76rem;color:var(--text-muted);min-width:180px;">${escHtml(w.note || '')}</td>
       </tr>`;
     };
@@ -11559,7 +11560,7 @@ async function loadNlWatchlist() {
       if (!rows.length) return '';
       return `<div style="font-size:0.8rem;font-weight:600;margin:12px 0 6px;${t === 'X' ? 'color:var(--text-muted);' : ''}">${TIERS[t]}</div>
         <div class="table-wrap"><table>
-        <thead><tr><th>事務所</th><th style="text-align:right;">專利 ${B - 1}→${B}→${B + 1}</th><th style="text-align:center;">動能</th><th style="text-align:right;">依賴%</th><th>主事者（${B} 年）</th><th style="text-align:right;">商標 ${B}→${B + 1}</th><th>備註</th></tr></thead>
+        <thead><tr><th>事務所</th><th style="text-align:right;">專利 ${B - 1}→${B}→${B + 1}</th><th style="text-align:center;">動能</th><th style="text-align:right;">依賴%</th><th>主事者（${B} 年）</th><th style="text-align:right;">商標 ${B}→${B + 1}</th><th>合作律師所</th><th>備註</th></tr></thead>
         <tbody>${rows.map(rowHtml).join('')}</tbody></table></div>`;
     }).join('');
     document.getElementById('nlWatchIntro').innerHTML =
