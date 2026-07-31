@@ -3860,8 +3860,9 @@ async function showDashboard() {
   ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
   ensureLeaderOverrides(); // 前台標註所長對照表（mig 061，同上背景載）
 
-  // 初始化導覽（預設律師區）
-  showSection('lawyer');
+  // 初始化導覽：回復上次停留的區塊；admin 區需等 profile 載入後才可見，不在此回復
+  const savedSec = navState.section;
+  showSection(savedSec && savedSec !== 'admin' && document.getElementById('navBtn_' + savedSec) ? savedSec : 'lawyer');
 
   // 輕量 KPI 先載入，重量圖表延後
   loadOverviewFast();
@@ -3935,8 +3936,15 @@ const SECTIONS = {
   sources: [],
   admin: [],
 };
+// 導覽狀態記憶：閒置分頁被瀏覽器休眠回收後重載，回復上次停留的頁面（不再跳回預設「律師」）
+let navState = {};
+try { navState = JSON.parse(localStorage.getItem('navState') || '{}') || {}; } catch (e) { navState = {}; }
+function saveNavState() {
+  try { localStorage.setItem('navState', JSON.stringify(navState)); } catch (e) {}
+}
 let currentSection = 'lawyer';
-const lastTabBySection = {};
+const lastTabBySection = (navState.tabs && typeof navState.tabs === 'object') ? navState.tabs : {};
+navState.tabs = lastTabBySection;
 
 function showSection(sec) {
   currentSection = sec;
@@ -3950,7 +3958,8 @@ function showSection(sec) {
     bar.style.display = '';
     bar.innerHTML = tabs.map(t =>
       `<button class="tab-btn" id="tabBtn_${t.tab}" onclick="showTab('${t.tab}')">${t.label}</button>`).join('');
-    showTab(lastTabBySection[sec] || tabs[0].tab);
+    const remembered = lastTabBySection[sec];
+    showTab(tabs.some(t => t.tab === remembered) ? remembered : tabs[0].tab);
   } else {
     // 資料來源 / 帳號管理沒有子頁
     bar.style.display = 'none';
@@ -3960,6 +3969,8 @@ function showSection(sec) {
 
 function showTab(tab) {
   if ((SECTIONS[currentSection] || []).some(t => t.tab === tab)) lastTabBySection[currentSection] = tab;
+  navState.section = currentSection;
+  saveNavState();
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
@@ -12021,10 +12032,16 @@ function loadCauseSupplyOnce() { if (_csLoaded) return; _csLoaded = true; initCa
 
 // 訴訟市場：市場趨勢 / 地區供需 / 案由供需 / 事務所版圖 / 家事律師 收攏為子分頁（builder 不動，各自 lazy-load 一次）
 let _domainInit = false;
-function initDomainTab() { if (_domainInit) return; _domainInit = true; switchDomainTab('mkt-trend'); }
+const DOMAIN_TABS = ['mkt-trend', 'region-market', 'cause-supply', 'fam-lawyers'];
+function initDomainTab() {
+  if (_domainInit) return; _domainInit = true;
+  switchDomainTab(DOMAIN_TABS.includes(navState.domain) ? navState.domain : 'mkt-trend');
+}
 window.switchDomainTab = function(d) {
+  navState.domain = d;
+  saveNavState();
   document.querySelectorAll('#domainTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.domain === d));
-  ['mkt-trend', 'region-market', 'cause-supply', 'fam-lawyers'].forEach(t => {
+  DOMAIN_TABS.forEach(t => {
     const el = document.getElementById('tab-' + t);
     if (el) el.style.display = (t === d) ? 'block' : 'none';
   });
