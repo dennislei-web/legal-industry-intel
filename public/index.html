@@ -3607,16 +3607,18 @@
               <tr>
                 <th>來源名稱</th>
                 <th>資料類型</th>
+                <th>支撐前端頁面</th>
                 <th>更新頻率</th>
                 <th>最後爬取</th>
                 <th>狀態</th>
               </tr>
             </thead>
             <tbody id="sourcesTableBody">
-              <tr><td colspan="5" class="loading">載入中</td></tr>
+              <tr><td colspan="6" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">點頁面標籤可直接跳轉。另有多頁使用「靜態年更資料」不經爬蟲排程（書記官、供給預測、法扶市場、調解與仲裁、勞資爭議、公證市場、地政士市場、商標專利名簿），更新時點於各頁內標示。</div>
       </div>
 
       <div class="card">
@@ -7685,6 +7687,79 @@ ${clone.innerHTML}
 // ============================================================
 // SOURCES TAB
 // ============================================================
+// 來源 → 前端頁面對照（chips 可點擊跳轉；key＝data_sources.name）
+const SOURCE_PAGES = {
+  '法務部律師查詢': [
+    { sec: 'lawyer', tab: 'lawyers', label: '律師＞律師名錄（名冊主源）' },
+    { sec: 'lawyer', tab: 'offices', label: '律師＞事務所名錄' },
+    { sec: 'lawyer', tab: 'changes', label: '律師＞異動追蹤' },
+    { sec: 'lawyer', tab: 'alumni', label: '律師＞喆律校友會' },
+  ],
+  '全聯會律師名單': [
+    { sec: 'lawyer', tab: 'lawyers', label: '律師＞律師名錄（名冊合併）' },
+    { sec: 'lawyer', tab: 'overview', label: '律師＞律師總覽' },
+  ],
+  'Lawsnote 律師專長': [
+    { sec: 'lawyer', tab: 'lawyers', label: '律師＞律師名錄（個人檔案經歷）' },
+  ],
+  '事務所官網': [
+    { sec: 'lawyer', tab: 'offices', label: '律師＞事務所名錄（官網連結）' },
+    { sec: 'lawyer', tab: 'firm-overview', label: '律師＞事務所總覽' },
+  ],
+  '司法院法官名冊': [
+    { sec: 'judge', tab: 'judges', label: '法官＞法官' },
+    { sec: 'judge', tab: 'courts', label: '法官＞法院' },
+    { sec: 'judge', tab: 'family', label: '法官＞家事法官' },
+  ],
+  '司法院裁判書開放資料': [
+    { sec: 'lawyer', tab: 'overview', label: '律師＞總覽（出庭/案由統計）' },
+    { sec: 'lawyer', tab: 'firm-overview', label: '律師＞事務所總覽（版圖戰力）' },
+    { sec: 'lawyer', tab: 'corpmap', label: '律師＞企業客戶版圖' },
+    { sec: 'judge', tab: 'judge-overview', label: '法官＞總覽' },
+    { sec: 'judge', tab: 'judge-changes', label: '法官＞異動追蹤' },
+    { sec: 'industry', tab: 'domain', label: '產業分析＞訴訟市場' },
+  ],
+  '裁判書檢察官統計': [
+    { sec: 'prosecutor', tab: 'prosecutor-overview', label: '檢察官＞總覽' },
+    { sec: 'prosecutor', tab: 'prosecutors', label: '檢察官＞檢察官' },
+    { sec: 'prosecutor', tab: 'pros-offices', label: '檢察官＞檢察署' },
+  ],
+  '法務統計-檢察官人數': [
+    { sec: 'prosecutor', tab: 'prosecutor-overview', label: '檢察官＞總覽（人數趨勢）' },
+  ],
+  '司法院官方案件統計': [
+    { sec: 'jstat', tab: 'jstat-overview', label: '司法統計＞總覽' },
+    { sec: 'jstat', tab: 'jstat-organs', label: '司法統計＞各法院比較' },
+    { sec: 'industry', tab: 'domain', label: '產業分析＞訴訟市場（趨勢）' },
+    { sec: 'industry', tab: 'adr', label: '產業分析＞調解與仲裁（法院端）' },
+  ],
+  '終結案件微資料統計': [
+    { sec: 'jstat', tab: 'jstat-causes', label: '司法統計＞案由細分' },
+    { sec: 'jstat', tab: 'jstat-topics', label: '司法統計＞案件專題' },
+    { sec: 'industry', tab: 'value', label: '產業分析＞產值與市場（委任率）' },
+    { sec: 'industry', tab: 'domain', label: '產業分析＞訴訟市場（業務線）' },
+  ],
+  '終結案件案由委任交叉': [
+    { sec: 'jstat', tab: 'jstat-causes', label: '司法統計＞案由細分' },
+    { sec: 'jstat', tab: 'jstat-repcurve', label: '司法統計＞委任門檻' },
+  ],
+  '終結案件標的金額委任交叉': [
+    { sec: 'jstat', tab: 'jstat-repcurve', label: '司法統計＞委任門檻（金額段）' },
+  ],
+  '政府電子採購網（標案）': [
+    { sec: 'industry', tab: 'govtender', label: '產業分析＞政府標案' },
+    { sec: 'lawyer', tab: 'overview', label: '律師＞總覽（得標紀錄卡）' },
+  ],
+};
+
+function renderSourcePages(name) {
+  const pages = SOURCE_PAGES[name];
+  if (!pages?.length) return '<span style="color:var(--text-muted);">-</span>';
+  return pages.map(p =>
+    `<a href="#" onclick="gotoTab('${p.sec}','${p.tab}');return false;" style="display:inline-block;background:var(--bg-row);border:1px solid var(--border);border-radius:4px;padding:1px 7px;margin:1px 2px;font-size:0.72rem;color:var(--text);text-decoration:none;white-space:nowrap;">${escHtml(p.label)}</a>`
+  ).join('');
+}
+
 async function loadSources() {
   // Data sources
   const { data: sources } = await db.from('data_sources').select('*').order('name');
@@ -7701,13 +7776,14 @@ async function loadSources() {
       <tr>
         <td><strong>${escHtml(s.name)}</strong>${s.url ? ` <a href="${escHtml(s.url)}" target="_blank" style="color:var(--blue);font-size:0.8rem;">&#8599;</a>` : ''}${s.notes ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escHtml(s.notes)}</div>` : ''}</td>
         <td>${escHtml(s.data_type || '-')}</td>
+        <td style="max-width:340px;">${renderSourcePages(s.name)}</td>
         <td>${escHtml({ daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年', manual: '手動' }[s.update_frequency] || s.update_frequency || '-')}</td>
         <td>${s.last_scraped_at ? formatDate(s.last_scraped_at) : (s.update_frequency === 'manual' || s.scraper_name === 'manual' ? '—（人工維護）' : '尚未執行')}</td>
         <td>${status}</td>
       </tr>`;
     }).join('');
   } else {
-    srcBody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="msg">無資料來源</div></td></tr>';
+    srcBody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="msg">無資料來源</div></td></tr>';
   }
 
   // Scrape logs
