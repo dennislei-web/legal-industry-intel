@@ -1,0 +1,45 @@
+name: 司法院法官名冊（每月更新）
+
+on:
+  schedule:
+    - cron: '0 19 7 * *'  # 每月 8 日台灣凌晨 3:00（各法院官網名錄，PDF+HTML 雙模式）
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '限制爬取法院數量（測試用，留空=全部）'
+        required: false
+        default: ''
+      court:
+        description: '指定單一法院名稱（留空=全部）'
+        required: false
+        default: ''
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt pdfplumber
+          playwright install chromium
+          playwright install-deps chromium
+          sudo apt-get install -y -qq xvfb
+
+      - name: Scrape judge rosters
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        # 爬蟲用有頭瀏覽器（headless 會被司法院網站擋），CI 上以 xvfb 提供虛擬顯示
+        run: |
+          ARGS=""
+          [ -n "${{ github.event.inputs.limit }}" ] && ARGS="$ARGS --limit ${{ github.event.inputs.limit }}"
+          [ -n "${{ github.event.inputs.court }}" ] && ARGS="$ARGS --court ${{ github.event.inputs.court }}"
+          xvfb-run -a python scrape_jy_judges.py $ARGS
