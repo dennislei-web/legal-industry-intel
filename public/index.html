@@ -7784,17 +7784,18 @@ function renderSourcePages(name) {
 
 // 反向視角：前端頁面 → 資料來源。爬蟲來源由 SOURCE_PAGES 反轉，靜態／人工更新資料在此補列。
 const STATIC_PAGE_SOURCES = {
-  'lawyer/overview': ['公開資訊觀測站 獨董簡歷（年更手動）', 'TIPO 代理名簿（年更手動）'],
+  'lawyer/overview': ['公開資訊觀測站 獨董簡歷（手動・建議每年1月）', 'TIPO 代理名簿（手動・建議每年1月）'],
   'lawyer/alumni': ['喆律校友 MOJ 刷新（每週一凌晨自動）'],
   'lawyer/law010': ['010 總表每日同步（lawyer-dashboard 管線）'],
-  'clerk/clerk-overview': ['司法院年報 ODS（年更手動）', '考選部四等特考（年更手動）'],
-  'industry/supply': ['考選部司律考試序列（年更手動）'],
-  'industry/value': ['財政部營業稅・工商普查（年更手動）'],
-  'industry/laf': ['法扶基金會年報 PDF（年更手動）'],
-  'industry/adr': ['內政統計通報 鄉鎮市調解（年更手動）', '仲裁機構統計（年更手動）'],
-  'industry/notary': ['司法院年報 公證統計（年更手動）'],
-  'industry/landagent': ['內政部地政統計（每年6月手動）'],
-  'industry/nonlit': ['TIPO 名簿 CSV＋FTPS 逐案件數（年更手動）'],
+  'clerk/clerk-overview': ['司法院年報 ODS（手動・建議每年6月）', '考選部四等特考（手動・建議每年11月放榜後）'],
+  'jstat/jstat-overview': ['官方統計年度序列 judicial_stats.json（手動・建議每年2月）'],
+  'industry/supply': ['考選部司律考試序列（手動・建議每年11月放榜後）'],
+  'industry/value': ['財政部營業稅・工商普查（手動・建議每年6月）'],
+  'industry/laf': ['法扶基金會年報 PDF（手動・建議每年6-8月）'],
+  'industry/adr': ['內政統計通報 鄉鎮市調解（手動・建議每年6-8月）', '仲裁機構統計（手動・建議每年7月）'],
+  'industry/notary': ['司法院年報 公證統計（手動・建議每年6月）'],
+  'industry/landagent': ['內政部地政統計（手動・每年6月）'],
+  'industry/nonlit': ['TIPO 名簿 CSV＋FTPS 逐案件數（手動・建議每年1月）'],
 };
 const SECTION_LABELS = { lawyer: '律師', judge: '法官', prosecutor: '檢察官', clerk: '書記官', jstat: '司法統計', industry: '產業分析' };
 

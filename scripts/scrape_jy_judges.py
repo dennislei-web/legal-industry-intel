@@ -95,13 +95,10 @@ def find_pdf_url(page, base_url):
         return results;
     }''')
 
-    # 優先選擇同一法院子域名的連結
+    # 只認同一法院子域名的連結——www.judicial.gov.tw 的 dl- 常是不相干文件
+    # （實測 tnh 頁面曾抓到「律師酬金核定」PDF 當名錄，解析 0 人）
     for link in links:
         if 'dl-' in link['href'] and subdomain in link['href']:
-            return link['href']
-    # 退而求其次：任何 dl- 連結
-    for link in links:
-        if 'dl-' in link['href'] and 'judicial.gov.tw' in link['href']:
             return link['href']
 
     # 策略 2: 找頁面上的子連結（有些法院名錄放在子頁面）
