@@ -60,6 +60,21 @@
 - 已回填 2020-01 ~ 2025-04；`avg_processing_days` 是估算值（裁判日 − 案號年 1/1），僅供法官間相對比較
 - **多 session 注意**：backfill 不要兩個 session 同時跑（會撞 `.judgment_work` 檔案鎖與 upload 重複鍵）
 
+## 法官/檢察官懲戒紀錄（migration 121）
+
+- `scripts/judge_disciplines.py`：FJUD（judgment.judicial.gov.tw）進階查詢 `jud_court=TPJ`
+  （懲戒法院職務法庭＋改制前司法院職務法庭，101 年起全量 164 篇）→ 解析被付懲戒人/
+  機關/主文/結果分類 → `judge_disciplines`（(case_no,name) upsert 冪等）
+- FJUD 流程：Default_AD.aspx POST → 中繼頁 hidden 轉 qryresult.aspx → iframe
+  qryresultlst.aspx?q={hash}&page=N（20 筆/頁）；**須 http1.1 + 瀏覽器 UA**，節流 1.2s
+- **版式陷阱**：新制當事人列「label＋2+半形空白＋姓名」；舊制（司法院職務法庭）是
+  「label＋單一全形空白＋姓名」，101-102 年還有姓名後帶「（機關職稱）」或全形空白＋機關；
+  105 年前檢察署舊名「地方法院檢察署」（COURT_RE 長詞優先）
+- 「訴/聲/停」字案＝職務案件（法官告司法院）無被付懲戒人，解析為 0 列屬正常
+- 手動執行（職務法庭案量 ~2-3 篇/月，久久跑一次即可）；前端＝法官 modal 紅框懲戒卡＋徽章
+- 未納入：改制前公務員懲戒委員會（鑑字，需全文關鍵字過濾雜訊高）、法官評鑑委員會決議
+  （lp-1700 同 CMS 可爬但姓名在 PDF 內，1,817 筆多為不付評鑑）、監察院彈劾案文
+
 ## 司法統計（前端「司法統計」區塊 + 官方案件統計管線）
 
 - **前端**：第一層導覽「司法統計」4 分頁（總覽/各法院比較/案由細分/案件專題），從獨立站 judicial-stats 移植進 `public/index.html`。所有 id 加 `jstat_` / `tab-jstat-` 前綴、CSS scope 在 `.jstat` 下、深度分析文章固定白底紙張樣式。資料源是**靜態** `public/data/judicial_stats.json`（統計月報聚合，離婚原因/罪名/家事細項等專題表，年更、半自動——產生 script 不在 repo）

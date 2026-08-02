@@ -27,8 +27,10 @@ BASE = 'https://judgment.judicial.gov.tw/FJUD/'
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36'
 
 COURT_RE = (r'(?:臺灣|福建)?[^\s，。、()（）]{1,12}'
-            r'(?:地方法院|高等法院|最高法院|行政法院|少年及家事法院|智慧財產及商業法院|'
-            r'地方檢察署|高等檢察署|最高檢察署)(?:[^\s，。、()（）]{0,6}分[院署])?')
+            r'(?:地方法院檢察署|高等法院檢察署|最高法院檢察署|'  # 105 年前檢察署舊名
+            r'地方檢察署|高等檢察署|最高檢察署|'
+            r'地方法院|高等法院|最高法院|行政法院|少年及家事法院|智慧財產及商業法院)'
+            r'(?:[^\s，。、()（）]{0,6}分[院署])?')
 ROLE_RE = r'(?:候補|試署)?(?:法官|庭長|審判長|主任檢察官|檢察官|檢察長)'
 
 # 主文 → 結果分類（依序比對，先中先贏；一列主文可命中多個）
@@ -42,8 +44,9 @@ SANCTIONS = [
     ('減少退休金', '減少退休金'),
     ('轉任法官以外', '轉任非法官職務'),
     ('罰款', '罰款'),
-    ('降級', '降級'),
-    ('減俸', '減俸'),
+    ('休職', '休職'),
+    ('降.{0,3}級', '降級改敘'),
+    ('減.{0,3}俸', '減俸'),
     ('記過', '記過'),
     ('申誡', '申誡'),
     ('停止.{0,4}職務', '停止職務'),
@@ -121,30 +124,41 @@ def parse_detail(html, url):
     case_no = re.sub(r'\s+', '', re.sub(r'^(?:懲戒法院|司法院)職務法庭\s*', '', meta['裁判字號']))
     kind = '裁定' if '裁定' in case_no else '判決'
 
-    # 當事人區塊：「label＋2 格以上空白＋姓名」列（掃到主文為止；區塊位置因頁面雜訊不固定）
+    # 當事人區塊：「label＋2 格以上空白＋姓名」列（掃到主文或「上列…」為止）
     respondents, cur_label = [], ''
+    prev_was_party = False
     for ln in lines:
-        if re.match(r'^主[\s　]{0,4}文$', ln):
+        if re.match(r'^主[\s　]*文$', ln) or ln.startswith(('上列', '上開')):
             break
-        # 分隔：新制 2+ 半形空白 / 舊制（司法院職務法庭）單一全形空白
-        m = re.match(r'^([一-鿿][一-鿿\s　]{1,16}?)(?:[ \t]{2,}|　+)([一-鿿]{2,4})$', ln)
+        # 分隔：新制 2+ 半形空白 / 舊制（司法院職務法庭）單一全形空白；
+        # 姓名後可帶「（機關職稱）」或空白＋機關職稱（101-102 年版式）
+        m = re.match(r'^([一-鿿][一-鿿\s　]{1,16}?)(?:[ \t]{2,}|　+)\s*'
+                     r'([一-鿿]{2,4})([\s　]*[（(].*|[\s　]+\S.*)?$', ln)
+        hint = ''
         if m:
             cur_label = re.sub(r'[\s　]', '', m.group(1))
             name = m.group(2)
-        elif re.match(r'^[一-鿿]{2,4}$', ln) and cur_label and ln not in ('律師',):
-            name = ln  # 同 label 連續列名（多名被付懲戒人）
+            hint = m.group(3) or ''
+            prev_was_party = True
+        elif re.match(r'^[一-鿿]{2,4}$', ln) and cur_label and prev_was_party and ln not in ('律師',):
+            name = ln  # 同 label 緊接連續列名（多名被付懲戒人/多代理人）
         else:
+            prev_was_party = False
             continue
-        if ('懲戒人' in cur_label or cur_label == '被移送人') and \
+        if ('懲戒人' in cur_label or cur_label in ('被移送人', '受判決人')) and \
                 not any(x in cur_label for x in EXCLUDE_LABELS):
-            respondents.append(name)
+            respondents.append((name, hint.strip('　 （()）')))
 
-    # 主文：主文標記到 事實/理由 之間
-    mm = re.search(r'主\s{0,4}文\s*\n(.*?)\n\s*(?:事\s{0,4}實|理\s{0,4}由|犯罪事實)', text, re.S)
+    # 主文：主文標記到 事實/理由 之間（標題空白可能是全形）
+    mm = re.search(r'主[\s　]{0,4}文[\s　]*\n(.*?)\n[\s　]*(?:事[\s　]{0,4}實|理[\s　]{0,4}由|犯罪事實)', text, re.S)
     main = re.sub(r'\s+', '', mm.group(1))[:600] if mm else ''
 
     out = []
-    for name in dict.fromkeys(respondents):  # 去重保序
+    seen = set()
+    for name, hint in respondents:
+        if name in seen:
+            continue
+        seen.add(name)
         # 該員主文句（多名被付懲戒人時各取各的），取不到就用整段
         sm = re.search(re.escape(name) + r'[^。]{0,120}。', main)
         my_main = sm.group(0) if sm else main
@@ -153,9 +167,13 @@ def parse_detail(html, url):
         if any(l.endswith('駁回') and l != '駁回' for l in labels) and '駁回' in labels:
             labels.remove('駁回')  # 上訴駁回/抗告駁回 已涵蓋
         sanction = '、'.join(labels) or '（見主文）'
-        # 任職機關與身分：全文首次「機關+職稱...姓名」或「姓名...機關+職稱」鄰近共現
+        # 任職機關與身分：當事人列自帶括註優先，否則全文鄰近共現
         role, org = '', ''
-        for m in re.finditer(re.escape(name), text):
+        hm = re.search(COURT_RE, hint) if hint else None
+        if hm:
+            org = hm.group(0)
+            role = '檢察官' if '檢察' in hint else ('法官' if '法官' in hint else '')
+        for m in (() if org else re.finditer(re.escape(name), text)):
             win = text[max(0, m.start() - 120):m.start() + 120]
             cm = re.findall(r'(%s)[^\n。]{0,20}?(%s)' % (COURT_RE, ROLE_RE), win)
             if cm:
