@@ -1,0 +1,96 @@
+name: 判決/裁定回填（doctypefill）
+
+# 判決 vs 裁定拆分回填搬上雲端跑（模式同 judgment-causefill.yml）。
+# doctypefill 冪等：已帶 doctypes 的月份自動跳過，失敗月重 dispatch 即補。
+# 只重傳 judge/lawyer 月表（pair 三表是近 60 月滾動視窗，老月份重傳會灌回已 prune 的列）。
+# shard 月份區間互斥（_upload_rows 先刪後插按月操作，不同月不互撞）。
+# 全量 = 199601-202605；老月份包小、每 shard 塞較多月份。
+
+on:
+  workflow_dispatch:
+    inputs:
+      ranges_json:
+        description: '月份區間 shards（JSON array，格式 "起-迄"）'
+        required: false
+        default: '["199601-199812","199901-200112","200201-200412","200501-200712","200801-201012","201101-201312","201401-201512","201601-201712","201801-201912","202001-202104","202105-202204","202205-202304","202305-202404","202405-202504","202505-202605"]'
+
+concurrency:
+  group: judgment-doctypefill
+  cancel-in-progress: false
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        range: ${{ fromJSON(github.event.inputs.ranges_json || '["199601-199812","199901-200112","200201-200412","200501-200712","200801-201012","201101-201312","201401-201512","201601-201712","201801-201912","202001-202104","202105-202204","202205-202304","202305-202404","202405-202504","202505-202605"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full p7zip-rar
+
+      - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
+        run: |
+          IP=$(curl -s "https://dns.google/resolve?name=opendata.judicial.gov.tw&type=A" | jq -r '[.Answer[]? | select(.type==1)][0].data // empty')
+          if [ -z "$IP" ]; then IP=210.69.124.89; fi
+          echo "resolved: $IP"
+          echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
+
+      - name: Doctypefill ${{ matrix.range }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
+          JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
+          SEVENZ_PATH: 7z
+        working-directory: scripts
+        run: |
+          RANGE="${{ matrix.range }}"
+          python judgment_stats.py doctypefill "${RANGE%-*}" "${RANGE#*-}"
+
+  refresh:
+    runs-on: ubuntu-latest
+    needs: shard
+    if: always()   # 部分 shard 失敗也先 refresh（缺月重 dispatch 補跑即可）
+    timeout-minutes: 30
+    steps:
+      - name: Refresh 法官彙總表 + 檢查缺月
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install -q requests
+          python - <<'EOF'
+          import os, requests, sys
+          url = os.environ['SUPABASE_URL'].strip()
+          key = os.environ['SUPABASE_SERVICE_KEY'].strip()
+          H = {'apikey': key, 'Authorization': f'Bearer {key}'}
+          for rpc in ('refresh_judge_judgment_stats', 'refresh_lawyer_judgment_stats'):
+              r = requests.post(f'{url}/rest/v1/rpc/{rpc}', json={},
+                                headers={**H, 'Content-Type': 'application/json'}, timeout=900)
+              print(rpc, 'HTTP', r.status_code)
+          # 缺月檢查（199601-202605 應全帶 doctypes）
+          missing = []
+          y, m = 1996, 1
+          while (y, m) <= (2026, 5):
+              ym = f'{y}{m:02d}'
+              r = requests.get(f'{url}/rest/v1/judge_month_stats',
+                               params={'yyyymm': f'eq.{ym}', 'doctypes': 'not.is.null',
+                                       'select': 'yyyymm', 'limit': 1}, headers=H, timeout=30)
+              if not r.json():
+                  missing.append(ym)
+              m += 1
+              if m > 12: y, m = y + 1, 1
+          print('缺 doctypes 的月份:', missing or '無 ✅')
+          if missing:
+              sys.exit(1)  # 讓 run 標紅，提醒重 dispatch 補跑
+          EOF

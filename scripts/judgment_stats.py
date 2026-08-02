@@ -16,6 +16,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py backfill 202001 202504   # 依序跑一段區間（跳過已上傳的月份）
   python judgment_stats.py pairfill 202005 202504   # Phase 2 配對回填（強制重解、跳過已上傳 pair 的月）
   python judgment_stats.py causefill 202105 202604  # Phase B 案由回填（強制重解、跳過已帶 causes 的月）
+  python judgment_stats.py doctypefill 199601 202605 # 判決/裁定回填（強制重解、只傳 judge/lawyer 月表）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full p7zip-rar）。
 """
@@ -446,6 +447,17 @@ def classify(jfull_head, jcase):
     return '其他'
 
 
+def doctype_of(jfull_head):
+    """判決/裁定拆分：文件類型寫在首行法院名之後（「民事判決」「刑事裁定」…）。
+    先驗「裁定」：更正判決之裁定等首行後段會提到「判決」，反之罕見。
+    非判決/裁定者（支付命令、宣示筆錄外的處分命令等）歸「其他」。"""
+    if '裁定' in jfull_head:
+        return '裁定'
+    if '判決' in jfull_head:
+        return '判決'
+    return '其他'
+
+
 def parse(yyyymm):
     """解壓並逐檔解析，聚合成 (法官, 法院) × 月 的統計 JSON"""
     rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
@@ -464,13 +476,15 @@ def parse(yyyymm):
         if r.returncode != 0:
             raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
 
-    # 聚合鍵：(name, court) → {n, sum_days, cats{}, causes{}}
+    # 聚合鍵：(name, court) → {n, sum_days, cats{}, causes{}, doctypes{}}
     agg = defaultdict(lambda: {'n': 0, 'sum_days': 0, 'n_days': 0,
-                               'cats': defaultdict(int), 'causes': defaultdict(int)})
-    # 律師聚合：(name, court) → {n, cats{}, causes{}}
+                               'cats': defaultdict(int), 'causes': defaultdict(int),
+                               'doctypes': defaultdict(int)})
+    # 律師聚合：(name, court) → {n, cats{}, causes{}, doctypes{}}
     # causes 鍵 = 「案類|正規化JTITLE」複合鍵（Phase B，migration 069）
     lagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int),
-                                'causes': defaultdict(int)})
+                                'causes': defaultdict(int),
+                                'doctypes': defaultdict(int)})
     cause_keys = set()  # 本月出現過的複合鍵（上傳時同步 cause_group_map）
     # 檢察官聚合：(name, office) → {n, cats{}}
     pagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})
@@ -498,6 +512,7 @@ def parse(yyyymm):
             mc = RE_COURT.search(head.strip())
             court = normalize_court(mc.group(1)) if mc else '未知法院'
             cat = classify(head, doc.get('JCASE') or '')
+            dt = doctype_of(head)
             ck = f'{cat}|{norm_cause(doc.get("JTITLE") or "")}'
             cause_keys.add(ck)
             lawyers = extract_lawyers(jfull)
@@ -506,6 +521,7 @@ def parse(yyyymm):
                 la['n'] += 1
                 la['cats'][cat] += 1
                 la['causes'][ck] += 1
+                la['doctypes'][dt] += 1
             # ── 協同/對造 pair（不需法官，judge-less 案件也要算）──
             if lawyers:
                 sided = extract_lawyers_sided(jfull)
@@ -559,6 +575,7 @@ def parse(yyyymm):
                 a['n'] += 1
                 a['cats'][cat] += 1
                 a['causes'][ck] += 1
+                a['doctypes'][dt] += 1
                 if days is not None:
                     a['sum_days'] += days
                     a['n_days'] += 1
@@ -567,10 +584,12 @@ def parse(yyyymm):
 
     rows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
              'case_count': v['n'], 'sum_days': v['sum_days'], 'n_days': v['n_days'],
-             'cats': dict(v['cats']), 'causes': dict(v['causes'])} for k, v in agg.items()]
+             'cats': dict(v['cats']), 'causes': dict(v['causes']),
+             'doctypes': dict(v['doctypes'])} for k, v in agg.items()]
     lrows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm,
               'case_count': v['n'], 'cats': dict(v['cats']),
-              'causes': dict(v['causes'])} for k, v in lagg.items()]
+              'causes': dict(v['causes']),
+              'doctypes': dict(v['doctypes'])} for k, v in lagg.items()]
     prows = [{'name': k[0], 'office_name': k[1], 'yyyymm': yyyymm,
               'case_count': v['n'], 'cats': dict(v['cats'])} for k, v in pagg.items()]
     ljrows = [{'lawyer_name': k[0], 'judge_name': k[1], 'court_name': k[2],
@@ -650,7 +669,11 @@ def sync_cause_map(cause_keys):
     print(f'  cause_group_map 同步 {len(rows)} 鍵')
 
 
-def upload(yyyymm):
+def upload(yyyymm, tables=None):
+    """tables=None 上傳全部；給 tuple 時只傳指定月表（doctypefill 用：
+    pair 三表是近 60 月滾動視窗，老月份重傳會把已 prune 的列灌回去）"""
+    def want(t):
+        return tables is None or t in tables
     out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
     with open(out_path, encoding='utf-8') as f:
         data = json.load(f)
@@ -658,17 +681,18 @@ def upload(yyyymm):
         data = {'judges': data, 'lawyers': []}
     if data.get('cause_keys'):
         sync_cause_map(data['cause_keys'])
-    _upload_rows('judge_month_stats', yyyymm, data['judges'])
-    if data['lawyers']:
+    if want('judge_month_stats'):
+        _upload_rows('judge_month_stats', yyyymm, data['judges'])
+    if data['lawyers'] and want('lawyer_month_stats'):
         _upload_rows('lawyer_month_stats', yyyymm, data['lawyers'])
-    if data.get('prosecutors'):
+    if data.get('prosecutors') and want('prosecutor_month_stats'):
         _upload_rows('prosecutor_month_stats', yyyymm, data['prosecutors'])
     # Phase 2 配對表（舊 agg.json 無此三 key 時略過）
-    if data.get('lawyer_judge'):
+    if data.get('lawyer_judge') and want('lawyer_judge_pairs'):
         _upload_rows('lawyer_judge_pairs', yyyymm, data['lawyer_judge'])
-    if data.get('cocounsel'):
+    if data.get('cocounsel') and want('lawyer_cocounsel_pairs'):
         _upload_rows('lawyer_cocounsel_pairs', yyyymm, data['cocounsel'])
-    if data.get('opposing'):
+    if data.get('opposing') and want('lawyer_opposing_pairs'):
         _upload_rows('lawyer_opposing_pairs', yyyymm, data['opposing'])
     print('  上傳完成')
 
@@ -677,6 +701,15 @@ def pairs_uploaded(yyyymm):
     """該月律師×法官 pair 是否已上傳（pairfill 冪等跳過用）"""
     r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
                      params={'yyyymm': f'eq.{yyyymm}', 'select': 'yyyymm', 'limit': 1},
+                     headers=HEADERS_SB, timeout=30, verify=False)
+    return r.status_code == 200 and len(r.json()) > 0
+
+
+def doctypes_uploaded(yyyymm):
+    """該月 judge_month_stats 是否已帶判決/裁定拆分（doctypefill 冪等跳過用）"""
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/judge_month_stats',
+                     params={'yyyymm': f'eq.{yyyymm}', 'doctypes': 'not.is.null',
+                             'select': 'yyyymm', 'limit': 1},
                      headers=HEADERS_SB, timeout=30, verify=False)
     return r.status_code == 200 and len(r.json()) > 0
 
@@ -820,6 +853,39 @@ if __name__ == '__main__':
                 time.sleep(90)
                 try:
                     upload(ym)
+                    cleanup(ym, purge_rar=True)
+                    print(f'{ym}: 重試成功')
+                except Exception as e2:
+                    print(f'{ym}: 重試仍失敗 — {e2}（重 dispatch 可補跑）')
+                    failed.append(ym)
+        if failed:
+            print(f'最終失敗月份: {failed}')
+            sys.exit(1)
+    elif cmd == 'doctypefill':
+        # 判決/裁定回填：強制重解（舊 agg 快取沒存 doctype），冪等跳過已帶 doctypes 的月份。
+        # 只重傳 judge/lawyer 月表：pair 三表與 prosecutor 表內容不受 doctype 影響，
+        # 且 pair 三表是近 60 月滾動視窗，老月份重傳會把已 prune 的列灌回去。
+        # 失敗處理同 causefill：等 90 秒重傳一次，最終失敗 exit 1（CI shard 不假綠燈）。
+        DT_TABLES = ('judge_month_stats', 'lawyer_month_stats')
+        failed = []
+        for ym in month_range(sys.argv[2], sys.argv[3]):
+            try:
+                if doctypes_uploaded(ym):
+                    print(f'{ym}: doctypes 已上傳，跳過')
+                    continue
+                old_agg = os.path.join(WORK_DIR, f'{ym}_agg.json')
+                if os.path.exists(old_agg):
+                    os.remove(old_agg)
+                print(f'=== {ym} ===')
+                download(ym)
+                parse(ym)
+                upload(ym, tables=DT_TABLES)
+                cleanup(ym, purge_rar=True)
+            except Exception as e:
+                print(f'{ym}: 失敗 — {e}，90 秒後重試上傳一次')
+                time.sleep(90)
+                try:
+                    upload(ym, tables=DT_TABLES)
                     cleanup(ym, purge_rar=True)
                     print(f'{ym}: 重試成功')
                 except Exception as e2:
