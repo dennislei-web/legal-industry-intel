@@ -7616,7 +7616,7 @@ function exportJudgePdf() {
   exportModalPdf({
     bodyId: 'judgeModalBody', titleId: 'judgeModalTitle',
     chartKeys: ['jdTrend', 'jdCats'], docLabel: '法官檔案',
-    foot: '資料來源：司法院法官名冊、司法院裁判書開放資料、司法院人事審議委員會決議。裁判書統計為下限估計（家事裁定、少年事件等多不公開）；合議庭每位署名法官各計 1 件；平均結案天數為估算值（裁判日−案號年初）；法官無唯一識別碼，同名以「姓名×法院」區辨。',
+    foot: '資料來源：司法院法官名冊、司法院裁判書開放資料、司法院人事審議委員會決議、懲戒法院職務法庭裁判。裁判書統計為下限估計（家事裁定、少年事件等多不公開）；合議庭每位署名法官各計 1 件；平均結案天數為估算值（裁判日−案號年初）；法官無唯一識別碼，同名以「姓名×法院」區辨。',
   });
 }
 function exportModalPdf({ bodyId, titleId, chartKeys, docLabel, foot }) {
@@ -7741,12 +7741,15 @@ async function showJudgeDetail(name, court) {
   bodyEl.scrollTop = 0;
   if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
 
-  // 並行撈：名冊+整合統計、同名跨院官方統計、逐月署名、常對到律師、案由、合議庭圈、異動事件
-  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [];
+  // 並行撈：名冊+整合統計、同名跨院官方統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒紀錄
+  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [], disciplines = [];
   const monthRows = [];
   await Promise.all([
     db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
       .then(r => { jc = r.data?.[0] || null; }),
+    db.from('judge_disciplines').select('*').eq('name', name)
+      .order('decided_date', { ascending: false })
+      .then(r => { disciplines = r.data || []; }),
     db.from('judge_judgment_stats').select('*').eq('name', name)
       .then(r => { statRows = r.data || []; }),
     db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
@@ -7825,6 +7828,8 @@ async function showJudgeDetail(name, court) {
   if (stat) badges.push('<span class="badge" style="background:var(--green-dim);color:var(--green);">裁判書統計</span>');
   if (jc?.has_lawsnote) badges.push('<span class="badge badge-orange">Lawsnote</span>');
   if (statRows.length > 1) badges.push(`<span class="badge badge-orange" style="cursor:help;" title="此姓名亦出現於其他 ${statRows.length - 1} 個法院的裁判書統計，可能為轉調或同名不同人；本頁配對、案由、合議庭均已鎖定本院資料">同名/跨院 ×${statRows.length}</span>`);
+  const judgeDisc = disciplines.filter(d => d.role !== '檢察官');
+  if (judgeDisc.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="懲戒法院職務法庭有以此姓名為被付懲戒人之裁判（姓名比對，詳懲戒紀錄卡）">&#9888; 懲戒紀錄 ×${judgeDisc.length}</span>`);
 
   const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:110px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
 
@@ -7846,6 +7851,8 @@ async function showJudgeDetail(name, court) {
         </tbody>
       </table>
     </div>
+
+    ${renderJudgeDisciplineCard(judgeDisc)}
 
     ${stat || thisCourtRows.length ? `
     <div class="card" style="margin-bottom:16px;">
@@ -7905,6 +7912,27 @@ async function showJudgeDetail(name, court) {
   `;
 
   renderJudgeCharts(thisCourtRows, catsObj);
+}
+
+// 懲戒紀錄卡（judge_disciplines：FJUD 懲戒法院職務法庭裁判，mig 121；姓名比對）
+function renderJudgeDisciplineCard(rows) {
+  if (!rows || !rows.length) return '';
+  const items = rows.map(d => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        <a href="${escHtml(d.source_url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:600;" title="開啟裁判原文">${escHtml(d.case_no)}</a>
+        <span style="color:var(--red);font-weight:600;">${escHtml(d.sanction || '')}</span>
+      </div>
+      <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px;">
+        ${d.decided_date || '-'}｜${escHtml(d.org || '任職機關未解析')}${d.role ? '｜' + escHtml(d.role) : ''}
+      </div>
+      ${d.main_text ? `<div style="font-size:0.8rem;margin-top:4px;color:var(--text);">${escHtml(d.main_text.length > 120 ? d.main_text.slice(0, 120) + '…' : d.main_text)}</div>` : ''}
+    </div>`).join('');
+  return `
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--red);">
+      <div class="card-title" style="color:var(--red);">&#9888; 懲戒紀錄（職務法庭） <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">懲戒法院職務法庭裁判（2020-07 起），姓名比對——請以任職機關核對是否同名</span></div>
+      ${items}
+    </div>`;
 }
 
 // 常對到的律師（judge_pair_summary）＋ 合議庭共署圈（judge_copanel_circle），並排一張卡
