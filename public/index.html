@@ -7938,31 +7938,65 @@ function renderJudgePairsCard(pairs, copanel, court) {
 }
 
 // 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
+// 同名仲裁（與 mig 089 max_overlap 同口徑）：他院署名區間與本院重疊 >6 個月＝不可能是同一人
+// → 拆到「疑似同名法官」區塊；並沿遷調/推定邊傳遞（如 屏東→新北 銜接到重疊的新北，一併歸入）
 function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
   if (!spanRows.length) return '';
   const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
-  const rows = spanRows.map(([c, s]) => {
+  const m2i = m => +m.slice(0, 4) * 12 + +m.slice(4, 6);
+  const anchor = spanRows.find(([c]) => c === court);
+  const others = new Set();
+  if (anchor) {
+    const af = m2i(anchor[1].first), al = m2i(anchor[1].last);
+    spanRows.forEach(([c, s]) => {
+      if (c === court) return;
+      if (Math.min(al, m2i(s.last)) - Math.max(af, m2i(s.first)) + 1 > 6) others.add(c);
+    });
+    const edgeCourts = r => [r.transfer_to, r.transfer_from, r.inferred_to, r.inferred_from].filter(Boolean);
+    const linked = c => (changes || []).some(r =>
+      (r.court_name === c && edgeCourts(r).some(x => others.has(x))) ||
+      (others.has(r.court_name) && edgeCourts(r).includes(c)));
+    for (let changed = true; changed;) {
+      changed = false;
+      spanRows.forEach(([c]) => {
+        if (c !== court && !others.has(c) && linked(c)) { others.add(c); changed = true; }
+      });
+    }
+  }
+  const row = ([c, s], dim) => {
     const notes = (changes || []).filter(r => r.court_name === c)
       .map(r => jchgXferCell(r))
       .filter(h => !h.includes('>—<'));
     const cur = c === court;
-    return `<tr${cur ? ' style="background:color-mix(in srgb, var(--gold) 8%, transparent);"' : ''}>
+    return `<tr style="${cur ? 'background:color-mix(in srgb, var(--gold) 8%, transparent);' : ''}${dim ? 'opacity:0.65;' : ''}">
       <td style="font-size:0.85rem;${cur ? 'font-weight:600;' : ''}">${cur ? escHtml(c) : judgeLink(name, c, 'font-size:0.85rem;', escHtml(c))}</td>
       <td style="white-space:nowrap;font-variant-numeric:tabular-nums;">${fmtM(s.first)} ~ ${fmtM(s.last)}</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums;">${s.cases.toLocaleString()}</td>
       <td style="font-size:0.82rem;">${notes.join('<br>') || '<span style="color:var(--text-muted);">—</span>'}</td>
     </tr>`;
-  }).join('');
+  };
+  const mainRows = spanRows.filter(([c]) => !others.has(c)).map(sp => row(sp, false)).join('');
+  const otherRows = spanRows.filter(([c]) => others.has(c)).map(sp => row(sp, true)).join('');
   return `
     <div class="card" style="margin-bottom:16px;">
       <div class="card-title">&#128506; 生涯軌跡 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書署名區間（1996 起）× 人審會遷調決議</span></div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>法院</th><th style="width:150px;">署名期間</th><th style="width:80px;text-align:right;">掛名件數</th><th>異動註記</th></tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${mainRows}</tbody>
         </table>
       </div>
-      ${multiCourt ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
+      ${multiCourt && mainRows ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
+      ${otherRows ? `
+      <div style="margin-top:14px;">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--orange);margin-bottom:2px;">&#9888; 疑似另一位同名法官</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">以下法院的署名期間與本院任期重疊超過 6 個月（或與重疊院有遷調銜接），同一人不可能同時在兩院常態署名，推定為同名的另一位「${escHtml(name)}」；點法院名可開啟該院檔案。</div>
+        <div class="table-wrap">
+          <table>
+            <tbody>${otherRows}</tbody>
+          </table>
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
