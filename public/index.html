@@ -7808,8 +7808,13 @@ async function showJudgeDetail(name, court) {
 
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
   let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [];
+  let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   const monthRows = [];
   await Promise.all([
+    db.from('crm_officer_reviews').select('*').eq('name', name)
+      .then(r => { crmRows = r.data || []; }),
+    db.from('crm_crawl_status').select('*').eq('id', 1).maybeSingle()
+      .then(r => { crmStatus = r.data || null; }).catch(() => {}),
     db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
       .then(r => { jc = r.data?.[0] || null; }),
     db.from('judge_disciplines').select('*').eq('name', name)
@@ -7919,6 +7924,8 @@ async function showJudgeDetail(name, court) {
       </table>
     </div>
 
+    ${renderCrmInternalCard(crmRows, crmStatus, name, court)}
+
     ${renderJudgeDisciplineCard(disciplines, impeachments)}
 
     ${stat || thisCourtRows.length ? `
@@ -7979,6 +7986,99 @@ async function showJudgeDetail(name, court) {
   `;
 
   renderJudgeCharts(thisCourtRows, catsObj);
+}
+
+// --- 喆律 CRM 內部紀錄卡（mig 127）---
+// RLS 綁單一 uid：非擁有者兩張表都查回空 → 卡片完全不渲染，無感。
+// 評論與案件明細為所內機密，僅存在 crm_officer_reviews（admin-only 表），絕不進公開 view。
+const CRM_TYPE_LABEL = { Judge: '法官/司法事務官', Prosecutor: '檢察官' };
+function renderCrmInternalCard(rows, status, name, court) {
+  if ((!rows || !rows.length) && !status) return ''; // 非擁有者（或表未建）
+  const fmtT = t => t ? new Date(t).toLocaleString('zh-TW', { hour12: false }).slice(0, 16) : '-';
+  const running = status?.status === 'running';
+  const courtShort = (court || '').replace(/^臺灣|^台灣/, '');
+  const blocks = (rows || []).map(r => {
+    const agChips = (r.agencies || []).map(a => {
+      const hit = court && a.agency && (a.agency === court || (courtShort && a.agency.includes(courtShort)));
+      return `<span class="badge" style="background:${hit ? 'color-mix(in srgb, var(--gold) 22%, transparent)' : 'color-mix(in srgb, var(--text-muted) 14%, transparent)'};color:${hit ? 'var(--gold)' : 'var(--text-muted)'};" title="${hit ? 'CRM 記載機關與本頁法院相符' : 'CRM 記載機關（與本頁法院不同時請留意同名不同人）'}">${escHtml(a.agency || '-')}${a.division ? '·' + escHtml(a.division) + '股' : ''}${a.note ? '·' + escHtml(a.note) : ''}</span>`;
+    }).join(' ');
+    const caseRows = (r.cases || []).slice(0, 15).map(c => `
+      <tr><td style="padding:4px 8px;white-space:nowrap;">${escHtml(c.case_no || '-')}</td>
+      <td style="padding:4px 8px;white-space:nowrap;">${escHtml(c.branch || '-')}</td>
+      <td style="padding:4px 8px;">${escHtml(c.cause || '-')}</td></tr>`).join('');
+    const comments = (r.comments || []).map(cm => `
+      <div style="padding:8px 10px;margin-top:6px;background:color-mix(in srgb, var(--gold) 7%, transparent);border-left:3px solid var(--gold);border-radius:4px;font-size:0.84rem;">
+        <div style="color:var(--text-muted);font-size:0.72rem;margin-bottom:3px;">${escHtml(cm.agency || '-')}${cm.division ? '｜' + escHtml(cm.division) + '股' : ''}${cm.created_at ? '｜' + escHtml(cm.created_at) + ' 建立' : ''}</div>
+        <div style="white-space:pre-wrap;">${escHtml(cm.comment || '')}</div>
+      </div>`).join('');
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+          <span style="font-weight:700;color:var(--gold);font-size:1.05rem;">交手 ${r.case_count} 件</span>
+          <span class="badge badge-blue">${escHtml(CRM_TYPE_LABEL[r.officer_type] || r.officer_type)}</span>
+          ${agChips}
+        </div>
+        ${caseRows ? `
+        <table style="width:100%;font-size:0.82rem;border:1px solid var(--border);border-radius:6px;">
+          <thead><tr style="color:var(--text-muted);"><th style="padding:4px 8px;text-align:left;">案件編號</th><th style="padding:4px 8px;text-align:left;">承辦分所</th><th style="padding:4px 8px;text-align:left;">案由</th></tr></thead>
+          <tbody>${caseRows}</tbody>
+        </table>
+        ${(r.cases || []).length > 15 ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">…僅列前 15 筆，共 ${r.cases.length} 筆掛列（distinct ${r.case_count} 件）</div>` : ''}` : ''}
+        ${comments ? `<div style="margin-top:8px;"><div style="font-size:0.78rem;color:var(--text-muted);">內部評論</div>${comments}</div>` : '<div style="font-size:0.78rem;color:var(--text-muted);margin-top:6px;">（無內部評論）</div>'}
+      </div>`;
+  }).join('');
+  const lastCrawl = (rows || []).reduce((m, r) => r.crawled_at > m ? r.crawled_at : m, '') || status?.finished_at;
+  return `
+    <div class="card" style="margin-bottom:16px;border:1px solid var(--gold);">
+      <div class="card-title">&#128274; 喆律內部紀錄（CRM）
+        <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">僅限你</span>
+      </div>
+      ${blocks || '<div style="color:var(--text-muted);font-size:0.85rem;">CRM 尚無此姓名的交手案件或評論紀錄</div>'}
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+        <button id="crmCrawlBtn" class="btn btn-sm btn-blue" ${running ? 'disabled' : ''} onclick="crmCrawlDispatch('${_nameArg(name)}','${_nameArg(court || '')}')">${running ? '&#9203; 爬蟲進行中…' : '&#128260; 爬蟲更新'}</button>
+        <span id="crmCrawlStatus" style="font-size:0.75rem;color:var(--text-muted);">${running ? escHtml(status?.detail || '進行中') : `最後爬取：${fmtT(lastCrawl)}${status?.status === 'error' ? '｜<span style="color:var(--red);">上次失敗：' + escHtml(status?.detail || '') + '</span>' : ''}`}</span>
+      </div>
+    </div>`;
+}
+
+// 「爬蟲更新」：呼叫 crm-crawl Edge Function（驗 uid）→ dispatch GitHub workflow → 輪詢 crm_crawl_status
+async function crmCrawlDispatch(name, court) {
+  if (!confirm('重新爬取 CRM 全部法官/檢察官內部紀錄？\n（觸發 GitHub Actions，全量約 30-60 分鐘，期間可關閉此視窗）')) return;
+  const btn = document.getElementById('crmCrawlBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '&#9203; 觸發中…'; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/crm-crawl`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + (await db.auth.getSession()).data.session.access_token,
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({}),
+    });
+    const out = await res.json();
+    if (!out.success) throw new Error(out.error || `HTTP ${res.status}`);
+    if (btn) btn.innerHTML = '&#9203; 爬蟲進行中…';
+    // 輪詢狀態（最長 90 分鐘；modal 已關或已換人就停）
+    for (let k = 0; k < 270; k++) {
+      await new Promise(r => setTimeout(r, 20000));
+      const modal = document.getElementById('judgeModal');
+      if (!modal || modal.style.display === 'none') return;
+      if (document.getElementById('judgeModalTitle')?.textContent !== name) return;
+      const { data: st } = await db.from('crm_crawl_status').select('*').eq('id', 1).maybeSingle();
+      const statusEl = document.getElementById('crmCrawlStatus');
+      if (st?.status === 'running' && statusEl) statusEl.textContent = st.detail || '進行中';
+      if (st?.status === 'done') { showJudgeDetail(name, court); return; }
+      if (st?.status === 'error') {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--red);">失敗：' + escHtml(st.detail || '') + '</span>';
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; 爬蟲更新'; }
+        return;
+      }
+    }
+  } catch (e) {
+    alert('觸發失敗：' + e.message);
+    if (btn) { btn.disabled = false; btn.innerHTML = '&#128260; 爬蟲更新'; }
+  }
 }
 
 // 懲戒與彈劾紀錄卡（judge_disciplines mig 121 ＋ judge_impeachments mig 125；姓名比對）
@@ -9962,7 +10062,7 @@ async function loadFamCat(key) {
     chartInstances.famYearly = new Chart(document.getElementById('chartFamYearly').getContext('2d'), {
       type: 'bar',
       data: {
-        labels: yearly.map(y => y.ok_months < y.months ? y.year + '（回填中）' : y.year),
+        labels: yearly.map(y => (y.ok_months < y.months ? y.year + '（回填中）' : y.year) + (Number(y.months) < 12 ? '（未滿年）' : '')),
         datasets: [{ label: `${cfg.noun}裁判數`, data: yearly.map(y => Number(y.cat_cases)),
           backgroundColor: yearly.map(y => y.ok_months < y.months ? 'rgba(130,160,190,0.35)' : 'rgba(69,183,209,0.65)'),
           borderRadius: 4 }]
@@ -9974,20 +10074,30 @@ async function loadFamCat(key) {
     });
 
     // 年度平均結案天數（line）
+    // 未滿年（months < 12）＝右截尾偏差：長案還沒進樣本，天數天然偏低（歷年 1-5 月切片都比全年低 30-50 天）
+    // → 虛線＋空心點＋tooltip 註記，避免被讀成「變快了」
     const daysYears = yearly.filter(y => y.cat_avg_days != null && y.ok_months > 0);
+    const daysPartial = daysYears.map(y => Number(y.months) < 12);
     if (chartInstances.famDays) chartInstances.famDays.destroy();
     chartInstances.famDays = new Chart(document.getElementById('chartFamDays').getContext('2d'), {
       type: 'line',
       data: {
-        labels: daysYears.map(y => y.ok_months < y.months ? y.year + '*' : y.year),
+        labels: daysYears.map((y, i) => (y.ok_months < y.months ? y.year + '*' : y.year) + (daysPartial[i] ? '（未滿年）' : '')),
         datasets: [{ label: '平均結案天數（估算）', data: daysYears.map(y => Number(y.cat_avg_days)),
           borderColor: 'rgba(224,149,74,0.9)', backgroundColor: 'rgba(224,149,74,0.12)',
-          fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: 'rgba(224,149,74,1)' }]
+          fill: true, tension: 0.3, pointRadius: 4,
+          pointBackgroundColor: daysYears.map((y, i) => daysPartial[i] ? 'transparent' : 'rgba(224,149,74,1)'),
+          pointBorderColor: 'rgba(224,149,74,1)', pointBorderWidth: 2,
+          segment: { borderDash: ctx => daysPartial[ctx.p1DataIndex] ? [6, 4] : undefined } }]
       },
       options: { responsive: true, maintainAspectRatio: false,
         scales: { x: { ticks: { color: txtColor }, grid: { display: false } },
                   y: { ticks: { color: txtColor, callback: v => v + ' 天' }, grid: { color: 'rgba(255,255,255,0.05)' } } },
-        plugins: { legend: { display: false } } }
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: {
+            label: ctx => `平均 ${ctx.parsed.y} 天（${daysYears[ctx.dataIndex].months} 個月資料）` +
+                          (daysPartial[ctx.dataIndex] ? '｜未滿年：長案尚未結案，天數天然偏低，勿與整年比較' : ''),
+          } } } }
     });
 
     // 各法院裁判量 TOP 10
