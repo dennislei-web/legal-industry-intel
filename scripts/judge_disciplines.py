@@ -67,15 +67,16 @@ def hidden(text, name):
     return m.group(1) if m else ''
 
 
-def fetch_list(session):
-    """進階查詢 TPJ 全量 → 回傳 [(detail_url, title), ...]"""
+def fetch_list(session, court='TPJ', kw=''):
+    """進階查詢（court×全文關鍵字）→ 回傳 [(detail_url, title), ...]。
+    FJUD 結果上限 500 筆——回傳量達 500 時要加關鍵字/年度切片。"""
     r = session.get(BASE + 'Default_AD.aspx', timeout=30)
     data = {k: hidden(r.text, k) for k in
             ('__VIEWSTATE', '__VIEWSTATEGENERATOR', '__VIEWSTATEENCRYPTED', '__EVENTVALIDATION')}
-    data.update({'judtype': 'JUDBOOK', 'whosub': '0', 'jud_court': 'TPJ', 'jud_sys': '',
+    data.update({'judtype': 'JUDBOOK', 'whosub': '0', 'jud_court': court, 'jud_sys': '',
                  'jud_year': '', 'jud_case': '', 'jud_no': '', 'jud_no_end': '',
                  'dy1': '', 'dm1': '', 'dd1': '', 'dy2': '', 'dm2': '', 'dd2': '',
-                 'jud_title': '', 'jud_jmain': '', 'jud_kw': '', 'KbStart': '', 'KbEnd': '',
+                 'jud_title': '', 'jud_jmain': '', 'jud_kw': kw, 'KbStart': '', 'KbEnd': '',
                  'sel_judword': 'comm', 'ctl00$cp_content$btnQry': '送出查詢'})
     r2 = session.post(BASE + 'Default_AD.aspx', data=data, timeout=30)
     hiddens = dict(re.findall(r'<input type="hidden" name="([^"]+)"[^>]*value="([^"]*)"', r2.text))
@@ -122,7 +123,7 @@ def parse_detail(html, url):
     lines = [ln.strip() for ln in text.split('\n')]
 
     case_no = re.sub(r'\s+', '', re.sub(r'^(?:懲戒法院|司法院)職務法庭\s*', '', meta['裁判字號']))
-    kind = '裁定' if '裁定' in case_no else '判決'
+    kind = '裁定' if '裁定' in case_no else ('議決' if '議決' in case_no else '判決')
 
     # 當事人區塊：「label＋2 格以上空白＋姓名」列（掃到主文或「上列…」為止）
     respondents, cur_label = [], ''
@@ -206,11 +207,15 @@ def upload(rows):
     r.raise_for_status()
 
 
-def main():
+def crawl(court='TPJ', kw='', require_role=False):
+    """require_role：TPP（懲戒法庭含改制前公懲會）用全文關鍵字撈，會混入
+    引用法官文句的非司法人員案 → 只保留解析出 role 的被付懲戒人列。"""
     s = requests.Session()
     s.headers['User-Agent'] = UA
-    listing = fetch_list(s)
-    print(f'清單共 {len(listing)} 篇')
+    listing = fetch_list(s, court, kw)
+    print(f'[{court} kw={kw or "-"}] 清單共 {len(listing)} 篇')
+    if len(listing) >= 500:
+        print('  [警告] 觸及 FJUD 500 筆上限，需切片（年度/關鍵字）補抓')
     all_rows, skipped = [], 0
     for i, (url, title) in enumerate(listing, 1):
         # 「職」字案（不服職務監督）非懲戒處分，當事人角色相反 → 跳過
@@ -228,7 +233,9 @@ def main():
         else:
             continue
         rows = parse_detail(r.text, url)
-        if not rows:
+        if require_role:
+            rows = [x for x in rows if x['role']]
+        if not rows and not require_role:
             print(f'  [警告] 無被付懲戒人: {title}')
         all_rows.extend(rows)
         if i % 20 == 0:
@@ -238,6 +245,15 @@ def main():
     for j in range(0, len(all_rows), 100):
         upload(all_rows[j:j + 100])
     print('done')
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'tpp':
+        # 改制前公懲會＋現制懲戒法庭中被懲戒的法官/檢察官（全文關鍵字撈，僅留具 role 列）
+        crawl('TPP', '法院法官', require_role=True)
+        crawl('TPP', '檢察署檢察官', require_role=True)
+    else:
+        crawl('TPJ')
 
 
 if __name__ == '__main__':
