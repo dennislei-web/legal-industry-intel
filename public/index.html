@@ -12802,6 +12802,10 @@ async function loadCourts() {
 
   let allCourts = (courtsResult.data || []).map(c => {
     c.judge_count = judgeCountMap[c.name] || 0;
+    // DB 欄位名 → 前端表格用的別名（排序/render 沿用這些鍵）
+    c.annual_cases = c.annual_case_volume;
+    c.clearance_rate = c.annual_clearance_rate;
+    c.avg_disposition_days = c.avg_processing_days;
     return c;
   });
 
@@ -12876,7 +12880,7 @@ async function loadCourtKpis() {
     db.from('courts').select('*', { count: 'exact', head: true }),
     db.from('courts').select('*', { count: 'exact', head: true }).eq('court_type', '地方法院'),
     db.from('courts').select('*', { count: 'exact', head: true }).eq('court_type', '高等法院'),
-    db.from('courts').select('annual_cases'),
+    db.from('courts').select('annual_case_volume'),
   ]);
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v != null ? v.toLocaleString() : '0'; };
   set('kpiCourtTotal', total.count);
@@ -12884,7 +12888,7 @@ async function loadCourtKpis() {
   set('kpiCourtDistrict', district.count);
   set('kpiCourtHigh', high.count);
   if (annualSum.data) {
-    const sum = annualSum.data.filter(r => r.annual_cases != null).reduce((a, b) => a + b.annual_cases, 0);
+    const sum = annualSum.data.filter(r => r.annual_case_volume != null).reduce((a, b) => a + b.annual_case_volume, 0);
     set('kpiCourtTotalCases', sum);
   }
 }
