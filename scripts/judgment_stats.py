@@ -481,9 +481,11 @@ def parse(yyyymm):
     if not os.path.isdir(extract_dir):
         print(f'  解壓 {yyyymm}.rar ...')
         r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, errors='replace')
         if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
+            # p7zip 舊版部分錯誤只進 stdout 或兩者皆空（如不支援的 RAR 打包），rc 一併帶出
+            raise RuntimeError(f'7z 解壓失敗 rc={r.returncode}: '
+                               f'{(r.stderr or r.stdout or "")[:500]}')
 
     # 聚合鍵：(name, court) → {n, sum_days, cats{}, causes{}, doctypes{}}
     agg = defaultdict(lambda: {'n': 0, 'sum_days': 0, 'n_days': 0,

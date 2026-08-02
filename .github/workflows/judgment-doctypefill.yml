@@ -36,7 +36,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r scripts/requirements.txt
-          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full p7zip-rar
+          # 官方 7zz：ubuntu 的 p7zip 16.02（2016）解不開部分「Update」重打包月包
+          # （200407/201001/201410/202404/202505 連續兩輪解壓失敗、本機新版 7-Zip 正常）
+          curl -sL https://github.com/ip7z/7zip/releases/download/24.09/7z2409-linux-x64.tar.xz -o /tmp/7z.tar.xz
+          sudo tar -xf /tmp/7z.tar.xz -C /usr/local/bin 7zz
+          7zz | head -2
 
       - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
         run: |
@@ -51,7 +55,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
           JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
-          SEVENZ_PATH: 7z
+          SEVENZ_PATH: 7zz
         working-directory: scripts
         run: |
           RANGE="${{ matrix.range }}"

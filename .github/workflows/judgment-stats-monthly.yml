@@ -24,7 +24,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r scripts/requirements.txt
-          sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full p7zip-rar
+          # 官方 7zz：ubuntu 的 p7zip 16.02（2016）解不開部分「Update」重打包月包
+          curl -sL https://github.com/ip7z/7zip/releases/download/24.09/7z2409-linux-x64.tar.xz -o /tmp/7z.tar.xz
+          sudo tar -xf /tmp/7z.tar.xz -C /usr/local/bin 7zz
+          7zz | head -2
 
       - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
         run: |
@@ -39,7 +42,7 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
           JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
-          SEVENZ_PATH: 7z
+          SEVENZ_PATH: 7zz
         working-directory: scripts
         run: |
           YM="${{ github.event.inputs.yyyymm }}"
@@ -53,7 +56,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SEVENZ_PATH: 7z
+          SEVENZ_PATH: 7zz
         working-directory: scripts
         run: |
           YM="${{ github.event.inputs.yyyymm }}"
