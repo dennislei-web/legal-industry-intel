@@ -7812,7 +7812,7 @@ async function showJudgeDetail(name, court) {
   }
 
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
-  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [];
+  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   const monthRows = [];
   await Promise.all([
@@ -7830,6 +7830,9 @@ async function showJudgeDetail(name, court) {
       .then(r => { impeachments = r.data || []; }),
     db.from('judge_appeal_stats').select('*').eq('name', name)
       .then(r => { appealStats = r.data || []; }).catch(() => {}),
+    db.from('judge_evaluations').select('*').eq('matched_name', name)
+      .order('decided_date', { ascending: false })
+      .then(r => { evalMatches = r.data || []; }).catch(() => {}),
     db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
       .then(r => { pairs = r.data; }),
     db.rpc('judge_cause_summary', { p_name: name, p_court: court })
@@ -7908,7 +7911,7 @@ async function showJudgeDetail(name, court) {
   if (statRows.length > 1) badges.push(`<span class="badge badge-orange" style="cursor:help;" title="此姓名亦出現於其他 ${statRows.length - 1} 個法院的裁判書統計，可能為轉調或同名不同人；本頁配對、案由、合議庭均已鎖定本院資料">同名/跨院 ×${statRows.length}</span>`);
   const judgeDisc = disciplines.filter(d => d.role !== '檢察官');
   const judgeImp = impeachments.filter(d => d.role !== '檢察官');
-  if (judgeDisc.length || judgeImp.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="職務法庭懲戒裁判或監察院彈劾案有此姓名（姓名比對，詳懲戒與彈劾卡）">&#9888; 懲戒/彈劾 ×${judgeDisc.length + judgeImp.length}</span>`);
+  if (judgeDisc.length || judgeImp.length || evalMatches.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="職務法庭懲戒裁判、監察院彈劾案或評鑑成立決議（對應回推）有此姓名（姓名比對，詳懲戒與彈劾卡）">&#9888; 懲戒/彈劾/評鑑 ×${judgeDisc.length + judgeImp.length + evalMatches.length}</span>`);
 
   const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:110px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
 
@@ -7933,7 +7936,7 @@ async function showJudgeDetail(name, court) {
 
     ${renderCrmInternalCard(crmRows, crmStatus, name, court)}
 
-    ${renderJudgeDisciplineCard(disciplines, impeachments)}
+    ${renderJudgeDisciplineCard(disciplines, impeachments, evalMatches)}
 
     ${renderJudgeAppealCard(appealStats, court)}
 
@@ -8136,8 +8139,8 @@ function renderJudgeAppealCard(rows, court) {
 }
 
 // 懲戒與彈劾紀錄卡（judge_disciplines mig 121 ＋ judge_impeachments mig 125；姓名比對）
-function renderJudgeDisciplineCard(rows, impRows) {
-  if ((!rows || !rows.length) && (!impRows || !impRows.length)) return '';
+function renderJudgeDisciplineCard(rows, impRows, evalRows) {
+  if ((!rows || !rows.length) && (!impRows || !impRows.length) && (!evalRows || !evalRows.length)) return '';
   const items = (rows || []).map(d => `
     <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -8160,6 +8163,17 @@ function renderJudgeDisciplineCard(rows, impRows) {
       </div>
       ${d.cause ? `<div style="font-size:0.8rem;margin-top:4px;color:var(--text);">${escHtml(d.cause.length > 130 ? d.cause.slice(0, 130) + '…' : d.cause)}</div>` : ''}
     </div>`).join('');
+  const evalItems = (evalRows || []).map(d => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        ${d.doc_url ? `<a href="${escHtml(d.doc_url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:600;" title="下載評鑑決議書（公開版遮罩姓名）">${escHtml(d.case_no)}</a>` : `<span style="font-weight:600;">${escHtml(d.case_no)}</span>`}
+        <span style="color:#a06cd5;font-weight:600;">${escHtml(d.result || '')}</span>
+      </div>
+      <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px;">
+        ${d.decided_date || '-'}｜${escHtml(d.org || '-')}｜決議書遮罩為「${escHtml(d.name_masked || '')}」，由${d.matched_kind === 'imp' ? '彈劾案文' : '懲戒判決'}${d.match_basis === 'citation' ? '引用評鑑案號對應' : '姓氏＋法院＋時序推定'}（${escHtml(d.matched_case_no || '')}）
+      </div>
+      ${d.summary ? `<div style="font-size:0.8rem;margin-top:4px;color:var(--text);">${escHtml(d.summary.length > 120 ? d.summary.slice(0, 120) + '…' : d.summary)}</div>` : ''}
+    </div>`).join('');
   const sec = (title, hint, body) => body ? `
     <div style="font-size:0.82rem;font-weight:600;margin:10px 0 2px;">${title} <span style="font-size:0.68rem;color:var(--text-muted);font-weight:400;">${hint}</span></div>${body}` : '';
   return `
@@ -8167,6 +8181,7 @@ function renderJudgeDisciplineCard(rows, impRows) {
       <div class="card-title" style="color:var(--red);">&#9888; 懲戒與彈劾紀錄 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">姓名比對——請以任職機關核對是否同名</span></div>
       ${sec('懲戒裁判', '懲戒法院職務法庭／司法院職務法庭／改制前公務員懲戒委員會', items)}
       ${sec('監察院彈劾', '彈劾成立後移送職務法庭，兩者常前後對應', impItems)}
+      ${sec('個案評鑑（成立）', '法官評鑑委員會；懲戒的前哨程序，對應由具名案回推', evalItems)}
     </div>`;
 }
 
@@ -8185,10 +8200,10 @@ async function loadJudgeDiscipline(force) {
       .order('decided_date', { ascending: false }).limit(1000),
     // 評鑑 ~1,814 列超過 PostgREST 單請求 1000 列上限 → range 兩頁
     db.from('judge_evaluations')
-      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url')
+      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url,matched_kind,matched_case_no,matched_name,match_basis')
       .order('decided_date', { ascending: false }).range(0, 999),
     db.from('judge_evaluations')
-      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url')
+      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url,matched_kind,matched_case_no,matched_name,match_basis')
       .order('decided_date', { ascending: false }).range(1000, 1999),
   ]);
   const evalRows = [...(e1.data || []), ...(e2.data || [])].map(r => ({
@@ -8202,8 +8217,9 @@ async function loadJudgeDiscipline(force) {
   ].sort((a, b) => (b.decided_date || '').localeCompare(a.decided_date || ''));
 
   // 在職比對：法官＝司法院現任名冊有此姓名；檢察官＝最近 3 個資料月仍具名起訴
-  // （姓名比對，同名可能誤標——tooltip 註記，點開檔案核對）。評鑑列姓名遮罩，不比對。
-  const names = [...new Set(_jdisRows.filter(r => r.src !== 'eval').map(r => r.name))];
+  // （姓名比對，同名可能誤標——tooltip 註記，點開檔案核對）。
+  // 評鑑列姓名遮罩不比對；已由懲戒/彈劾對應解遮罩者（matched_name）用解遮罩名比對。
+  const names = [...new Set(_jdisRows.map(r => r.src === 'eval' ? r.matched_name : r.name).filter(Boolean))];
   const activeJudge = {}, activePros = new Set();
   const chunks = [];
   for (let i = 0; i < names.length; i += 80) chunks.push(names.slice(i, i + 80));
@@ -8217,8 +8233,9 @@ async function loadJudgeDiscipline(force) {
       .then(r => (r.data || []).forEach(x => activePros.add(x.name))) : null,
   ].filter(Boolean)));
   _jdisRows.forEach(r => {
-    r.activeCourts = activeJudge[r.name] || null;
-    r.activeP = activePros.has(r.name);
+    const key = r.src === 'eval' ? r.matched_name : r.name;
+    r.activeCourts = (key && activeJudge[key]) || null;
+    r.activeP = activePros.has(key);
   });
 
   // KPI
@@ -8256,7 +8273,7 @@ function renderJudgeDiscipline() {
     return act === '1' ? on : !on;
   });
   if (kw) rows = rows.filter(r =>
-    [r.name, r.org, r.case_no, r.result].some(v => (v || '').includes(kw)));
+    [r.name, r.matched_name, r.org, r.case_no, r.result].some(v => (v || '').includes(kw)));
   const shown = rows.slice(0, 400);
   const tbody = document.getElementById('jdisTableBody');
   if (!shown.length) {
@@ -8275,12 +8292,14 @@ function renderJudgeDiscipline() {
     tbody.innerHTML = shown.map(r => `<tr>
       <td style="white-space:nowrap;font-size:0.85rem;">${r.decided_date || '-'}</td>
       <td>${typeBadge(r)}</td>
-      <td>${r.src === 'eval'
-        ? `<span style="font-weight:600;cursor:help;" title="評鑑決議書公開版遮罩姓名，無法連結個人檔案">${escHtml(r.name)}</span>`
-        : judgeLink(r.name, '', 'font-weight:600;')}</td>
+      <td>${r.src !== 'eval'
+        ? judgeLink(r.name, '', 'font-weight:600;')
+        : r.matched_name
+          ? `${judgeLink(r.matched_name, '', 'font-weight:600;')} <span style="font-size:0.72rem;color:var(--text-muted);cursor:help;" title="決議書公開版遮罩為「${escHtml(r.name_masked || '')}」；由${r.matched_kind === 'imp' ? '監察院彈劾案文' : '職務法庭懲戒判決'}${r.match_basis === 'citation' ? '原文引用評鑑案號' : '以姓氏＋法院＋時序推定'}對應解遮罩：${escHtml(r.matched_case_no || '')}">（${escHtml(r.name_masked || '')}${r.match_basis === 'inferred' ? '・推定' : ''}）</span>`
+          : `<span style="font-weight:600;cursor:help;" title="評鑑決議書公開版遮罩姓名，且無可對應的具名懲戒/彈劾案">${escHtml(r.name)}</span>`}</td>
       <td style="font-size:0.82rem;">${escHtml(r.org || '-')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.role || '-')}</td>
-      <td style="white-space:nowrap;">${r.src === 'eval'
+      <td style="white-space:nowrap;">${r.src === 'eval' && !r.matched_name
         ? '<span style="color:var(--text-muted);cursor:help;" title="姓名遮罩，無法比對現任名冊">？</span>'
         : activeCell(r)}</td>
       <td style="font-size:0.82rem;color:${resultColor(r)};font-weight:600;${r.src === 'eval' && r.summary ? 'cursor:help;' : ''}"${r.src === 'eval' && r.summary ? ` title="主文：${escHtml(r.summary)}"` : ''}>${escHtml(r.result || '-')}</td>

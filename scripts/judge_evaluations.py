@@ -12,7 +12,8 @@
   python judge_evaluations.py list     # 爬列表 → .eval_work/list.json
   python judge_evaluations.py docs     # 下載成立類 PDF 抽姓名/法院 → 更新 list.json
   python judge_evaluations.py upload   # upsert 到 judge_evaluations
-  python judge_evaluations.py all      # 以上全部（月增量手動跑即可，量極低）
+  python judge_evaluations.py match    # 成立案 ↔ 懲戒/彈劾具名案對應（解遮罩，mig 129）
+  python judge_evaluations.py all      # list+docs+upload+match（月增量手動跑即可）
 """
 import io
 import json
@@ -213,6 +214,133 @@ def upload():
     print(f'完成：{len(payload)} 筆')
 
 
+# ── 評鑑 ↔ 懲戒/彈劾 對應（解遮罩）──
+# 職務法庭懲戒判決（FJUD 全文）與監察院彈劾案文（PDF）具名，且常引用
+# 「○年度評字第○號」→ citation 對應；沒有引用者用 姓氏+法院+時序 推定（唯一候選才收）。
+RE_EVAL_CITE = re.compile(r'(\d{2,3})\s*年度\s*(審)?評字\s*第\s*(\d+)\s*號')
+COURT_LOC = re.compile(r'(臺北|新北|士林|板橋|桃園|新竹|苗栗|臺中|南投|彰化|雲林|嘉義|'
+                       r'臺南|高雄|橋頭|屏東|臺東|花蓮|宜蘭|基隆|澎湖|金門|連江|'
+                       r'高等|最高|智慧財產|懲戒|少年及家事)')
+
+
+def _db_get(path):
+    out, frm = [], 0
+    while True:
+        r = requests.get(f'{SB_URL}/rest/v1/{path}',
+                         headers={**HEAD, 'Range': f'{frm}-{frm + 999}'}, timeout=60)
+        rows = r.json() if r.status_code in (200, 206) else []
+        out.extend(rows)
+        if len(rows) < 1000:
+            break
+        frm += 1000
+    return out
+
+
+def match():
+    from pypdf import PdfReader
+    s = requests.Session()
+    s.headers['User-Agent'] = UA
+    evals = [r for r in _db_get('judge_evaluations?select=case_no,doc_url,decided_date,'
+                                'result,name_masked,org&result=like.%E6%88%90%E7%AB%8B*')]
+    # PostgREST like 編碼麻煩 → 直接全撈本地過濾
+    if not evals:
+        evals = _db_get('judge_evaluations?select=case_no,doc_url,decided_date,result,name_masked,org')
+    evals = [r for r in evals if (r['result'] or '').startswith('成立')]
+    print(f'成立類評鑑 {len(evals)} 筆')
+    discs = _db_get('judge_disciplines?select=case_no,name,role,org,decided_date,source_url')
+    imps = _db_get('judge_impeachments?select=case_no,name,role,org,decided_date,doc_url')
+    discs = [d for d in discs if d.get('role') != '檢察官']
+    imps = [d for d in imps if d.get('role') == '法官' and d.get('doc_url')]
+    print(f'待掃描：懲戒 {len(discs)}、彈劾案文 {len(imps)}')
+
+    cites = {}  # evalno → [(kind, case_no, name, org)]
+    def scan(kind, case_no, name, org, text):
+        for y, shen, n in RE_EVAL_CITE.findall(text):
+            key = f'{int(y)}年度{"審" if shen else ""}評字第{int(n)}號'
+            cites.setdefault(key, []).append((kind, case_no, name, org))
+
+    for i, d in enumerate(discs):
+        if not d.get('source_url'):
+            continue
+        cache = os.path.join(WORK, 'fjud_' + re.sub(r'\W', '', d['case_no'])[:40] + '.html')
+        try:
+            if os.path.exists(cache):
+                t = io.open(cache, encoding='utf-8').read()
+            else:
+                t = s.get(d['source_url'], timeout=30).text
+                io.open(cache, 'w', encoding='utf-8').write(t)
+                time.sleep(0.5)
+            scan('disc', d['case_no'], d['name'], d.get('org'), t)
+        except requests.RequestException as e:
+            print(f'  disc {d["case_no"]} 抓取失敗: {e}')
+        if (i + 1) % 50 == 0:
+            print(f'  …懲戒 {i + 1}/{len(discs)}', flush=True)
+    for i, d in enumerate(imps):
+        fid = re.search(r'download/(\d+)', d['doc_url'] or '')
+        cache = os.path.join(WORK, f'imp_{fid.group(1)}.pdf') if fid else None
+        try:
+            if cache and os.path.exists(cache):
+                blob = open(cache, 'rb').read()
+            else:
+                blob = s.get(d['doc_url'], timeout=90).content
+                if cache and blob[:4] == b'%PDF':
+                    with open(cache, 'wb') as f:
+                        f.write(blob)
+                time.sleep(0.5)
+            if blob[:4] == b'%PDF':
+                t = ''.join(pg.extract_text() or '' for pg in PdfReader(io.BytesIO(blob)).pages)
+                scan('imp', d['case_no'], d['name'], d.get('org'), t)
+        except Exception as e:  # noqa: BLE001
+            print(f'  imp {d["case_no"]} 解析失敗: {str(e)[:80]}')
+        if (i + 1) % 50 == 0:
+            print(f'  …彈劾 {i + 1}/{len(imps)}', flush=True)
+
+    n_cit = n_inf = 0
+    for ev in evals:
+        surname = (ev.get('name_masked') or '')[:1]
+        loc = COURT_LOC.search(ev.get('org') or '')
+        cands = cites.get(ev['case_no'], [])
+        # citation 候選需通過姓氏防呆（引用他案評鑑決議的誤中靠此排除）
+        cands = [c for c in cands if not surname or c[2][:1] == surname]
+        basis = 'citation'
+        if not cands:
+            # 推定：僅限「移送懲戒法院/監察院」案（程序鏈上必有後端具名案）；
+            # 「建議職務監督」只到人審會，後來若另有懲戒屬不同事件，推定會誤導 → 不推定
+            if '移送' not in (ev['result'] or ''):
+                continue
+            # 姓氏＋法院地名＋時序（對應案在評鑑後 4 年內）；唯一人選才收
+            basis = 'inferred'
+            pool = [('disc', d['case_no'], d['name'], d.get('org'), d.get('decided_date'))
+                    for d in discs] + \
+                   [('imp', d['case_no'], d['name'], d.get('org'), d.get('decided_date'))
+                    for d in imps]
+            cands = [c[:4] for c in pool
+                     if surname and c[2][:1] == surname
+                     and loc and loc.group(1) in (c[3] or '')
+                     and ev.get('decided_date') and c[4]
+                     and 0 <= (int(c[4][:4]) - int(ev['decided_date'][:4])) <= 4]
+            if len({c[2] for c in cands}) != 1:
+                continue
+        # 依評鑑結果選主對應：移送懲戒法院→disc 優先、移送監察院→imp 優先
+        pref = 'imp' if '監察院' in (ev['result'] or '') else 'disc'
+        cands.sort(key=lambda c: (c[0] != pref,))
+        kind, cno, nm, _org = cands[0]
+        r = requests.patch(
+            f'{SB_URL}/rest/v1/judge_evaluations'
+            f'?case_no=eq.{requests.utils.quote(ev["case_no"])}',
+            headers={**HEAD, 'Content-Type': 'application/json',
+                     'Prefer': 'return=minimal'},
+            json={'matched_kind': kind, 'matched_case_no': cno,
+                  'matched_name': nm, 'match_basis': basis}, timeout=60)
+        if r.status_code not in (200, 204):
+            print(f'  PATCH {ev["case_no"]} 失敗 {r.status_code}')
+            continue
+        n_cit += basis == 'citation'
+        n_inf += basis == 'inferred'
+        print(f'  {ev["case_no"]} → {nm}（{kind} {cno}，{basis}）')
+    print(f'對應完成：citation {n_cit}、inferred {n_inf}、未對應 {len(evals) - n_cit - n_inf}')
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'all'
     if cmd in ('list', 'all'):
@@ -221,3 +349,5 @@ if __name__ == '__main__':
         parse_docs()
     if cmd in ('upload', 'all'):
         upload()
+    if cmd in ('match', 'all'):
+        match()
