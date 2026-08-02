@@ -124,6 +124,13 @@ def download(yyyymm):
 # 「(審判長)法 官 姓名」列，姓名 2-4 個漢字（不含空白時）或全形空白分隔。
 RE_JUDGE = re.compile(
     r'(?:審判長)?法\s*官\s+([一-鿿][一-鿿\s　]{0,8}[一-鿿])\s*(?:\r|\n|$)')
+# 折行孤字：少數裁判書署名排版壞掉，姓名末字被排到下一行行首（如新北 114 侵附民 49
+# 「法 官 俞秀／美 …… 法 官 吳丁／偉」），RE_JUDGE 只捕到前 2 字。孤字判定＝
+# 行首單一漢字，後面接行尾或（隔一段空白後）下一位的「(審判長)法 官／書 記 官」label。
+# 名冊真兩字名（張議/方荳…）簽名正常時下一行以 label 開頭、非孤字，不受此規則誤傷。
+RE_WRAP_ORPHAN = re.compile(
+    r'^[ \t　]*([一-鿿])'
+    r'(?:[ \t　]*(?:\r|\n|$)|[ \t　]+(?=(?:審判長)?法\s*官|書\s*記\s*官))')
 # 分院要一起捕（臺灣高等法院「高雄分院」），否則各分院判決全被歸到高本院
 RE_COURT = re.compile(r'^([一-鿿]{2,15}法院(?:[一-鿿]{2,4}分院)?)')
 
@@ -439,6 +446,11 @@ def extract_judges(jfull):
         # 4 字名無「以」結尾者，去尾不誤傷（migration 082 清歷史資料同規則）
         if len(name) == 4 and name.endswith('以'):
             name = name[:3]
+        # 折行截斷：兩字名＋下一行以孤字開頭 → 接回末字（migration 134 清歷史資料同規則）
+        if len(name) == 2:
+            om = RE_WRAP_ORPHAN.match(tail[m.end():])
+            if om:
+                name += om.group(1)
         if 2 <= len(name) <= 4 and name not in names and not RE_JUDGE_NAME_NOISE.search(name):
             names.append(name)
     return names
@@ -776,7 +788,10 @@ def prune_pairs():
 
 
 def refresh_stats():
-    for rpc in ('refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
+    for rpc in (
+                # 折行截斷清洗：先清 judge_month_stats 源頭再重算各彙總（migration 134）
+                'clean_judge_name_truncations',
+                'refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
                 'refresh_lawyer_judgment_stats', 'refresh_family_lawyer_stats',
                 'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats',
                 'refresh_judge_changes',
