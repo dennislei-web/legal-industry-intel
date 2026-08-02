@@ -8091,8 +8091,8 @@ function renderJudgeDiscipline() {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted);">無符合條件的紀錄</td></tr>';
   } else {
     const activeCell = r => {
-      if (r.activeCourts?.length) return `<span class="badge badge-green" style="cursor:help;" title="司法院現任法官名冊有此姓名（${escHtml(r.activeCourts.join('、'))}）；同名可能誤標，點姓名開檔案核對">&#10003; 在職</span>`;
-      if (r.role === '檢察官' && r.activeP) return '<span class="badge badge-green" style="cursor:help;" title="最近 3 個資料月的起訴書仍有此姓名具名；同名可能誤標">&#10003; 在職</span>';
+      if (r.activeCourts?.length) return `<span class="badge badge-green" style="cursor:help;white-space:nowrap;" title="司法院現任法官名冊有此姓名（${escHtml(r.activeCourts.join('、'))}）；同名可能誤標，點姓名開檔案核對">&#10003;在職</span>`;
+      if (r.role === '檢察官' && r.activeP) return '<span class="badge badge-green" style="cursor:help;white-space:nowrap;" title="最近 3 個資料月的起訴書仍有此姓名具名；同名可能誤標">&#10003;在職</span>';
       return '<span style="color:var(--text-muted);cursor:help;" title="現任法官名冊與近期起訴具名皆查無此姓名（已免職/退休/離職，或轉任非審檢職務）">—</span>';
     };
     tbody.innerHTML = shown.map(r => `<tr>
@@ -8103,7 +8103,7 @@ function renderJudgeDiscipline() {
       <td>${judgeLink(r.name, '', 'font-weight:600;')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.org || '-')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.role || '-')}</td>
-      <td>${activeCell(r)}</td>
+      <td style="white-space:nowrap;">${activeCell(r)}</td>
       <td style="font-size:0.82rem;color:${r.src === 'disc' ? 'var(--red)' : 'var(--orange)'};font-weight:600;">${escHtml(r.result || '-')}</td>
       <td style="font-size:0.8rem;">${r.url
         ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;">${escHtml(r.case_no)}</a>`
