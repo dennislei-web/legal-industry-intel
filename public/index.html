@@ -2607,16 +2607,19 @@
     <div id="tab-judge-discipline" class="tab-content">
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
-          彙整<strong>懲戒法院職務法庭／司法院職務法庭／改制前公務員懲戒委員會</strong>之懲戒裁判，與<strong>監察院彈劾案</strong>（彈劾成立後移送職務法庭，兩者常前後對應）。
+          彙整<strong>懲戒法院職務法庭／司法院職務法庭／改制前公務員懲戒委員會</strong>之懲戒裁判、<strong>監察院彈劾案</strong>（彈劾成立後移送職務法庭，兩者常前後對應），
+          與<strong>法官評鑑委員會個案評鑑決議</strong>（懲戒的前哨程序：評鑑成立→移送懲戒法院／監察院或建議職務監督）。
           含已離開現任名冊的歷史法官——<b>點姓名開啟個人檔案</b>（自動錨定其署名最多的法院）。
           姓名為裁判/案文具名之公開資訊；同名可能誤併，請以任職機關核對。
-          涵蓋：職務法庭 101 年起全量；公懲會約 2006 年起（受裁判書系統收錄範圍限制）；檢察官之公懲會時代紀錄因查詢上限尚非全量。
+          涵蓋：職務法庭 101 年起全量；公懲會約 2006 年起（受裁判書系統收錄範圍限制）；檢察官之公懲會時代紀錄因查詢上限尚非全量；
+          評鑑決議 101 年迄今全量，惟<b>決議書公開版一律遮罩姓名</b>（含成立案），僅能識別姓氏＋法院，預設檢視只列成立案。
         </div>
       </div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
         <div class="kpi-card"><div class="kpi-label">懲戒裁判</div><div class="kpi-value" id="kpiJdisRows" style="color:var(--red);">-</div><div class="kpi-sub" id="kpiJdisRowsSub">列 / 人</div></div>
         <div class="kpi-card"><div class="kpi-label">監察院彈劾</div><div class="kpi-value" id="kpiJdisImp" style="color:var(--orange);">-</div><div class="kpi-sub" id="kpiJdisImpSub">列 / 人</div></div>
         <div class="kpi-card"><div class="kpi-label">免職／撤職</div><div class="kpi-value" id="kpiJdisSevere">-</div><div class="kpi-sub">免除職務＋撤職（人）</div></div>
+        <div class="kpi-card"><div class="kpi-label">個案評鑑</div><div class="kpi-value" id="kpiJdisEval" style="color:var(--purple,#a06cd5);">-</div><div class="kpi-sub" id="kpiJdisEvalSub">請求案 / 成立</div></div>
         <div class="kpi-card"><div class="kpi-label">最新紀錄</div><div class="kpi-value" id="kpiJdisLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">裁判/審議日期</div></div>
       </div>
       <div class="search-bar">
@@ -2627,9 +2630,10 @@
           <option value="">全部</option>
         </select>
         <select id="jdisKind" onchange="renderJudgeDiscipline()">
-          <option value="">懲戒＋彈劾</option>
+          <option value="">懲戒＋彈劾＋評鑑成立</option>
           <option value="disc">僅懲戒裁判</option>
           <option value="imp">僅彈劾</option>
+          <option value="eval">僅評鑑（含不付評鑑）</option>
         </select>
         <select id="jdisActive" onchange="renderJudgeDiscipline()">
           <option value="">在職＋離職</option>
@@ -2643,7 +2647,7 @@
             <thead>
               <tr><th style="width:92px;">日期</th><th style="width:64px;">類型</th><th>姓名</th><th>機關（案發時）</th><th style="width:56px;">身分</th><th style="width:76px;">在職</th><th>結果／進度</th><th>案號（連原文）</th></tr>
             </thead>
-            <tbody id="jdisTableBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
+            <tbody id="jdisTableBody"><tr><td colspan="8" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;" id="jdisTableNote"></div>
@@ -7808,7 +7812,7 @@ async function showJudgeDetail(name, court) {
   }
 
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
-  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [];
+  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   const monthRows = [];
   await Promise.all([
@@ -7824,6 +7828,8 @@ async function showJudgeDetail(name, court) {
     db.from('judge_impeachments').select('*').eq('name', name)
       .order('decided_date', { ascending: false })
       .then(r => { impeachments = r.data || []; }),
+    db.from('judge_appeal_stats').select('*').eq('name', name)
+      .then(r => { appealStats = r.data || []; }).catch(() => {}),
     db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
       .then(r => { pairs = r.data; }),
     db.rpc('judge_cause_summary', { p_name: name, p_court: court })
@@ -7928,6 +7934,8 @@ async function showJudgeDetail(name, court) {
     ${renderCrmInternalCard(crmRows, crmStatus, name, court)}
 
     ${renderJudgeDisciplineCard(disciplines, impeachments)}
+
+    ${renderJudgeAppealCard(appealStats, court)}
 
     ${stat || thisCourtRows.length ? `
     <div class="card" style="margin-bottom:16px;">
@@ -8082,6 +8090,50 @@ async function crmCrawlDispatch(name, court) {
   }
 }
 
+// 上訴維持率卡（judge_appeal_stats mig 128；裁判書全文反算，(name, court) 比對）
+function renderJudgeAppealCard(rows, court) {
+  if (!rows?.length) return '';
+  const trial = rows.filter(r => r.side === 'trial' && r.court_name === court);
+  const app = rows.filter(r => r.side === 'appellate' && r.court_name === court);
+  if (!trial.length && !app.length) return '';
+  const sum = rs => rs.reduce((a, r) => {
+    a.appealed += r.appealed; a.upheld += r.upheld; a.rev_full += r.rev_full;
+    a.rev_part += r.rev_part; a.other += r.other; return a;
+  }, { appealed: 0, upheld: 0, rev_full: 0, rev_part: 0, other: 0 });
+  const pct = (n, d) => d ? (n / d * 100).toFixed(1) + '%' : '-';
+  const bar = t => {
+    if (!t.appealed) return '';
+    const seg = (n, color, label) => n ? `<span style="display:block;height:100%;width:${(n / t.appealed * 100).toFixed(2)}%;background:${color};float:left;" title="${label} ${n} 件"></span>` : '';
+    return `<div style="height:10px;border-radius:5px;overflow:hidden;background:var(--border);margin:6px 0 4px;">
+      ${seg(t.upheld, 'var(--green)', '維持（上訴駁回）')}${seg(t.rev_part, 'var(--orange)', '部分廢棄')}${seg(t.rev_full, 'var(--red)', '全部廢棄')}${seg(t.other, 'var(--text-muted)', '其他（發回/和解等）')}
+    </div>`;
+  };
+  const catChips = rs => rs.filter(r => r.appealed >= 5)
+    .sort((a, b) => b.appealed - a.appealed)
+    .map(r => `<span style="display:inline-block;background:var(--bg-row);border:1px solid var(--border);border-radius:4px;padding:1px 7px;margin:2px 3px 0 0;font-size:0.72rem;" title="維持 ${r.upheld}／部分廢棄 ${r.rev_part}／全部廢棄 ${r.rev_full}／其他 ${r.other}">${escHtml(r.cat)} 維持 ${pct(r.upheld, r.appealed)}（${r.appealed} 件）</span>`).join('');
+  const block = (title, hint, rs) => {
+    const t = sum(rs);
+    if (!t.appealed) return '';
+    return `<div style="margin-bottom:10px;">
+      <div style="font-size:0.82rem;font-weight:600;">${title} <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">${hint}</span></div>
+      ${bar(t)}
+      <div style="font-size:0.78rem;color:var(--text-muted);">
+        維持 <b style="color:var(--green);">${pct(t.upheld, t.appealed)}</b>（${t.upheld}）｜
+        部分廢棄 <b style="color:var(--orange);">${pct(t.rev_part, t.appealed)}</b>（${t.rev_part}）｜
+        全部廢棄 <b style="color:var(--red);">${pct(t.rev_full, t.appealed)}</b>（${t.rev_full}）｜
+        其他 ${t.other}｜計 ${t.appealed} 件
+      </div>
+      <div>${catChips(rs)}</div>
+    </div>`;
+  };
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9877; 上訴維持率 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書全文反算（獨家指標）；僅計上級審「判決」且原審可對回開放資料窗口者，為下限估計；合議庭每位署名法官各計 1 件</span></div>
+      ${block('本院判決被上訴後', '其署名判決遭上訴、上級審已判決者的結果分佈', trial)}
+      ${block('審理上訴案時', '其於本院審理上訴案件（含合議庭署名）的處理傾向', app)}
+    </div>`;
+}
+
 // 懲戒與彈劾紀錄卡（judge_disciplines mig 121 ＋ judge_impeachments mig 125；姓名比對）
 function renderJudgeDisciplineCard(rows, impRows) {
   if ((!rows || !rows.length) && (!impRows || !impRows.length)) return '';
@@ -8123,22 +8175,34 @@ function renderJudgeDisciplineCard(rows, impRows) {
 let _jdisRows = null;
 async function loadJudgeDiscipline(force) {
   if (_jdisRows && !force) { renderJudgeDiscipline(); return; }
-  const [d1, d2] = await Promise.all([
+  const [d1, d2, e1, e2] = await Promise.all([
     db.from('judge_disciplines')
       .select('case_no,kind,decided_date,name,role,org,sanction,source_url')
       .order('decided_date', { ascending: false }).limit(1000),
     db.from('judge_impeachments')
       .select('case_no,decided_date,name,role,org,title,progress,doc_url')
       .order('decided_date', { ascending: false }).limit(1000),
+    // 評鑑 ~1,814 列超過 PostgREST 單請求 1000 列上限 → range 兩頁
+    db.from('judge_evaluations')
+      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url')
+      .order('decided_date', { ascending: false }).range(0, 999),
+    db.from('judge_evaluations')
+      .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url')
+      .order('decided_date', { ascending: false }).range(1000, 1999),
   ]);
+  const evalRows = [...(e1.data || []), ...(e2.data || [])].map(r => ({
+    ...r, src: 'eval', role: '法官', name: r.name || r.name_masked || '（未載明）',
+    masked: !r.name, url: r.doc_url || r.source_url,
+  }));
   _jdisRows = [
     ...(d1.data || []).map(r => ({ ...r, src: 'disc', result: r.sanction, url: r.source_url })),
     ...(d2.data || []).map(r => ({ ...r, src: 'imp', result: r.progress ? `彈劾成立（${r.progress}）` : '彈劾成立', url: r.doc_url })),
+    ...evalRows,
   ].sort((a, b) => (b.decided_date || '').localeCompare(a.decided_date || ''));
 
   // 在職比對：法官＝司法院現任名冊有此姓名；檢察官＝最近 3 個資料月仍具名起訴
-  // （姓名比對，同名可能誤標——tooltip 註記，點開檔案核對）
-  const names = [...new Set(_jdisRows.map(r => r.name))];
+  // （姓名比對，同名可能誤標——tooltip 註記，點開檔案核對）。評鑑列姓名遮罩，不比對。
+  const names = [...new Set(_jdisRows.filter(r => r.src !== 'eval').map(r => r.name))];
   const activeJudge = {}, activePros = new Set();
   const chunks = [];
   for (let i = 0; i < names.length; i += 80) chunks.push(names.slice(i, i + 80));
@@ -8166,6 +8230,10 @@ async function loadJudgeDiscipline(force) {
   el('kpiJdisImpSub').textContent = `${imp.length} 列 / ${set(imp)} 人`;
   el('kpiJdisSevere').textContent = new Set(
     disc.filter(r => /免除|撤職/.test(r.result || '')).map(r => r.name)).size;
+  const evals = _jdisRows.filter(r => r.src === 'eval');
+  el('kpiJdisEval').textContent = evals.length.toLocaleString();
+  el('kpiJdisEvalSub').textContent =
+    `請求案 / 成立 ${evals.filter(r => (r.result || '').startsWith('成立')).length} 件`;
   el('kpiJdisLast').textContent = _jdisRows[0]?.decided_date || '-';
 
   renderJudgeDiscipline();
@@ -8180,6 +8248,8 @@ function renderJudgeDiscipline() {
   let rows = _jdisRows;
   if (role) rows = rows.filter(r => (r.role || '法官') === role); // role 未解析者多為法官案，歸法官
   if (kind) rows = rows.filter(r => r.src === kind);
+  // 預設檢視：評鑑只列成立案（不付評鑑/不成立 ~1,700 件會淹沒表格；選「僅評鑑」看全量）
+  else rows = rows.filter(r => r.src !== 'eval' || (r.result || '').startsWith('成立'));
   if (act) rows = rows.filter(r => {
     const on = !!(r.activeCourts?.length || (r.role === '檢察官' && r.activeP));
     return act === '1' ? on : !on;
@@ -8196,16 +8266,23 @@ function renderJudgeDiscipline() {
       if (r.role === '檢察官' && r.activeP) return '<span class="badge badge-green" style="cursor:help;white-space:nowrap;" title="最近 3 個資料月的起訴書仍有此姓名具名；同名可能誤標">&#10003;在職</span>';
       return '<span style="color:var(--text-muted);cursor:help;" title="現任法官名冊與近期起訴具名皆查無此姓名（已免職/退休/離職，或轉任非審檢職務）">—</span>';
     };
+    const typeBadge = r => r.src === 'disc' ? '<span class="badge badge-red">懲戒</span>'
+      : r.src === 'imp' ? '<span class="badge badge-orange">彈劾</span>'
+      : '<span class="badge" style="background:color-mix(in srgb, #a06cd5 22%, transparent);color:#a06cd5;">評鑑</span>';
+    const resultColor = r => r.src === 'disc' ? 'var(--red)' : r.src === 'imp' ? 'var(--orange)'
+      : (r.result || '').startsWith('成立') ? '#a06cd5' : 'var(--text-muted)';
     tbody.innerHTML = shown.map(r => `<tr>
       <td style="white-space:nowrap;font-size:0.85rem;">${r.decided_date || '-'}</td>
-      <td>${r.src === 'disc'
-        ? '<span class="badge badge-red">懲戒</span>'
-        : '<span class="badge badge-orange">彈劾</span>'}</td>
-      <td>${judgeLink(r.name, '', 'font-weight:600;')}</td>
+      <td>${typeBadge(r)}</td>
+      <td>${r.src === 'eval'
+        ? `<span style="font-weight:600;cursor:help;" title="評鑑決議書公開版遮罩姓名，無法連結個人檔案">${escHtml(r.name)}</span>`
+        : judgeLink(r.name, '', 'font-weight:600;')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.org || '-')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.role || '-')}</td>
-      <td style="white-space:nowrap;">${activeCell(r)}</td>
-      <td style="font-size:0.82rem;color:${r.src === 'disc' ? 'var(--red)' : 'var(--orange)'};font-weight:600;">${escHtml(r.result || '-')}</td>
+      <td style="white-space:nowrap;">${r.src === 'eval'
+        ? '<span style="color:var(--text-muted);cursor:help;" title="姓名遮罩，無法比對現任名冊">？</span>'
+        : activeCell(r)}</td>
+      <td style="font-size:0.82rem;color:${resultColor(r)};font-weight:600;${r.src === 'eval' && r.summary ? 'cursor:help;' : ''}"${r.src === 'eval' && r.summary ? ` title="主文：${escHtml(r.summary)}"` : ''}>${escHtml(r.result || '-')}</td>
       <td style="font-size:0.8rem;">${r.url
         ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;">${escHtml(r.case_no)}</a>`
         : escHtml(r.case_no)}</td>
@@ -8437,6 +8514,7 @@ const STATIC_PAGE_SOURCES = {
   'lawyer/overview': ['公開資訊觀測站 獨董簡歷（手動・建議每年1月）', 'TIPO 代理名簿（手動・建議每年1月）'],
   'lawyer/alumni': ['喆律校友 MOJ 刷新（每週一凌晨自動）'],
   'lawyer/law010': ['010 總表每日同步（lawyer-dashboard 管線）'],
+  'judge/judge-discipline': ['FJUD 職務法庭裁判（手動・月增量極低）', '監察院彈劾案文 CyBsBox（手動）', '司法院法官評鑑決議書（手動・judge_evaluations.py）'],
   'clerk/clerk-overview': ['司法院年報 ODS（手動・建議每年6月）', '考選部四等特考（手動・建議每年11月放榜後）'],
   'jstat/jstat-overview': ['官方統計年度序列 judicial_stats.json（手動・建議每年2月）'],
   'industry/supply': ['考選部司律考試序列（手動・建議每年11月放榜後）'],
