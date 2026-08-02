@@ -503,6 +503,10 @@ def parse(yyyymm):
     ljagg = defaultdict(lambda: {'n': 0, 'cats': defaultdict(int)})  # (律師,法官,法院)
     coagg = defaultdict(int)   # (律師A,律師B,法院) 協同（canonical A<B）
     opagg = defaultdict(int)   # (律師A,律師B,法院) 對造（canonical A<B）
+    # 細分專庭字別（mig 131）：法官人次與案件數兩口徑；backfill 端在 jcasefill.py，
+    # 這裡是月更常態輸出（兩邊聚合邏輯需一致）
+    jcagg = defaultdict(int)   # (法官,法院,字別) 人次 → judge_month_jcase
+    ccagg = defaultdict(int)   # (法院,字別) 案件數（含未抽到法官）→ court_month_jcase
     n_files = 0
     n_no_judge = 0
     t0 = time.time()
@@ -522,8 +526,11 @@ def parse(yyyymm):
             head = jfull[:60]
             mc = RE_COURT.search(head.strip())
             court = normalize_court(mc.group(1)) if mc else '未知法院'
-            cat = classify(head, doc.get('JCASE') or '')
+            jcase = (doc.get('JCASE') or '').strip()
+            cat = classify(head, jcase)
             dt = doctype_of(head)
+            if jcase:
+                ccagg[(court, jcase)] += 1
             ck = f'{cat}|{norm_cause(doc.get("JTITLE") or "")}'
             cause_keys.add(ck)
             lawyers = extract_lawyers(jfull)
@@ -590,6 +597,8 @@ def parse(yyyymm):
                 if days is not None:
                     a['sum_days'] += days
                     a['n_days'] += 1
+                if jcase:
+                    jcagg[(name, court, jcase)] += 1
             if n_files % 50000 == 0:
                 print(f'  ...{n_files} 檔，{(time.time()-t0)/60:.1f} 分', flush=True)
 
@@ -610,9 +619,14 @@ def parse(yyyymm):
                'yyyymm': yyyymm, 'case_count': v} for k, v in coagg.items()]
     oprows = [{'lawyer_a': k[0], 'lawyer_b': k[1], 'court_name': k[2],
                'yyyymm': yyyymm, 'case_count': v} for k, v in opagg.items()]
+    jcrows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm, 'jcase': k[2], 'n': v}
+              for k, v in jcagg.items()]
+    ccrows = [{'court_name': k[0], 'yyyymm': yyyymm, 'jcase': k[1], 'n': v}
+              for k, v in ccagg.items()]
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump({'judges': rows, 'lawyers': lrows, 'prosecutors': prows,
                    'lawyer_judge': ljrows, 'cocounsel': corows, 'opposing': oprows,
+                   'judge_jcase': jcrows, 'court_jcase': ccrows,
                    'cause_keys': sorted(cause_keys)},
                   f, ensure_ascii=False)
     print(f'  解析完成：{n_files} 份裁判書，{len(rows)} 個 (法官,法院) 組合，'
@@ -698,6 +712,11 @@ def upload(yyyymm, tables=None):
         _upload_rows('lawyer_month_stats', yyyymm, data['lawyers'])
     if data.get('prosecutors') and want('prosecutor_month_stats'):
         _upload_rows('prosecutor_month_stats', yyyymm, data['prosecutors'])
+    # 細分專庭字別（mig 131；舊 agg.json 無此二 key 時略過，該月由 jcasefill.py 覆蓋）
+    if data.get('judge_jcase') and want('judge_month_jcase'):
+        _upload_rows('judge_month_jcase', yyyymm, data['judge_jcase'])
+    if data.get('court_jcase') and want('court_month_jcase'):
+        _upload_rows('court_month_jcase', yyyymm, data['court_jcase'])
     # Phase 2 配對表（舊 agg.json 無此三 key 時略過）
     if data.get('lawyer_judge') and want('lawyer_judge_pairs'):
         _upload_rows('lawyer_judge_pairs', yyyymm, data['lawyer_judge'])

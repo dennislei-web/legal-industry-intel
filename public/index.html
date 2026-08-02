@@ -10034,6 +10034,22 @@ const FAM_CATS = {
     rosterQ: { court: '智慧財產*' },
     caveat: '※ 智商法院＝該院全部法官與全部公開裁判（含 110 年 7 月改制前的智慧財產法院）。',
   },
+  // ==== 細分專庭（字別模式；mig 131/132，jcase_category_map 驅動）====
+  labor: {
+    noun: '勞動', subcat: '勞動', shareDef: '0', rosterLabel: '勞動庭',
+    rosterQ: { divOr: ['*勞動*'] }, daysSub: '勞動專責估算',
+    caveat: '※ 勞動＝勞動事件法（109 年施行）字別案件（勞訴/勞簡/勞執/勞補等，排除職安刑事勞安字）；僅少數法院設專責勞動庭，多數由民庭兼辦。',
+  },
+  debt: {
+    noun: '消債', subcat: '消債', shareDef: '0', rosterLabel: '消債庭', rosterQ: null,
+    daysSub: '消債專責估算',
+    caveat: '※ 消債＝消費者債務清理條例事件（消債更/消債清/消債職聲免等），幾乎全為裁定；法院名冊無獨立消債庭別，現任庭別不適用。',
+  },
+  natjury: {
+    noun: '國民法官', subcat: '國民法官', shareDef: '0', rosterLabel: '國民法官庭', rosterQ: null,
+    daysSub: '國審專責估算', kpiJudgesSub: '112 年制度上路起',
+    caveat: '※ 國民法官＝國審字案件（112 年上路）；名單為合議庭職業法官人次（一案計三位），年度量圖為案件數口徑；結案天數樣本少、僅供參考。',
+  },
 };
 let _famLoaded = false;
 let famCat = 'family';        // 目前類別 key
@@ -10065,10 +10081,10 @@ function switchFamCat(key, force) {
   const el = id => document.getElementById(id);
   const noun = cfg.noun;
   el('famKpiLabelRecent').textContent = `${noun}裁判數`;
-  el('famKpiLabelJudges').textContent = cfg.cat ? `${noun}專責法官` : `${noun}法官`;
-  el('famKpiJudgesSub').textContent = cfg.cat ? `${noun}佔比 ≥ 50%` : '2020 年起有公開裁判';
+  el('famKpiLabelJudges').textContent = cfg.cat ? `${noun}專責法官` : (cfg.subcat ? `${noun}承辦法官` : `${noun}法官`);
+  el('famKpiJudgesSub').textContent = cfg.kpiJudgesSub || (cfg.cat ? `${noun}佔比 ≥ 50%` : (cfg.subcat ? '2020 起有承辦（≥3 件）' : '2020 年起有公開裁判'));
   el('famKpiLabelRoster').textContent = `現任${cfg.rosterLabel}法官`;
-  el('famKpiDaysSub').textContent = cfg.cat ? `${noun}專責估算` : '該院全案件';
+  el('famKpiDaysSub').textContent = cfg.daysSub || (cfg.cat ? `${noun}專責估算` : '該院全案件');
   el('famTitleYearly').innerHTML = `&#128202; 年度${noun}裁判量`;
   el('famTitleDays').innerHTML = `&#9202;&#65039; ${noun}平均結案天數（年度）`;
   el('famTitleCourts').innerHTML = `&#127963;&#65039; 各法院${noun}裁判量 TOP 10`;
@@ -10078,12 +10094,15 @@ function switchFamCat(key, force) {
   el('famThShare').textContent = `${noun}佔比`;
   el('famThRoster').textContent = `現任${cfg.rosterLabel}`;
   el('famCaveat').textContent = cfg.caveat;
-  el('famShareFilter').innerHTML = (cfg.cat ? [
+  const shareOpts = (cfg.cat || cfg.subcat) ? [
     ['0.8', `${noun}佔比 ≥ 80%`], ['0.5', `${noun}佔比 ≥ 50%`], ['0.3', `${noun}佔比 ≥ 30%`],
-    ['roster', `現任${cfg.rosterLabel}法官`], ['0', `全部（含少量${noun}）`],
+    ...(cfg.rosterQ ? [['roster', `現任${cfg.rosterLabel}法官`]] : []),
+    ['0', `全部（含少量${noun}）`],
   ] : [
     ['0', '全部'], ['roster', `現任${cfg.rosterLabel}法官`],
-  ]).map(([v, t]) => `<option value="${v}"${v === cfg.shareDef ? ' selected' : ''}>${t}</option>`).join('');
+  ];
+  el('famShareFilter').innerHTML = shareOpts
+    .map(([v, t]) => `<option value="${v}"${v === cfg.shareDef ? ' selected' : ''}>${t}</option>`).join('');
   const search = el('famSearch');
   if (search) search.value = '';
   famSortCol = 'cat_cases';
@@ -10103,21 +10122,32 @@ async function loadFamCat(key) {
     if (!_famCache[key]) {
       document.getElementById('famTableBody').innerHTML = '<tr><td colspan="9" class="loading">載入中</td></tr>';
       document.getElementById('famTopJudges').innerHTML = '<div class="loading">載入中</div>';
-      const args = cfg.cat ? { p_cat: cfg.cat } : { p_court_like: cfg.courtLike };
-      let rosterQ = db.from('judges_combined').select('name, court_name, division');
-      rosterQ = cfg.rosterQ.court
-        ? rosterQ.ilike('court_name', cfg.rosterQ.court)
-        : rosterQ.or(cfg.rosterQ.divOr.map(p => `division.ilike.${p}`).join(','));
+      const isSub = !!cfg.subcat;   // 字別模式（mig 131/132）
+      const args = isSub ? { p_category: cfg.subcat }
+                 : cfg.cat ? { p_cat: cfg.cat } : { p_court_like: cfg.courtLike };
+      let rosterQ;
+      if (!cfg.rosterQ) {
+        rosterQ = Promise.resolve({ data: [] });   // 無獨立庭名（消債/國審）
+      } else {
+        rosterQ = db.from('judges_combined').select('name, court_name, division');
+        rosterQ = cfg.rosterQ.court
+          ? rosterQ.ilike('court_name', cfg.rosterQ.court)
+          : rosterQ.or(cfg.rosterQ.divOr.map(p => `division.ilike.${p}`).join(','));
+      }
       const [yearlyR, catRows, rosterR, periodR] = await Promise.all([
-        db.rpc('cat_cases_by_year', { ...args, p_ok_min: cfg.okMin }),
-        fetchAllRpc('cat_judge_stats', args),   // 刑事 ~3,100 列、民事 ~1,800 列，分批抓
+        isSub ? db.rpc('subcat_cases_by_year', args)
+              : db.rpc('cat_cases_by_year', { ...args, p_ok_min: cfg.okMin }),
+        fetchAllRpc(isSub ? 'subcat_judge_stats' : 'cat_judge_stats', args),   // 刑事 ~3,100 列，分批抓
         rosterQ,
-        db.rpc('cat_same_period_stats', args),  // 未滿年同期比（mig 128）
+        db.rpc(isSub ? 'subcat_same_period_stats' : 'cat_same_period_stats', args),  // 未滿年同期比
       ]);
       let rosterRows = rosterR.data || [];
-      if (cfg.rosterQ.divExclude) rosterRows = rosterRows.filter(j => !cfg.rosterQ.divExclude.test(j.division || ''));
+      if (cfg.rosterQ?.divExclude) rosterRows = rosterRows.filter(j => !cfg.rosterQ.divExclude.test(j.division || ''));
+      // 字別模式：結案天數樣本（days_n=專責法官月案量）不足 100 的年度不畫、不進 KPI
+      const yearlyRows = (yearlyR.data || []).map(y =>
+        (isSub && y.days_n != null && Number(y.days_n) < 100) ? { ...y, cat_avg_days: null } : y);
       _famCache[key] = {
-        yearly: yearlyR.data || [],
+        yearly: yearlyRows,
         // 畫面層防禦（mig 119/126 已在 RPC 端排除）：未知法院殘渣列與 1-2 件雜訊不進表
         rows: catRows.filter(r => r.court_name !== '未知法院' && Number(r.cat_cases) >= 3),
         roster: new Set(rosterRows.map(j => j.name + '|' + j.court_name)),
@@ -10130,12 +10160,14 @@ async function loadFamCat(key) {
     _famRoster = roster;
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
-    // 回填提示（有任何年度 ok_months < months 就顯示，補完自動消失；okMin=0 的類別恆隱藏）
-    const pending = yearly.filter(y => y.ok_months < y.months);
+    // 回填提示（補完自動消失）：案類模式看 ok_months；字別模式看非當年年度是否缺月
+    const pending = cfg.subcat
+      ? yearly.slice(0, -1).filter(y => Number(y.months) < 12)
+      : yearly.filter(y => y.ok_months < y.months);
     const note = document.getElementById('famBackfillNote');
     if (pending.length) {
       note.style.display = '';
-      note.textContent = `⏳ ${cfg.noun}分類回填中：` + pending.map(y => `${y.year}（${y.ok_months}/${y.months} 月）`).join('、') + ' — 完成前歷史數字會偏低。';
+      note.textContent = `⏳ ${cfg.noun}${cfg.subcat ? '字別' : '分類'}回填中：` + pending.map(y => `${y.year}（${cfg.subcat ? y.months : y.ok_months}/${cfg.subcat ? 12 : y.months} 月）`).join('、') + ' — 完成前歷史數字會偏低。';
     } else {
       note.style.display = 'none';
     }
@@ -10171,11 +10203,15 @@ async function loadFamCat(key) {
       const days = okYears.filter(y => y.cat_avg_days != null).slice(-1)[0];
       if (days) {
         el('famKpiDays').textContent = Number(days.cat_avg_days);
-        el('famKpiDaysSub').textContent = `${days.year} 年・${cfg.cat ? cfg.noun + '專責估算' : '該院全案件'}`;
+        el('famKpiDaysSub').textContent = `${days.year} 年・${cfg.daysSub || (cfg.cat ? cfg.noun + '專責估算' : '該院全案件')}`;
+      } else {
+        // 切換類別時重設，避免殘留上一類別數字（如天數樣本不足的類別）
+        el('famKpiDays').textContent = '-';
+        el('famKpiDaysSub').textContent = '專責樣本不足';
       }
     }
     el('famKpiJudges').textContent = cfg.cat ? _famRows.filter(r => r.cat_share >= 0.5).length : _famRows.length;
-    el('famKpiRoster').textContent = _famRoster.size;
+    el('famKpiRoster').textContent = cfg.rosterQ ? _famRoster.size : '—';
 
     // 年度裁判量（bar，回填中年度標註）
     if (chartInstances.famYearly) chartInstances.famYearly.destroy();
