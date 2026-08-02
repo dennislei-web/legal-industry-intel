@@ -2604,6 +2604,48 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: JUDGE-DISCIPLINE (懲戒彈劾) ==================== -->
+    <div id="tab-judge-discipline" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
+          彙整<strong>懲戒法院職務法庭／司法院職務法庭／改制前公務員懲戒委員會</strong>之懲戒裁判，與<strong>監察院彈劾案</strong>（彈劾成立後移送職務法庭，兩者常前後對應）。
+          含已離開現任名冊的歷史法官——<b>點姓名開啟個人檔案</b>（自動錨定其署名最多的法院）。
+          姓名為裁判/案文具名之公開資訊；同名可能誤併，請以任職機關核對。
+          涵蓋：職務法庭 101 年起全量；公懲會約 2006 年起（受裁判書系統收錄範圍限制）；檢察官之公懲會時代紀錄因查詢上限尚非全量。
+        </div>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">懲戒裁判</div><div class="kpi-value" id="kpiJdisRows" style="color:var(--red);">-</div><div class="kpi-sub" id="kpiJdisRowsSub">列 / 人</div></div>
+        <div class="kpi-card"><div class="kpi-label">監察院彈劾</div><div class="kpi-value" id="kpiJdisImp" style="color:var(--orange);">-</div><div class="kpi-sub" id="kpiJdisImpSub">列 / 人</div></div>
+        <div class="kpi-card"><div class="kpi-label">免職／撤職</div><div class="kpi-value" id="kpiJdisSevere">-</div><div class="kpi-sub">免除職務＋撤職（人）</div></div>
+        <div class="kpi-card"><div class="kpi-label">最新紀錄</div><div class="kpi-value" id="kpiJdisLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">裁判/審議日期</div></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="jdisSearch" placeholder="搜尋姓名、機關、案號、結果..." oninput="renderJudgeDiscipline()">
+        <select id="jdisRole" onchange="renderJudgeDiscipline()">
+          <option value="法官">法官</option>
+          <option value="檢察官">檢察官</option>
+          <option value="">全部</option>
+        </select>
+        <select id="jdisKind" onchange="renderJudgeDiscipline()">
+          <option value="">懲戒＋彈劾</option>
+          <option value="disc">僅懲戒裁判</option>
+          <option value="imp">僅彈劾</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th style="width:92px;">日期</th><th style="width:64px;">類型</th><th>姓名</th><th>機關（案發時）</th><th style="width:56px;">身分</th><th>結果／進度</th><th>案號（連原文）</th></tr>
+            </thead>
+            <tbody id="jdisTableBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;" id="jdisTableNote"></div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: JUDGES (法官) ==================== -->
     <div id="tab-judges" class="tab-content">
       <div class="kpi-grid" id="judgeKpis" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
@@ -3921,6 +3963,7 @@ const SECTIONS = {
     { tab: 'courts', label: '法院' },
     { tab: 'family', label: '家事法官' },
     { tab: 'judge-changes', label: '異動追蹤' },
+    { tab: 'judge-discipline', label: '懲戒彈劾' },
   ],
   prosecutor: [
     { tab: 'prosecutor-overview', label: '總覽' },
@@ -4029,6 +4072,7 @@ function showTab(tab) {
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'judge-changes') loadJudgeChanges();
+  if (tab === 'judge-discipline') loadJudgeDiscipline();
   if (tab === 'prosecutors') loadProsecutors();
   if (tab === 'sources') loadSources();
   if (tab === 'admin' && isAdmin) loadAdminUsers();
@@ -7743,8 +7787,24 @@ async function showJudgeDetail(name, court) {
   bodyEl.scrollTop = 0;
   if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
 
-  // 並行撈：名冊+整合統計、同名跨院官方統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒紀錄
-  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [];
+  // 錨定法院：未指定或（名冊×官方統計）皆查無指定法院時，退回署名最多的法院
+  // （懲戒彈劾子頁等歷史法官入口以空 court 呼叫）
+  let statRows = [];
+  {
+    const { data: sr } = await db.from('judge_judgment_stats').select('*').eq('name', name);
+    statRows = sr || [];
+    if (!court || (statRows.length && !statRows.some(s => s.court_name === court))) {
+      const { data: jcChk } = court
+        ? await db.from('judges_combined').select('name').eq('name', name).eq('court_name', court).limit(1)
+        : { data: null };
+      if (!jcChk?.length && statRows.length) {
+        court = statRows.slice().sort((a, b) => (b.case_count_total || 0) - (a.case_count_total || 0))[0].court_name;
+      }
+    }
+  }
+
+  // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
+  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [];
   const monthRows = [];
   await Promise.all([
     db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
@@ -7755,8 +7815,6 @@ async function showJudgeDetail(name, court) {
     db.from('judge_impeachments').select('*').eq('name', name)
       .order('decided_date', { ascending: false })
       .then(r => { impeachments = r.data || []; }),
-    db.from('judge_judgment_stats').select('*').eq('name', name)
-      .then(r => { statRows = r.data || []; }),
     db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
       .then(r => { pairs = r.data; }),
     db.rpc('judge_cause_summary', { p_name: name, p_court: court })
@@ -7777,7 +7835,7 @@ async function showJudgeDetail(name, court) {
   ]);
 
   const stat = statRows.find(s => s.court_name === court) || null;
-  if (!jc && !stat) {
+  if (!jc && !stat && !disciplines.length && !impeachments.length) {
     bodyEl.innerHTML = '<div style="color:var(--red);padding:20px;">查無此法官資料</div>';
     return;
   }
@@ -7858,7 +7916,7 @@ async function showJudgeDetail(name, court) {
       </table>
     </div>
 
-    ${renderJudgeDisciplineCard(judgeDisc, judgeImp)}
+    ${renderJudgeDisciplineCard(disciplines, impeachments)}
 
     ${stat || thisCourtRows.length ? `
     <div class="card" style="margin-bottom:16px;">
@@ -7953,6 +8011,73 @@ function renderJudgeDisciplineCard(rows, impRows) {
       ${sec('懲戒裁判', '懲戒法院職務法庭／司法院職務法庭／改制前公務員懲戒委員會', items)}
       ${sec('監察院彈劾', '彈劾成立後移送職務法庭，兩者常前後對應', impItems)}
     </div>`;
+}
+
+// ============================================================
+// 懲戒彈劾子頁（judge_disciplines ＋ judge_impeachments 全量列表；含歷史法官入口）
+// ============================================================
+let _jdisRows = null;
+async function loadJudgeDiscipline(force) {
+  if (_jdisRows && !force) { renderJudgeDiscipline(); return; }
+  const [d1, d2] = await Promise.all([
+    db.from('judge_disciplines')
+      .select('case_no,kind,decided_date,name,role,org,sanction,source_url')
+      .order('decided_date', { ascending: false }).limit(1000),
+    db.from('judge_impeachments')
+      .select('case_no,decided_date,name,role,org,title,progress,doc_url')
+      .order('decided_date', { ascending: false }).limit(1000),
+  ]);
+  _jdisRows = [
+    ...(d1.data || []).map(r => ({ ...r, src: 'disc', result: r.sanction, url: r.source_url })),
+    ...(d2.data || []).map(r => ({ ...r, src: 'imp', result: r.progress ? `彈劾成立（${r.progress}）` : '彈劾成立', url: r.doc_url })),
+  ].sort((a, b) => (b.decided_date || '').localeCompare(a.decided_date || ''));
+
+  // KPI
+  const disc = _jdisRows.filter(r => r.src === 'disc'), imp = _jdisRows.filter(r => r.src === 'imp');
+  const set = rs => new Set(rs.map(r => r.name)).size;
+  const el = id => document.getElementById(id);
+  el('kpiJdisRows').textContent = disc.length.toLocaleString();
+  el('kpiJdisRowsSub').textContent = `${disc.length} 列 / ${set(disc)} 人`;
+  el('kpiJdisImp').textContent = imp.length.toLocaleString();
+  el('kpiJdisImpSub').textContent = `${imp.length} 列 / ${set(imp)} 人`;
+  el('kpiJdisSevere').textContent = new Set(
+    disc.filter(r => /免除|撤職/.test(r.result || '')).map(r => r.name)).size;
+  el('kpiJdisLast').textContent = _jdisRows[0]?.decided_date || '-';
+
+  renderJudgeDiscipline();
+}
+
+function renderJudgeDiscipline() {
+  if (!_jdisRows) return;
+  const kw = (document.getElementById('jdisSearch').value || '').trim();
+  const role = document.getElementById('jdisRole').value;
+  const kind = document.getElementById('jdisKind').value;
+  let rows = _jdisRows;
+  if (role) rows = rows.filter(r => (r.role || '法官') === role); // role 未解析者多為法官案，歸法官
+  if (kind) rows = rows.filter(r => r.src === kind);
+  if (kw) rows = rows.filter(r =>
+    [r.name, r.org, r.case_no, r.result].some(v => (v || '').includes(kw)));
+  const shown = rows.slice(0, 400);
+  const tbody = document.getElementById('jdisTableBody');
+  if (!shown.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">無符合條件的紀錄</td></tr>';
+  } else {
+    tbody.innerHTML = shown.map(r => `<tr>
+      <td style="white-space:nowrap;font-size:0.85rem;">${r.decided_date || '-'}</td>
+      <td>${r.src === 'disc'
+        ? '<span class="badge badge-red">懲戒</span>'
+        : '<span class="badge badge-orange">彈劾</span>'}</td>
+      <td>${judgeLink(r.name, '', 'font-weight:600;')}</td>
+      <td style="font-size:0.82rem;">${escHtml(r.org || '-')}</td>
+      <td style="font-size:0.82rem;">${escHtml(r.role || '-')}</td>
+      <td style="font-size:0.82rem;color:${r.src === 'disc' ? 'var(--red)' : 'var(--orange)'};font-weight:600;">${escHtml(r.result || '-')}</td>
+      <td style="font-size:0.8rem;">${r.url
+        ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;">${escHtml(r.case_no)}</a>`
+        : escHtml(r.case_no)}</td>
+    </tr>`).join('');
+  }
+  document.getElementById('jdisTableNote').textContent =
+    `符合條件 ${rows.length} 列` + (rows.length > 400 ? '（僅顯示前 400 列，可用搜尋縮小範圍）' : '');
 }
 
 // 常對到的律師（judge_pair_summary）＋ 合議庭共署圈（judge_copanel_circle），並排一張卡
@@ -13070,7 +13195,11 @@ async function loadJudges() {
 
   const tbody = document.getElementById('judgeTableBody');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="msg">無資料</div></td></tr>';
+    // 現任名冊查無，但懲戒/彈劾名單有此姓名（已免職/退場的歷史法官）→ 給檔案入口
+    const hint = search && _judgeDiscSet?.has(search)
+      ? `<div style="margin-top:10px;font-size:0.85rem;color:var(--text);">現任名冊查無「${escHtml(search)}」，但<span style="color:var(--red);">懲戒／彈劾紀錄</span>有此姓名 → ${judgeLink(search, '', 'font-weight:600;')} 點姓名開啟歷史檔案，或至「懲戒彈劾」子頁瀏覽全部紀錄。</div>`
+      : '';
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-state"><div class="msg">無資料${hint}</div></td></tr>`;
     renderPagination('judgePagination', judgePage, judgeTotal, p => { judgePage = p; loadJudges(); });
     return;
   }
