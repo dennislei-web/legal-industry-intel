@@ -8000,7 +8000,8 @@ async function showJudgeDetail(name, court) {
 // --- 喆律 CRM 內部紀錄卡（mig 127）---
 // RLS 綁單一 uid：非擁有者兩張表都查回空 → 卡片完全不渲染，無感。
 // 評論與案件明細為所內機密，僅存在 crm_officer_reviews（admin-only 表），絕不進公開 view。
-const CRM_TYPE_LABEL = { Judge: '法官/司法事務官', Prosecutor: '檢察官' };
+const CRM_TYPE_LABEL = { Judge: '法官/司法事務官', Prosecutor: '檢察官', Mediator: '調解委員' };
+const fmtCrmDate = s => { if (!s) return ''; const d = new Date(s); return isNaN(d) ? s : d.toISOString().slice(0, 10); };
 function renderCrmInternalCard(rows, status, name, court) {
   if ((!rows || !rows.length) && !status) return ''; // 非擁有者（或表未建）
   const fmtT = t => t ? new Date(t).toLocaleString('zh-TW', { hour12: false }).slice(0, 16) : '-';
@@ -8012,12 +8013,12 @@ function renderCrmInternalCard(rows, status, name, court) {
       return `<span class="badge" style="background:${hit ? 'color-mix(in srgb, var(--gold) 22%, transparent)' : 'color-mix(in srgb, var(--text-muted) 14%, transparent)'};color:${hit ? 'var(--gold)' : 'var(--text-muted)'};" title="${hit ? 'CRM 記載機關與本頁法院相符' : 'CRM 記載機關（與本頁法院不同時請留意同名不同人）'}">${escHtml(a.agency || '-')}${a.division ? '·' + escHtml(a.division) + '股' : ''}${a.note ? '·' + escHtml(a.note) : ''}</span>`;
     }).join(' ');
     const caseRows = (r.cases || []).slice(0, 15).map(c => `
-      <tr><td style="padding:4px 8px;white-space:nowrap;">${escHtml(c.case_no || '-')}</td>
+      <tr><td style="padding:4px 8px;white-space:nowrap;">${c.crm_case_id ? `<a href="https://crm.lawyer/dashboard/cases/${c.crm_case_id}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;" title="開啟 CRM 案件頁">${escHtml(c.case_no || '-')}</a>` : escHtml(c.case_no || '-')}</td>
       <td style="padding:4px 8px;white-space:nowrap;">${escHtml(c.branch || '-')}</td>
       <td style="padding:4px 8px;">${escHtml(c.cause || '-')}</td></tr>`).join('');
     const comments = (r.comments || []).map(cm => `
       <div style="padding:8px 10px;margin-top:6px;background:color-mix(in srgb, var(--gold) 7%, transparent);border-left:3px solid var(--gold);border-radius:4px;font-size:0.84rem;">
-        <div style="color:var(--text-muted);font-size:0.72rem;margin-bottom:3px;">${escHtml(cm.agency || '-')}${cm.division ? '｜' + escHtml(cm.division) + '股' : ''}${cm.created_at ? '｜' + escHtml(cm.created_at) + ' 建立' : ''}</div>
+        <div style="color:var(--text-muted);font-size:0.72rem;margin-bottom:3px;">${escHtml(cm.agency || '-')}${cm.division ? '｜' + escHtml(cm.division) + '股' : ''}${cm.created_at ? '｜' + escHtml(fmtCrmDate(cm.created_at)) + ' 建立' : ''}</div>
         <div style="white-space:pre-wrap;">${escHtml(cm.comment || '')}</div>
       </div>`).join('');
     return `
