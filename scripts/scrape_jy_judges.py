@@ -81,13 +81,33 @@ NAME_BLACKLIST = [
     '院長', '法官', '候補', '試署', '充任', '主任', '秘書', '促轉', '醫療', '勞動',
     '民事', '刑事', '家事', '少年', '選舉', '原住民', '金融', '海商', '國安', '軍事',
     '性侵', '一般', '智慧', '財產', '公職', '交通', '毒品', '公司', '保險', '證券',
+    # mig 122 清洗後補（結構詞，真名不含這些子字串）
+    '代理', '次序', '戳記', '親送', '路線', '證書', '演講', '交接',
 ]
+
+# 完整比對黑名單：這些詞是雜訊，但可能是真名的子字串（如「許可欣」含「許可」），
+# 只在整格＝該詞時排除（mig 122 清洗來源）
+NAME_EXACT_BAD = {
+    '許可', '潮州', '核定', '登錄', '編號', '組別', '順序', '號數', '法院',
+    '依下列', '依前點', '參與審', '平常日', '楠梓站', '專題演', '銘洋訪',
+    '卸新任', '無戳記', '臺北地院', '最高法院',
+}
 RANK_WORDS = ['院長', '法官兼庭長', '法官兼審判長', '庭長', '審判長', '充任審判長',
               '候補法官', '試署法官', '法官']
 
 import re as _re
 _WS = _re.compile(r'[\s　\xa0]')
 _CJK_NAME = _re.compile(r'^[一-鿿]{2,4}$')
+
+# 整張表跳過的關鍵詞：職務「代理次序」表的內容是股別代字（仁/公/安/瑾…），
+# 逐格看全像 2-4 字姓名，黑名單擋不住（新竹曾整批寫入「仁公安瑾」等假名）
+TABLE_SKIP_WORDS = ('代理次序', '代理順序', '職務代理')
+
+
+def _skip_table(rows):
+    """表內任一格含代理次序類關鍵詞 → 整張表不是名冊，跳過"""
+    joined = ''.join(''.join(str(c) for c in r if c) for r in rows)
+    return any(w in joined for w in TABLE_SKIP_WORDS)
 
 
 def _clean_name(cell):
@@ -97,8 +117,13 @@ def _clean_name(cell):
     s = _WS.sub('', cell)
     if not _CJK_NAME.match(s):
         return None
-    # 庭別/單位詞（以庭、處、室、股、科結尾）不是姓名
-    if s[-1] in '庭處室股科組':
+    # 庭別/單位/場站詞（以庭、處、室、股、科、站結尾）不是姓名
+    if s[-1] in '庭處室股科組站':
+        return None
+    # 股別＋序數（碩二/軒三）不是姓名
+    if len(s) == 2 and s[1] in '一二三四五六七八九十':
+        return None
+    if s in NAME_EXACT_BAD:
         return None
     if any(bad in cell or bad in s for bad in NAME_BLACKLIST):
         return None
@@ -442,6 +467,8 @@ def parse_judge_pdf(pdf_path, court_name):
             log(f'  PDF 共 {len(pdf.pages)} 頁')
             for page in pdf.pages:
                 for table in page.extract_tables():
+                    if _skip_table(table):
+                        continue
                     for row in table:
                         if row and not all(c is None or str(c).strip() == '' for c in row):
                             all_rows.append([str(c) if c is not None else '' for c in row])
@@ -542,15 +569,28 @@ def extract_judges_on_page(page, court_name, division):
         })
 
     # 格式 2: HTML 表格（庭別/股別/姓名/類別 等，無固定職稱欄）→ 通用列解析
+    # 按表分組回傳：職務代理次序表要整張跳過（內容是股別代字，逐列看全像姓名）
     if not results:
-        rows = page.evaluate('''() => {
+        tables = page.evaluate('''() => {
             const out = [];
-            document.querySelectorAll('table tr').forEach(tr => {
-                const cells = Array.from(tr.querySelectorAll('td,th')).map(c => c.textContent);
-                if (cells.length >= 2) out.push(cells);
+            document.querySelectorAll('table').forEach(tb => {
+                const rows = [];
+                tb.querySelectorAll('tr').forEach(tr => {
+                    if (tr.closest('table') !== tb) return;  // 巢狀表的列歸內層表
+                    const cells = Array.from(tr.querySelectorAll('td,th'))
+                        .filter(c => c.closest('table') === tb)
+                        .map(c => c.textContent);
+                    if (cells.length >= 2) rows.push(cells);
+                });
+                if (rows.length) out.push(rows);
             });
             return out;
         }''')
+        rows = []
+        for tb in tables:
+            if _skip_table(tb):
+                continue
+            rows.extend(tb)
         results = parse_roster_rows(rows, court_name, default_division=division)
 
     return results
