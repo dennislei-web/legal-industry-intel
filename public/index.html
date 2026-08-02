@@ -6792,6 +6792,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeFirmM
 // 律師詳細 Modal
 // ============================================================
 async function showLawyerDetail(name, certNumber) {
+  closeJudgeModal(); // 從法官 modal 點律師名跳過來時先關舊層
   const modal = document.getElementById('lawyerModal');
   const titleEl = document.getElementById('lawyerModalTitle');
   const bodyEl = document.getElementById('lawyerModalBody');
@@ -7376,7 +7377,7 @@ function renderPairCard(pairs) {
       <div class="card-title">&#9876; 對到的法官與律師 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 5 年公開裁判書，姓名比對（同名合併），案量為下限</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;">
         ${col('常對到的法官', '出現在其承辦案的合議庭/獨任法官',
-          list(judges, j => `${escHtml(j.judge)} <span style="color:var(--text-muted);font-size:0.75rem;">${escHtml(shortCourt(j.court))}</span>`,
+          list(judges, j => `${judgeLink(j.judge, j.court)} <span style="color:var(--text-muted);font-size:0.75rem;">${escHtml(shortCourt(j.court))}</span>`,
                'rgba(79,142,247,0.7)', '無資料'))}
         ${col('常協同律師', '同案同造（含同所同僚、共同代理）',
           list(co, c => lawyerNameLink(c.peer), 'rgba(76,175,130,0.7)', '無協同紀錄'))}
@@ -7602,11 +7603,26 @@ function closeLawyerModal() {
   });
 }
 
-// 律師檔案一鍵匯出 PDF：複製 modal 內容到列印視窗（Chart.js canvas 轉快照圖），由瀏覽器列印對話框另存 PDF
+// 檔案一鍵匯出 PDF：複製 modal 內容到列印視窗（Chart.js canvas 轉快照圖），由瀏覽器列印對話框另存 PDF
+// 律師 / 法官 modal 共用：chartKeys=要快照的 chartInstances key、docLabel=檔名與頁首標籤、foot=資料來源註腳
 function exportLawyerPdf() {
-  const bodyEl = document.getElementById('lawyerModalBody');
-  if (!bodyEl || bodyEl.querySelector('.loading')) { alert('律師資料載入中，請稍候再匯出'); return; }
-  const name = (document.getElementById('lawyerModalTitle')?.textContent || '律師').trim();
+  exportModalPdf({
+    bodyId: 'lawyerModalBody', titleId: 'lawyerModalTitle',
+    chartKeys: ['lwTrend', 'lwCats', 'lwCourts'], docLabel: '律師檔案',
+    foot: '資料來源：法務部律師查詢系統、全國律師聯合會名冊、司法院公開裁判書、政府電子採購網、公開資訊觀測站、Lawsnote。裁判書出庭統計為下限估計（家事裁定等多不公開）。',
+  });
+}
+function exportJudgePdf() {
+  exportModalPdf({
+    bodyId: 'judgeModalBody', titleId: 'judgeModalTitle',
+    chartKeys: ['jdTrend', 'jdCats'], docLabel: '法官檔案',
+    foot: '資料來源：司法院法官名冊、司法院裁判書開放資料、司法院人事審議委員會決議。裁判書統計為下限估計（家事裁定、少年事件等多不公開）；合議庭每位署名法官各計 1 件；平均結案天數為估算值（裁判日−案號年初）；法官無唯一識別碼，同名以「姓名×法院」區辨。',
+  });
+}
+function exportModalPdf({ bodyId, titleId, chartKeys, docLabel, foot }) {
+  const bodyEl = document.getElementById(bodyId);
+  if (!bodyEl || bodyEl.querySelector('.loading')) { alert('資料載入中，請稍候再匯出'); return; }
+  const name = (document.getElementById(titleId)?.textContent || docLabel).trim();
 
   const clone = bodyEl.cloneNode(true);
 
@@ -7616,7 +7632,7 @@ function exportLawyerPdf() {
   const savedDefaults = { color: Chart.defaults.color, borderColor: Chart.defaults.borderColor };
   Chart.defaults.color = INK; Chart.defaults.borderColor = PRINT_GRID;
   const touched = [];
-  ['lwTrend', 'lwCats', 'lwCourts'].forEach(k => {
+  chartKeys.forEach(k => {
     const ch = chartInstances[k];
     if (!ch || !ch.canvas) return;
     const saved = [];
@@ -7657,7 +7673,7 @@ function exportLawyerPdf() {
   if (!w) { alert('瀏覽器阻擋了彈出視窗，請允許彈出視窗後重試'); return; }
   const today = new Date().toISOString().slice(0, 10);
   w.document.write(`<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8">
-<title>${escHtml(name)}_律師檔案_${today}</title>
+<title>${escHtml(name)}_${docLabel}_${today}</title>
 <style>
   @page { size: A4; margin: 12mm 13mm; }
   :root {
@@ -7693,13 +7709,298 @@ function exportLawyerPdf() {
 </style></head><body>
 <div class="pdf-header">
   <h1>${escHtml(name)}</h1>
-  <div class="sub">法律產業情報｜律師檔案<br>產出日期 ${today}</div>
+  <div class="sub">法律產業情報｜${docLabel}<br>產出日期 ${today}</div>
 </div>
 ${clone.innerHTML}
-<div class="pdf-foot">資料來源：法務部律師查詢系統、全國律師聯合會名冊、司法院公開裁判書、政府電子採購網、公開資訊觀測站、Lawsnote。裁判書出庭統計為下限估計（家事裁定等多不公開）。</div>
+<div class="pdf-foot">${escHtml(foot)}</div>
 <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 400); };<\/script>
 </body></html>`);
   w.document.close();
+}
+
+// ============================================================
+// 法官詳細 Modal（法官版 showLawyerDetail；錨定「姓名×法院」，後端 mig 120）
+// 法官無律師證號式唯一鍵，同名跨院常見 → 配對/案由/合議庭一律鎖定本院，跨院軌跡標推定
+// ============================================================
+function closeJudgeModal() {
+  const m = document.getElementById('judgeModal');
+  if (m) m.style.display = 'none';
+  ['jdTrend', 'jdCats'].forEach(k => {
+    if (chartInstances[k]) { chartInstances[k].destroy(); delete chartInstances[k]; }
+  });
+}
+
+async function showJudgeDetail(name, court) {
+  closeLawyerModal(); // 從律師 modal 配對卡跳過來時先關舊層
+  const modal = document.getElementById('judgeModal');
+  const titleEl = document.getElementById('judgeModalTitle');
+  const bodyEl = document.getElementById('judgeModalBody');
+  modal.style.display = 'flex';
+  titleEl.textContent = name;
+  bodyEl.innerHTML = '<div class="loading">載入法官資料中...</div>';
+  bodyEl.scrollTop = 0;
+  if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
+
+  // 並行撈：名冊+整合統計、同名跨院官方統計、逐月署名、常對到律師、案由、合議庭圈、異動事件
+  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [];
+  const monthRows = [];
+  await Promise.all([
+    db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
+      .then(r => { jc = r.data?.[0] || null; }),
+    db.from('judge_judgment_stats').select('*').eq('name', name)
+      .then(r => { statRows = r.data || []; }),
+    db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
+      .then(r => { pairs = r.data; }),
+    db.rpc('judge_cause_summary', { p_name: name, p_court: court })
+      .then(r => { causes = r.data; }),
+    db.rpc('judge_copanel_circle', { p_name: name, p_court: court })
+      .then(r => { copanel = (r.data || []).slice(0, 12); }),
+    db.from('judge_changes').select('*').eq('name', name)
+      .then(r => { changes = r.data || []; }),
+    (async () => { // 逐月署名全院（PostgREST 1000 列上限 → range 逐頁）
+      for (let from = 0; ; from += 1000) {
+        const { data: mr } = await db.from('judge_month_stats')
+          .select('court_name,yyyymm,case_count,cats').eq('name', name)
+          .order('yyyymm').range(from, from + 999);
+        if (mr?.length) monthRows.push(...mr);
+        if (!mr || mr.length < 1000) break;
+      }
+    })(),
+  ]);
+
+  const stat = statRows.find(s => s.court_name === court) || null;
+  if (!jc && !stat) {
+    bodyEl.innerHTML = '<div style="color:var(--red);padding:20px;">查無此法官資料</div>';
+    return;
+  }
+
+  const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
+  const knownRows = monthRows.filter(r => r.court_name !== '未知法院');
+  const thisCourtRows = knownRows.filter(r => r.court_name === court);
+  const dataEnd = monthRows.length ? monthRows[monthRows.length - 1].yyyymm : null;
+  const cutoff5 = dataEnd ? jchgMonthMinus(dataEnd, 59) : null;
+
+  // 本院近 5 年掛名＋案類聚合（近 5 年優先，無近 5 年紀錄退回全期）
+  let c5 = 0;
+  const cats5 = {}, catsAll = {};
+  thisCourtRows.forEach(r => {
+    const in5 = cutoff5 && r.yyyymm >= cutoff5;
+    if (in5) c5 += r.case_count || 0;
+    Object.entries(r.cats || { '其他': r.case_count || 0 }).forEach(([k, v]) => {
+      catsAll[k] = (catsAll[k] || 0) + v;
+      if (in5) cats5[k] = (cats5[k] || 0) + v;
+    });
+  });
+  const catsObj = c5 ? cats5 : catsAll;
+  const lastYm = thisCourtRows.length ? thisCourtRows[thisCourtRows.length - 1].yyyymm : null;
+
+  // 生涯軌跡：逐院署名區間（同名串接，官方遷調邊佐證者較可靠）
+  const spans = {};
+  knownRows.forEach(r => {
+    const s = spans[r.court_name] || (spans[r.court_name] = { first: r.yyyymm, last: r.yyyymm, cases: 0 });
+    if (r.yyyymm < s.first) s.first = r.yyyymm;
+    if (r.yyyymm > s.last) s.last = r.yyyymm;
+    s.cases += r.case_count || 0;
+  });
+  const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
+  const multiCourt = spanRows.length > 1;
+
+  // 家事專責度（近 5 年本院署名的家事佔比）
+  const famN = cats5['家事'] || 0;
+  const famShare = c5 ? famN / c5 : 0;
+  const isFamDiv = (jc?.division || '').includes('家');
+
+  // 徽章列
+  const badges = [];
+  if (jc?.has_jy) badges.push('<span class="badge badge-blue" title="司法院現任法官名冊有此人">現任名冊</span>');
+  else badges.push('<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);" title="司法院現任名冊查無此人於本院（可能已調離、退休或轉任）">非現任名冊</span>');
+  if (isFamDiv) badges.push('<span class="badge badge-green">家事庭</span>');
+  if (jc?.rank && jc.rank !== '法官') badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">${escHtml(jc.rank)}</span>`);
+  if (stat) badges.push('<span class="badge" style="background:var(--green-dim);color:var(--green);">裁判書統計</span>');
+  if (jc?.has_lawsnote) badges.push('<span class="badge badge-orange">Lawsnote</span>');
+  if (statRows.length > 1) badges.push(`<span class="badge badge-orange" style="cursor:help;" title="此姓名亦出現於其他 ${statRows.length - 1} 個法院的裁判書統計，可能為轉調或同名不同人；本頁配對、案由、合議庭均已鎖定本院資料">同名/跨院 ×${statRows.length}</span>`);
+
+  const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:110px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
+
+  bodyEl.innerHTML = `
+    <div style="margin-bottom:16px;">${badges.join(' ')}</div>
+
+    <div class="card" style="margin-bottom:16px;padding:0;">
+      <table style="width:100%;font-size:0.9rem;">
+        <tbody>
+          ${row('法院', escHtml(court || '-'))}
+          ${row('庭別', escHtml(jc?.division || '-'))}
+          ${row('職稱', escHtml(jc?.rank || '-'))}
+          ${row('年資', jc?.seniority_years != null ? `${jc.seniority_years} 年 <span style="font-size:0.72rem;color:var(--text-muted);" title="司法院名冊年資；名冊無值時以最早署名裁判年推估（1996 年前任職者會被低估）">（名冊或首判推估）</span>` : '-')}
+          ${row('性別', escHtml(jc?.sex || '-'))}
+          ${jc?.status && jc.status !== '現任' ? row('狀態', `<span style="color:var(--orange);">${escHtml(jc.status)}</span>`) : ''}
+          ${row('首見裁判', fmtM(stat?.first_yyyymm))}
+          ${row('最近署名', fmtM(lastYm))}
+        </tbody>
+      </table>
+    </div>
+
+    ${stat || thisCourtRows.length ? `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9878; 官方裁判書署名統計 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">含判決與裁定；合議庭每位署名法官各計 1 件；家事裁定、少年事件等多不公開，為下限估計</span></div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">近 5 年掛名（本院）</div>
+          <div style="font-size:1.8rem;font-weight:700;color:var(--gold);">${c5.toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">歷年總計（本院）</div>
+          <div style="font-size:1.8rem;font-weight:700;">${(stat?.case_count_total || spans[court]?.cases || 0).toLocaleString()}</div>
+        </div>
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">平均結案天數</div>
+          <div style="font-size:1.8rem;font-weight:700;">${stat?.avg_processing_days != null ? Math.round(stat.avg_processing_days) : '-'}<span style="font-size:0.75rem;color:var(--text-muted);" title="估算值（裁判日−案號年 1/1），僅供法官間相對比較">＊</span></div>
+        </div>
+        ${famShare >= 0.2 || isFamDiv ? `
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">家事案佔比(近5年)</div>
+          <div style="font-size:1.8rem;font-weight:700;color:var(--blue);">${Math.round(famShare * 100)}%</div>
+        </div>` : ''}
+        <div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">最近署名</div>
+          <div style="font-size:0.95rem;font-weight:600;padding-top:10px;">${fmtM(lastYm)}</div>
+        </div>
+      </div>
+      <div class="grid-2" style="gap:16px;">
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">歷年案量趨勢（案型堆疊，本院）</div>
+          <canvas id="jdTrendChart" height="170"></canvas>
+        </div>
+        <div>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">案類組合${c5 ? '（近 5 年）' : '（全期）'}</div>
+          <canvas id="jdCatsChart" height="170"></canvas>
+        </div>
+      </div>
+    </div>
+    ` : `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9878; 官方裁判書署名統計</div>
+      <div style="color:var(--text-muted);font-size:0.85rem;">查無公開裁判書署名紀錄（家事裁定、少年事件等多數不公開，或名冊新進尚無裁判）</div>
+    </div>
+    `}
+
+    ${renderCauseCard(causes ? { cases_5yr: causes.total, by_group: causes.by_group, top_causes: causes.top_causes } : null, false)}
+
+    ${renderJudgePairsCard(pairs, copanel, court)}
+
+    ${renderJudgeCareerCard(name, spanRows, changes, court, multiCourt)}
+
+    ${jc?.lawsnote_url ? `
+    <div style="text-align:center;margin-top:12px;">
+      <a href="${escHtml(jc.lawsnote_url)}" target="_blank" class="btn btn-sm btn-blue" style="text-decoration:none;">前往 Lawsnote 頁面 →</a>
+    </div>
+    ` : ''}
+  `;
+
+  renderJudgeCharts(thisCourtRows, catsObj);
+}
+
+// 常對到的律師（judge_pair_summary）＋ 合議庭共署圈（judge_copanel_circle），並排一張卡
+function renderJudgePairsCard(pairs, copanel, court) {
+  const lawyers = pairs?.lawyers || [];
+  const peers = (copanel || []).map(c => ({ name: c.colleague, cases: Number(c.cases), first: c.first_ym, last: c.last_ym }));
+  if (!lawyers.length && !peers.length) return '';
+
+  const list = (items, labelFn, color, emptyMsg) => {
+    if (!items.length) return `<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">${emptyMsg}</div>`;
+    const max = items[0].cases || 1;
+    return items.map(it => {
+      const w = Math.max(4, Math.round(it.cases / max * 100));
+      return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.85rem;">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${labelFn(it)}</span>
+        <span style="width:72px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;flex-shrink:0;"><span style="display:block;height:100%;width:${w}%;background:${color};"></span></span>
+        <span style="width:34px;text-align:right;color:var(--text-muted);flex-shrink:0;">${it.cases}</span>
+      </div>`;
+    }).join('');
+  };
+
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#9876; 常對到的律師與合議庭 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">近 5 年公開裁判書（鎖定本院），姓名比對（同名合併），案量為下限</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;">
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:2px;">常對到的律師</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;">其承審案件中出現的訴訟代理人／辯護人</div>
+          ${list(lawyers, it => lawyerNameLink(it.lawyer), 'rgba(79,142,247,0.7)', '無資料（2021-06 起配對資料）')}
+        </div>
+        <div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:2px;">合議庭共署圈</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:6px;">同院合議庭共同署名的法官（2020 起）</div>
+          ${list(peers, it => judgeLink(it.name, court, '', `${escHtml(it.name)} <span style="color:var(--text-muted);font-size:0.72rem;">${it.first.slice(0, 4)}~${it.last.slice(0, 4)}</span>`), 'rgba(160,108,213,0.7)', '無共署紀錄（多為獨任審理）')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
+function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
+  if (!spanRows.length) return '';
+  const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
+  const rows = spanRows.map(([c, s]) => {
+    const notes = (changes || []).filter(r => r.court_name === c)
+      .map(r => jchgXferCell(r))
+      .filter(h => !h.includes('>—<'));
+    const cur = c === court;
+    return `<tr${cur ? ' style="background:color-mix(in srgb, var(--gold) 8%, transparent);"' : ''}>
+      <td style="font-size:0.85rem;${cur ? 'font-weight:600;' : ''}">${cur ? escHtml(c) : judgeLink(name, c, 'font-size:0.85rem;', escHtml(c))}</td>
+      <td style="white-space:nowrap;font-variant-numeric:tabular-nums;">${fmtM(s.first)} ~ ${fmtM(s.last)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${s.cases.toLocaleString()}</td>
+      <td style="font-size:0.82rem;">${notes.join('<br>') || '<span style="color:var(--text-muted);">—</span>'}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128506; 生涯軌跡 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書署名區間（1996 起）× 人審會遷調決議</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>法院</th><th style="width:150px;">署名期間</th><th style="width:80px;text-align:right;">掛名件數</th><th>異動註記</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${multiCourt ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
+    </div>`;
+}
+
+function renderJudgeCharts(thisCourtRows, catsObj) {
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const CAT_COLORS = { '民事': '#4f8ef7', '刑事': '#e05c5c', '家事': '#4caf82', '行政': '#c9a84c', '懲戒': '#a06cd5', '少年': '#45b7d1', '其他': '#8899aa' };
+
+  // 歷年案量趨勢（年 × 案型堆疊，本院）
+  if (chartInstances['jdTrend']) chartInstances['jdTrend'].destroy();
+  const tCtx = document.getElementById('jdTrendChart');
+  const yt = {};
+  thisCourtRows.forEach(r => {
+    const y = r.yyyymm.slice(0, 4);
+    const o = yt[y] || (yt[y] = {});
+    Object.entries(r.cats || { '其他': r.case_count || 0 }).forEach(([k, v]) => { o[k] = (o[k] || 0) + v; });
+  });
+  const years = Object.keys(yt).sort();
+  if (tCtx && years.length) {
+    const cats = [...new Set(years.flatMap(y => Object.keys(yt[y])))]
+      .sort((a, b) => (a === '其他' ? 1 : b === '其他' ? -1 : 0));
+    chartInstances['jdTrend'] = new Chart(tCtx.getContext('2d'), {
+      type: 'bar',
+      data: { labels: years, datasets: cats.map(c => ({ label: c, data: years.map(y => yt[y][c] || 0), backgroundColor: CAT_COLORS[c] || '#8899aa' })) },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 10, font: { size: 10 } } } }, scales: { x: { stacked: true, ticks: { color: muted, maxRotation: 60, autoSkip: true, maxTicksLimit: 14 } }, y: { stacked: true, ticks: { color: muted }, beginAtZero: true } } }
+    });
+  }
+
+  // 案類組合
+  if (chartInstances['jdCats']) chartInstances['jdCats'].destroy();
+  const cCtx = document.getElementById('jdCatsChart');
+  const catEntries = Object.entries(catsObj || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (cCtx && catEntries.length) {
+    chartInstances['jdCats'] = new Chart(cCtx.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: catEntries.map(e => e[0]), datasets: [{ data: catEntries.map(e => e[1]), backgroundColor: catEntries.map(e => CAT_COLORS[e[0]] || '#8899aa') }] },
+      options: { responsive: true, plugins: { legend: { position: 'right', labels: { color: muted, boxWidth: 12 } } } }
+    });
+  }
 }
 
 // ============================================================
@@ -8557,54 +8858,6 @@ let jchgPage = 0;
 let jchgRosterPage = 0;
 let jchgRosterSortKey = 'month';
 
-function judgeMonthGap(a, b) {
-  return (+b.slice(0,4)*12 + +b.slice(4,6)) - (+a.slice(0,4)*12 + +a.slice(4,6));
-}
-function closeJudgeCareerModal(event) {
-  if (event && event.target.id !== 'judgeCareerModal') return;
-  document.getElementById('judgeCareerModal').style.display = 'none';
-  document.body.style.overflow = '';
-}
-async function showJudgeCareer(name, court, lastMonth) {
-  document.getElementById('judgeCareerTitle').textContent = name + '　·　' + court;
-  document.getElementById('judgeCareerBody').innerHTML = '<div class="loading">載入中</div>';
-  document.getElementById('judgeCareerModal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  const fmtM = m => m ? m.slice(0,4) + '-' + m.slice(4,6) : '-';
-  const [histR, afterR] = await Promise.all([
-    db.from('judge_month_stats').select('yyyymm,case_count,cats').eq('name', name).eq('court_name', court),
-    db.from('judge_month_stats').select('court_name,yyyymm,case_count').eq('name', name).gt('yyyymm', lastMonth).order('yyyymm'),
-  ]);
-  const hist = histR.data || [], after = afterR.data || [];
-  const cats = {}; let total = 0;
-  const months = hist.map(h => h.yyyymm).sort();
-  hist.forEach(h => { total += h.case_count || 0; if (h.cats) Object.entries(h.cats).forEach(kv => { cats[kv[0]] = (cats[kv[0]] || 0) + kv[1]; }); });
-  const catRows = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-  const catSum = catRows.reduce((s, kv) => s + kv[1], 0) || 1;
-  const catHtml = catRows.length
-    ? catRows.map(kv => '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.86rem;border-bottom:1px solid var(--border);"><span>' + escHtml(kv[0]) + '</span><span style="font-variant-numeric:tabular-nums;">' + kv[1].toLocaleString() + ' 件（' + Math.round(kv[1]/catSum*100) + '%）</span></div>').join('')
-    : '<div style="color:var(--text-muted);font-size:0.85rem;">無案類資料</div>';
-  const dest = {};
-  after.forEach(a => { const c = a.court_name; if (!dest[c]) dest[c] = { first: a.yyyymm, last: a.yyyymm, cases: 0 }; dest[c].last = a.yyyymm; dest[c].cases += a.case_count || 0; });
-  const destRows = Object.entries(dest).sort((a, b) => b[1].cases - a[1].cases);
-  let destHtml;
-  if (!destRows.length) {
-    destHtml = '<div style="color:var(--text-muted);font-size:0.86rem;">無後續署名紀錄（可能退休／離職／轉任非審判職）</div>';
-  } else {
-    destHtml = destRows.map(dr => {
-      const c = dr[0], d = dr[1], gap = judgeMonthGap(lastMonth, d.first);
-      const tag = gap <= 2 ? '<span style="color:var(--green);">時間銜接，可信度較高</span>'
-                : gap <= 6 ? '<span style="color:var(--orange);">間隔數月，可能轉調</span>'
-                : '<span style="color:var(--text-muted);">間隔較久，同名混入風險高</span>';
-      return '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.86rem;"><div style="display:flex;justify-content:space-between;"><span style="font-weight:600;color:var(--blue);">' + escHtml(c) + '</span><span style="font-variant-numeric:tabular-nums;">' + d.cases.toLocaleString() + ' 件</span></div><div style="color:var(--text-muted);font-size:0.8rem;">' + fmtM(d.first) + ' 起　' + tag + '</div></div>';
-    }).join('');
-    if (destRows.length > 1) destHtml += '<div style="color:var(--orange);font-size:0.78rem;margin-top:6px;">&#9888; 出現多個去向，可能為同名不同人，請人工核對。</div>';
-  }
-  document.getElementById('judgeCareerBody').innerHTML =
-    '<div style="margin-bottom:18px;"><div style="color:var(--gold);font-weight:600;font-size:0.8rem;margin-bottom:6px;">退場前案件概況</div><div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">原院活躍 ' + fmtM(months[0]) + ' ~ ' + fmtM(months[months.length-1]) + '　·　累計掛名 ' + total.toLocaleString() + ' 件</div>' + catHtml + '</div>' +
-    '<div><div style="color:var(--gold);font-weight:600;font-size:0.8rem;margin-bottom:4px;">疑似去向</div><div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">依「同名＋時間」推測，非官方人事令；法官無唯一識別碼，僅供參考。</div>' + destHtml + '</div>';
-}
-
 async function loadJudgeChanges(force) {
   if (_jchgRows && !force) { renderJudgeChanges(); return; }
   jchgPage = 0;
@@ -8809,7 +9062,7 @@ function renderJudgeChanges() {
         : '<span class="badge badge-orange" title="裁判書反推，可能久未掛名或同名，未必為真異動">疑似</span>';
       return `<tr>
         <td style="white-space:nowrap;">${r.event_month.slice(0, 4)}-${r.event_month.slice(4, 6)}</td>
-        <td><a href="#" onclick="showJudgeCareer('${escHtml(r.name||'').replace(/'/g,"\\'")}','${escHtml(r.court_name||'').replace(/'/g,"\\'")}','${r.event_month}');return false;" style="color:var(--blue);text-decoration:none;font-weight:600;">${escHtml(r.name || '-')}</a></td>
+        <td>${judgeLink(r.name, r.court_name, 'font-weight:600;')}</td>
         <td>${escHtml(r.court_name || '-')}</td>
         <td style="font-variant-numeric:tabular-nums;">${r.active_months != null ? r.active_months : '-'}</td>
         <td>${conf}</td>
@@ -8832,6 +9085,12 @@ function _nameArg(n) { return escHtml(String(n)).replace(/'/g, "\\'"); }
 function lawyerLink(name, style = '', inner = null) {
   if (!name) return '';
   return `<a href="#" onclick="showLawyerDetail('${_nameArg(name)}','');return false;" style="color:var(--blue);text-decoration:none;${style}">${inner != null ? inner : escHtml(name)}</a>`;
+}
+
+// 共用：法官名 → 法官詳細 modal 連結（錨定姓名×法院；showJudgeDetail 會自動關閉律師 modal）
+function judgeLink(name, court, style = '', inner = null) {
+  if (!name) return '';
+  return `<a href="#" onclick="showJudgeDetail('${_nameArg(name)}','${_nameArg(court || '')}');return false;" style="color:var(--blue);text-decoration:none;${style}">${inner != null ? inner : escHtml(name)}</a>`;
 }
 function firmLink(name, style = '', inner = null) {
   if (!name) return '';
@@ -9236,7 +9495,7 @@ async function loadJudgeOverview() {
         const barW = Math.round(j.case_count / top10[0].case_count * 100);
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
           <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
-          <span style="min-width:64px;font-weight:600;">${escHtml(j.name)}</span>
+          <span style="min-width:64px;font-weight:600;">${judgeLink(j.name, j.court_name)}</span>
           <span style="flex:1;color:var(--text-muted);font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(j.court_name || '')}</span>
           <span style="width:${Math.max(barW, 4) * 0.5}%;max-width:30%;height:8px;background:rgba(201,168,76,0.5);border-radius:4px;"></span>
           <span style="min-width:56px;text-align:right;font-weight:600;color:var(--gold);">${Number(j.case_count).toLocaleString()}</span>
@@ -9402,7 +9661,7 @@ async function loadFamily() {
         const barW = Math.round(j.family_cases / topJ[0].family_cases * 100);
         return `<div style="display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:8px;">
           <span style="width:22px;color:var(--text-muted);font-size:0.8rem;">${i + 1}</span>
-          <span style="min-width:64px;font-weight:600;">${escHtml(j.name)}</span>
+          <span style="min-width:64px;font-weight:600;">${judgeLink(j.name, j.court_name)}</span>
           <span style="flex:1;color:var(--text-muted);font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(j.court_name || '')}</span>
           <span class="badge" style="background:var(--ghost-bg);color:var(--text-muted);font-size:0.7rem;">${Math.round(j.family_share * 100)}%</span>
           <span style="width:${Math.max(barW, 4) * 0.4}%;max-width:25%;height:8px;background:rgba(69,183,209,0.55);border-radius:4px;"></span>
@@ -9455,7 +9714,7 @@ function renderFamTable() {
     const roster = _famRoster.has(r.name + '|' + r.court_name);
     const lastYm = r.last_ym ? `${r.last_ym.slice(0, 4)}-${r.last_ym.slice(4)}` : '-';
     return `<tr>
-      <td><strong>${escHtml(r.name)}</strong></td>
+      <td>${judgeLink(r.name, r.court_name, 'font-weight:600;')}</td>
       <td style="font-size:0.85rem;">${escHtml(r.court_name || '-')}</td>
       <td style="text-align:center;font-weight:600;color:var(--blue);">${Number(r.family_cases).toLocaleString()}</td>
       <td style="text-align:center;font-weight:600;color:${shareColor};">${share}%</td>
@@ -12724,7 +12983,7 @@ async function loadJudges() {
     }
 
     return `<tr>
-      <td><strong>${escHtml(j.name)}</strong></td>
+      <td>${judgeLink(j.name, j.court_name, 'font-weight:600;')}</td>
       <td style="font-size:0.85rem;">${escHtml(j.court_name || '-')}</td>
       <td>${escHtml(j.division || '-')}</td>
       <td>${escHtml(j.rank || '-')}</td>
@@ -15015,14 +15274,21 @@ async function showCourtDetail(name) {
   </div>
 </div>
 
-<!-- 法院詳細 Modal（官方統計 × 裁判書 × 終結案件微資料） -->
-    <div id="judgeCareerModal" class="modal-overlay" style="display:none;" onclick="closeJudgeCareerModal(event)">
-      <div class="modal-box" onclick="event.stopPropagation()">
-        <button class="modal-close" onclick="closeJudgeCareerModal()">&times;</button>
-        <h2 id="judgeCareerTitle" class="modal-title"></h2>
-        <div id="judgeCareerBody"></div>
+<!-- 法官詳細 Modal -->
+<div id="judgeModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeJudgeModal();">
+  <div class="modal-content" style="max-width:680px;">
+    <div class="modal-header">
+      <h2 id="judgeModalTitle">載入中...</h2>
+      <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+        <button onclick="exportJudgePdf()" title="匯出 PDF" style="font-size:0.8rem;border:1px solid var(--border);border-radius:6px;padding:5px 12px;white-space:nowrap;">&#11015; 匯出 PDF</button>
+        <button onclick="closeJudgeModal()">✕</button>
       </div>
     </div>
+    <div class="modal-body" id="judgeModalBody">
+      <div class="loading">載入中</div>
+    </div>
+  </div>
+</div>
     <!-- 案由種類明細 Modal（案由供需 tab 點列開啟：TOP 律師/事務所下鑽＋原始案由明細） -->
     <div id="causeGroupModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeCauseGroupModal();">
       <div class="modal-content" style="max-width:880px;">
