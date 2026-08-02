@@ -9311,11 +9311,12 @@ async function loadFamily() {
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
     const [yearlyR, famRows, rosterR] = await Promise.all([
       db.rpc('family_cases_by_year'),
-      fetchAllRpc('family_judge_stats'),   // 1,148 列 > max-rows 1000，必須分批
+      fetchAllRpc('family_judge_stats'),   // mig 119 後 ~609 列；仍分批以防回長
       db.from('judges_combined').select('name, court_name').ilike('division', '%家%'),
     ]);
     const yearly = yearlyR.data || [];
-    _famRows = famRows;
+    // 畫面層防禦（mig 119 已在 RPC 端排除）：未知法院殘渣列與 1-2 件雜訊不進家事法官表
+    _famRows = famRows.filter(r => r.court_name !== '未知法院' && Number(r.family_cases) >= 3);
     _famRoster = new Set((rosterR.data || []).map(j => j.name + '|' + j.court_name));
 
     // 回填提示（有任何年度 ok_months < months 就顯示，補完自動消失）
