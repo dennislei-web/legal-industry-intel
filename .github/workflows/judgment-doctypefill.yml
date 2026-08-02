@@ -78,10 +78,14 @@ jobs:
           url = os.environ['SUPABASE_URL'].strip()
           key = os.environ['SUPABASE_SERVICE_KEY'].strip()
           H = {'apikey': key, 'Authorization': f'Bearer {key}'}
+          bad = False
           for rpc in ('refresh_judge_judgment_stats', 'refresh_lawyer_judgment_stats'):
               r = requests.post(f'{url}/rest/v1/rpc/{rpc}', json={},
                                 headers={**H, 'Content-Type': 'application/json'}, timeout=900)
-              print(rpc, 'HTTP', r.status_code)
+              print(rpc, 'HTTP', r.status_code, '' if r.ok else r.text[:200])
+              bad = bad or not r.ok  # refresh 失敗不能讓 job 假綠燈（曾靜默 500 兩天）
+          if bad:
+              sys.exit(1)
           # 缺月檢查（199601-202605 應全帶 doctypes）
           missing = []
           y, m = 1996, 1
