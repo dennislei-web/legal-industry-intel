@@ -95,13 +95,22 @@ def download(yyyymm):
         raise RuntimeError(f'找不到 {yyyymm} 的裁判書資料集（可能尚未發布）')
     print(f'  下載 {title}（fileSetId={fileset_id}）...')
     t0 = time.time()
-    with requests.get(f'{OPENDATA}/api/FilesetLists/{fileset_id}/file',
-                      headers={'Authorization': f'Bearer {get_od_token()}'},
-                      stream=True, timeout=7200, verify=False) as r:
-        r.raise_for_status()
-        with open(rar_path + '.part', 'wb') as f:
-            for chunk in r.iter_content(chunk_size=1 << 20):
-                f.write(chunk)
+    # 檔案端點偶發 connect timeout（Actions 曾整包掛在第一次連線），連線層重試 3 次
+    for attempt in range(3):
+        try:
+            with requests.get(f'{OPENDATA}/api/FilesetLists/{fileset_id}/file',
+                              headers={'Authorization': f'Bearer {get_od_token()}'},
+                              stream=True, timeout=(30, 7200), verify=False) as r:
+                r.raise_for_status()
+                with open(rar_path + '.part', 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=1 << 20):
+                        f.write(chunk)
+            break
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt == 2:
+                raise
+            print(f'  下載連線失敗（第 {attempt+1} 次）：{e}，60 秒後重試')
+            time.sleep(60)
     os.replace(rar_path + '.part', rar_path)
     print(f'  完成：{os.path.getsize(rar_path)/1e6:.0f} MB，{(time.time()-t0)/60:.1f} 分鐘')
     return rar_path
