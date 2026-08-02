@@ -2294,7 +2294,7 @@
         </select>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
-        <div class="card"><div class="card-title">&#128200; 人才流入排行</div><div id="chgInflow" class="loading">載入中</div></div>
+        <div class="card"><div class="card-title">&#128200; 人才流入排行 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">含新進律師（事務所卡片的「轉入」僅計跳槽）</span></div><div id="chgInflow" class="loading">載入中</div></div>
         <div class="card"><div class="card-title">&#128201; 人才流出排行</div><div id="chgOutflow" class="loading">載入中</div></div>
         <div class="card">
           <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
@@ -8331,16 +8331,22 @@ function renderChanges() {
   document.getElementById('kpiChgLast').textContent = _chgRows.length ? _chgRows[0].changed_at.slice(0, 10) : '尚無資料';
 
   // 流入/流出排行（僅事務所異動 + 新進律師的目的所）
-  const inflow = {}, outflow = {};
+  const inflow = {}, outflow = {}, inflowNew = {};
   _chgRows.forEach(r => {
     if (r.change_type === 'firm_change') {
       if (r.new_office) inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
       if (r.old_office) outflow[r.old_office] = (outflow[r.old_office] || 0) + 1;
     } else if (r.change_type === 'new_lawyer' && r.new_office) {
       inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
+      inflowNew[r.new_office] = (inflowNew[r.new_office] || 0) + 1;
     }
   });
-  const rankHtml = (obj, key) => {
+  // 流入列附「轉入＋新進」拆分，讓數字能對上事務所卡片的「轉入」（僅計跳槽）
+  const inflowSub = (firm, n) => {
+    const nw = inflowNew[firm] || 0;
+    return nw ? `<span style="color:var(--text-muted);font-size:0.72rem;font-weight:400;">轉入 ${n - nw}＋新進 ${nw}　</span>` : '';
+  };
+  const rankHtml = (obj, key, subFn) => {
     const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
     if (!all.length) return '<div style="color:var(--text-muted);font-size:0.85rem;">此期間無資料</div>';
     const totalPages = Math.ceil(all.length / CHG_RANK_PAGE_SIZE);
@@ -8350,7 +8356,7 @@ function renderChanges() {
     let html = all.slice(start, start + CHG_RANK_PAGE_SIZE).map(([firm, n], i) =>
       `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
         <span>${start + i + 1}. <a href="#" onclick="showFirmDetail('${escHtml(firm).replace(/'/g, "\\'")}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(firm)}</a></span>
-        <span style="font-weight:600;">${n} 人</span>
+        <span style="font-weight:600;">${subFn ? subFn(firm, n) : ''}${n} 人</span>
       </div>`).join('');
     if (totalPages > 1) {
       html += `<div class="pagination" style="margin-top:10px;">
@@ -8365,7 +8371,7 @@ function renderChanges() {
   const outflowEl = document.getElementById('chgOutflow');
   inflowEl.className = '';
   outflowEl.className = '';
-  inflowEl.innerHTML = rankHtml(inflow, 'inflow');
+  inflowEl.innerHTML = rankHtml(inflow, 'inflow', inflowSub);
   outflowEl.innerHTML = rankHtml(outflow, 'outflow');
 
   // 淨流動 = 流入 - 流出
