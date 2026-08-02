@@ -241,6 +241,23 @@ def _on_site(page, base_url):
         return False
 
 
+def goto_home_with_retry(page, base_url, waits=(0, 45, 90, 150)):
+    """載入首頁並過 challenge；被 WAF 暫時封鎖（CONNECTION_REFUSED/RESET）時長退避重試。
+    連續存取多院後司法院 WAF 會短時封整個來源 IP，退避等封鎖窗口過去即可恢復。
+    """
+    for i, w in enumerate(waits):
+        if w:
+            log(f'  首頁被拒，退避 {w}s 後重試（{i}/{len(waits) - 1}）')
+            time.sleep(w)
+        try:
+            page.goto(base_url, wait_until='domcontentloaded', timeout=30000)
+            if wait_page_ready(page):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def safe_goto(page, url, base_url):
     """深層頁導航：直連帶 referer 為主；被 WAF reset 就先回首頁（過 challenge）
     再用 location.assign 頁內導航。站方對「短時間多次直連」會 reset，故重試前先歇。
@@ -253,13 +270,11 @@ def safe_goto(page, url, base_url):
     except Exception:
         pass
 
-    # 嘗試 2: 歇一下 → 回首頁過 challenge → 頁內 location.assign
+    # 嘗試 2: 回首頁（被 WAF 封鎖時短退避重試）過 challenge → 頁內 location.assign
     try:
         if page.is_closed():
             return False
-        time.sleep(2.5)
-        page.goto(base_url, wait_until='domcontentloaded', timeout=25000)
-        if not wait_page_ready(page):
+        if not goto_home_with_retry(page, base_url, waits=(2.5, 20, 45)):
             return False
         if _js_nav(page, url):
             return wait_page_ready(page, timeout_s=15)
@@ -460,12 +475,41 @@ def collect_roster_links(page):
         document.querySelectorAll('a[href]').forEach(a => {
             const text = a.textContent.trim();
             const href = a.href;
-            if ((text.includes('法官名錄') || text.includes('調辦事')) &&
-                !text.includes('國民') &&
+            // 名錄頁的連結文字各院不一：法官名錄 / 調辦事法官 / ○○法官事務分配表
+            // （事務分配表頁內含股別+法官姓名表格；排除要點/規則/設置情形等無名單頁）
+            const isRoster = text.includes('法官名錄') || text.includes('調辦事') ||
+                (text.includes('事務分配表') && !text.includes('要點') &&
+                 !text.includes('規則') && !text.includes('情形'));
+            if (isRoster && !text.includes('國民') &&
                 !href.includes('javascript') && !seen.has(href)) {
                 seen.add(href);
                 links.push({ href, text: text.substring(0, 30) });
             }
+        });
+        return links;
+    }''')
+
+
+def collect_division_links(page):
+    """收集「以庭/處結尾」的庭別連結（如彰化名錄頁內的『少年及家事庭』『民事執行處』）。
+    只在展開名錄內層時當退路用（首頁層走 collect_roster_links），避免誤收導覽選單。
+    """
+    return page.evaluate('''() => {
+        const links = [];
+        const seen = new Set();
+        const bad = ['分案', '規則', '要點', '設置', '情形', '專業法庭', '國民', '要覽',
+                     '名錄', '憲法', '最高', '行政法院', '懲戒', '智慧'];
+        document.querySelectorAll('a[href]').forEach(a => {
+            const text = a.textContent.trim();
+            const href = a.href;
+            if (!text || text.length > 20 || seen.has(href)) return;
+            if (href.includes('javascript')) return;
+            // 僅同院（same-origin），排除憲法法庭等外站連結
+            try { if (new URL(href).origin !== location.origin) return; } catch (e) { return; }
+            if (!/[庭處]$/.test(text.replace(/[（(].*$/, ''))) return;
+            if (bad.some(b => text.includes(b))) return;
+            seen.add(href);
+            links.push({ href, text: text.substring(0, 30) });
         });
         return links;
     }''')
@@ -522,10 +566,8 @@ def scrape_html_judges(page, court_name, subdomain):
     judges = []
 
     try:
-        page.goto(base_url, wait_until='domcontentloaded', timeout=30000)
-        if not wait_page_ready(page):
-            log(f'  首頁 challenge 未過，跳過')
-            dump_page_hint(page, ':首頁')
+        if not goto_home_with_retry(page, base_url):
+            log(f'  首頁 challenge 未過（含退避重試），跳過')
             return []
 
         roster_links = collect_roster_links(page)
@@ -556,7 +598,9 @@ def scrape_html_judges(page, court_name, subdomain):
             if href in visited:
                 return
             visited.add(href)
-            division = re.sub(r'^\d+', '', rl['text'].replace('法官名錄', '')).strip() or '未分類'
+            division = re.sub(r'^\d+', '', rl['text']
+                              .replace('法官名錄', '').replace('法官事務分配表', '')
+                              .replace('事務分配表', '')).strip() or '未分類'
             try:
                 if not click_goto(page, href, base_url):
                     log(f'    {division}: 導航失敗，跳過')
@@ -570,6 +614,9 @@ def scrape_html_judges(page, court_name, subdomain):
                 # 抓不到 → 可能是「專區/入口」頁，展開子名錄連結再往下抓
                 if depth > 0:
                     subs = [s for s in collect_roster_links(page) if s['href'] not in visited]
+                    # 內層退路：名錄頁下各庭連結是純庭名（如彰化『少年及家事庭』）
+                    if not subs:
+                        subs = [s for s in collect_division_links(page) if s['href'] not in visited]
                     if subs:
                         log(f'    {division}: 入口頁，展開 {len(subs)} 子名錄')
                         for s in subs:
@@ -598,7 +645,7 @@ def scrape_html_judges(page, court_name, subdomain):
                 log(f'    {division} 擷取失敗: {e}')
 
         for rl in roster_links:
-            harvest(rl, depth=2)
+            harvest(rl, depth=3)
 
     except Exception as e:
         log(f'  HTML 擷取錯誤: {e}')
