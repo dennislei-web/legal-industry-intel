@@ -7744,7 +7744,7 @@ async function showJudgeDetail(name, court) {
   if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
 
   // 並行撈：名冊+整合統計、同名跨院官方統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒紀錄
-  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [], disciplines = [];
+  let jc = null, statRows = [], pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [];
   const monthRows = [];
   await Promise.all([
     db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
@@ -7752,6 +7752,9 @@ async function showJudgeDetail(name, court) {
     db.from('judge_disciplines').select('*').eq('name', name)
       .order('decided_date', { ascending: false })
       .then(r => { disciplines = r.data || []; }),
+    db.from('judge_impeachments').select('*').eq('name', name)
+      .order('decided_date', { ascending: false })
+      .then(r => { impeachments = r.data || []; }),
     db.from('judge_judgment_stats').select('*').eq('name', name)
       .then(r => { statRows = r.data || []; }),
     db.rpc('judge_pair_summary', { p_name: name, p_court: court, p_limit: 12 })
@@ -7831,7 +7834,8 @@ async function showJudgeDetail(name, court) {
   if (jc?.has_lawsnote) badges.push('<span class="badge badge-orange">Lawsnote</span>');
   if (statRows.length > 1) badges.push(`<span class="badge badge-orange" style="cursor:help;" title="此姓名亦出現於其他 ${statRows.length - 1} 個法院的裁判書統計，可能為轉調或同名不同人；本頁配對、案由、合議庭均已鎖定本院資料">同名/跨院 ×${statRows.length}</span>`);
   const judgeDisc = disciplines.filter(d => d.role !== '檢察官');
-  if (judgeDisc.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="懲戒法院職務法庭有以此姓名為被付懲戒人之裁判（姓名比對，詳懲戒紀錄卡）">&#9888; 懲戒紀錄 ×${judgeDisc.length}</span>`);
+  const judgeImp = impeachments.filter(d => d.role !== '檢察官');
+  if (judgeDisc.length || judgeImp.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="職務法庭懲戒裁判或監察院彈劾案有此姓名（姓名比對，詳懲戒與彈劾卡）">&#9888; 懲戒/彈劾 ×${judgeDisc.length + judgeImp.length}</span>`);
 
   const row = (label, value) => `<tr><td style="padding:8px 12px;color:var(--text-muted);width:110px;white-space:nowrap;">${label}</td><td style="padding:8px 12px;">${value}</td></tr>`;
 
@@ -7854,7 +7858,7 @@ async function showJudgeDetail(name, court) {
       </table>
     </div>
 
-    ${renderJudgeDisciplineCard(judgeDisc)}
+    ${renderJudgeDisciplineCard(judgeDisc, judgeImp)}
 
     ${stat || thisCourtRows.length ? `
     <div class="card" style="margin-bottom:16px;">
@@ -7916,10 +7920,10 @@ async function showJudgeDetail(name, court) {
   renderJudgeCharts(thisCourtRows, catsObj);
 }
 
-// 懲戒紀錄卡（judge_disciplines：FJUD 懲戒法院職務法庭裁判，mig 121；姓名比對）
-function renderJudgeDisciplineCard(rows) {
-  if (!rows || !rows.length) return '';
-  const items = rows.map(d => `
+// 懲戒與彈劾紀錄卡（judge_disciplines mig 121 ＋ judge_impeachments mig 125；姓名比對）
+function renderJudgeDisciplineCard(rows, impRows) {
+  if ((!rows || !rows.length) && (!impRows || !impRows.length)) return '';
+  const items = (rows || []).map(d => `
     <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <a href="${escHtml(d.source_url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:600;" title="開啟裁判原文">${escHtml(d.case_no)}</a>
@@ -7930,10 +7934,24 @@ function renderJudgeDisciplineCard(rows) {
       </div>
       ${d.main_text ? `<div style="font-size:0.8rem;margin-top:4px;color:var(--text);">${escHtml(d.main_text.length > 120 ? d.main_text.slice(0, 120) + '…' : d.main_text)}</div>` : ''}
     </div>`).join('');
+  const impItems = (impRows || []).map(d => `
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+        ${d.doc_url ? `<a href="${escHtml(d.doc_url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;font-weight:600;" title="下載彈劾案文（公布版）">${escHtml(d.case_no)}</a>` : `<span style="font-weight:600;">${escHtml(d.case_no)}</span>`}
+        <span style="color:var(--orange);font-weight:600;">${escHtml(d.progress || '')}</span>
+      </div>
+      <div style="color:var(--text-muted);font-size:0.78rem;margin-top:2px;">
+        ${d.decided_date || '-'}｜${escHtml(d.org || '-')}${d.title ? '｜' + escHtml(d.title) : ''}
+      </div>
+      ${d.cause ? `<div style="font-size:0.8rem;margin-top:4px;color:var(--text);">${escHtml(d.cause.length > 130 ? d.cause.slice(0, 130) + '…' : d.cause)}</div>` : ''}
+    </div>`).join('');
+  const sec = (title, hint, body) => body ? `
+    <div style="font-size:0.82rem;font-weight:600;margin:10px 0 2px;">${title} <span style="font-size:0.68rem;color:var(--text-muted);font-weight:400;">${hint}</span></div>${body}` : '';
   return `
     <div class="card" style="margin-bottom:16px;border-left:3px solid var(--red);">
-      <div class="card-title" style="color:var(--red);">&#9888; 懲戒紀錄（職務法庭） <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">懲戒法院職務法庭裁判（2020-07 起），姓名比對——請以任職機關核對是否同名</span></div>
-      ${items}
+      <div class="card-title" style="color:var(--red);">&#9888; 懲戒與彈劾紀錄 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">姓名比對——請以任職機關核對是否同名</span></div>
+      ${sec('職務法庭懲戒裁判', '懲戒法院／司法院職務法庭（101 年起）', items)}
+      ${sec('監察院彈劾', '彈劾成立後移送職務法庭，兩者常前後對應', impItems)}
     </div>`;
 }
 
@@ -13022,8 +13040,12 @@ function renderFlTable() {
 let _judgeDiscSet = null;
 async function ensureJudgeDiscSet() {
   if (_judgeDiscSet) return _judgeDiscSet;
-  const { data } = await db.from('judge_disciplines').select('name,role');
-  _judgeDiscSet = new Set((data || []).filter(r => r.role !== '檢察官').map(r => r.name));
+  const [d1, d2] = await Promise.all([
+    db.from('judge_disciplines').select('name,role'),
+    db.from('judge_impeachments').select('name,role'),
+  ]);
+  _judgeDiscSet = new Set([...(d1.data || []), ...(d2.data || [])]
+    .filter(r => r.role !== '檢察官').map(r => r.name));
   return _judgeDiscSet;
 }
 
@@ -13080,7 +13102,7 @@ async function loadJudges() {
     }
 
     const disc = _judgeDiscSet?.has(j.name)
-      ? ' <span style="color:var(--red);cursor:help;" title="懲戒法院職務法庭有同名懲戒紀錄（點開法官檔案查看，並以任職機關核對是否同名）">&#9888;</span>' : '';
+      ? ' <span style="color:var(--red);cursor:help;" title="職務法庭懲戒裁判或監察院彈劾案有同名紀錄（點開法官檔案查看，並以任職機關核對是否同名）">&#9888;</span>' : '';
     return `<tr>
       <td>${judgeLink(j.name, j.court_name, 'font-weight:600;')}${disc}</td>
       <td style="font-size:0.85rem;">${escHtml(j.court_name || '-')}</td>
