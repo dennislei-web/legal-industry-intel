@@ -7805,6 +7805,12 @@ async function showJudgeDetail(name, court) {
   const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
   const multiCourt = spanRows.length > 1;
 
+  // 全期首見（跨院，同名合併；早於本院首見時於基本資料補一列，避免「年資推估」與「本院首見」看似矛盾）
+  const firstEver = knownRows.length
+    ? { ym: knownRows.reduce((a, r) => r.yyyymm < a ? r.yyyymm : a, '999999'),
+        court: knownRows.reduce((a, r) => r.yyyymm < a.yyyymm ? r : a, { yyyymm: '999999' }).court_name }
+    : null;
+
   // 家事專責度（近 5 年本院署名的家事佔比）
   const famN = cats5['家事'] || 0;
   const famShare = c5 ? famN / c5 : 0;
@@ -7831,10 +7837,11 @@ async function showJudgeDetail(name, court) {
           ${row('法院', escHtml(court || '-'))}
           ${row('庭別', escHtml(jc?.division || '-'))}
           ${row('職稱', escHtml(jc?.rank || '-'))}
-          ${row('年資', jc?.seniority_years != null ? `${jc.seniority_years} 年 <span style="font-size:0.72rem;color:var(--text-muted);" title="司法院名冊年資；名冊無值時以最早署名裁判年推估（1996 年前任職者會被低估）">（名冊或首判推估）</span>` : '-')}
+          ${row('年資', jc?.seniority_years != null ? `${jc.seniority_years} 年 <span style="font-size:0.72rem;color:var(--text-muted);" title="司法院名冊年資；名冊無值時以同名最早署名裁判年推估（含曾任職他院；1996 年前任職者會被低估）">（名冊或首判推估）</span>` : '-')}
           ${row('性別', escHtml(jc?.sex || '-'))}
           ${jc?.status && jc.status !== '現任' ? row('狀態', `<span style="color:var(--orange);">${escHtml(jc.status)}</span>`) : ''}
-          ${row('首見裁判', fmtM(stat?.first_yyyymm))}
+          ${row('本院首見', fmtM(stat?.first_yyyymm))}
+          ${firstEver && firstEver.ym < (stat?.first_yyyymm || '999999') ? row('全期首見', `${fmtM(firstEver.ym)} <span style="font-size:0.78rem;color:var(--text-muted);">（${escHtml(firstEver.court)}，詳生涯軌跡）</span>`) : ''}
           ${row('最近署名', fmtM(lastYm))}
         </tbody>
       </table>
@@ -7850,7 +7857,7 @@ async function showJudgeDetail(name, court) {
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);">歷年總計（本院）</div>
-          <div style="font-size:1.8rem;font-weight:700;">${(stat?.case_count_total || spans[court]?.cases || 0).toLocaleString()}</div>
+          <div style="font-size:1.8rem;font-weight:700;">${(spans[court]?.cases ?? stat?.case_count_total ?? 0).toLocaleString()}</div>
         </div>
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);">平均結案天數</div>
