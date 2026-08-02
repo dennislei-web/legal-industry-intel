@@ -175,6 +175,9 @@ def join():
             for line in fh:
                 r = json.loads(line)
                 r['ok'] = _norm_key(r['ok'])
+                # 引用抓到偵查案號（起訴案號括注）＝非裁判，永遠對不回索引 → 剔除
+                if '偵' in r['ok'].split('|')[2]:
+                    continue
                 cited.add(r['ok'])
                 appeals.append(r)
     print(f'上訴審列 {len(appeals)}，被引用原審 key {len(cited)}')
