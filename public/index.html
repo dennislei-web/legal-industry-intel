@@ -2019,6 +2019,7 @@
           <div class="kpi-sub" id="famKpiDaysSub">家事專責估算</div>
         </div>
       </div>
+      <div id="famPeriodNote" style="display:none;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:0.82rem;color:var(--text-muted);"></div>
       <div class="grid-2">
         <div class="card">
           <div class="card-title" id="famTitleYearly">&#128202; 年度家事裁判量</div>
@@ -10009,10 +10010,11 @@ async function loadFamCat(key) {
       rosterQ = cfg.rosterQ.court
         ? rosterQ.ilike('court_name', cfg.rosterQ.court)
         : rosterQ.or(cfg.rosterQ.divOr.map(p => `division.ilike.${p}`).join(','));
-      const [yearlyR, catRows, rosterR] = await Promise.all([
+      const [yearlyR, catRows, rosterR, periodR] = await Promise.all([
         db.rpc('cat_cases_by_year', { ...args, p_ok_min: cfg.okMin }),
         fetchAllRpc('cat_judge_stats', args),   // 刑事 ~3,100 列、民事 ~1,800 列，分批抓
         rosterQ,
+        db.rpc('cat_same_period_stats', args),  // 未滿年同期比（mig 128）
       ]);
       let rosterRows = rosterR.data || [];
       if (cfg.rosterQ.divExclude) rosterRows = rosterRows.filter(j => !cfg.rosterQ.divExclude.test(j.division || ''));
@@ -10021,10 +10023,11 @@ async function loadFamCat(key) {
         // 畫面層防禦（mig 119/126 已在 RPC 端排除）：未知法院殘渣列與 1-2 件雜訊不進表
         rows: catRows.filter(r => r.court_name !== '未知法院' && Number(r.cat_cases) >= 3),
         roster: new Set(rosterRows.map(j => j.name + '|' + j.court_name)),
+        period: periodR.data || [],
       };
     }
     if (key !== famCat) return;   // 使用者已切走，不要畫舊類別
-    const { yearly, rows, roster } = _famCache[key];
+    const { yearly, rows, roster, period } = _famCache[key];
     _famRows = rows;
     _famRoster = roster;
     const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
@@ -10037,6 +10040,25 @@ async function loadFamCat(key) {
       note.textContent = `⏳ ${cfg.noun}分類回填中：` + pending.map(y => `${y.year}（${y.ok_months}/${y.months} 月）`).join('、') + ' — 完成前歷史數字會偏低。';
     } else {
       note.style.display = 'none';
+    }
+
+    // 未滿年同期比一行敘述（右截尾偏差的公平比較基準：同月份窗 vs 去年）
+    const pNote = document.getElementById('famPeriodNote');
+    const lastYear = yearly[yearly.length - 1];
+    const perCur = lastYear && (period || []).find(p => p.year === lastYear.year);
+    const perPrev = lastYear && (period || []).find(p => Number(p.year) === Number(lastYear.year) - 1);
+    if (lastYear && Number(lastYear.months) < 12 && perCur && perPrev && Number(perPrev.cat_cases) > 0) {
+      const dCase = (Number(perCur.cat_cases) - Number(perPrev.cat_cases)) / Number(perPrev.cat_cases) * 100;
+      const sign = v => (v >= 0 ? '+' : '−') + Math.abs(v);
+      let txt = `📅 ${lastYear.year} 未滿年，與去年同期（1–${perCur.upto_month} 月）相比：` +
+        `${cfg.noun}裁判量 ${Number(perCur.cat_cases).toLocaleString()} 件 vs ${perPrev.year} 同期 ${Number(perPrev.cat_cases).toLocaleString()} 件（${sign(Math.round(dCase * 10) / 10)}%）`;
+      if (perCur.cat_avg_days != null && perPrev.cat_avg_days != null) {
+        txt += `；平均結案天數 ${Number(perCur.cat_avg_days)} 天 vs ${Number(perPrev.cat_avg_days)} 天（${sign(Number(perCur.cat_avg_days) - Number(perPrev.cat_avg_days))} 天）`;
+      }
+      pNote.style.display = '';
+      pNote.textContent = txt;
+    } else {
+      pNote.style.display = 'none';
     }
 
     // KPI（取最新一個有新分類資料的年度）
