@@ -471,6 +471,8 @@
     #domainTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
     #valueTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
     #valueTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
+    #famCatTabs .sub-tab-btn { padding: 8px 18px; font-size: 13.5px; border-radius: 8px; }
+    #famCatTabs .sub-tab-btn.active { background: var(--tab-active-color); color: var(--bg-main); border-color: var(--tab-active-color); font-weight: 700; }
     /* 市場規模拆解（vt-market） */
     .ms-badge { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 10.5px; font-weight: 700; margin-left: 4px; vertical-align: 1px; }
     .ms-a { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
@@ -1988,10 +1990,11 @@
 
     <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
     <div id="tab-family" class="tab-content">
+      <div id="famCatTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
       <div id="famBackfillNote" style="display:none;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:var(--orange);"></div>
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
         <div class="kpi-card">
-          <div class="kpi-label">家事裁判數</div>
+          <div class="kpi-label" id="famKpiLabelRecent">家事裁判數</div>
           <div class="kpi-value" id="famKpiRecent" style="color:var(--blue);">-</div>
           <div class="kpi-sub" id="famKpiRecentSub">載入中</div>
         </div>
@@ -2001,12 +2004,12 @@
           <div class="kpi-sub" id="famKpiShareSub">-</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">家事專責法官</div>
+          <div class="kpi-label" id="famKpiLabelJudges">家事專責法官</div>
           <div class="kpi-value" id="famKpiJudges" style="color:var(--gold);">-</div>
-          <div class="kpi-sub">家事佔比 ≥ 50%</div>
+          <div class="kpi-sub" id="famKpiJudgesSub">家事佔比 ≥ 50%</div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">現任家事庭法官</div>
+          <div class="kpi-label" id="famKpiLabelRoster">現任家事庭法官</div>
           <div class="kpi-value" id="famKpiRoster" style="color:var(--green);">-</div>
           <div class="kpi-sub">司法院名冊</div>
         </div>
@@ -2018,35 +2021,29 @@
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">&#128202; 年度家事裁判量</div>
+          <div class="card-title" id="famTitleYearly">&#128202; 年度家事裁判量</div>
           <div class="chart-container"><canvas id="chartFamYearly"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">&#9202;&#65039; 家事平均結案天數（年度）</div>
+          <div class="card-title" id="famTitleDays">&#9202;&#65039; 家事平均結案天數（年度）</div>
           <div class="chart-container"><canvas id="chartFamDays"></canvas></div>
         </div>
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">&#127963;&#65039; 各法院家事裁判量 TOP 10</div>
+          <div class="card-title" id="famTitleCourts">&#127963;&#65039; 各法院家事裁判量 TOP 10</div>
           <div class="chart-container"><canvas id="chartFamCourts"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">&#128293; 家事案件量 TOP 10 法官</div>
+          <div class="card-title" id="famTitleTop">&#128293; 家事案件量 TOP 10 法官</div>
           <div id="famTopJudges"><div class="loading">載入中</div></div>
         </div>
       </div>
       <div class="card">
-        <div class="card-title">&#128203; 家事法官名單</div>
+        <div class="card-title" id="famTitleList">&#128203; 家事法官名單</div>
         <div class="search-bar">
           <input type="text" id="famSearch" placeholder="搜尋法官姓名或法院..." oninput="renderFamTable()">
-          <select id="famShareFilter" onchange="renderFamTable()">
-            <option value="0.5" selected>家事佔比 ≥ 50%</option>
-            <option value="0.8">家事佔比 ≥ 80%</option>
-            <option value="0.3">家事佔比 ≥ 30%</option>
-            <option value="roster">現任家事庭法官</option>
-            <option value="0">全部（含少量家事）</option>
-          </select>
+          <select id="famShareFilter" onchange="renderFamTable()"></select>
         </div>
         <div class="table-wrap">
           <table>
@@ -2054,24 +2051,25 @@
               <tr>
                 <th>法官</th>
                 <th style="cursor:pointer" onclick="sortFam('court_name')">法院 <span id="famSort_court_name">↕</span></th>
-                <th style="cursor:pointer" onclick="sortFam('family_cases')">家事案件 <span id="famSort_family_cases">↓</span></th>
-                <th style="cursor:pointer" onclick="sortFam('family_share')">家事佔比 <span id="famSort_family_share">↕</span></th>
+                <th>層級</th>
+                <th style="cursor:pointer" onclick="sortFam('cat_cases')"><span id="famThCases">家事案件</span> <span id="famSort_cat_cases">↓</span></th>
+                <th style="cursor:pointer" onclick="sortFam('cat_share')"><span id="famThShare">家事佔比</span> <span id="famSort_cat_share">↕</span></th>
                 <th style="cursor:pointer" onclick="sortFam('total_cases')">總案件 <span id="famSort_total_cases">↕</span></th>
                 <th style="cursor:pointer" onclick="sortFam('avg_days')">平均結案天數 <span id="famSort_avg_days">↕</span></th>
                 <th>最近裁判</th>
-                <th>現任家事庭</th>
+                <th id="famThRoster">現任家事庭</th>
               </tr>
             </thead>
             <tbody id="famTableBody">
-              <tr><td colspan="8" class="loading">載入中</td></tr>
+              <tr><td colspan="9" class="loading">載入中</td></tr>
             </tbody>
           </table>
         </div>
         <div id="famTableNote" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;"></div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 家事案件以字別（婚/家/繼/親/監宣等）自裁判書辨識；家事裁定多數不公開，數字僅反映公開裁判。
-        結案天數為估算值（裁判日 − 案號年度起算日），法官的平均結案天數為其全部案件之平均（家事專責法官可視為家事均值），僅供相對比較。
+        <span id="famCaveat">※ 家事案件以字別（婚/家/繼/親/監宣等）自裁判書辨識；家事裁定多數不公開，數字僅反映公開裁判。</span>
+        結案天數為估算值（裁判日 − 案號年度起算日），法官的平均結案天數為其全部案件之平均（專責法官可視為該類均值），僅供相對比較。
       </div>
     </div>
 
@@ -2632,12 +2630,17 @@
           <option value="disc">僅懲戒裁判</option>
           <option value="imp">僅彈劾</option>
         </select>
+        <select id="jdisActive" onchange="renderJudgeDiscipline()">
+          <option value="">在職＋離職</option>
+          <option value="1">僅在職</option>
+          <option value="0">僅已離職</option>
+        </select>
       </div>
       <div class="card">
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th style="width:92px;">日期</th><th style="width:64px;">類型</th><th>姓名</th><th>機關（案發時）</th><th style="width:56px;">身分</th><th>結果／進度</th><th>案號（連原文）</th></tr>
+              <tr><th style="width:92px;">日期</th><th style="width:64px;">類型</th><th>姓名</th><th>機關（案發時）</th><th style="width:56px;">身分</th><th style="width:76px;">在職</th><th>結果／進度</th><th>案號（連原文）</th></tr>
             </thead>
             <tbody id="jdisTableBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
           </table>
@@ -8032,6 +8035,26 @@ async function loadJudgeDiscipline(force) {
     ...(d2.data || []).map(r => ({ ...r, src: 'imp', result: r.progress ? `彈劾成立（${r.progress}）` : '彈劾成立', url: r.doc_url })),
   ].sort((a, b) => (b.decided_date || '').localeCompare(a.decided_date || ''));
 
+  // 在職比對：法官＝司法院現任名冊有此姓名；檢察官＝最近 3 個資料月仍具名起訴
+  // （姓名比對，同名可能誤標——tooltip 註記，點開檔案核對）
+  const names = [...new Set(_jdisRows.map(r => r.name))];
+  const activeJudge = {}, activePros = new Set();
+  const chunks = [];
+  for (let i = 0; i < names.length; i += 80) chunks.push(names.slice(i, i + 80));
+  const { data: pLatest } = await db.from('prosecutor_month_stats')
+    .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
+  const pCut = pLatest?.[0]?.yyyymm ? jchgMonthMinus(pLatest[0].yyyymm, 2) : null;
+  await Promise.all(chunks.flatMap(c => [
+    db.from('judges_combined').select('name,court_name').eq('has_jy', true).in('name', c)
+      .then(r => (r.data || []).forEach(x => (activeJudge[x.name] = activeJudge[x.name] || []).push(x.court_name))),
+    pCut ? db.from('prosecutor_month_stats').select('name').gte('yyyymm', pCut).in('name', c)
+      .then(r => (r.data || []).forEach(x => activePros.add(x.name))) : null,
+  ].filter(Boolean)));
+  _jdisRows.forEach(r => {
+    r.activeCourts = activeJudge[r.name] || null;
+    r.activeP = activePros.has(r.name);
+  });
+
   // KPI
   const disc = _jdisRows.filter(r => r.src === 'disc'), imp = _jdisRows.filter(r => r.src === 'imp');
   const set = rs => new Set(rs.map(r => r.name)).size;
@@ -8052,16 +8075,26 @@ function renderJudgeDiscipline() {
   const kw = (document.getElementById('jdisSearch').value || '').trim();
   const role = document.getElementById('jdisRole').value;
   const kind = document.getElementById('jdisKind').value;
+  const act = document.getElementById('jdisActive').value;
   let rows = _jdisRows;
   if (role) rows = rows.filter(r => (r.role || '法官') === role); // role 未解析者多為法官案，歸法官
   if (kind) rows = rows.filter(r => r.src === kind);
+  if (act) rows = rows.filter(r => {
+    const on = !!(r.activeCourts?.length || (r.role === '檢察官' && r.activeP));
+    return act === '1' ? on : !on;
+  });
   if (kw) rows = rows.filter(r =>
     [r.name, r.org, r.case_no, r.result].some(v => (v || '').includes(kw)));
   const shown = rows.slice(0, 400);
   const tbody = document.getElementById('jdisTableBody');
   if (!shown.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">無符合條件的紀錄</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted);">無符合條件的紀錄</td></tr>';
   } else {
+    const activeCell = r => {
+      if (r.activeCourts?.length) return `<span class="badge badge-green" style="cursor:help;" title="司法院現任法官名冊有此姓名（${escHtml(r.activeCourts.join('、'))}）；同名可能誤標，點姓名開檔案核對">&#10003; 在職</span>`;
+      if (r.role === '檢察官' && r.activeP) return '<span class="badge badge-green" style="cursor:help;" title="最近 3 個資料月的起訴書仍有此姓名具名；同名可能誤標">&#10003; 在職</span>';
+      return '<span style="color:var(--text-muted);cursor:help;" title="現任法官名冊與近期起訴具名皆查無此姓名（已免職/退休/離職，或轉任非審檢職務）">—</span>';
+    };
     tbody.innerHTML = shown.map(r => `<tr>
       <td style="white-space:nowrap;font-size:0.85rem;">${r.decided_date || '-'}</td>
       <td>${r.src === 'disc'
@@ -8070,6 +8103,7 @@ function renderJudgeDiscipline() {
       <td>${judgeLink(r.name, '', 'font-weight:600;')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.org || '-')}</td>
       <td style="font-size:0.82rem;">${escHtml(r.role || '-')}</td>
+      <td>${activeCell(r)}</td>
       <td style="font-size:0.82rem;color:${r.src === 'disc' ? 'var(--red)' : 'var(--orange)'};font-weight:600;">${escHtml(r.result || '-')}</td>
       <td style="font-size:0.8rem;">${r.url
         ? `<a href="${escHtml(r.url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;">${escHtml(r.case_no)}</a>`
