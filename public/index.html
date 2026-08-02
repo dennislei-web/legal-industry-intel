@@ -13016,10 +13016,20 @@ function renderFlTable() {
 // ============================================================
 // JUDGES (法官)
 // ============================================================
+// 懲戒名單快取（judge_disciplines 姓名 set，法官名錄列表標示用；排除純檢察官列）
+let _judgeDiscSet = null;
+async function ensureJudgeDiscSet() {
+  if (_judgeDiscSet) return _judgeDiscSet;
+  const { data } = await db.from('judge_disciplines').select('name,role');
+  _judgeDiscSet = new Set((data || []).filter(r => r.role !== '檢察官').map(r => r.name));
+  return _judgeDiscSet;
+}
+
 async function loadJudges() {
   const search = document.getElementById('judgeSearch').value.trim();
   const court = document.getElementById('judgeCourtFilter').value;
   const division = document.getElementById('judgeDivisionFilter').value;
+  await ensureJudgeDiscSet(); // 一次性小查詢（~百列），之後走快取
 
   let query = db.from('judges_combined').select('*', { count: 'exact' });
   if (search) query = query.ilike('name', `%${search}%`);
@@ -13057,8 +13067,10 @@ async function loadJudges() {
       srcBadge = '<span style="color:var(--text-muted);">-</span>';
     }
 
+    const disc = _judgeDiscSet?.has(j.name)
+      ? ' <span style="color:var(--red);cursor:help;" title="懲戒法院職務法庭有同名懲戒紀錄（點開法官檔案查看，並以任職機關核對是否同名）">&#9888;</span>' : '';
     return `<tr>
-      <td>${judgeLink(j.name, j.court_name, 'font-weight:600;')}</td>
+      <td>${judgeLink(j.name, j.court_name, 'font-weight:600;')}${disc}</td>
       <td style="font-size:0.85rem;">${escHtml(j.court_name || '-')}</td>
       <td>${escHtml(j.division || '-')}</td>
       <td>${escHtml(j.rank || '-')}</td>
