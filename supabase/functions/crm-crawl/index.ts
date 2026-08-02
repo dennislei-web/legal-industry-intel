@@ -14,10 +14,11 @@ Deno.serve(async (req: Request) => {
   if (userId !== OWNER_UID) return errorResponse('Permission denied', 403);
 
   try {
-    // GITHUB_REPO/GITHUB_TOKEN 被 lawyer-dashboard 佔用，本 project 一律用 INTEL_ 前綴 secret
-    const repo = Deno.env.get('INTEL_GITHUB_REPO') || 'dennislei-web/legal-industry-intel';
-    const token = Deno.env.get('INTEL_GITHUB_TOKEN') || Deno.env.get('GITHUB_TOKEN');
-    if (!token) return errorResponse('INTEL_GITHUB_TOKEN secret 未設定', 500);
+    // workflow 放在 lawyer-dashboard repo（private、CRM_USERNAME/CRM_PASSWORD secrets 已在該處）
+    // → 直接用該 repo 專屬的 GITHUB_REPO/GITHUB_TOKEN secrets（trigger_sync 同款）
+    const repo = Deno.env.get('GITHUB_REPO') || 'dennislei-web/lawyer-dashboard';
+    const token = Deno.env.get('GITHUB_TOKEN');
+    if (!token) return errorResponse('GITHUB_TOKEN secret 未設定', 500);
 
     const res = await fetch(
       `https://api.github.com/repos/${repo}/actions/workflows/crm-officer-crawl.yml/dispatches`,
