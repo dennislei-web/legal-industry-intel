@@ -10092,7 +10092,7 @@ function switchFamCat(key, force) {
   const noun = cfg.noun;
   el('famKpiLabelRecent').textContent = `${noun}裁判數`;
   el('famKpiLabelJudges').textContent = cfg.cat ? `${noun}專責法官` : (cfg.subcat ? `${noun}承辦法官` : `${noun}法官`);
-  el('famKpiJudgesSub').textContent = cfg.kpiJudgesSub || (cfg.cat ? `${noun}佔比 ≥ 50%` : (cfg.subcat ? '2020 起有承辦（≥3 件）' : '2020 年起有公開裁判'));
+  el('famKpiJudgesSub').textContent = cfg.kpiJudgesSub || (cfg.cat ? `${noun}佔比 ≥ 50%・2020 起累計` : (cfg.subcat ? '2020 起有承辦（≥3 件）' : '2020 年起有公開裁判'));
   el('famKpiLabelRoster').textContent = `現任${cfg.rosterLabel}法官`;
   el('famKpiDaysSub').textContent = cfg.daysSub || (cfg.cat ? `${noun}專責估算` : '該院全案件');
   el('famTitleYearly').innerHTML = `&#128202; 年度${noun}裁判量`;
@@ -10247,7 +10247,9 @@ async function loadFamCat(key) {
         el('famKpiDaysSub').textContent = '專責樣本不足';
       }
     }
-    el('famKpiJudges').textContent = cfg.cat ? _famRows.filter(r => r.cat_share >= 0.5).length : _famRows.length;
+    // KPI 計去重人數（名單表維持逐院列）：同人 2020 起跨院輪調不重複計次
+    const famDistinct = rows => new Set(rows.map(r => r.name)).size;
+    el('famKpiJudges').textContent = famDistinct(cfg.cat ? _famRows.filter(r => r.cat_share >= 0.5) : _famRows);
     el('famKpiRoster').textContent = cfg.rosterQ ? _famRoster.size : '—';
 
     // 年度裁判量（bar，回填中年度標註）
