@@ -2686,7 +2686,7 @@
                 <th style="cursor:pointer" onclick="sortJudges('division')">庭別 <span id="sortIcon_j_division">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('rank')">職稱 <span id="sortIcon_j_rank">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('seniority_years')">年資 <span id="sortIcon_j_seniority_years">↕</span></th>
-                <th style="cursor:pointer" onclick="sortJudges('case_count_total')">生涯累計 <span id="sortIcon_j_case_count_total">↕</span></th>
+                <th style="cursor:pointer" onclick="sortJudges('case_count_total')" title="本院署名累計（1996 起）；曾跨院調任者下方加註同一人跨院生涯合計">生涯累計 <span id="sortIcon_j_case_count_total">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('case_count_5y')">近五年 <span id="sortIcon_j_case_count_5y">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('case_count_1y')">近一年 <span id="sortIcon_j_case_count_1y">↕</span></th>
                 <th style="cursor:pointer" onclick="sortJudges('avg_processing_days')">平均結案天數 <span id="sortIcon_j_avg_processing_days">↕</span></th>
@@ -8430,15 +8430,23 @@ function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, trans
       <td style="font-size:0.82rem;">${notes.join('<br>') || '<span style="color:var(--text-muted);">—</span>'}</td>
     </tr>`;
   };
-  const mainRows = spanRows.filter(([c]) => !others.has(c)).map(sp => row(sp, false)).join('');
+  const mainSpans = spanRows.filter(([c]) => !others.has(c));
+  const mainRows = mainSpans.map(sp => row(sp, false)).join('');
   const otherRows = spanRows.filter(([c]) => others.has(c)).map(sp => row(sp, true)).join('');
+  // 主軌跡跨院合計（≥2 院才顯示；件數為幽靈月排除後口徑）
+  const totalRow = mainSpans.length > 1 ? `<tr style="border-top:2px solid var(--border);">
+      <td style="font-size:0.85rem;font-weight:600;">跨院合計（${mainSpans.length} 院）</td>
+      <td style="white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--text-muted);">${fmtM(mainSpans[0][1].first)} ~ ${fmtM(mainSpans.reduce((a, [, s]) => s.last > a ? s.last : a, '')) }</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">${mainSpans.reduce((a, [, s]) => a + s.cases, 0).toLocaleString()}</td>
+      <td></td>
+    </tr>` : '';
   return `
     <div class="card" style="margin-bottom:16px;">
       <div class="card-title">&#128506; 生涯軌跡 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書署名區間（1996 起）× 人審會遷調決議</span></div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>法院</th><th style="width:150px;">署名期間</th><th style="width:80px;text-align:right;">掛名件數</th><th>異動註記</th></tr></thead>
-          <tbody>${mainRows}</tbody>
+          <tbody>${mainRows}${totalRow}</tbody>
         </table>
       </div>
       ${multiCourt && mainRows ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
@@ -13687,15 +13695,19 @@ async function loadJudges() {
     return;
   }
 
-  // 案件量欄：總數＋判/裁明細（doctypefill 回填後才有；未回填顯示總數）
-  const caseCell = (total, dt, style) => {
+  // 案件量欄：總數＋判/裁明細（doctypefill 回填後才有；未回填顯示總數）；extra 附加列（跨院合計）
+  const caseCell = (total, dt, style, extra) => {
     if (total == null) return '<td style="text-align:center;">-</td>';
     let sub = '';
     if (dt && (dt['判決'] != null || dt['裁定'] != null)) {
       sub = `<div style="font-size:0.68rem;color:var(--text-muted);white-space:nowrap;">判 ${(dt['判決'] || 0).toLocaleString()}・裁 ${(dt['裁定'] || 0).toLocaleString()}</div>`;
     }
-    return `<td style="text-align:center;font-weight:600;${style}">${total.toLocaleString()}${sub}</td>`;
+    return `<td style="text-align:center;font-weight:600;${style}">${total.toLocaleString()}${sub}${extra || ''}</td>`;
   };
+  // 跨院生涯合計（mig 137，同一人同名串接後全院合計；單院或無資料不顯示）
+  const xcourtLine = j => (j.career_courts > 1 && j.career_total_xcourt != null)
+    ? `<div style="font-size:0.68rem;color:var(--purple);white-space:nowrap;cursor:help;" title="同一人跨院署名生涯合計（${j.career_courts} 院；同名重疊法院與孤立幽靈署名月已排除，詳法官檔案生涯軌跡卡）">跨院 ${j.career_total_xcourt.toLocaleString()}</div>`
+    : '';
 
   tbody.innerHTML = data.map(j => {
     // Data source badge
@@ -13721,7 +13733,7 @@ async function loadJudges() {
       <td>${escHtml(j.division || '-')}</td>
       <td>${escHtml(j.rank || '-')}</td>
       <td style="text-align:center;">${j.seniority_years != null ? j.seniority_years + ' 年' : '-'}</td>
-      ${caseCell(j.case_count_total, j.doctype_total, 'color:var(--gold);')}
+      ${caseCell(j.case_count_total, j.doctype_total, 'color:var(--gold);', xcourtLine(j))}
       ${caseCell(j.case_count_5y, j.doctype_5y, 'color:var(--blue);')}
       ${caseCell(j.case_count_1y, j.doctype_1y, 'color:var(--green);')}
       <td style="text-align:center;">${j.avg_processing_days != null ? j.avg_processing_days.toFixed(1) : '-'}</td>
