@@ -7812,7 +7812,7 @@ async function showJudgeDetail(name, court) {
   }
 
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
-  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [];
+  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [], transfers = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   const monthRows = [];
   await Promise.all([
@@ -7841,6 +7841,8 @@ async function showJudgeDetail(name, court) {
       .then(r => { copanel = (r.data || []).slice(0, 12); }),
     db.from('judge_changes').select('*').eq('name', name)
       .then(r => { changes = r.data || []; }),
+    db.from('judge_transfers').select('from_org,to_org').eq('name', name)
+      .then(r => { transfers = r.data || []; }).catch(() => {}),
     (async () => { // 逐月署名全院（PostgREST 1000 列上限 → range 逐頁）
       for (let from = 0; ; from += 1000) {
         const { data: mr } = await db.from('judge_month_stats')
@@ -7879,16 +7881,30 @@ async function showJudgeDetail(name, court) {
   const lastYm = thisCourtRows.length ? thisCourtRows[thisCourtRows.length - 1].yyyymm : null;
 
   // 生涯軌跡：逐院署名區間（同名串接，官方遷調邊佐證者較可靠）
+  // 幽靈署名防呆（mig 135 問題一同型態：上訴審附件原審全文誤抓）：孤立月（該院 ±6 個月內
+  // 無其他署名且當月 ≤2 件）不列入區間與掛名件數，避免單件幽靈拉長區間、誤觸同名重疊拆分；
+  // 該院全部月份皆孤立者（零星支援/借調）無從區分，保留原樣
+  const ymIdx = m => +m.slice(0, 4) * 12 + +m.slice(4, 6);
+  const byCourt = {};
+  knownRows.forEach(r => (byCourt[r.court_name] = byCourt[r.court_name] || []).push(r));
   const spans = {};
-  knownRows.forEach(r => {
-    const s = spans[r.court_name] || (spans[r.court_name] = { first: r.yyyymm, last: r.yyyymm, cases: 0 });
-    if (r.yyyymm < s.first) s.first = r.yyyymm;
-    if (r.yyyymm > s.last) s.last = r.yyyymm;
-    s.cases += r.case_count || 0;
+  let ghostMonths = 0;
+  Object.entries(byCourt).forEach(([c, rows]) => {
+    const mi = rows.map(r => ymIdx(r.yyyymm));
+    const isolated = rows.map((r, i) =>
+      (r.case_count || 0) <= 2 && !mi.some((m, j) => j !== i && Math.abs(m - mi[i]) <= 6));
+    const kept = isolated.every(Boolean) ? rows : rows.filter((_, i) => !isolated[i]);
+    ghostMonths += rows.length - kept.length;
+    const s = spans[c] = { first: kept[0].yyyymm, last: kept[0].yyyymm, cases: 0 };
+    kept.forEach(r => {
+      if (r.yyyymm < s.first) s.first = r.yyyymm;
+      if (r.yyyymm > s.last) s.last = r.yyyymm;
+      s.cases += r.case_count || 0;
+    });
   });
   const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
   const multiCourt = spanRows.length > 1;
-  const sameNameCourts = judgeSameNameCourts(spanRows, changes, court);
+  const sameNameCourts = judgeSameNameCourts(spanRows, changes, court, transfers);
 
   // 全期首見（跨院，同名合併；早於本院首見時於基本資料補一列，避免「年資推估」與「本院首見」看似矛盾）
   const firstEver = knownRows.length
@@ -7993,7 +8009,7 @@ async function showJudgeDetail(name, court) {
 
     ${renderJudgePairsCard(pairs, copanel, court)}
 
-    ${renderJudgeCareerCard(name, spanRows, changes, court, multiCourt)}
+    ${renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths)}
 
     ${jc?.lawsnote_url ? `
     <div style="text-align:center;margin-top:12px;">
@@ -8356,14 +8372,31 @@ function renderJudgePairsCard(pairs, copanel, court) {
 
 // 同名仲裁（與 mig 089 max_overlap 同口徑）：他院署名區間與本院重疊 >6 個月＝不可能是同一人
 // 並沿遷調/推定邊傳遞（如 屏東→新北 銜接到重疊的新北，一併歸入）；徽章列與生涯軌跡卡共用
-function judgeSameNameCourts(spanRows, changes, court) {
+// 官方邊否決：與本院經人審會遷調/支援邊（judge_transfers＋judge_changes 官方欄）串接者
+// 確認為同一人，即使區間重疊也不拆（重疊視為幽靈署名殘留，非兩人）
+function judgeSameNameCourts(spanRows, changes, court, transfers) {
   const m2i = m => +m.slice(0, 4) * 12 + +m.slice(4, 6);
   const anchor = spanRows.find(([c]) => c === court);
   const others = new Set();
   if (!anchor) return others;
+  const offAdj = {};
+  const offEdge = (a, b) => {
+    if (!a || !b || a === b) return;
+    (offAdj[a] = offAdj[a] || new Set()).add(b);
+    (offAdj[b] = offAdj[b] || new Set()).add(a);
+  };
+  (changes || []).forEach(r => { offEdge(r.court_name, r.transfer_to); offEdge(r.court_name, r.transfer_from); });
+  (transfers || []).forEach(t => offEdge(t.from_org, t.to_org));
+  const officiallyLinked = new Set([court]);
+  for (const q = [court]; q.length;) {
+    const c = q.shift();
+    (offAdj[c] || []).forEach(n => {
+      if (!officiallyLinked.has(n)) { officiallyLinked.add(n); q.push(n); }
+    });
+  }
   const af = m2i(anchor[1].first), al = m2i(anchor[1].last);
   spanRows.forEach(([c, s]) => {
-    if (c === court) return;
+    if (c === court || officiallyLinked.has(c)) return;
     if (Math.min(al, m2i(s.last)) - Math.max(af, m2i(s.first)) + 1 > 6) others.add(c);
   });
   const edgeCourts = r => [r.transfer_to, r.transfer_from, r.inferred_to, r.inferred_from].filter(Boolean);
@@ -8373,7 +8406,7 @@ function judgeSameNameCourts(spanRows, changes, court) {
   for (let changed = true; changed;) {
     changed = false;
     spanRows.forEach(([c]) => {
-      if (c !== court && !others.has(c) && linked(c)) { others.add(c); changed = true; }
+      if (c !== court && !others.has(c) && !officiallyLinked.has(c) && linked(c)) { others.add(c); changed = true; }
     });
   }
   return others;
@@ -8381,10 +8414,10 @@ function judgeSameNameCourts(spanRows, changes, court) {
 
 // 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
 // 重疊同名者拆到「疑似同名法官」區塊
-function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
+function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths) {
   if (!spanRows.length) return '';
   const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
-  const others = judgeSameNameCourts(spanRows, changes, court);
+  const others = judgeSameNameCourts(spanRows, changes, court, transfers);
   const row = ([c, s], dim) => {
     const notes = (changes || []).filter(r => r.court_name === c)
       .map(r => jchgXferCell(r))
@@ -8409,6 +8442,7 @@ function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
         </table>
       </div>
       ${multiCourt && mainRows ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
+      ${ghostMonths ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">已排除 ${ghostMonths} 個孤立署名月（該院前後 6 個月內無其他署名且當月 &le;2 件，多為上訴審判決附件誤抓原審署名）。</div>` : ''}
       ${otherRows ? `
       <div style="margin-top:14px;">
         <div style="font-size:0.82rem;font-weight:600;color:var(--orange);margin-bottom:2px;">&#9888; 疑似另一位同名法官</div>
