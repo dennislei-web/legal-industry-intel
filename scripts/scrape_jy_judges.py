@@ -131,10 +131,12 @@ def _clean_name(cell):
 
 
 def _row_rank(cells):
-    """從整列 cell 找職稱（取最完整匹配），預設『法官』"""
-    joined = ' '.join(cells)
+    """從職稱欄找職稱：只認整格恰為職稱詞的 cell，預設『法官』。
+    不可掃整列 join 文字——高院名冊的經歷欄常含「某地院候補法官」，
+    會把現職法官誤標成候補法官（2026-08 全高院 41 位誤標事故）"""
+    stripped = [_WS.sub('', c) for c in cells if c]
     for w in RANK_WORDS:  # RANK_WORDS 已由完整→簡單排序
-        if w in joined:
+        if w in stripped:
             return w
     return '法官'
 
