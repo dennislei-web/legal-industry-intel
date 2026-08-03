@@ -131,6 +131,14 @@ RE_JUDGE = re.compile(
 RE_WRAP_ORPHAN = re.compile(
     r'^[ \t　]*([一-鿿])'
     r'(?:[ \t　]*(?:\r|\n|$)|[ \t　]+(?=(?:審判長)?法\s*官|書\s*記\s*官))')
+# 署名區錨點：結尾日期列（全形空白墊排的「中 華 民 國 114 年…」；數字前必有空白，
+# 內文行內日期「中華民國114年5月3日」無空白墊排不會誤中；1996-2001 OCR 老件用
+# 國字年「八十五年」不會中 → fallback 舊的尾窗行為）。
+# 為什麼要錨定：上訴審判決常在結尾附「原審判決全文」（附件），附件超過 3000 字時
+# 舊版「取最後 3000 字」會抓到附件裡的原審署名（原審地院法官被記到上訴審法院、
+# 本判決合議庭反而漏抓）→ 推定轉調誤判整排「地院→高院 異動」。本判決署名必在
+# 附件之前，故取「第一個日期列＋緊接署名」的區塊。
+RE_SIG_DATE = re.compile(r'中\s*華\s*民\s*國\s+\d{1,3}\s*年')
 # 分院要一起捕（臺灣高等法院「高雄分院」），否則各分院判決全被歸到高本院
 RE_COURT = re.compile(r'^([一-鿿]{2,15}法院(?:[一-鿿]{2,4}分院)?)')
 
@@ -432,8 +440,18 @@ def extract_prosecutors(jfull, court):
 
 
 def extract_judges(jfull):
-    """從裁判書全文結尾抽出法官姓名（去重、排除書記官等）"""
-    tail = jfull[-3000:]
+    """從裁判書署名區抽出法官姓名（去重、排除書記官等）。
+    先錨定「第一個結尾日期列＋緊接法官署名」的區塊（見 RE_SIG_DATE 註解，
+    防上訴審附件原審署名誤抓）；錨不到（老 OCR 件等）fallback 舊的尾窗。"""
+    tail = None
+    for dm in RE_SIG_DATE.finditer(jfull):
+        win = jfull[dm.end(): dm.end() + 1500]
+        jm = RE_JUDGE.search(win[:300])
+        if jm:
+            tail = win
+            break
+    if tail is None:
+        tail = jfull[-3000:]
     names = []
     for m in RE_JUDGE.finditer(tail):
         # 該列若同時含書記官等字樣則跳過
@@ -445,6 +463,10 @@ def extract_judges(jfull):
         # 「以上正本證明…」折行黏字：「以」落在署名行尾 → 「○○○以」。現任名冊
         # 4 字名無「以」結尾者，去尾不誤傷（migration 082 清歷史資料同規則）
         if len(name) == 4 and name.endswith('以'):
+            name = name[:3]
+        # 下一位法官的「法 官」label 折行、「法」黏到前一位名字尾（如「楊佳祥法」）。
+        # 現任名冊 0 個「法」結尾名，去尾不誤傷（migration 135 清歷史資料同規則）
+        if len(name) == 4 and name.endswith('法'):
             name = name[:3]
         # 折行截斷：兩字名＋下一行以孤字開頭 → 接回末字（migration 134 清歷史資料同規則）
         if len(name) == 2:
