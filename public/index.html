@@ -10126,43 +10126,70 @@ function switchFamCat(key, force) {
   loadFamCat(key);
 }
 
+const _famFetching = {};   // key → in-flight promise（點擊與背景預抓共用，避免同類別重複打）
+
+async function fetchFamCat(key) {
+  if (_famCache[key]) return;
+  if (_famFetching[key]) return _famFetching[key];
+  const cfg = FAM_CATS[key];
+  _famFetching[key] = (async () => {
+    const isSub = !!cfg.subcat;   // 字別模式（mig 131/132）
+    const args = isSub ? { p_category: cfg.subcat }
+               : cfg.cat ? { p_cat: cfg.cat } : { p_court_like: cfg.courtLike };
+    let rosterQ;
+    if (!cfg.rosterQ) {
+      rosterQ = Promise.resolve({ data: [] });   // 無獨立庭名（消債/國審）
+    } else {
+      rosterQ = db.from('judges_combined').select('name, court_name, division');
+      rosterQ = cfg.rosterQ.court
+        ? rosterQ.ilike('court_name', cfg.rosterQ.court)
+        : rosterQ.or(cfg.rosterQ.divOr.map(p => `division.ilike.${p}`).join(','));
+    }
+    const [yearlyR, catRowsR, rosterR, periodR] = await Promise.all([
+      isSub ? db.rpc('subcat_cases_by_year', args)
+            : db.rpc('cat_cases_by_year', { ...args, p_ok_min: cfg.okMin }),
+      // jsonb 單發版（mig 136）：RPC 的 range 分頁每頁都重跑整個聚合，刑事 4+ 頁串行要 6 秒
+      db.rpc(isSub ? 'subcat_judge_stats_json' : 'cat_judge_stats_json', args),
+      rosterQ,
+      db.rpc(isSub ? 'subcat_same_period_stats' : 'cat_same_period_stats', args),  // 未滿年同期比
+    ]);
+    if (catRowsR.error) console.log('judge_stats_json error:', catRowsR.error);
+    const catRows = catRowsR.data || [];
+    let rosterRows = rosterR.data || [];
+    if (cfg.rosterQ?.divExclude) rosterRows = rosterRows.filter(j => !cfg.rosterQ.divExclude.test(j.division || ''));
+    // 字別模式：結案天數樣本（days_n=專責法官月案量）不足 100 的年度不畫、不進 KPI
+    const yearlyRows = (yearlyR.data || []).map(y =>
+      (isSub && y.days_n != null && Number(y.days_n) < 100) ? { ...y, cat_avg_days: null } : y);
+    _famCache[key] = {
+      yearly: yearlyRows,
+      // 畫面層防禦（mig 119/126 已在 RPC 端排除）：未知法院殘渣列與 1-2 件雜訊不進表
+      rows: catRows.filter(r => r.court_name !== '未知法院' && Number(r.cat_cases) >= 3),
+      roster: new Set(rosterRows.map(j => j.name + '|' + j.court_name)),
+      period: periodR.data || [],
+    };
+  })().finally(() => { delete _famFetching[key]; });
+  return _famFetching[key];
+}
+
+// 首類渲染完成後，背景逐一預抓其餘類別 → 之後切 tab 直接命中快取
+let _famPrefetchQueued = false;
+function prefetchFamCats() {
+  if (_famPrefetchQueued) return;
+  _famPrefetchQueued = true;
+  (async () => {
+    for (const k of Object.keys(FAM_CATS)) {
+      if (!_famCache[k]) { try { await fetchFamCat(k); } catch (e) { console.log('fam prefetch error:', k, e); } }
+    }
+  })();
+}
+
 async function loadFamCat(key) {
   const cfg = FAM_CATS[key];
   try {
     if (!_famCache[key]) {
       document.getElementById('famTableBody').innerHTML = '<tr><td colspan="9" class="loading">載入中</td></tr>';
       document.getElementById('famTopJudges').innerHTML = '<div class="loading">載入中</div>';
-      const isSub = !!cfg.subcat;   // 字別模式（mig 131/132）
-      const args = isSub ? { p_category: cfg.subcat }
-                 : cfg.cat ? { p_cat: cfg.cat } : { p_court_like: cfg.courtLike };
-      let rosterQ;
-      if (!cfg.rosterQ) {
-        rosterQ = Promise.resolve({ data: [] });   // 無獨立庭名（消債/國審）
-      } else {
-        rosterQ = db.from('judges_combined').select('name, court_name, division');
-        rosterQ = cfg.rosterQ.court
-          ? rosterQ.ilike('court_name', cfg.rosterQ.court)
-          : rosterQ.or(cfg.rosterQ.divOr.map(p => `division.ilike.${p}`).join(','));
-      }
-      const [yearlyR, catRows, rosterR, periodR] = await Promise.all([
-        isSub ? db.rpc('subcat_cases_by_year', args)
-              : db.rpc('cat_cases_by_year', { ...args, p_ok_min: cfg.okMin }),
-        fetchAllRpc(isSub ? 'subcat_judge_stats' : 'cat_judge_stats', args),   // 刑事 ~3,100 列，分批抓
-        rosterQ,
-        db.rpc(isSub ? 'subcat_same_period_stats' : 'cat_same_period_stats', args),  // 未滿年同期比
-      ]);
-      let rosterRows = rosterR.data || [];
-      if (cfg.rosterQ?.divExclude) rosterRows = rosterRows.filter(j => !cfg.rosterQ.divExclude.test(j.division || ''));
-      // 字別模式：結案天數樣本（days_n=專責法官月案量）不足 100 的年度不畫、不進 KPI
-      const yearlyRows = (yearlyR.data || []).map(y =>
-        (isSub && y.days_n != null && Number(y.days_n) < 100) ? { ...y, cat_avg_days: null } : y);
-      _famCache[key] = {
-        yearly: yearlyRows,
-        // 畫面層防禦（mig 119/126 已在 RPC 端排除）：未知法院殘渣列與 1-2 件雜訊不進表
-        rows: catRows.filter(r => r.court_name !== '未知法院' && Number(r.cat_cases) >= 3),
-        roster: new Set(rosterRows.map(j => j.name + '|' + j.court_name)),
-        period: periodR.data || [],
-      };
+      await fetchFamCat(key);
     }
     if (key !== famCat) return;   // 使用者已切走，不要畫舊類別
     const { yearly, rows, roster, period } = _famCache[key];
@@ -10298,6 +10325,7 @@ async function loadFamCat(key) {
     </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">尚無資料</div>';
 
     renderFamTable();
+    prefetchFamCats();
   } catch (e) { console.log('fam cat error:', e); }
 }
 
