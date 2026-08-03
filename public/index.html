@@ -7905,6 +7905,11 @@ async function showJudgeDetail(name, court) {
   const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
   const multiCourt = spanRows.length > 1;
   const sameNameCourts = judgeSameNameCourts(spanRows, changes, court, transfers);
+  // 前院清單（主軌跡扣掉本院與同名院，最近的前院在前）：上訴維持率卡分院並列用
+  const prevCourts = spanRows
+    .filter(([c]) => c !== court && !sameNameCourts.has(c))
+    .sort((a, b) => b[1].last.localeCompare(a[1].last))
+    .map(([c]) => c);
 
   // 全期首見（跨院，同名合併；早於本院首見時於基本資料補一列，避免「年資推估」與「本院首見」看似矛盾）
   const firstEver = knownRows.length
@@ -7959,7 +7964,7 @@ async function showJudgeDetail(name, court) {
 
     ${renderJudgeDisciplineCard(disciplines, impeachments, evalMatches)}
 
-    ${renderJudgeAppealCard(appealStats, court)}
+    ${renderJudgeAppealCard(appealStats, court, prevCourts)}
 
     ${stat || thisCourtRows.length ? `
     <div class="card" style="margin-bottom:16px;">
@@ -8116,11 +8121,16 @@ async function crmCrawlDispatch(name, court) {
 }
 
 // 上訴維持率卡（judge_appeal_stats mig 128；裁判書全文反算，(name, court) 比對）
-function renderJudgeAppealCard(rows, court) {
+function renderJudgeAppealCard(rows, court, prevCourts) {
   if (!rows?.length) return '';
   const trial = rows.filter(r => r.side === 'trial' && r.court_name === court);
   const app = rows.filter(r => r.side === 'appellate' && r.court_name === court);
-  if (!trial.length && !app.length) return '';
+  // 前院時期（生涯主軌跡其他院，同名院已排除；最近的前院在前）——各院分開列，
+  // 不與本院合併成單一維持率：審級不同（地院被高院審 vs 高院被最高審）廢棄率不可比
+  const prevTrial = (prevCourts || [])
+    .map(c => ({ c, rs: rows.filter(r => r.side === 'trial' && r.court_name === c) }))
+    .filter(x => x.rs.some(r => r.appealed > 0));
+  if (!trial.length && !app.length && !prevTrial.length) return '';
   const sum = rs => rs.reduce((a, r) => {
     a.appealed += r.appealed; a.upheld += r.upheld; a.rev_full += r.rev_full;
     a.rev_part += r.rev_part; a.other += r.other; return a;
@@ -8156,6 +8166,11 @@ function renderJudgeAppealCard(rows, court) {
       <div class="card-title">&#9877; 上訴維持率 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書全文反算（獨家指標）；僅計上級審「判決」且原審可對回開放資料窗口者，為下限估計；合議庭每位署名法官各計 1 件</span></div>
       ${block('本院判決被上訴後', '其署名判決遭上訴、上級審已判決者的結果分佈', trial)}
       ${block('審理上訴案時', '其於本院審理上訴案件（含合議庭署名）的處理傾向', app)}
+      ${prevTrial.length ? `
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">前院時期（依生涯主軌跡串接；各審級分開列，不與本院合併——不同審級的廢棄率不可比）</div>
+        ${prevTrial.map(x => block(`${escHtml(x.c)}時期判決被上訴後`, '其於該院署名判決遭上訴、上級審已判決者', x.rs)).join('')}
+      </div>` : ''}
     </div>`;
 }
 
