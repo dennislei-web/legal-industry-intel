@@ -7888,6 +7888,7 @@ async function showJudgeDetail(name, court) {
   });
   const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
   const multiCourt = spanRows.length > 1;
+  const sameNameCourts = judgeSameNameCourts(spanRows, changes, court);
 
   // 全期首見（跨院，同名合併；早於本院首見時於基本資料補一列，避免「年資推估」與「本院首見」看似矛盾）
   const firstEver = knownRows.length
@@ -7908,7 +7909,11 @@ async function showJudgeDetail(name, court) {
   if (jc?.rank && jc.rank !== '法官') badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">${escHtml(jc.rank)}</span>`);
   if (stat) badges.push('<span class="badge" style="background:var(--green-dim);color:var(--green);">裁判書統計</span>');
   if (jc?.has_lawsnote) badges.push('<span class="badge badge-orange">Lawsnote</span>');
-  if (statRows.length > 1) badges.push(`<span class="badge badge-orange" style="cursor:help;" title="此姓名亦出現於其他 ${statRows.length - 1} 個法院的裁判書統計，可能為轉調或同名不同人；本頁配對、案由、合議庭均已鎖定本院資料">同名/跨院 ×${statRows.length}</span>`);
+  if (sameNameCourts.size) {
+    badges.push(`<span class="badge badge-orange" style="cursor:help;" title="以下 ${sameNameCourts.size} 個法院的署名期間與本院任期重疊超過 6 個月，同一人不可能同時在兩院常態署名，推定為同名的另一位法官：${escHtml([...sameNameCourts].join('、'))}（詳生涯軌跡卡）；本頁配對、案由、合議庭均已鎖定本院資料">疑似同名 ×${sameNameCourts.size}</span>`);
+  } else if (multiCourt) {
+    badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);cursor:help;" title="此姓名曾於 ${spanRows.length} 個法院署名，署名區間互不重疊，推定為同一人歷次轉調（有官方遷調決議者於生涯軌跡卡標註）；本頁配對、案由、合議庭均已鎖定本院資料">跨院軌跡 ×${spanRows.length}</span>`);
+  }
   const judgeDisc = disciplines.filter(d => d.role !== '檢察官');
   const judgeImp = impeachments.filter(d => d.role !== '檢察官');
   if (judgeDisc.length || judgeImp.length || evalMatches.length) badges.push(`<span class="badge badge-red" style="cursor:help;" title="職務法庭懲戒裁判、監察院彈劾案或評鑑成立決議（對應回推）有此姓名（姓名比對，詳懲戒與彈劾卡）">&#9888; 懲戒/彈劾/評鑑 ×${judgeDisc.length + judgeImp.length + evalMatches.length}</span>`);
@@ -8349,32 +8354,37 @@ function renderJudgePairsCard(pairs, copanel, court) {
     </div>`;
 }
 
-// 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
 // 同名仲裁（與 mig 089 max_overlap 同口徑）：他院署名區間與本院重疊 >6 個月＝不可能是同一人
-// → 拆到「疑似同名法官」區塊；並沿遷調/推定邊傳遞（如 屏東→新北 銜接到重疊的新北，一併歸入）
-function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
-  if (!spanRows.length) return '';
-  const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
+// 並沿遷調/推定邊傳遞（如 屏東→新北 銜接到重疊的新北，一併歸入）；徽章列與生涯軌跡卡共用
+function judgeSameNameCourts(spanRows, changes, court) {
   const m2i = m => +m.slice(0, 4) * 12 + +m.slice(4, 6);
   const anchor = spanRows.find(([c]) => c === court);
   const others = new Set();
-  if (anchor) {
-    const af = m2i(anchor[1].first), al = m2i(anchor[1].last);
-    spanRows.forEach(([c, s]) => {
-      if (c === court) return;
-      if (Math.min(al, m2i(s.last)) - Math.max(af, m2i(s.first)) + 1 > 6) others.add(c);
+  if (!anchor) return others;
+  const af = m2i(anchor[1].first), al = m2i(anchor[1].last);
+  spanRows.forEach(([c, s]) => {
+    if (c === court) return;
+    if (Math.min(al, m2i(s.last)) - Math.max(af, m2i(s.first)) + 1 > 6) others.add(c);
+  });
+  const edgeCourts = r => [r.transfer_to, r.transfer_from, r.inferred_to, r.inferred_from].filter(Boolean);
+  const linked = c => (changes || []).some(r =>
+    (r.court_name === c && edgeCourts(r).some(x => others.has(x))) ||
+    (others.has(r.court_name) && edgeCourts(r).includes(c)));
+  for (let changed = true; changed;) {
+    changed = false;
+    spanRows.forEach(([c]) => {
+      if (c !== court && !others.has(c) && linked(c)) { others.add(c); changed = true; }
     });
-    const edgeCourts = r => [r.transfer_to, r.transfer_from, r.inferred_to, r.inferred_from].filter(Boolean);
-    const linked = c => (changes || []).some(r =>
-      (r.court_name === c && edgeCourts(r).some(x => others.has(x))) ||
-      (others.has(r.court_name) && edgeCourts(r).includes(c)));
-    for (let changed = true; changed;) {
-      changed = false;
-      spanRows.forEach(([c]) => {
-        if (c !== court && !others.has(c) && linked(c)) { others.add(c); changed = true; }
-      });
-    }
   }
+  return others;
+}
+
+// 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
+// 重疊同名者拆到「疑似同名法官」區塊
+function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt) {
+  if (!spanRows.length) return '';
+  const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
+  const others = judgeSameNameCourts(spanRows, changes, court);
   const row = ([c, s], dim) => {
     const notes = (changes || []).filter(r => r.court_name === c)
       .map(r => jchgXferCell(r))
