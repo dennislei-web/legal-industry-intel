@@ -17,6 +17,8 @@ join 需跨月（上訴審距原審判決可達 1-2 年），原審索引窗要�
   python appeal_stats.py backfill 202001 202605   # 逐月補（跳過已有快取月份）
   python appeal_stats.py join                 # 全部快取 join → .judgment_work/appeal_agg.json
   python appeal_stats.py upload               # 重建 judge_appeal_stats 表
+  python appeal_stats.py auto                 # 月增量：補到最新已發布月，有新才 join+upload
+                                              # （Windows 排程每月 20 日 03:30 跑，見 appeal_monthly.bat）
 """
 import gzip
 import io
@@ -235,6 +237,39 @@ def upload():
     print(f'完成：{len(rows)} 列（上訴審 {d["n_appeals"]}、可對回 {d["n_matched"]}）')
 
 
+def _next_ym(ym):
+    y, m = int(ym[:4]), int(ym[4:]) + 1
+    return f'{y + 1:04d}01' if m > 12 else f'{y:04d}{m:02d}'
+
+
+def auto():
+    """月增量：從最後快取月的次月補到（當月-2，月包晚兩個月發布）；有新月才 join+upload"""
+    from datetime import date as _date
+    yms = sorted(f[:6] for f in os.listdir(WORK_DIR) if f.endswith('_appeal.jsonl.gz'))
+    if not yms:
+        print('無既有快取，請先跑 backfill')
+        return
+    today = _date.today()
+    ty, tm = (today.year, today.month - 2) if today.month > 2 else (today.year - 1, today.month + 10)
+    target = f'{ty:04d}{tm:02d}'
+    ym, ran = _next_ym(yms[-1]), []
+    while ym <= target:
+        print(f'== {ym} ==', flush=True)
+        try:
+            month(ym)
+            ran.append(ym)
+        except RuntimeError as e:
+            print(f'  {ym}：{e}（停止，下次再試）', flush=True)
+            break
+        ym = _next_ym(ym)
+    if ran:
+        join()
+        upload()
+        print(f'月增量完成：{ran}')
+    else:
+        print('無新月份可補')
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else ''
     if cmd == 'month':
@@ -257,5 +292,7 @@ if __name__ == '__main__':
         join()
     elif cmd == 'upload':
         upload()
+    elif cmd == 'auto':
+        auto()
     else:
         print(__doc__)
