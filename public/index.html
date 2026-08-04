@@ -1753,6 +1753,123 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: 霸凌調查人才庫（wbie_experts 每日同步，mig 138） ==================== -->
+    <div id="tab-wbie" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        職安法職場霸凌專章（2026-07-01 施行）要求雇主接獲申訴後啟動調查，逾百人事業單位須有<strong>外部專業人士</strong>參與——職安署為此建置「<a href="https://etms.osha.gov.tw/wbie/ExpertSearch/SearchIndex" target="_blank" style="color:var(--blue);">職場霸凌調查專業人士資料庫</a>」（官方目標 1,000 名）。本頁每日同步官方名冊全量，追蹤總量走勢、身分組成與入退庫動態。
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;">
+        <div class="kpi-card"><div class="kpi-label">名冊總量</div><div class="kpi-value" id="wbKpiTotal">-</div><div class="kpi-sub" id="wbKpiTotalSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">執業律師</div><div class="kpi-value" style="color:var(--blue);" id="wbKpiLawyer">-</div><div class="kpi-sub" id="wbKpiLawyerSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">心理師</div><div class="kpi-value" style="color:var(--gold);" id="wbKpiPsy">-</div><div class="kpi-sub">臨床＋諮商</div></div>
+        <div class="kpi-card"><div class="kpi-label">喆律入庫</div><div class="kpi-value" style="color:var(--green);" id="wbKpiZhelu">-</div><div class="kpi-sub" id="wbKpiZheluSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">最後同步</div><div class="kpi-value" style="font-size:1.1rem;" id="wbKpiSync">-</div><div class="kpi-sub" id="wbKpiSyncSub">-</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128200; 名冊總量走勢 vs 官方 1,000 名目標</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="wbTrendDesc">每日同步累積（自 2026-08-04 起追蹤）。</div>
+        <div class="chart-container" style="height:280px;"><canvas id="wbTrendChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#129513; 培訓身分組成</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="wbIdentityDesc">-</div>
+          <div class="chart-container" style="height:300px;"><canvas id="wbIdentityChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#128506;&#65039; 各縣市可參與調查人數</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">多數專家勾選多縣市（可複選），此為各縣市「可用人力池」而非駐地。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="wbAreaChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;border:2px solid var(--green);">
+        <div class="card-title">&#127793; 喆律入庫狀態</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="wbZheluDesc">-</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>姓名</th><th>狀態</th><th id="wbZheluNoteTh" style="display:none;">培訓進度</th><th>可參與區域</th></tr></thead>
+          <tbody id="wbZheluBody"></tbody>
+        </table></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9888;&#65039; 競品入庫動態</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="wbCompDesc">依服務單位歸戶的重點勞動法事務所入庫狀況。</div>
+        <div id="wbCompList">-</div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128257; 最近同步紀錄</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>日期</th><th>狀態</th><th style="text-align:right;">總量</th><th style="text-align:right;">新入庫</th><th style="text-align:right;">移除</th><th style="text-align:right;">異動</th><th>事件</th></tr></thead>
+          <tbody id="wbSyncBody"></tbody>
+        </table></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 資料源：職安署官方查詢系統，每日台北凌晨同步（筆數異變防呆，異常縮水不寫入）。「執業律師」為官方培訓身分欄；「MOJ 名冊命中」另以姓名比對全國律師名冊（同名可能誤判，供組成估計）。喆律／競品旗標依服務單位與內部觀察名單標記。
+      </div>
+    </div>
+
+    <!-- ==================== TAB: 霸凌競品儀表（admin；b2b_competitor_stats RPC，mig 139） ==================== -->
+    <div id="tab-b2b-comp" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        B2B 職場霸凌線競品追蹤（<strong>內部限定</strong>）：勞動法市場八所比較＋人才庫入庫布局。案量口徑＝近五年判決露面數（lawyers_with_stats）；勞動案＝各律師前 20 大案由含勞動關鍵字合計（<strong>下限值</strong>）。資料隨月更管線自動重算。
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9876;&#65039; 競品事務所比較</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="bcTableDesc">-</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>事務所</th><th style="text-align:right;">律師數</th><th style="text-align:right;">近5年案量</th><th style="text-align:right;">人均</th><th style="text-align:right;">勞動案</th><th style="text-align:right;">勞動占比</th><th style="text-align:right;">人才庫入庫</th><th>主力律師</th></tr></thead>
+          <tbody id="bcTableBody"></tbody>
+        </table></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title">&#128202; 勞動案占比對決</div>
+          <div class="chart-container" style="height:300px;"><canvas id="bcLaborChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">&#127942; 人才庫入庫人數</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">外部調查委員資格＝案源入口；入庫人數×可參與區域＝地理覆蓋能力。</div>
+          <div class="chart-container" style="height:300px;"><canvas id="bcWbieChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128188; 職場霸凌相關政府標案</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="bcTenderDesc">gov_tenders 表標題含「霸凌」之標案（法律服務口徑；EAP／管顧類標案不在本表，見人資顧問生態分析報告）。</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>決標日</th><th>機關</th><th>標案</th><th>得標者</th><th style="text-align:right;">金額</th></tr></thead>
+          <tbody id="bcTenderBody"></tbody>
+        </table></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
+        ※ 競品清單維護在 wbie_watchlist（admin-only 表）；戰略脈絡見 Playbook v3.3（內部文件，不在本站）。
+      </div>
+    </div>
+
+    <!-- ==================== TAB: 霸凌戰略 KPI（admin；b2b_kpi_entries 手填，mig 138） ==================== -->
+    <div id="tab-b2b-kpi" class="tab-content">
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
+        B2B 霸凌線 90 天啟動計畫進度（<strong>內部限定</strong>）：KPI 實測值手動填報，漏斗假設值 vs 實測對照。目標與假設值出自 Playbook v3.3（第七／十章）。
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127919; 90 天 KPI 進度</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">「人才庫入庫」自動帶入名冊實測；其餘指標點數字可直接改、按儲存寫回。</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>指標</th><th style="text-align:right;">目標</th><th style="text-align:right;">實測</th><th style="text-align:right;">達成率</th><th>備註</th><th></th></tr></thead>
+          <tbody id="bkKpiBody"></tbody>
+        </table></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128293; 轉化漏斗：假設 vs 實測</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">全漏斗尚無 B2B 實測——KPI 逐段拆計就是為了 90 天內把假設換成實測；實測欄有值後此表即為定價與資源配置依據。</div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>漏斗段</th><th style="text-align:right;">假設值</th><th style="text-align:right;">實測值</th><th>依據／備註</th><th></th></tr></thead>
+          <tbody id="bkFunnelBody"></tbody>
+        </table></div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;" id="bkFooter">
+        ※ 資料表 b2b_kpi_entries（admin-only）；之後接 CRM 自動填報。
+      </div>
+    </div>
+
     <!-- ==================== TAB: 公證市場（民間公證人 — 供給/價格雙管制的特許市場，司法院名冊全量＋統計月報） ==================== -->
     <div id="tab-notary" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
@@ -4001,6 +4118,9 @@ const SECTIONS = {
     { tab: 'laf', label: '法扶市場' },
     { tab: 'adr', label: '調解與仲裁' },
     { tab: 'labor', label: '勞資爭議' },
+    { tab: 'wbie', label: '霸凌調查人才庫' },
+    { tab: 'b2b-comp', label: '霸凌競品儀表', adminOnly: true },
+    { tab: 'b2b-kpi', label: '霸凌戰略 KPI', adminOnly: true },
     { tab: 'notary', label: '公證市場' },
     { tab: 'landagent', label: '地政士市場' },
     { tab: 'nonlit', label: '商標專利' },
@@ -4063,6 +4183,9 @@ function showTab(tab) {
   if (tab === 'govtender') loadGovTenderOnce();
   if (tab === 'adr') loadAdrOnce();
   if (tab === 'labor') loadLaborOnce();
+  if (tab === 'wbie') loadWbieOnce();
+  if (tab === 'b2b-comp' && isAdmin) loadB2bCompOnce();
+  if (tab === 'b2b-kpi' && isAdmin) loadB2bKpiOnce();
   if (tab === 'value') loadValueOnce();
   if (tab === 'notary') loadNotaryOnce();
   if (tab === 'landagent') loadLandagentOnce();
@@ -12324,6 +12447,258 @@ async function loadLaborOnce() {
     const el = document.getElementById('lbKpiCases'); if (el) el.textContent = '載入失敗';
     console.error('勞資爭議資料載入失敗', e);
   }
+}
+
+// ===== 霸凌調查人才庫（wbie_experts 每日同步，mig 138/139）=====
+let _wbCharts = {};
+function _wbChart(id, cfg) {
+  if (_wbCharts[id]) _wbCharts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  _wbCharts[id] = new Chart(el.getContext('2d'), cfg);
+  requestAnimationFrame(() => { if (_wbCharts[id]) _wbCharts[id].resize(); });
+}
+let _wbExpertsCache = null;
+async function _wbFetchExperts() {
+  // PostgREST 單次上限 1000 列，名冊已 1,040+ → .range() 逐頁
+  if (_wbExpertsCache) return _wbExpertsCache;
+  const out = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await db.from('wbie_experts')
+      .select('id,name,gender,identity,unit,title,areas,is_zhelu,is_competitor,competitor_firm,is_lawyer,first_seen')
+      .is('removed_at', null).order('id').range(i, i + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  _wbExpertsCache = out;
+  return out;
+}
+let _wbLoaded = false;
+async function loadWbieOnce() {
+  if (_wbLoaded) return;
+  _wbLoaded = true;
+  try {
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red'), muted = _lafVar('--text-muted');
+    const [experts, logsQ, wlQ] = await Promise.all([
+      _wbFetchExperts(),
+      db.from('wbie_sync_log').select('sync_date,status,total_count,new_count,removed_count,changed_count,milestones').order('created_at', { ascending: false }).limit(60),
+      db.from('wbie_watchlist').select('category,name,note,sort').eq('category', 'zhelu').order('sort'),
+    ]);
+    if (logsQ.error) throw logsQ.error;
+    const logs = logsQ.data || [];
+    const wl = (wlQ.data || []);  // 非 admin：RLS 回空 → 只顯示已入庫者
+    const total = experts.length;
+    // KPI
+    document.getElementById('wbKpiTotal').textContent = total.toLocaleString();
+    document.getElementById('wbKpiTotalSub').innerHTML = '官方目標 1,000 名：<strong>' + (total / 10).toFixed(0) + '%</strong>' + (total >= 1000 ? '（已達標）' : '');
+    const idDist = {};
+    experts.forEach(e => idDist[e.identity || '未填'] = (idDist[e.identity || '未填'] || 0) + 1);
+    const nLaw = idDist['執業律師'] || 0, nPsy = idDist['執業臨床心理師或諮商心理師'] || 0;
+    const nMoj = experts.filter(e => e.is_lawyer).length;
+    document.getElementById('wbKpiLawyer').textContent = nLaw.toLocaleString();
+    document.getElementById('wbKpiLawyerSub').textContent = (nLaw / total * 100).toFixed(0) + '%（MOJ 名冊命中 ' + nMoj + '）';
+    document.getElementById('wbKpiPsy').textContent = nPsy.toLocaleString();
+    const zhelu = experts.filter(e => e.is_zhelu);
+    document.getElementById('wbKpiZhelu').textContent = zhelu.length;
+    document.getElementById('wbKpiZheluSub').textContent = wl.length ? '報名池 ' + wl.length + ' 位' : '依服務單位歸戶';
+    const lastOk = logs.find(l => l.status === 'ok');
+    document.getElementById('wbKpiSync').textContent = lastOk ? lastOk.sync_date : '—';
+    document.getElementById('wbKpiSyncSub').textContent = lastOk ? '每日台北凌晨自動同步' : '尚無成功同步';
+    // 1) 總量走勢（sync_log 每日一點；同日取最新）
+    const byDate = {};
+    logs.slice().reverse().forEach(l => { if (l.status === 'ok') byDate[l.sync_date] = l.total_count; });
+    const dates = Object.keys(byDate).sort();
+    _wbChart('wbTrendChart', {
+      data: {
+        labels: dates,
+        datasets: [
+          { type: 'line', label: '名冊總量', data: dates.map(d => byDate[d]), borderColor: blue, backgroundColor: blue + '33', fill: true, tension: 0.2, pointRadius: 3 },
+          { type: 'line', label: '官方目標 1,000', data: dates.map(() => 1000), borderColor: red, borderDash: [6, 4], pointRadius: 0 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }, scales: { y: { beginAtZero: true, suggestedMax: 1200 } } }
+    });
+    // 2) 身分組成 doughnut
+    const idEntries = Object.entries(idDist).sort((a, b) => b[1] - a[1]);
+    const idColors = [blue, gold, green, '#9b7ef7', '#5fc9e7', '#e78fb3', red, muted];
+    document.getElementById('wbIdentityDesc').innerHTML =
+      '律師 <strong>' + (nLaw / total * 100).toFixed(0) + '%</strong> 為最大族群；另以姓名比對 MOJ 全國名冊命中 ' + nMoj + ' 位（含「其他」「仲裁調解委員」等身分中的律師）。';
+    _wbChart('wbIdentityChart', {
+      type: 'doughnut',
+      data: { labels: idEntries.map(x => x[0]), datasets: [{ data: idEntries.map(x => x[1]), backgroundColor: idEntries.map((_, i) => idColors[i % idColors.length] + 'cc') }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }, tooltip: { callbacks: { label: ctx => ctx.label + '：' + ctx.parsed + ' 位（' + (ctx.parsed / total * 100).toFixed(1) + '%）' } } } }
+    });
+    // 3) 縣市覆蓋
+    const areaCnt = {};
+    experts.forEach(e => (e.areas || []).forEach(a => areaCnt[a] = (areaCnt[a] || 0) + 1));
+    const areaRows = Object.entries(areaCnt).sort((a, b) => b[1] - a[1]);
+    _wbChart('wbAreaChart', {
+      type: 'bar',
+      data: { labels: areaRows.map(x => x[0]), datasets: [{ label: '可參與人數', data: areaRows.map(x => x[1]), backgroundColor: blue + 'cc' }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+    });
+    // 4) 喆律入庫狀態（admin：報名池全名單對照；非 admin：僅已入庫）
+    const zheluByName = {}; zhelu.forEach(e => zheluByName[e.name] = e);
+    const showNotes = wl.length > 0;
+    if (showNotes) document.getElementById('wbZheluNoteTh').style.display = '';
+    const rows = showNotes
+      ? wl.map(w => ({ name: w.name, note: w.note, exp: zheluByName[w.name] }))
+      : zhelu.map(e => ({ name: e.name, note: null, exp: e }));
+    document.getElementById('wbZheluDesc').innerHTML = showNotes
+      ? '已入庫 <strong style="color:var(--green);">' + zhelu.length + '</strong> ／ 報名池 ' + wl.length + ' 位（培訓進度為人工維護，wbie_watchlist）。'
+      : '依服務單位歸戶，已入庫 <strong style="color:var(--green);">' + zhelu.length + '</strong> 位。';
+    document.getElementById('wbZheluBody').innerHTML = rows.map(r => `<tr>
+      <td style="font-weight:600;">${escHtml(r.name)}</td>
+      <td>${r.exp ? '<span style="color:var(--green);font-weight:700;">✓ 已入庫</span>' : '<span style="color:var(--text-muted);">報名／培訓中</span>'}</td>
+      ${showNotes ? '<td style="font-size:0.78rem;color:var(--text-muted);">' + escHtml(r.note || '') + '</td>' : ''}
+      <td style="font-size:0.76rem;">${r.exp ? ((r.exp.areas || []).length >= 20 ? '全國（' + r.exp.areas.length + ' 縣市）' : escHtml((r.exp.areas || []).join('、'))) : '—'}</td>
+    </tr>`).join('');
+    // 5) 競品入庫動態
+    const compByFirm = {};
+    experts.filter(e => e.is_competitor).forEach(e => (compByFirm[e.competitor_firm] = compByFirm[e.competitor_firm] || []).push(e));
+    const compFirms = Object.entries(compByFirm).sort((a, b) => b[1].length - a[1].length);
+    document.getElementById('wbCompDesc').innerHTML = compFirms.length
+      ? '重點勞動法所已入庫 <strong>' + compFirms.reduce((s, x) => s + x[1].length, 0) + '</strong> 位（喆律 ' + zhelu.length + '）。'
+      : '觀察名單未載入或無命中。';
+    document.getElementById('wbCompList').innerHTML = compFirms.map(([firm, list]) => `
+      <div style="margin-bottom:8px;"><strong>${escHtml(firm)}</strong>
+        <span style="color:var(--gold);font-weight:700;">${list.length} 位</span>：
+        <span style="font-size:0.82rem;">${list.map(e => escHtml(e.name) + (e.title && e.title !== '律師' ? '<span style="color:var(--text-muted);">(' + escHtml(e.title) + ')</span>' : '')).join('、')}</span>
+      </div>`).join('') || '-';
+    // 6) 同步紀錄
+    document.getElementById('wbSyncBody').innerHTML = logs.slice(0, 14).map(l => `<tr>
+      <td>${l.sync_date}</td>
+      <td>${l.status === 'ok' ? '<span style="color:var(--green);">ok</span>' : '<span style="color:var(--red);font-weight:700;">' + escHtml(l.status) + '</span>'}</td>
+      <td style="text-align:right;">${l.total_count.toLocaleString()}</td>
+      <td style="text-align:right;">${l.new_count || 0}</td>
+      <td style="text-align:right;">${l.removed_count || 0}</td>
+      <td style="text-align:right;">${l.changed_count || 0}</td>
+      <td style="font-size:0.76rem;">${(l.milestones || []).map(m => escHtml(m.msg)).join('<br>') || '—'}</td>
+    </tr>`).join('');
+  } catch (e) {
+    _wbLoaded = false;
+    const el = document.getElementById('wbKpiTotal'); if (el) el.textContent = '載入失敗';
+    console.error('人才庫戰情載入失敗', e);
+  }
+}
+
+// ===== 霸凌競品儀表（admin；競品清單自 wbie_watchlist，數字由 b2b_competitor_stats RPC 即時算）=====
+let _bcLoaded = false;
+async function loadB2bCompOnce() {
+  if (_bcLoaded) return;
+  _bcLoaded = true;
+  try {
+    const blue = _lafVar('--blue'), green = _lafVar('--green'), gold = _lafVar('--gold'), red = _lafVar('--red');
+    const wlQ = await db.from('wbie_watchlist').select('firm_keyword,firm_label,note,sort').eq('category', 'competitor').order('sort');
+    if (wlQ.error || !wlQ.data || !wlQ.data.length) { _bcLoaded = false; return; } // 非 admin：RLS 回空
+    const wl = wlQ.data.filter(w => w.firm_keyword);
+    const lawKw = wl.filter(w => !['和一健康'].includes(w.firm_keyword)).map(w => w.firm_keyword);
+    const keywords = [...lawKw, '喆律'];
+    const [rpcQ, experts] = await Promise.all([
+      db.rpc('b2b_competitor_stats', { p_keywords: keywords }),
+      _wbFetchExperts(),
+    ]);
+    if (rpcQ.error) throw rpcQ.error;
+    const stats = {}; (rpcQ.data || []).forEach(r => stats[r.keyword] = r);
+    const wbCnt = {};
+    experts.filter(e => e.is_competitor).forEach(e => wbCnt[e.competitor_firm] = (wbCnt[e.competitor_firm] || 0) + 1);
+    wbCnt['喆律'] = experts.filter(e => e.is_zhelu).length;
+    const order = [...lawKw, '喆律'].map(k => stats[k]).filter(Boolean).sort((a, b) => b.labor_pct - a.labor_pct);
+    document.getElementById('bcTableDesc').innerHTML =
+      '勝綸為勞動占比最高的正面對手；喆律勞動實績墊底＝行銷論述押「前法官＋程序合法性＋全案型量能」，勿打勞動實績對比（Playbook v3.1 結論）。';
+    document.getElementById('bcTableBody').innerHTML = order.map(r => {
+      const isZ = r.keyword === '喆律';
+      return `<tr${isZ ? ' style="background:rgba(74,222,128,0.08);font-weight:600;"' : ''}>
+        <td>${escHtml(r.keyword)}${isZ ? ' <span style="color:var(--green);">★</span>' : ''}</td>
+        <td style="text-align:right;">${r.lawyers}</td>
+        <td style="text-align:right;">${r.total_5yr.toLocaleString()}</td>
+        <td style="text-align:right;">${r.lawyers ? Math.round(r.total_5yr / r.lawyers) : 0}</td>
+        <td style="text-align:right;">${r.labor_5yr.toLocaleString()}</td>
+        <td style="text-align:right;color:${r.labor_pct >= 30 ? 'var(--red)' : 'var(--text-muted)'};font-weight:700;">${r.labor_pct}%</td>
+        <td style="text-align:right;font-weight:700;color:${(wbCnt[r.keyword] || 0) ? 'var(--gold)' : 'var(--text-muted)'};">${wbCnt[r.keyword] || 0}</td>
+        <td style="font-size:0.76rem;">${(r.top_lawyers || []).slice(0, 3).map(t => escHtml(t[0]) + '<span style="color:var(--text-muted);">(' + t[1].toLocaleString() + ')</span>').join('、')}</td>
+      </tr>`;
+    }).join('');
+    _wbChart('bcLaborChart', {
+      type: 'bar',
+      data: {
+        labels: order.map(r => r.keyword),
+        datasets: [{ label: '勞動案占比 %', data: order.map(r => r.labor_pct), backgroundColor: order.map(r => r.keyword === '喆律' ? green + 'cc' : blue + 'cc') }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.parsed.x + '%（' + (stats[order[ctx.dataIndex].keyword] || {}).labor_5yr + ' 件）' } } }, scales: { x: { beginAtZero: true, ticks: { callback: v => v + '%' } } } }
+    });
+    const wbOrder = Object.entries(wbCnt).sort((a, b) => b[1] - a[1]);
+    _wbChart('bcWbieChart', {
+      type: 'bar',
+      data: { labels: wbOrder.map(x => x[0]), datasets: [{ label: '入庫人數', data: wbOrder.map(x => x[1]), backgroundColor: wbOrder.map(x => x[0] === '喆律' ? green + 'cc' : gold + 'cc') }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    });
+    // 標案（gov_tenders 標題含霸凌；得標者在 gov_tender_firms 按 tender_key 撈）
+    const tQ = await db.from('gov_tenders').select('tender_key,award_date,unit_name,title,total_amount').ilike('title', '%霸凌%').order('award_date', { ascending: false }).limit(20);
+    const tRows = (tQ.data || []);
+    let winners = {};
+    if (tRows.length) {
+      const fQ = await db.from('gov_tender_firms').select('tender_key,firm_name,is_winner').in('tender_key', tRows.map(t => t.tender_key)).eq('is_winner', true);
+      (fQ.data || []).forEach(f => (winners[f.tender_key] = winners[f.tender_key] || []).push(f.firm_name));
+    }
+    document.getElementById('bcTenderBody').innerHTML = tRows.length ? tRows.map(t => `<tr>
+      <td style="white-space:nowrap;">${t.award_date || '-'}</td><td style="font-size:0.78rem;">${escHtml(t.unit_name || '')}</td>
+      <td style="font-size:0.78rem;">${escHtml(t.title || '')}</td><td>${escHtml((winners[t.tender_key] || []).join('、') || '-')}</td>
+      <td style="text-align:right;">${t.total_amount ? (+t.total_amount).toLocaleString() : '-'}</td>
+    </tr>`).join('') : '<tr><td colspan="5" style="color:var(--text-muted);">目前無標題含「霸凌」的法律服務標案（EAP／宣導類標案由管顧、協會體系承接，見內部報告）。</td></tr>';
+  } catch (e) {
+    _bcLoaded = false;
+    console.error('競品儀表載入失敗', e);
+  }
+}
+
+// ===== 霸凌戰略 KPI（admin；b2b_kpi_entries 手填）=====
+let _bkLoaded = false;
+async function loadB2bKpiOnce() {
+  if (_bkLoaded) return;
+  _bkLoaded = true;
+  try {
+    const q = await db.from('b2b_kpi_entries').select('*').order('sort');
+    if (q.error || !q.data || !q.data.length) { _bkLoaded = false; return; } // 非 admin：RLS 回空
+    let liveZhelu = null;
+    try { liveZhelu = (await _wbFetchExperts()).filter(e => e.is_zhelu).length; } catch (e) {}
+    const kpis = q.data.filter(r => r.period === '90d');
+    const funnel = q.data.filter(r => r.period === 'funnel');
+    document.getElementById('bkKpiBody').innerHTML = kpis.map(r => {
+      const isAuto = r.metric.includes('入庫');
+      const actual = isAuto && liveZhelu != null ? liveZhelu : r.actual;
+      const pct = r.target && actual != null ? Math.round(actual / r.target * 100) : null;
+      return `<tr>
+        <td style="font-weight:600;">${escHtml(r.metric)}</td>
+        <td style="text-align:right;">${r.target != null ? (+r.target).toLocaleString() : '-'} ${escHtml(r.unit_label || '')}</td>
+        <td style="text-align:right;">${isAuto
+          ? '<strong style="color:var(--green);">' + (actual ?? '-') + '</strong> <span style="font-size:0.7rem;color:var(--text-muted);">(自動)</span>'
+          : `<input type="number" step="any" value="${r.actual ?? ''}" id="bkAct_${r.id}" style="width:70px;text-align:right;background:var(--bg-input,transparent);color:inherit;border:1px solid var(--border,#445);border-radius:4px;padding:2px 4px;">`}</td>
+        <td style="text-align:right;${pct != null && pct >= 100 ? 'color:var(--green);font-weight:700;' : ''}">${pct != null ? pct + '%' : '—'}</td>
+        <td style="font-size:0.76rem;color:var(--text-muted);">${escHtml(r.note || '')}</td>
+        <td>${isAuto ? '' : `<button class="btn-sm" onclick="saveB2bKpi(${r.id})" style="font-size:0.72rem;padding:2px 8px;">儲存</button>`}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('bkFunnelBody').innerHTML = funnel.map(r => `<tr>
+      <td style="font-weight:600;">${escHtml(r.metric)}</td>
+      <td style="text-align:right;">${r.assumption != null ? r.assumption + '%' : '-'}</td>
+      <td style="text-align:right;"><input type="number" step="any" value="${r.actual ?? ''}" id="bkAct_${r.id}" style="width:70px;text-align:right;background:var(--bg-input,transparent);color:inherit;border:1px solid var(--border,#445);border-radius:4px;padding:2px 4px;"> %</td>
+      <td style="font-size:0.76rem;color:var(--text-muted);">${escHtml(r.note || '')}</td>
+      <td><button class="btn-sm" onclick="saveB2bKpi(${r.id})" style="font-size:0.72rem;padding:2px 8px;">儲存</button></td>
+    </tr>`).join('');
+  } catch (e) {
+    _bkLoaded = false;
+    console.error('戰略 KPI 載入失敗', e);
+  }
+}
+async function saveB2bKpi(id) {
+  const el = document.getElementById('bkAct_' + id);
+  if (!el) return;
+  const v = el.value === '' ? null : +el.value;
+  const { error } = await db.from('b2b_kpi_entries').update({ actual: v, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { alert('儲存失敗：' + error.message); return; }
+  el.style.borderColor = 'var(--green)';
+  _bkLoaded = false; loadB2bKpiOnce();
 }
 
 // ===== 地政士市場（代書 — 地政司名冊＋內政統計，靜態 data/landagent_stats.json）=====
