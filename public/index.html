@@ -6635,7 +6635,7 @@ function renderFirmLitTrend() {
         <span style="font-size:0.7rem;">點長條可切換上方年度</span>
       </div>
       <div class="chart-container" style="height:190px;"><canvas id="firmLitTrendChart"></canvas></div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">※ ${thisYear} 年為未滿年度（裁判書開放資料約落後 2 個月），不宜與往年直接比較；早年數字同樣按<strong>現任名冊</strong>回溯。</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">※ ${thisYear} 年為未滿年度（裁判書開放資料約落後 2 個月），不宜與往年直接比較；早年數字同樣按<strong>現任名冊</strong>回溯。本圖為<strong>曆年</strong>口徑，上方「近 5 年」為資料最新月往前滾動 60 個月，兩者加總不會相等。</div>
     </div>`;
 
   const ctx = document.getElementById('firmLitTrendChart')?.getContext('2d');
