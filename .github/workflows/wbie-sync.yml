@@ -1,10 +1,9 @@
 name: 職安署霸凌調查專家名冊同步
 
 on:
-  # 台灣凌晨 02:52（UTC 18:52）；與 lawyer-dashboard sync-010（UTC 18:23）錯開，
-  # GH Actions 排程常延遲 1-4 小時，實際落在台灣 03:00-06:00 離峰時段
-  schedule:
-    - cron: '52 18 * * *'
+  # ⚠️ 無排程：etms.osha.gov.tw 擋海外 IP（GH runner Errno 101 network unreachable，
+  # 2026-08-04 實測）。每日同步走本機 Windows 工作排程器（wbie_sync_daily，台北 03:10，
+  # 比照 law010 系列本機排程）。此 workflow 僅留手動觸發備用（若官方日後解除封鎖可恢復 cron）。
   workflow_dispatch:
 
 permissions:
