@@ -1,0 +1,33 @@
+name: 職安署霸凌調查專家名冊同步
+
+on:
+  # 台灣凌晨 02:52（UTC 18:52）；與 lawyer-dashboard sync-010（UTC 18:23）錯開，
+  # GH Actions 排程常延遲 1-4 小時，實際落在台灣 03:00-06:00 離峰時段
+  schedule:
+    - cron: '52 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wbie-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run wbie_sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: python -u wbie_sync.py
