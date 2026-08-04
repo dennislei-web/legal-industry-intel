@@ -183,6 +183,21 @@
   書記官異動不經人審會，**無**法官 `judge_transfers` 式結構資料；缺額（2026-03 全國 353 人）
   僅新聞/司法院說明，前端靜態引用
 
+## B2B 霸凌線（migration 138/139）
+
+- **職安署霸凌調查專業人士名冊**：`scripts/wbie_sync.py` 每日同步
+  `etms.osha.gov.tw/wbie/ExpertSearch/GetQualifiedExperts`（單一 GET 全量 JSON、無分頁）
+  → `wbie_experts`（diff：新入庫/移除/異動；筆數異變防呆 exit 2）＋ `wbie_sync_log`
+- **排程在本機**：政府站擋海外 IP（GH runner Errno 101），走 Windows 工作排程器
+  `wbie_expert_sync`（每日台北 03:10，`scripts/wbie_sync_daily.bat` → wbie_sync.log）；
+  `wbie-sync.yml` 僅剩 workflow_dispatch 備用
+- **機密紅線**：喆律報名名單/競品清單/戰略 KPI 全在 admin-only 表
+  `wbie_watchlist`／`b2b_kpi_entries`（repo 與前端 JS 是 public，**不可硬編碼**任何
+  戰略內容——含結論文字，競品儀表的戰略註記走 b2b_kpi_entries period='comp-note'）
+- 前端＝產業分析 3 子頁：`wbie` 人才庫戰情（authenticated）＋`b2b-comp` 競品儀表
+  ＋`b2b-kpi` 戰略 KPI（後兩者 adminOnly；競品比較用 `b2b_competitor_stats(p_keywords)`
+  RPC，關鍵字由前端自 watchlist 取得後傳入）
+
 ## 010 合作律師 tab（migration 073）
 
 - 律師區子頁 `law010`（喆律校友會旁）：法律010 平台合作律師 × MOJ 現職所 × 官方案量
