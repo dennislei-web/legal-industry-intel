@@ -6380,6 +6380,7 @@ async function showFirmDetail(firmName) {
       </div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin:-4px 0 10px;line-height:1.5;">※ 按<strong>現任名冊</strong>回溯：轉入律師帶入其過往案量、已離所者不計；年份切得越早，與「當年實際陣容」落差越大。</div>
       <div id="firmLitBody"></div>
+      <div id="firmLitTrend"></div>
       <div id="firmLitMoves"></div>
     </div>
     ` : ''}
@@ -6604,7 +6605,80 @@ async function loadFirmLitYears(firmName) {
       o.value = r.yr; o.textContent = r.yr + ' 年';
       sel.appendChild(o);
     });
+    renderFirmLitTrend();
   } catch (e) { console.log('firm year stats error:', e); }
+}
+
+// 近 10 年出庭量趨勢：資料就是年份下拉用的 yearRows（每年一列），不另打 DB。
+// 當年度為未滿年度（裁判書開放資料月包晚約 2 個月），另色標示避免被誤讀成衰退。
+function renderFirmLitTrend() {
+  const el = document.getElementById('firmLitTrend');
+  if (!el || !_firmLit || !_firmLit.yearRows) return;
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let y = thisYear - 9; y <= thisYear; y++) years.push(String(y));
+  const byYear = {};
+  _firmLit.yearRows.forEach(r => { byYear[r.yr] = r; });
+  const vals = years.map(y => byYear[y]?.total || 0);
+  const nLaw = years.map(y => byYear[y]?.n_lawyers || 0);
+  if (!vals.some(v => v > 0)) { el.innerHTML = ''; return; }
+
+  // 年增率只比「最近一個完整年 vs 前一年」，不讓未滿年度的當年進來拉低
+  const iLast = years.length - 2;
+  const yoy = vals[iLast - 1] > 0 ? Math.round((vals[iLast] - vals[iLast - 1]) * 100 / vals[iLast - 1]) : null;
+
+  el.innerHTML = `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span>近 10 年出庭量趨勢</span>
+        ${yoy !== null ? `<span class="badge" style="color:${yoy >= 0 ? 'var(--green)' : 'var(--orange)'};">${years[iLast]} 年 ${yoy >= 0 ? '+' : ''}${yoy}% vs ${years[iLast - 1]}</span>` : ''}
+        <span style="font-size:0.7rem;">點長條可切換上方年度</span>
+      </div>
+      <div class="chart-container" style="height:190px;"><canvas id="firmLitTrendChart"></canvas></div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">※ ${thisYear} 年為未滿年度（裁判書開放資料約落後 2 個月），不宜與往年直接比較；早年數字同樣按<strong>現任名冊</strong>回溯。</div>
+    </div>`;
+
+  const ctx = document.getElementById('firmLitTrendChart')?.getContext('2d');
+  if (!ctx) return;
+  if (chartInstances['firmLitTrend']) { chartInstances['firmLitTrend'].destroy(); delete chartInstances['firmLitTrend']; }
+  const isPartial = y => y === String(thisYear);
+  chartInstances['firmLitTrend'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: years,
+      datasets: [{
+        data: vals,
+        backgroundColor: years.map(y => isPartial(y) ? 'rgba(201,168,76,0.25)' : 'rgba(201,168,76,0.65)'),
+        borderColor: years.map(y => isPartial(y) ? 'rgba(201,168,76,0.6)' : 'transparent'),
+        borderWidth: years.map(y => isPartial(y) ? 1 : 0),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      onClick: (e, els, chart) => {
+        if (!els?.length) return;
+        const yr = chart.data.labels[els[0].index];
+        const sel = document.getElementById('firmLitYearSel');
+        if (sel && Array.from(sel.options).some(o => o.value === yr)) { sel.value = yr; renderFirmLitBody(yr); }
+      },
+      onHover: (e, els) => { if (e?.native?.target) e.native.target.style.cursor = els?.length ? 'pointer' : 'default'; },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => items[0].label + ' 年' + (isPartial(items[0].label) ? '（未滿年度）' : ''),
+            label: c => `出庭 ${Number(c.parsed.y).toLocaleString()} 件`,
+            afterLabel: c => nLaw[c.dataIndex] ? `有出庭律師 ${nLaw[c.dataIndex]} 位` : ''
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#8899aa', font: { size: 11 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#8899aa', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      }
+    }
+  });
 }
 
 function renderFirmLitBody(mode) {
@@ -6837,6 +6911,7 @@ function closeFirmModal() {
   if (chartInstances['firmSeniority']) { chartInstances['firmSeniority'].destroy(); delete chartInstances['firmSeniority']; }
   if (chartInstances['firmCats']) { chartInstances['firmCats'].destroy(); delete chartInstances['firmCats']; }
   if (chartInstances['firmTopLawyers']) { chartInstances['firmTopLawyers'].destroy(); delete chartInstances['firmTopLawyers']; }
+  if (chartInstances['firmLitTrend']) { chartInstances['firmLitTrend'].destroy(); delete chartInstances['firmLitTrend']; }
 }
 
 // ESC 關閉 modal
