@@ -1840,14 +1840,14 @@
         </table></div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 競品清單維護在 wbie_watchlist（admin-only 表）；戰略脈絡見 Playbook v3.3（內部文件，不在本站）。
+        ※ 競品清單與註記維護在 wbie_watchlist（admin-only 表）；戰略脈絡見內部文件（不在本站）。
       </div>
     </div>
 
     <!-- ==================== TAB: 霸凌戰略 KPI（admin；b2b_kpi_entries 手填，mig 138） ==================== -->
     <div id="tab-b2b-kpi" class="tab-content">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-        B2B 霸凌線 90 天啟動計畫進度（<strong>內部限定</strong>）：KPI 實測值手動填報，漏斗假設值 vs 實測對照。目標與假設值出自 Playbook v3.3（第七／十章）。
+        B2B 霸凌線 90 天啟動計畫進度（<strong>內部限定</strong>）：KPI 實測值手動填報，漏斗假設值 vs 實測對照。目標與假設值維護在 admin-only 資料表。
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127919; 90 天 KPI 進度</div>
@@ -12604,12 +12604,15 @@ async function loadB2bCompOnce() {
     experts.filter(e => e.is_competitor).forEach(e => wbCnt[e.competitor_firm] = (wbCnt[e.competitor_firm] || 0) + 1);
     wbCnt['喆律'] = experts.filter(e => e.is_zhelu).length;
     const order = [...lawKw, '喆律'].map(k => stats[k]).filter(Boolean).sort((a, b) => b.labor_pct - a.labor_pct);
+    // 戰略註記一律出自 admin-only DB（b2b_kpi_entries period='comp-note'），不硬編碼進 public JS
+    const noteQ = await db.from('b2b_kpi_entries').select('note').eq('period', 'comp-note').limit(1);
     document.getElementById('bcTableDesc').innerHTML =
-      '勝綸為勞動占比最高的正面對手；喆律勞動實績墊底＝行銷論述押「前法官＋程序合法性＋全案型量能」，勿打勞動實績對比（Playbook v3.1 結論）。';
+      (noteQ.data && noteQ.data[0] && noteQ.data[0].note) ? escHtml(noteQ.data[0].note) : '按勞動案占比排序；喆律列為對照基準。';
+    const wlNote = {}; wl.forEach(w => wlNote[w.firm_label || w.firm_keyword] = w.note);
     document.getElementById('bcTableBody').innerHTML = order.map(r => {
       const isZ = r.keyword === '喆律';
       return `<tr${isZ ? ' style="background:rgba(74,222,128,0.08);font-weight:600;"' : ''}>
-        <td>${escHtml(r.keyword)}${isZ ? ' <span style="color:var(--green);">★</span>' : ''}</td>
+        <td>${escHtml(r.keyword)}${isZ ? ' <span style="color:var(--green);">★</span>' : ''}${wlNote[r.keyword] ? '<div style="font-size:0.68rem;color:var(--text-muted);font-weight:400;">' + escHtml(wlNote[r.keyword]) + '</div>' : ''}</td>
         <td style="text-align:right;">${r.lawyers}</td>
         <td style="text-align:right;">${r.total_5yr.toLocaleString()}</td>
         <td style="text-align:right;">${r.lawyers ? Math.round(r.total_5yr / r.lawyers) : 0}</td>
