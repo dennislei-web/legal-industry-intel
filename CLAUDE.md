@@ -34,7 +34,7 @@
 - `prosecutor_month_stats` / `prosecutor_stats` — 檢察官統計（migration 029），`judgment_stats.py` 從刑事裁判書萃取「檢察官○○○提起公訴/到庭執行職務」＋所屬檢察署，`refresh_prosecutor_stats` RPC 彙總；約半數刑事判決不具名檢察官，案件數為下限估計
 - `prosecutor_offices` — 檢察署基本資料 30 署（migration 033 種子）；**現職檢察官數用 `prosecutor_active_summary()` / `prosecutor_active_by_office()` RPC**（最新資料月具名數＋跨署主要歸屬去重，實測與法務統計官方 114 年底 1,460 誤差 <1%）。`prosecutor_stats` 的列數是五年累計（人×署）組合，**不是現職人數**，別直接當檢察官總數用
 - **檢察官姓名雜訊（migration 066，2026-07）**：舊版抽取 regex 允許 `\s` 跨換行，「…檢察署檢察官\n被　告　○○」會把被告名抓成檢察官，359 月累積 ~1 萬個假名（「累計具名人數」曾膨脹到 17,752）。已刪歷史假名列＋`prosecutor_active_summary().names_total` 改「跨 ≥12 個資料月」門檻（=2,646）；`judgment_stats.py` 的 `RE_PROS_*` 改僅容許水平空白＋擴充 `RE_PROS_BAD`（**停用字與 066 清洗 pattern 同步，改一邊要同步另一邊**）。殘餘零星假名（像真人名的誤抓被告）仍在 month_stats，靠門檻擋在 KPI 外
-- `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024），前端「異動追蹤」tab 讀取
+- `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024），前端「異動追蹤」tab 讀取；律師 modal 另有「登錄單位異動歷程」卡（`renderLawyerFirmHistoryCard`，按證號列 firm_change/state_change 時間軸，new_lawyer 事件因補掃入庫噪音不列）
 - `lawyer_members` — 律師公會會員（按地區公會）
 - `user_profiles` — 使用者角色 (admin/user)
 
