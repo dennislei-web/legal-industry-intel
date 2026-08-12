@@ -2590,13 +2590,13 @@
             <option value="active_months">活躍月數：多 → 少</option>
           </select>
         </div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。<span id="jchgRosterLawyerN"></span></div>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>退場月</th><th>法官</th><th>法院</th><th>活躍月數</th><th>信心</th><th>官方遷調</th></tr>
+              <tr><th>退場月</th><th>法官</th><th>法院</th><th>活躍月數</th><th>信心</th><th>官方遷調</th><th>轉任律師</th></tr>
             </thead>
-            <tbody id="jchgRosterBody"><tr><td colspan="6" class="loading">載入中</td></tr></tbody>
+            <tbody id="jchgRosterBody"><tr><td colspan="7" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
         <div class="pagination" id="jchgRosterPagination"></div>
@@ -9484,6 +9484,8 @@ let jchgPage = 0;
 // 退場法官名冊（07-07 併版時 JS 先進、HTML 與宣告漏掉，此為補齊）
 let jchgRosterPage = 0;
 let jchgRosterSortKey = 'month';
+// 退場法官 × 法務部律師名冊（ex_judicial_lawyers 高/中信心，name → {firm_name,lic_year,confidence}）
+let _jchgExjMap = null;
 
 async function loadJudgeChanges(force) {
   if (_jchgRows && !force) { renderJudgeChanges(); return; }
@@ -9506,6 +9508,29 @@ async function loadJudgeChanges(force) {
     from += PAGE;
   }
   _jchgRows = all;
+
+  // 退場法官轉任律師比對：ex_judicial_lawyers（五訊號同名剔除後 high/medium）。
+  // MOJ 名冊每週掃新證號、比對表隨排程刷新，新登錄會自動出現，無需另建管線。
+  if (!_jchgExjMap) {
+    try {
+      let exj = [], efrom = 0;
+      for (;;) {
+        const { data, error } = await db.from('ex_judicial_lawyers')
+          .select('name,firm_name,lic_year,confidence')
+          .eq('kind', 'judge').in('confidence', ['high', 'medium'])
+          .range(efrom, efrom + PAGE - 1);
+        if (error) throw error;
+        exj = exj.concat(data || []);
+        if (!data || data.length < PAGE) break;
+        efrom += PAGE;
+      }
+      _jchgExjMap = {};
+      exj.forEach(r => { _jchgExjMap[r.name] = r; });
+    } catch (e) {
+      console.warn('ex_judicial_lawyers 載入失敗（轉任律師欄顯示 —）', e);
+      _jchgExjMap = null;
+    }
+  }
 
   // 明細篩選下拉：年度 + 法院（依資料動態生成；重載時保留現選值）
   const rows0 = _jchgRows.filter(r => r.court_name !== '未知法院');
@@ -9550,6 +9575,20 @@ function jchgXferCell(r) {
   if (r.change_type === 'leave')
     return '<span style="color:var(--text-muted);" title="官方決議與署名軌跡皆查無此人自該院之轉調；較可能離開審判職，惟不排除留職停薪／調行政職／同名誤差">查無轉調</span>';
   return '<span style="color:var(--text-muted);">—</span>';
+}
+
+// 轉任律師欄：法務部律師名冊查得同名（高/中信心）→ 連律師 modal＋現登錄所；查無 → 灰字。
+// 口徑＝姓名比對推定（同名兩法官可能互相污染），tooltip 標注；名冊每週自動掃描，日後登錄會自動出現。
+function jchgLawyerCell(r) {
+  if (!_jchgExjMap) return '<span style="color:var(--text-muted);">—</span>';
+  const m = _jchgExjMap[r.name];
+  if (!m) return '<span style="color:var(--text-muted);" title="法務部律師名冊查無同名登錄；名冊每週自動掃描新證號，日後登錄會自動反映於此欄">查無登錄</span>';
+  const yr = m.lic_year ? `民國 ${m.lic_year} 年領證` : '領證年不詳';
+  const conf = m.confidence === 'high' ? '高' : '中';
+  const firm = m.firm_name
+    ? `<div style="font-size:0.72rem;color:var(--text-muted);">${escHtml(m.firm_name)}</div>` : '';
+  return `<span title="法務部律師名冊查得同名登錄（姓名比對推定，信心：${conf}）；${yr}">` +
+    lawyerLink(r.name, 'font-weight:600;', '&#9878; 已登錄律師') + `</span>${firm}`;
 }
 
 // yyyymm 往前推 n 個月（回傳 yyyymm 字串）
@@ -9680,8 +9719,13 @@ function renderJudgeChanges() {
   const rBody = document.getElementById('jchgRosterBody');
   const rPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
   if (jchgRosterPage >= rPages) jchgRosterPage = rPages - 1;
+  // 期間內已見於法務部律師名冊的人數（持續追蹤：名冊每週掃描更新）
+  const exjN = _jchgExjMap ? roster.filter(r => _jchgExjMap[r.name]).length : null;
+  document.getElementById('jchgRosterLawyerN').innerHTML = exjN
+    ? `其中 <b style="color:var(--blue);">${exjN}</b> 位已登錄法務部律師名冊（姓名比對推定，每週自動更新）。`
+    : '';
   if (!roster.length) {
-    rBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
+    rBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
   } else {
     rBody.innerHTML = roster.slice(jchgRosterPage * PAGE_SIZE, (jchgRosterPage + 1) * PAGE_SIZE).map(r => {
       const conf = r.confidence === 'confirmed'
@@ -9694,6 +9738,7 @@ function renderJudgeChanges() {
         <td style="font-variant-numeric:tabular-nums;">${r.active_months != null ? r.active_months : '-'}</td>
         <td>${conf}</td>
         <td>${jchgXferCell(r)}</td>
+        <td>${jchgLawyerCell(r)}</td>
       </tr>`;
     }).join('');
   }

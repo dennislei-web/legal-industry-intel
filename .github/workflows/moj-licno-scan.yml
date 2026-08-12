@@ -65,7 +65,9 @@ jobs:
           # secrets 可能帶尾端空白/換行，會讓 PostgREST 回 400 PGRST102（curl 不像 Python 會 strip）
           SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
           SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
-          for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
+          # refresh_ex_judicial_lawyers：新發現的律師若是退場法官/檢察官，讓「轉任律師」
+          # 比對每週隨掃描更新（原本只掛月更 causefill，退場法官名冊追蹤會晚一個月）
+          for rpc in refresh_firm_stats_cache refresh_lawyer_stats refresh_ex_judicial_lawyers; do
             success=0
             for attempt in 1 2 3; do
               http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" \
