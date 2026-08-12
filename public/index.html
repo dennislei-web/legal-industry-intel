@@ -6951,7 +6951,7 @@ async function showLawyerDetail(name, certNumber) {
   }
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [], exJud = [];
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [], exJud = [], lawyerChanges = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
@@ -6985,6 +6985,12 @@ async function showLawyerDetail(name, certNumber) {
   if (l.moj_id) {
     tasks.push(db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle()
       .then(r => { moj = r.data; }));
+  }
+  if (l.moj_lic_no) {
+    tasks.push(db.from('moj_lawyer_changes')
+      .select('change_type,old_office,new_office,old_state,new_state,changed_at')
+      .eq('lic_no', l.moj_lic_no).order('changed_at', { ascending: true }).limit(200)
+      .then(r => { lawyerChanges = r.data || []; }));
   }
   tasks.push(ensureSoloFirms()); // 一人所所長判定
   await Promise.all(tasks);
@@ -7103,6 +7109,8 @@ async function showLawyerDetail(name, certNumber) {
       </table>
     </div>
     `}
+
+    ${renderLawyerFirmHistoryCard(lawyerChanges)}
 
     ${renderExJudicialCard(exJud, exJudJMonths, exJudPros)}
 
@@ -7520,6 +7528,30 @@ function renderPairCard(pairs) {
 const CAUSE_CAT_COLORS = { '民事': 'rgba(79,142,247,0.7)', '刑事': 'rgba(224,92,92,0.7)',
   '家事': 'rgba(76,175,130,0.7)', '行政': 'rgba(201,168,76,0.7)', '少年': 'rgba(69,183,209,0.7)',
   '懲戒': 'rgba(160,108,213,0.7)', '其他': 'rgba(136,153,170,0.7)' };
+
+// 登錄單位異動歷程（moj_lawyer_changes，trigger 逐日比對自 2026-07-03 起累積）
+// new_lawyer 事件不列：早年證號的補掃入庫也會產生該事件，非真實新登錄，會誤導
+function renderLawyerFirmHistoryCard(changes) {
+  const rows = (changes || []).filter(r => r.change_type === 'firm_change' || r.change_type === 'state_change');
+  if (!rows.length) return '';
+  const fmtD = ts => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const item = r => r.change_type === 'firm_change'
+    ? `<span style="color:var(--text-muted);">${escHtml(r.old_office || '未提供')}</span> <span style="color:var(--text-muted);">→</span> <b>${escHtml(r.new_office || '未提供')}</b>`
+    : `執業狀態：<span style="color:var(--text-muted);">${escHtml(r.old_state || '-')}</span> <span style="color:var(--text-muted);">→</span> <b style="color:var(--orange);">${escHtml(r.new_state || '-')}</b>`;
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128257; 登錄單位異動歷程 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">法務部名冊逐日比對，2026-07-03 起追蹤（此前異動無公開紀錄可回溯）</span></div>
+      <table style="width:100%;font-size:0.85rem;">
+        <tbody>${rows.map(r => `<tr>
+          <td style="padding:5px 10px 5px 0;color:var(--text-muted);white-space:nowrap;width:92px;vertical-align:top;">${fmtD(r.changed_at)}</td>
+          <td style="padding:5px 0;">${item(r)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
 
 function renderCauseCard(cs, ambiguous) {
   if (!cs || !cs.cases_5yr) return '';
