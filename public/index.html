@@ -2590,7 +2590,7 @@
             <option value="active_months">活躍月數：多 → 少</option>
           </select>
         </div>
-        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。<span id="jchgRosterLawyerN"></span></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。同名於多院同期退場（本職＋兼辦）已摺疊為本職院單列。<span id="jchgRosterLawyerN"></span></div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -9598,6 +9598,40 @@ function jchgMonthMinus(yyyymm, n) {
   return `${Math.floor(tot / 12)}${String((tot % 12) + 1).padStart(2, '0')}`;
 }
 
+// 兩個 yyyymm 相差月數（絕對值）
+function jchgMonthDiff(a, b) {
+  const v = s => parseInt(s.slice(0, 4), 10) * 12 + parseInt(s.slice(4, 6), 10);
+  return Math.abs(v(a) - v(b));
+}
+
+// 同名多院同期退場摺疊：同一姓名的退場列依月份聚類（相鄰 ≤6 月同群），每群保留
+// 活躍月數最多的本職院為主列，其餘（支援/兼辦院）併為主列註記。法官無唯一 ID，
+// 跨院同名不保證同一人，故僅摺疊顯示、不動底層資料，註記標「疑同一人」。
+function jchgFoldRoster(roster) {
+  const byName = {};
+  roster.forEach(r => { (byName[r.name] = byName[r.name] || []).push(r); });
+  const folded = [];
+  Object.values(byName).forEach(rows => {
+    rows.sort((a, b) => (a.event_month || '').localeCompare(b.event_month || ''));
+    let cluster = [];
+    const flush = () => {
+      if (!cluster.length) return;
+      if (cluster.length === 1) { folded.push(cluster[0]); }
+      else {
+        const main = cluster.reduce((m, r) => (r.active_months || 0) > (m.active_months || 0) ? r : m);
+        folded.push(Object.assign({}, main, { _coExits: cluster.filter(r => r !== main) }));
+      }
+      cluster = [];
+    };
+    rows.forEach(r => {
+      if (cluster.length && jchgMonthDiff(r.event_month, cluster[cluster.length - 1].event_month) > 6) flush();
+      cluster.push(r);
+    });
+    flush();
+  });
+  return folded;
+}
+
 function renderJudgeChanges() {
   if (!_jchgRows) return;
   const kw = (document.getElementById('jchgSearch').value || '').trim();
@@ -9712,6 +9746,7 @@ function renderJudgeChanges() {
 
   // ── 退場法官名冊：真退場（leave 且非官方/推定轉出），套年月/法院/搜尋、排序、分頁 ──
   let roster = base.filter(r => r.change_type === 'leave' && jchgCat(r) === 'leave_true');
+  roster = jchgFoldRoster(roster);
   roster = roster.slice().sort((a, b) =>
     jchgRosterSortKey === 'active_months'
       ? (b.active_months || 0) - (a.active_months || 0)
@@ -9734,7 +9769,7 @@ function renderJudgeChanges() {
       return `<tr>
         <td style="white-space:nowrap;">${r.event_month.slice(0, 4)}-${r.event_month.slice(4, 6)}</td>
         <td>${judgeLink(r.name, r.court_name, 'font-weight:600;')}</td>
-        <td>${escHtml(r.court_name || '-')}</td>
+        <td>${escHtml(r.court_name || '-')}${(r._coExits || []).length ? `<div style="font-size:0.7rem;color:var(--text-muted);" title="同名於 ±6 個月內在多院退場，推定為同一人本職＋支援/兼辦，摺疊為本職院單列（法官無唯一 ID，同名不保證同一人）">另同期自 ${r._coExits.map(c => `${escHtml(c.court_name)}（${c.event_month.slice(0, 4)}-${c.event_month.slice(4, 6)}）`).join('、')} 退場</div>` : ''}</td>
         <td style="font-variant-numeric:tabular-nums;">${r.active_months != null ? r.active_months : '-'}</td>
         <td>${conf}</td>
         <td>${jchgXferCell(r)}</td>
