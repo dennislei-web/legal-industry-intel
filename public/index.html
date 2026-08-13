@@ -2585,10 +2585,16 @@
       <div class="card" style="margin-top:16px;">
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <span>&#128203; 退場法官名冊</span>
-          <select id="jchgRosterSort" onchange="jchgRosterSortKey=this.value;jchgRosterPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
-            <option value="month">退場月：新 → 舊</option>
-            <option value="active_months">活躍月數：多 → 少</option>
-          </select>
+          <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.78rem;font-weight:400;color:var(--text);cursor:pointer;user-select:none;" title="只列出已於法務部律師名冊查得同名登錄（高/中信心）的退場法官">
+              <input type="checkbox" id="jchgRosterLawyerOnly" onchange="jchgRosterPage=0;renderJudgeChanges()" style="cursor:pointer;accent-color:var(--blue);">
+              &#9878; 只看已登錄律師名冊
+            </label>
+            <select id="jchgRosterSort" onchange="jchgRosterSortKey=this.value;jchgRosterPage=0;renderJudgeChanges()" style="padding:4px 8px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit;font-size:0.78rem;cursor:pointer;">
+              <option value="month">退場月：新 → 舊</option>
+              <option value="active_months">活躍月數：多 → 少</option>
+            </select>
+          </span>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">期間內退場法官；點姓名看退場前案件概況與疑似去向。同名於多院同期退場（本職＋兼辦）已摺疊為本職院單列。<span id="jchgRosterLawyerN"></span></div>
         <div class="table-wrap">
@@ -9747,6 +9753,11 @@ function renderJudgeChanges() {
   // ── 退場法官名冊：真退場（leave 且非官方/推定轉出），套年月/法院/搜尋、排序、分頁 ──
   let roster = base.filter(r => r.change_type === 'leave' && jchgCat(r) === 'leave_true');
   roster = jchgFoldRoster(roster);
+  // 期間內已見於法務部律師名冊的人數（持續追蹤：名冊每週掃描更新）——在套「只看已登錄」前先算，計數不隨篩選變動
+  const exjN = _jchgExjMap ? roster.filter(r => _jchgExjMap[r.name]).length : null;
+  const lawyerOnlyEl = document.getElementById('jchgRosterLawyerOnly');
+  const lawyerOnly = !!(lawyerOnlyEl && lawyerOnlyEl.checked && _jchgExjMap);
+  if (lawyerOnly) roster = roster.filter(r => _jchgExjMap[r.name]);
   roster = roster.slice().sort((a, b) =>
     jchgRosterSortKey === 'active_months'
       ? (b.active_months || 0) - (a.active_months || 0)
@@ -9754,13 +9765,11 @@ function renderJudgeChanges() {
   const rBody = document.getElementById('jchgRosterBody');
   const rPages = Math.max(1, Math.ceil(roster.length / PAGE_SIZE));
   if (jchgRosterPage >= rPages) jchgRosterPage = rPages - 1;
-  // 期間內已見於法務部律師名冊的人數（持續追蹤：名冊每週掃描更新）
-  const exjN = _jchgExjMap ? roster.filter(r => _jchgExjMap[r.name]).length : null;
   document.getElementById('jchgRosterLawyerN').innerHTML = exjN
-    ? `其中 <b style="color:var(--blue);">${exjN}</b> 位已登錄法務部律師名冊（姓名比對推定，每週自動更新）。`
+    ? `其中 <a href="#" onclick="const c=document.getElementById('jchgRosterLawyerOnly');c.checked=!c.checked;jchgRosterPage=0;renderJudgeChanges();return false;" title="點擊切換：只看已登錄律師名冊的退場法官" style="color:var(--blue);text-decoration:none;"><b>${exjN}</b> 位</a>已登錄法務部律師名冊（姓名比對推定，每週自動更新）${lawyerOnly ? '——<b style="color:var(--blue);">目前只顯示這批</b>' : ''}。`
     : '';
   if (!roster.length) {
-    rBody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">此期間無退場法官</td></tr>';
+    rBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">${lawyerOnly ? '此期間無已登錄律師名冊的退場法官' : '此期間無退場法官'}</td></tr>`;
   } else {
     rBody.innerHTML = roster.slice(jchgRosterPage * PAGE_SIZE, (jchgRosterPage + 1) * PAGE_SIZE).map(r => {
       const conf = r.confidence === 'confirmed'
