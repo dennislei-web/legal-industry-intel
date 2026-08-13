@@ -6933,6 +6933,7 @@ async function showLawyerDetail(name, certNumber) {
   const bodyEl = document.getElementById('lawyerModalBody');
   modal.style.display = 'flex';
   titleEl.textContent = name;
+  clearRoleSwitch('lawyerModalRoleSwitch');
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
   // modal 內互跳（配對卡點其他律師）時捲回頂部
   bodyEl.scrollTop = 0;
@@ -6951,6 +6952,12 @@ async function showLawyerDetail(name, certNumber) {
     const { data: js } = await db.from('lawyer_judgment_stats').select('name').eq('name', name).maybeSingle();
     if (!js) {
       bodyEl.innerHTML = `<div style="color:var(--red);padding:20px;">查詢失敗: ${error?.message || '找不到資料'}</div>`;
+      // 從法官頁切過來但律師資料全查無時，仍補上切換 pill，讓使用者能切回法官頁
+      db.from('ex_judicial_lawyers').select('kind').eq('name', name).eq('kind', 'judge').in('confidence', ['high', 'medium'])
+        .then(r => {
+          if ((r.data || []).length && document.getElementById('lawyerModalTitle')?.textContent === name)
+            renderRoleSwitch('lawyerModalRoleSwitch', name, 'lawyer');
+        }).catch(() => {});
       return;
     }
     l = { name, not_in_roster: true };
@@ -7000,6 +7007,10 @@ async function showLawyerDetail(name, certNumber) {
   }
   tasks.push(ensureSoloFirms()); // 一人所所長判定
   await Promise.all(tasks);
+
+  // 前法官雙重身分 → 標頭切換 pill（可切到法官頁看署名軌跡）
+  if (exJud.some(r => r.kind === 'judge') && document.getElementById('lawyerModalTitle')?.textContent === name)
+    renderRoleSwitch('lawyerModalRoleSwitch', name, 'lawyer');
 
   // 司法官經歷明細（有前法官/前檢察官徽章者才查）
   let exJudJMonths = [], exJudPros = [];
@@ -7904,6 +7915,7 @@ async function showJudgeDetail(name, court) {
   const bodyEl = document.getElementById('judgeModalBody');
   modal.style.display = 'flex';
   titleEl.textContent = name;
+  clearRoleSwitch('judgeModalRoleSwitch');
   bodyEl.innerHTML = '<div class="loading">載入法官資料中...</div>';
   bodyEl.scrollTop = 0;
   if (bodyEl.parentElement) bodyEl.parentElement.scrollTop = 0;
@@ -7927,8 +7939,12 @@ async function showJudgeDetail(name, court) {
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
   let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [], transfers = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
+  let exjRole = []; // 已登錄律師名冊（雙重身分切換 pill 用）
   const monthRows = [];
   await Promise.all([
+    db.from('ex_judicial_lawyers').select('confidence').eq('name', name)
+      .eq('kind', 'judge').in('confidence', ['high', 'medium'])
+      .then(r => { exjRole = r.data || []; }).catch(() => {}),
     db.from('crm_officer_reviews').select('*').eq('name', name)
       .then(r => { crmRows = r.data || []; }),
     db.from('crm_crawl_status').select('*').eq('id', 1).maybeSingle()
@@ -7966,6 +7982,10 @@ async function showJudgeDetail(name, court) {
       }
     })(),
   ]);
+
+  // 雙重身分切換 pill（查無法官資料時也顯示，仍可切回律師頁）
+  if (exjRole.length && document.getElementById('judgeModalTitle')?.textContent === name)
+    renderRoleSwitch('judgeModalRoleSwitch', name, 'judge');
 
   const stat = statRows.find(s => s.court_name === court) || null;
   if (!jc && !stat && !disciplines.length && !impeachments.length) {
@@ -9798,6 +9818,30 @@ function escHtml(str) {
 
 // 共用：律師名/事務所名 → 個人介紹 modal 連結（inner 可自帶已轉義的 HTML）
 function _nameArg(n) { return escHtml(String(n)).replace(/'/g, "\\'"); }
+
+// 法官↔律師雙重身分切換 pill：退場法官已登錄律師名冊者（ex_judicial_lawyers 高/中信心，
+// 姓名比對推定），於法官/律師 modal 標頭顯示兩頁切換；單一身分者不出現。
+function renderRoleSwitch(elId, name, active) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const n = _nameArg(name);
+  const pill = (label, isActive, fn, title) => isActive
+    ? `<span style="padding:3px 10px;background:var(--blue);color:#fff;font-weight:600;white-space:nowrap;">${label}</span>`
+    : `<a href="#" onclick="${fn};return false;" title="${escHtml(title)}" style="padding:3px 10px;color:var(--text-muted);text-decoration:none;white-space:nowrap;">${label}</a>`;
+  el.innerHTML =
+    `<span title="同名同時見於法官署名紀錄與法務部律師名冊（姓名比對推定，同名可能誤併）" ` +
+    `style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:0.72rem;line-height:1.5;flex-shrink:0;">` +
+    pill('&#127963; 法官頁', active === 'judge', `showJudgeDetail('${n}','')`, '切換到法官頁：署名軌跡與退場前案件概況') +
+    pill('&#9878; 律師頁', active === 'lawyer', `showLawyerDetail('${n}','')`, '切換到律師頁：名冊登錄與執業概況') +
+    `</span>`;
+  el.style.display = '';
+}
+
+// modal 開啟/換人時先清掉舊的切換 pill（避免上一位的殘留）
+function clearRoleSwitch(elId) {
+  const el = document.getElementById(elId);
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
 function lawyerLink(name, style = '', inner = null) {
   if (!name) return '';
   return `<a href="#" onclick="showLawyerDetail('${_nameArg(name)}','');return false;" style="color:var(--blue);text-decoration:none;${style}">${inner != null ? inner : escHtml(name)}</a>`;
@@ -16238,7 +16282,10 @@ async function showCourtDetail(name) {
 <div id="judgeModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeJudgeModal();">
   <div class="modal-content" style="max-width:680px;">
     <div class="modal-header">
-      <h2 id="judgeModalTitle">載入中...</h2>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;">
+        <h2 id="judgeModalTitle">載入中...</h2>
+        <span id="judgeModalRoleSwitch" style="display:none;"></span>
+      </div>
       <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
         <button onclick="exportJudgePdf()" title="匯出 PDF" style="font-size:0.8rem;border:1px solid var(--border);border-radius:6px;padding:5px 12px;white-space:nowrap;">&#11015; 匯出 PDF</button>
         <button onclick="closeJudgeModal()">✕</button>
@@ -16277,7 +16324,10 @@ async function showCourtDetail(name) {
 <div id="lawyerModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeLawyerModal();">
   <div class="modal-content" style="max-width:680px;">
     <div class="modal-header">
-      <h2 id="lawyerModalTitle">載入中...</h2>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap;">
+        <h2 id="lawyerModalTitle">載入中...</h2>
+        <span id="lawyerModalRoleSwitch" style="display:none;"></span>
+      </div>
       <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
         <button onclick="exportLawyerPdf()" title="匯出 PDF" style="font-size:0.8rem;border:1px solid var(--border);border-radius:6px;padding:5px 12px;white-space:nowrap;">&#11015; 匯出 PDF</button>
         <button onclick="closeLawyerModal()">✕</button>
