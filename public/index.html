@@ -5454,10 +5454,31 @@ let _lawyerFlagsLoading = null;
 function exJudicialTip(r) {
   const ym = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
   const role = r.kind === 'judge' ? '法官' : '檢察官';
+  if (r.source === 'gazette')
+    return `總統府公報考據：約 ${ym(r.first_yyyymm)} ～ ${ym(r.last_yyyymm)} 曾任${role}\n最後職務：${r.main_org || '-'}\n任免令輯自公報（姓名＋年齡＋轉任次序查核）；裁判書署名統計自 2000 年起，此前案件量無源可考`;
   return `裁判書比對：${ym(r.first_yyyymm)} ～ ${ym(r.last_yyyymm)} 任職${role}\n主要在${r.main_org || '-'}，具名${r.kind === 'judge' ? '裁判' : '案件'} ${Number(r.case_count_total || 0).toLocaleString()} 件\n姓名比對推定${r.confidence === 'medium' ? '（同名風險中等）' : ''}，任期內同名律師活動已剔除，供參考`;
 }
-// 律師 modal 的司法官經歷卡（法官用 judge_month_stats 逐月、檢察官用 prosecutor_stats）
-function renderExJudicialCard(exJud, jMonths, pros) {
+
+// 公報任免紀錄時間軸（ex_judicial_gazette_events；2000 前退場司法官的經歷回補，mig 141）
+function renderGazetteBlock(evts) {
+  if (!evts || !evts.length) return '';
+  const rows = evts.slice().sort((a, b) => (a.order_date_roc || '').localeCompare(b.order_date_roc || ''));
+  return `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">公報任免紀錄
+    <span style="font-size:0.7rem;">（總統令任免；輯自政大「中華民國政府官職資料庫」，點期數看公報原稿 PDF）</span></div>
+  <table style="width:100%;font-size:0.82rem;"><tbody>
+  ${rows.map(e => `<tr>
+    <td style="white-space:nowrap;color:var(--text-muted);padding:3px 8px 3px 0;">民國 ${escHtml(e.order_date_roc || '?')}</td>
+    <td style="padding:3px 8px 3px 0;"><span class="badge ${e.action === '任' ? 'badge-green' : 'badge-red'}">${escHtml(e.action || '?')}</span></td>
+    <td style="padding:3px 8px 3px 0;">${escHtml(e.org || '-')}${e.reason && e.reason !== '任命' ? ` <span style="color:var(--text-muted);font-size:0.72rem;">（${escHtml(e.reason)}）</span>` : ''}</td>
+    <td style="text-align:right;white-space:nowrap;font-size:0.72rem;">${e.pdf_url
+      ? `<a href="${escHtml(e.pdf_url)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none;">${escHtml((e.gazette || '').replace('總統府(民國37年後)', ''))}</a>`
+      : escHtml(e.gazette || '')}</td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+// 律師 modal 的司法官經歷卡（法官用 judge_month_stats 逐月、檢察官用 prosecutor_stats；
+// gazette 訊號者無署名統計，改列公報任免時間軸）
+function renderExJudicialCard(exJud, jMonths, pros, gazEvents) {
   if (!exJud || !exJud.length) return '';
   const ym = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
   const span = (f, l) => {
@@ -5477,7 +5498,8 @@ function renderExJudicialCard(exJud, jMonths, pros) {
   };
   const kpi = (v, label, color) => `<div><div style="font-size:1.35rem;font-weight:700;color:${color};">${v}</div><div style="font-size:0.75rem;color:var(--text-muted);">${label}</div></div>`;
   const blocks = [];
-  const j = exJud.find(r => r.kind === 'judge');
+  if (gazEvents && gazEvents.length) blocks.push(renderGazetteBlock(gazEvents));
+  const j = exJud.find(r => r.kind === 'judge' && r.source !== 'gazette');
   if (j) {
     const byCourt = new Map();
     const byYear = {};
@@ -5502,7 +5524,7 @@ function renderExJudicialCard(exJud, jMonths, pros) {
       </tbody></table>` : ''}
       ${yearBars(byYear, 'var(--blue)')}`);
   }
-  const p = exJud.find(r => r.kind === 'prosecutor');
+  const p = exJud.find(r => r.kind === 'prosecutor' && r.source !== 'gazette');
   if (p) {
     const offices = (pros || []).slice().sort((a, b) => (b.case_count_total || 0) - (a.case_count_total || 0));
     const byYear = {};
@@ -5520,9 +5542,12 @@ function renderExJudicialCard(exJud, jMonths, pros) {
       ${yearBars(byYear, 'var(--purple)')}`);
   }
   if (!blocks.length) return '';
+  const note = (gazEvents && gazEvents.length && !j && !p)
+    ? '總統府公報任免令考據（姓名比對推定）；卸任於裁判書電子化（2000）之前，具名案件量無源可考'
+    : '裁判書具名統計（姓名比對推定，下限估計）；裁判書未公開的早年任期不計入';
   return `
   <div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px;">
-    <div class="card-title" style="color:var(--blue);">&#9878; 司法官經歷 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">裁判書具名統計（姓名比對推定，下限估計）；裁判書未公開的早年任期不計入</span></div>
+    <div class="card-title" style="color:var(--blue);">&#9878; 司法官經歷 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">${note}</span></div>
     ${blocks.join('<hr style="border:none;border-top:1px solid rgba(128,128,128,0.25);margin:12px 0;">')}
   </div>`;
 }
@@ -5547,7 +5572,7 @@ function ensureLawyerFlags() {
         const exj = new Map();
         for (let from = 0; ; from += 1000) {
           const { data } = await db.from('ex_judicial_lawyers')
-            .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,confidence')
+            .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,confidence,source')
             .in('confidence', ['high', 'medium']).range(from, from + 999);
           (data || []).forEach(r => { const a = exj.get(r.name) || []; a.push(r); exj.set(r.name, a); });
           if (!data || data.length < 1000) break;
@@ -7013,7 +7038,11 @@ async function showLawyerDetail(name, certNumber) {
     renderRoleSwitch('lawyerModalRoleSwitch', name, 'lawyer');
 
   // 司法官經歷明細（有前法官/前檢察官徽章者才查）
-  let exJudJMonths = [], exJudPros = [];
+  let exJudJMonths = [], exJudPros = [], exJudGaz = [];
+  if (exJud.some(r => r.source === 'gazette')) {
+    const { data: gz } = await db.from('ex_judicial_gazette_events').select('*').eq('name', name);
+    exJudGaz = gz || [];
+  }
   if (exJud.some(r => r.kind === 'judge')) {
     const { data: jm } = await db.from('judge_month_stats')
       .select('yyyymm,court_name,case_count').eq('name', name).order('yyyymm').limit(1000);
@@ -7129,7 +7158,7 @@ async function showLawyerDetail(name, certNumber) {
 
     ${renderLawyerFirmHistoryCard(lawyerChanges)}
 
-    ${renderExJudicialCard(exJud, exJudJMonths, exJudPros)}
+    ${renderExJudicialCard(exJud, exJudJMonths, exJudPros, exJudGaz)}
 
     ${renderIndepDirCard(indepDirs)}
 
@@ -7940,11 +7969,14 @@ async function showJudgeDetail(name, court) {
   let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [], transfers = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   let exjRole = []; // 已登錄律師名冊（雙重身分切換 pill 用）
+  let gazEvents = []; // 公報任免紀錄（2000 前退場司法官經歷回補）
   const monthRows = [];
   await Promise.all([
     db.from('ex_judicial_lawyers').select('confidence').eq('name', name)
       .eq('kind', 'judge').in('confidence', ['high', 'medium'])
       .then(r => { exjRole = r.data || []; }).catch(() => {}),
+    db.from('ex_judicial_gazette_events').select('*').eq('name', name)
+      .then(r => { gazEvents = r.data || []; }).catch(() => {}),
     db.from('crm_officer_reviews').select('*').eq('name', name)
       .then(r => { crmRows = r.data || []; }),
     db.from('crm_crawl_status').select('*').eq('id', 1).maybeSingle()
@@ -7989,6 +8021,14 @@ async function showJudgeDetail(name, court) {
 
   const stat = statRows.find(s => s.court_name === court) || null;
   if (!jc && !stat && !disciplines.length && !impeachments.length) {
+    if (gazEvents.length) {
+      // 裁判書署名零覆蓋（2000 前已卸任）→ 改列公報任免經歷
+      bodyEl.innerHTML = `<div class="card" style="border-left:3px solid var(--blue);">
+        <div class="card-title" style="color:var(--blue);">&#127963; 公報任免經歷</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">裁判書署名統計自 2000 年起才完整，此法官於資料起點前已卸任審判職，案件統計無源可考；以下為總統府公報任免令考據（姓名比對推定，同名可能誤併）。</div>
+        ${renderGazetteBlock(gazEvents)}</div>`;
+      return;
+    }
     bodyEl.innerHTML = '<div style="color:var(--red);padding:20px;">查無此法官資料</div>';
     return;
   }
