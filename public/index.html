@@ -615,6 +615,11 @@
           <div class="kpi-value" id="kpiSources">-</div>
           <div class="kpi-sub" id="kpiSourcesSub">載入中...</div>
         </div>
+        <div class="kpi-card" title="現行執業（狀態正常）× 前司法官比對（高/中信心，姓名去重）；審檢都做過者兩邊都算。來源＝裁判書署名比對＋總統府公報任免令考據（2000 前退場者）。屬下限估計：不具名的檢察官/檢察長年代與早年年輕轉任者難以全數辨識" style="cursor:help;">
+          <div class="kpi-label">前司法官律師</div>
+          <div class="kpi-value" id="kpiExJudicial" style="color:var(--blue);">-</div>
+          <div class="kpi-sub" id="kpiExJudicialSub">載入中...</div>
+        </div>
       </div>
 
       <div class="grid-2">
@@ -4563,6 +4568,7 @@ let _lwRankLoaded = false;
 function loadLawyerRankCardsOnce() {
   if (_lwRankLoaded) return;
   _lwRankLoaded = true;
+  loadExJudicialKpi();
   loadLwTopActive();
   loadLwGrowth();
   initCtlCard();
@@ -4570,6 +4576,23 @@ function loadLawyerRankCardsOnce() {
   loadLwIndep();
   loadLwGov();
   wireGovSortTabs('lwGovTabs', loadLwGov);
+}
+
+// 前司法官律師 KPI（ex_judicial_overview_stats RPC，mig 144；judgment＋gazette 合併口徑）
+async function loadExJudicialKpi() {
+  try {
+    const { data, error } = await db.rpc('ex_judicial_overview_stats');
+    if (error) throw error;
+    const s = data?.[0];
+    if (!s) return;
+    const pct = s.active_total ? (s.exj_total / s.active_total * 100).toFixed(1) : '-';
+    document.getElementById('kpiExJudicial').textContent = Number(s.exj_total).toLocaleString();
+    document.getElementById('kpiExJudicialSub').innerHTML =
+      `法官 <b>${Number(s.judges).toLocaleString()}</b> · 檢察官 <b>${Number(s.prosecutors).toLocaleString()}</b>｜佔執業 ${pct}%`;
+  } catch (e) {
+    document.getElementById('kpiExJudicialSub').textContent = '載入失敗';
+    console.warn('ex_judicial_overview_stats:', e);
+  }
 }
 
 // 近 5 年出庭 TOP 10（lawyer_judgment_stats，mig 046；同名合併值）
