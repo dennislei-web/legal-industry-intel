@@ -10,9 +10,18 @@
 --   (2) 沒有任何律師是「追蹤前就在籍」——現職成員全都有轉入紀錄、
 --       曾離開者離開前也都有轉入紀錄。
 --   新設所之後又歸零者 active_n = 0（前端標「已再歸零」），同時也會進 closed。
+--
+-- 2026-08-18 修訂：改 SECURITY DEFINER（比照 moj_firm_statistics 048/065）。
+--   原版以呼叫者身分跑，authenticated 角色下 moj_lawyers 全表掃描逐列過 RLS
+--   （auth.uid() 檢查）→ 超過 statement timeout；EXECUTE 僅授 authenticated，
+--   回傳內容本就是登入可讀的名冊聚合，無新資料暴露。
 
 CREATE OR REPLACE FUNCTION firm_open_close()
-RETURNS json LANGUAGE sql STABLE AS $$
+RETURNS json
+LANGUAGE sql STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
 WITH incoming AS (
   SELECT lic_no, flow_firm_key(new_office) AS fk, changed_at
   FROM moj_lawyer_changes
