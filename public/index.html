@@ -2276,7 +2276,7 @@
     <!-- ==================== TAB: CHANGES (異動追蹤) ==================== -->
     <div id="tab-changes" class="tab-content">
       <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:16px;">
-        <div class="kpi-card"><div class="kpi-label">事務所異動</div><div class="kpi-value" id="kpiChgFirm" style="color:var(--blue);">-</div><div class="kpi-sub">選定期間</div></div>
+        <div class="kpi-card"><div class="kpi-label">事務所異動</div><div class="kpi-value" id="kpiChgFirm" style="color:var(--blue);">-</div><div class="kpi-sub" id="kpiChgFirmSub">選定期間</div></div>
         <div class="kpi-card"><div class="kpi-label">新進律師</div><div class="kpi-value" id="kpiChgNew" style="color:var(--green);">-</div><div class="kpi-sub">選定期間</div></div>
         <div class="kpi-card"><div class="kpi-label">執業狀態變更</div><div class="kpi-value" id="kpiChgState" style="color:var(--orange);">-</div><div class="kpi-sub">停業/註銷/回復</div></div>
         <div class="kpi-card"><div class="kpi-label">最近偵測</div><div class="kpi-value" id="kpiChgLast" style="font-size:1.05rem;">-</div><div class="kpi-sub">最近一筆異動時間</div></div>
@@ -2311,6 +2311,7 @@
           <div id="chgNet" class="loading">載入中</div>
         </div>
       </div>
+      <div id="chgUnknownNote" style="font-size:0.75rem;color:var(--text-muted);line-height:1.65;margin:-6px 0 16px;display:none;"></div>
       <div class="card" id="chgDetailCard">
         <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
           <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128260; 異動明細
@@ -2343,12 +2344,12 @@
           <div class="kpi-card">
             <div class="kpi-label">進入執業</div>
             <div class="kpi-value" style="color:var(--green);" id="ffKpiEnter">-</div>
-            <div class="kpi-sub">企業/公職→事務所</div>
+            <div class="kpi-sub" id="ffKpiEnterSub">企業/公職→事務所</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">離開執業</div>
             <div class="kpi-value" style="color:var(--red);" id="ffKpiLeave">-</div>
-            <div class="kpi-sub">事務所→企業/公職</div>
+            <div class="kpi-sub" id="ffKpiLeaveSub">事務所→企業/公職</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">新進律師</div>
@@ -2458,8 +2459,10 @@
           追蹤機制：每日凌晨自動比對法務部律師登錄資料（一週完整刷新一輪全部律師），偵測事務所變更、新進律師與執業狀態變更。追蹤起始日 2026-07-03，此前的異動無法回溯；第一輪刷新會把 2026-04 以來累積的變動一次記入。<br>
           ※ 「事務所人才流動」各區塊為<strong>累積型縱向資料</strong>，時窗越長樣本越厚。
           事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
-          「事務所熄燈／新設」同樣受此限制：<strong>整所改名會同時出現在熄燈（舊名歸零）與新設（新名首見）兩表</strong>，對照兩表日期相近、成員重疊者多半是改名而非真正關閉。
-          企業法務、公職等非事務所去向歸入「進入/離開執業」，不計入跨所矩陣與淨流動排行。
+          「事務所熄燈／新設」同樣受此限制：<strong>整所改名會同時出現在熄燈（舊名歸零）與新設（新名首見）兩表</strong>，對照兩表日期相近、成員重疊者多半是改名而非真正關閉。<br>
+          企業法務、公職等非事務所去向歸入「進入/離開執業」，不計入跨所矩陣與淨流動排行。<br>
+          ※ 法務部名冊未登錄／不公開事務所者（空白或標示「律師未顯示」）視為<strong>未登錄</strong>，不是一間事務所，
+          不列入任何排行與矩陣，也不計入「進入/離開執業」（未登錄不等於離開執業），僅在 KPI 副標與排行下方註記其數量。
         </div>
       </div>
     </div>
@@ -8947,6 +8950,12 @@ let _chgRows = null;
 let chgPage = 0;
 let chgRankPage = { inflow: 0, outflow: 0, net: 0 };
 const CHG_RANK_PAGE_SIZE = 10;
+const CHG_MAX_ROWS = 6000;
+
+// 法務部名冊佔位字串：律師未登錄／不公開事務所時，office 欄回傳字面值「律師未顯示」，
+// 語意等同 NULL/空白，不是一間事務所（口徑同 migration 142 的事務所名錄）。
+const OFFICE_PLACEHOLDER = '律師未顯示';
+const isUnknownOffice = o => !o || !o.trim() || o.trim() === OFFICE_PLACEHOLDER;
 
 async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
@@ -8956,16 +8965,22 @@ async function loadChanges(force) {
   document.getElementById('chgOutflow').className = 'loading';
   document.getElementById('chgNet').className = 'loading';
   const days = parseInt(document.getElementById('chgWindow').value, 10);
-  let q = db.from('moj_lawyer_changes')
-    .select('name,change_type,old_office,new_office,old_state,new_state,changed_at')
-    .order('changed_at', { ascending: false }).limit(3000);
-  if (days > 0) q = q.gte('changed_at', new Date(Date.now() - days * 86400000).toISOString());
-  const { data, error } = await q;
-  if (error) {
-    document.getElementById('chgTableBody').innerHTML = `<tr><td colspan="4" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
-    return;
+  // PostgREST 單次回應上限 1000 列（.limit(3000) 會被靜默截斷），故逐頁取滿
+  const rows = [];
+  for (let from = 0; from < CHG_MAX_ROWS; from += 1000) {
+    let q = db.from('moj_lawyer_changes')
+      .select('name,change_type,old_office,new_office,old_state,new_state,changed_at')
+      .order('changed_at', { ascending: false }).range(from, from + 999);
+    if (days > 0) q = q.gte('changed_at', new Date(Date.now() - days * 86400000).toISOString());
+    const { data, error } = await q;
+    if (error) {
+      document.getElementById('chgTableBody').innerHTML = `<tr><td colspan="4" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
+      return;
+    }
+    rows.push(...(data || []));
+    if (!data || data.length < 1000) break;
   }
-  _chgRows = data || [];
+  _chgRows = rows;
   renderChanges();
 }
 
@@ -8993,27 +9008,42 @@ function renderChanges() {
   const kw = (document.getElementById('chgSearch').value || '').trim();
   const type = document.getElementById('chgType').value;
 
-  let rows = _chgRows;
+  // 兩端皆未登錄＝名冊補寫佔位字串，非真實異動，不列明細（數量在下方說明列揭露）
+  let rows = _chgRows.filter(r => !(r.change_type === 'firm_change'
+    && isUnknownOffice(r.old_office) && isUnknownOffice(r.new_office)));
   if (type) rows = rows.filter(r => r.change_type === type);
   if (kw) rows = rows.filter(r =>
     (r.name || '').includes(kw) || (r.old_office || '').includes(kw) || (r.new_office || '').includes(kw));
 
   // KPI（依搜尋前的期間資料計）
   const cnt = t => _chgRows.filter(r => r.change_type === t).length;
-  document.getElementById('kpiChgFirm').textContent = cnt('firm_change').toLocaleString();
+  // 兩端皆「未登錄」＝名冊補寫佔位字串，非真實異動（爬蟲 2026-08-13 起改寫入「律師未顯示」而非留空）
+  const chgNonEvent = _chgRows.filter(r => r.change_type === 'firm_change'
+    && isUnknownOffice(r.old_office) && isUnknownOffice(r.new_office)).length;
+  document.getElementById('kpiChgFirm').textContent = (cnt('firm_change') - chgNonEvent).toLocaleString();
+  document.getElementById('kpiChgFirmSub').textContent = chgNonEvent
+    ? `選定期間・另 ${chgNonEvent.toLocaleString()} 筆為未登錄補寫`
+    : '選定期間';
   document.getElementById('kpiChgNew').textContent = cnt('new_lawyer').toLocaleString();
   document.getElementById('kpiChgState').textContent = cnt('state_change').toLocaleString();
   document.getElementById('kpiChgLast').textContent = _chgRows.length ? _chgRows[0].changed_at.slice(0, 10) : '尚無資料';
 
   // 流入/流出排行（僅事務所異動 + 新進律師的目的所）
+  // 「未登錄」（空白或佔位字串「律師未顯示」）不是事務所，不進排行，但另計數於下方說明列
   const inflow = {}, outflow = {}, inflowNew = {};
+  let leftToUnknown = 0, joinedFromUnknown = 0, newLawyerUnknown = 0;
   _chgRows.forEach(r => {
     if (r.change_type === 'firm_change') {
-      if (r.new_office) inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
-      if (r.old_office) outflow[r.old_office] = (outflow[r.old_office] || 0) + 1;
-    } else if (r.change_type === 'new_lawyer' && r.new_office) {
-      inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
-      inflowNew[r.new_office] = (inflowNew[r.new_office] || 0) + 1;
+      const oldUnknown = isUnknownOffice(r.old_office), newUnknown = isUnknownOffice(r.new_office);
+      if (oldUnknown && newUnknown) return;   // 純補寫，非真實異動
+      if (newUnknown) leftToUnknown++; else inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
+      if (oldUnknown) joinedFromUnknown++; else outflow[r.old_office] = (outflow[r.old_office] || 0) + 1;
+    } else if (r.change_type === 'new_lawyer') {
+      if (isUnknownOffice(r.new_office)) newLawyerUnknown++;
+      else {
+        inflow[r.new_office] = (inflow[r.new_office] || 0) + 1;
+        inflowNew[r.new_office] = (inflowNew[r.new_office] || 0) + 1;
+      }
     }
   });
   // 流入列附「轉入＋新進」拆分，讓數字能對上事務所卡片的「轉入」（僅計跳槽）
@@ -9082,6 +9112,21 @@ function renderChanges() {
     netEl.innerHTML = html;
   }
 
+  // 未登錄事務所說明（被排除於三張排行之外的量，避免資訊消失）
+  const noteEl = document.getElementById('chgUnknownNote');
+  const parts = [];
+  if (leftToUnknown) parts.push(`離所後去向未登錄 <strong>${leftToUnknown.toLocaleString()}</strong> 人（僅計入原事務所的流出）`);
+  if (joinedFromUnknown) parts.push(`原本未登錄、本期登錄事務所 <strong>${joinedFromUnknown.toLocaleString()}</strong> 人（僅計入新事務所的流入）`);
+  if (newLawyerUnknown) parts.push(`新進律師未登錄事務所 <strong>${newLawyerUnknown.toLocaleString()}</strong> 人`);
+  if (chgNonEvent) parts.push(`兩端皆未登錄的名冊補寫 <strong>${chgNonEvent.toLocaleString()}</strong> 筆（非真實異動，不計入 KPI）`);
+  if (parts.length) {
+    noteEl.style.display = '';
+    noteEl.innerHTML = `※ <strong>未登錄事務所</strong>（法務部名冊空白或標示「律師未顯示」）不是一間事務所，不列入上方三張排行：`
+      + parts.join('；') + '。';
+  } else {
+    noteEl.style.display = 'none';
+  }
+
   // 明細表（分頁）
   const body = document.getElementById('chgTableBody');
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -9092,10 +9137,12 @@ function renderChanges() {
     body.innerHTML = rows.slice(chgPage * PAGE_SIZE, (chgPage + 1) * PAGE_SIZE).map(r => {
       const meta = CHG_TYPE_META[r.change_type] || { label: r.change_type, cls: '' };
       let detail = '';
+      const officeCell = o => isUnknownOffice(o)
+        ? '<span style="color:var(--text-muted);">（未登錄）</span>' : firmLink(o);
       if (r.change_type === 'firm_change') {
-        detail = `${r.old_office ? firmLink(r.old_office) : '（未登錄）'} <span style="color:var(--gold);">→</span> ${r.new_office ? firmLink(r.new_office) : '（未登錄）'}`;
+        detail = `${officeCell(r.old_office)} <span style="color:var(--gold);">→</span> ${officeCell(r.new_office)}`;
       } else if (r.change_type === 'new_lawyer') {
-        detail = `加入 ${r.new_office ? firmLink(r.new_office) : '（未登錄事務所）'}`;
+        detail = `加入 ${officeCell(r.new_office)}`;
       } else {
         detail = `${escHtml(r.old_state || '-')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_state || '-')}`;
       }
@@ -9108,9 +9155,9 @@ function renderChanges() {
     }).join('');
   }
   renderPagination('chgPagination', chgPage, rows.length, p => { chgPage = p; renderChanges(); });
-  if (_chgRows.length >= 3000) {
+  if (_chgRows.length >= CHG_MAX_ROWS) {
     document.getElementById('chgPagination').insertAdjacentHTML('beforeend',
-      '<span class="page-info">（已達載入上限 3000 筆，請縮短期間）</span>');
+      `<span class="page-info">（已達載入上限 ${CHG_MAX_ROWS} 筆，請縮短期間）</span>`);
   }
 }
 
@@ -11438,6 +11485,11 @@ async function loadFirmFlowOnce() {
     document.getElementById('ffKpiFirm2Firm').textContent = (s.firm_to_firm ?? 0).toLocaleString();
     document.getElementById('ffKpiEnter').textContent = (s.entering ?? 0).toLocaleString();
     document.getElementById('ffKpiLeave').textContent = (s.leaving ?? 0).toLocaleString();
+    // 未登錄事務所不等於離開/進入執業，另行揭露（145）
+    document.getElementById('ffKpiEnterSub').textContent = s.from_unknown
+      ? `企業/公職→事務所・另 ${s.from_unknown} 由未登錄` : '企業/公職→事務所';
+    document.getElementById('ffKpiLeaveSub').textContent = s.to_unknown
+      ? `事務所→企業/公職・另 ${s.to_unknown} 去向未登錄` : '事務所→企業/公職';
     document.getElementById('ffKpiNew').textContent = (s.new_lawyers ?? 0).toLocaleString();
 
     const rank = rankRes.data || [];
