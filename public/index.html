@@ -11475,7 +11475,7 @@ async function loadFirmFlowOnce() {
       const oc = ocRes.data || {};
       const closed = oc.closed || [], opened = oc.opened || [];
       const openedKeys = new Set(opened.map(o => o.firm_key));
-      const namesCell = (arr, more) => escHtml((arr || []).join('、')) + (more ? `<span style="color:var(--text-muted);">…等 ${more} 位</span>` : '');
+      const namesCell = (arr, more) => (arr || []).map(n => lawyerLink(n)).join('、') + (more ? `<span style="color:var(--text-muted);">…等 ${more} 位</span>` : '');
       document.getElementById('ffClosedCount').textContent = closed.length ? `（${closed.length} 所）` : '';
       document.getElementById('ffOpenedCount').textContent = opened.length ? `（${opened.length} 所）` : '';
       const CAP = 150;
