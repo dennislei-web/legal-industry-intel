@@ -2420,11 +2420,45 @@
         </div>
       </div>
 
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--red);">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128682; 事務所熄燈 — 律師歸零<span id="ffClosedCount" style="color:var(--text-muted);font-weight:400;"></span>
+        </div>
+        <div class="ff-body" style="display:none;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
+            追蹤期間有律師流失（轉所／停業／除名）、且目前在職律師數歸零的事務所。歸零日＝最後一位律師離開的異動時間。追蹤起始前就已無人的所不在此列。
+          </div>
+          <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>事務所</th><th>歸零日</th><th style="text-align:right;">流失律師</th><th>最後成員</th></tr></thead>
+              <tbody id="ffClosedBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--green);">
+          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127793; 新設事務所 — 追蹤起始後首次出現<span id="ffOpenedCount" style="color:var(--text-muted);font-weight:400;"></span>
+        </div>
+        <div class="ff-body" style="display:none;">
+          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
+            追蹤起始日後才在名冊上首次出現的事務所（分所歸戶）：所有成員都是追蹤期間才轉入／新掛號，沒有任何律師是追蹤前就在籍。多為新開業或既有所改名。
+          </div>
+          <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>事務所</th><th>首見日</th><th style="text-align:right;">現有律師</th><th>成員</th></tr></thead>
+              <tbody id="ffOpenedBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
           追蹤機制：每日凌晨自動比對法務部律師登錄資料（一週完整刷新一輪全部律師），偵測事務所變更、新進律師與執業狀態變更。追蹤起始日 2026-07-03，此前的異動無法回溯；第一輪刷新會把 2026-04 以來累積的變動一次記入。<br>
           ※ 「事務所人才流動」各區塊為<strong>累積型縱向資料</strong>，時窗越長樣本越厚。
           事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
+          「事務所熄燈／新設」同樣受此限制：<strong>整所改名會同時出現在熄燈（舊名歸零）與新設（新名首見）兩表</strong>，對照兩表日期相近、成員重疊者多半是改名而非真正關閉。
           企業法務、公職等非事務所去向歸入「進入/離開執業」，不計入跨所矩陣與淨流動排行。
         </div>
       </div>
@@ -11392,11 +11426,12 @@ async function loadFirmFlowOnce() {
   if (_ffLoaded) return;
   _ffLoaded = true;
   try {
-    const [sumRes, rankRes, matRes, intakeRes] = await Promise.all([
+    const [sumRes, rankRes, matRes, intakeRes, ocRes] = await Promise.all([
       db.rpc('firm_flow_summary'),
       db.rpc('firm_flow_ranking'),
       db.rpc('firm_flow_matrix', { p_min: 2 }),
       db.rpc('firm_intake_ranking'),
+      db.rpc('firm_open_close'),
     ]);
     const s = sumRes.data || {};
     document.getElementById('ffSince').textContent = s.tracking_since || '-';
@@ -11430,6 +11465,34 @@ async function loadFirmFlowOnce() {
       <td>${firmCell(r.firm_key)}</td>
       <td style="text-align:right;font-weight:700;color:var(--blue);">${r.intake}</td></tr>`).join('')
       : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
+
+    // 事務所熄燈 / 新設（migration 117 firm_open_close）
+    if (ocRes.error) {
+      const msg = `<tr><td colspan="4" style="color:var(--text-muted);">尚未啟用（migration 117 未套用）：${escHtml(ocRes.error.message || '')}</td></tr>`;
+      document.getElementById('ffClosedBody').innerHTML = msg;
+      document.getElementById('ffOpenedBody').innerHTML = msg;
+    } else {
+      const oc = ocRes.data || {};
+      const closed = oc.closed || [], opened = oc.opened || [];
+      const openedKeys = new Set(opened.map(o => o.firm_key));
+      const namesCell = (arr, more) => escHtml((arr || []).join('、')) + (more ? `<span style="color:var(--text-muted);">…等 ${more} 位</span>` : '');
+      document.getElementById('ffClosedCount').textContent = closed.length ? `（${closed.length} 所）` : '';
+      document.getElementById('ffOpenedCount').textContent = opened.length ? `（${opened.length} 所）` : '';
+      const CAP = 150;
+      const moreNote = (n, cols) => n > CAP ? `<tr><td colspan="${cols}" style="text-align:center;color:var(--text-muted);">…僅顯示前 ${CAP} 所（共 ${n} 所）</td></tr>` : '';
+      document.getElementById('ffClosedBody').innerHTML = closed.length ? closed.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+        <td>${firmCell(r.firm_key)}${openedKeys.has(r.firm_key) ? ' <span style="font-size:0.7rem;color:var(--orange);border:1px solid var(--orange);border-radius:4px;padding:0 4px;">追蹤期內新設</span>' : ''}</td>
+        <td style="white-space:nowrap;">${escHtml(r.closed_at || '')}</td>
+        <td style="text-align:right;font-weight:700;color:var(--red);">${r.departed}</td>
+        <td style="font-size:0.8rem;color:var(--text-muted);">${namesCell(r.names, r.departed > (r.names || []).length ? r.departed - r.names.length : 0)}</td></tr>`).join('') + moreNote(closed.length, 4)
+        : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">追蹤期間尚無事務所歸零</td></tr>';
+      document.getElementById('ffOpenedBody').innerHTML = opened.length ? opened.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+        <td>${firmCell(r.firm_key)}${r.active_n === 0 ? ' <span style="font-size:0.7rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;">已再歸零</span>' : ''}</td>
+        <td style="white-space:nowrap;">${escHtml(r.opened_at || '')}</td>
+        <td style="text-align:right;font-weight:700;color:var(--green);">${r.active_n}</td>
+        <td style="font-size:0.8rem;color:var(--text-muted);">${namesCell(r.names, r.active_n > (r.names || []).length ? r.active_n - r.names.length : 0)}</td></tr>`).join('') + moreNote(opened.length, 4)
+        : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">追蹤期間尚無新設事務所</td></tr>';
+    }
   } catch (e) {
     _ffLoaded = false;
     document.getElementById('ffMatrixBody').innerHTML = `<tr><td colspan="4" style="color:var(--red);">載入失敗：${escHtml(e.message || '')}</td></tr>`;
