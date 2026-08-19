@@ -2359,6 +2359,35 @@
         </div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title" style="color:var(--gold);">&#128200; 事務所異動總表 — 進出・新血・開關一次看<span id="ffOvCount" style="color:var(--text-muted);font-weight:400;"></span></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0;">
+          每所一列，整併跨所進出、名冊新血、其他進出（企業/公職/未登錄、停業除名）與開關/招牌異動判定。
+          淨 = 流入＋新血−流出；幅度 = 淨 ÷ 追蹤起始推估規模。點欄位標題排序，滑鼠停留流入/流出可見組成。
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0;">
+          <div id="ffOvChips" class="chip-row" style="margin:0;"></div>
+          <input id="ffOvSearch" type="text" placeholder="搜尋事務所…" oninput="setOvQuery(this.value)"
+                 style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 10px;font-size:0.8rem;width:150px;">
+        </div>
+        <div class="table-wrap" style="max-height:560px;overflow-y:auto;">
+          <table>
+            <thead><tr>
+              <th>事務所</th>
+              <th>狀態</th>
+              <th class="ov-sort" data-k="active_n" style="text-align:right;cursor:pointer;" onclick="setOvSort('active_n')">現有</th>
+              <th class="ov-sort" data-k="inflow" style="text-align:right;cursor:pointer;" onclick="setOvSort('inflow')">流入</th>
+              <th class="ov-sort" data-k="outflow" style="text-align:right;cursor:pointer;" onclick="setOvSort('outflow')">流出</th>
+              <th class="ov-sort" data-k="intake" style="text-align:right;cursor:pointer;" onclick="setOvSort('intake')">新血</th>
+              <th class="ov-sort" data-k="net" style="text-align:right;cursor:pointer;" onclick="setOvSort('net')">淨</th>
+              <th class="ov-sort" data-k="pct" style="text-align:right;cursor:pointer;" onclick="setOvSort('pct')">幅度</th>
+              <th>主要來源 / 去向</th>
+              <th class="ov-sort" data-k="last_at" style="cursor:pointer;" onclick="setOvSort('last_at')">最近</th>
+            </tr></thead>
+            <tbody id="ffOvBody"><tr><td colspan="10" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
           <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128293; 團隊出走矩陣 — A 所 → B 所（同期 ≥ 2 人）
         </div>
@@ -2374,100 +2403,15 @@
           </div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128202; 淨流入 / 淨流出 排行（累積・分所歸戶）
-        </div>
-        <div class="ff-body" style="display:none;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
-            與上方「淨流動排行」的差異：本表為<strong>追蹤起始日以來累積</strong>、事務所名歸戶合併分所，且僅計跨所移動（不含新進律師）。
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:8px;">
-            <div>
-              <div class="card-title" style="color:var(--green);font-size:0.95rem;">&#11014;&#65039; 淨流入 TOP（人才吸磁）</div>
-              <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
-                <table>
-                  <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
-                  <tbody id="ffInBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-            <div>
-              <div class="card-title" style="color:var(--red);font-size:0.95rem;">&#11015;&#65039; 淨流出 TOP（人才流失）</div>
-              <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
-                <table>
-                  <thead><tr><th>事務所</th><th style="text-align:right;">進</th><th style="text-align:right;">出</th><th style="text-align:right;">淨</th></tr></thead>
-                  <tbody id="ffOutBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--blue);">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127793; 新血招募 TOP — 名冊新增律師進哪些所
-        </div>
-        <div class="ff-body" style="display:none;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
-            「新進律師」= 法務部名冊新掛號的律師（多為新科），看哪些事務所在吸納新血。與上方跨所挖角互補。
-          </div>
-          <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
-            <table>
-              <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">新進人數</th></tr></thead>
-              <tbody id="ffIntakeBody"><tr><td colspan="3" class="loading">載入中</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--red);">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128682; 事務所熄燈 — 律師歸零<span id="ffClosedCount" style="color:var(--text-muted);font-weight:400;"></span>
-        </div>
-        <div class="ff-body" style="display:none;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
-            追蹤期間有律師流失（轉所／停業／除名）、且目前在職律師數歸零的事務所。歸零日＝最後一位律師離開的異動時間。追蹤起始前就已無人的所不在此列。<br>
-            歸零≠關門：<strong>改名</strong>（整批律師轉到同時新設的所）與<strong>併入</strong>（整批轉到既有所）只是招牌換人，
-            <strong>轉未登錄</strong>是名冊不再揭示所名。預設只列真正熄燈者，可切換檢視其餘型態。
-          </div>
-          <div id="ffClosedChips" class="chip-row" style="margin:10px 0;"></div>
-          <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
-            <table>
-              <thead><tr><th>事務所</th><th>歸零日</th><th style="text-align:right;">流失律師</th><th>歸零型態</th><th>最後成員</th></tr></thead>
-              <tbody id="ffClosedBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;color:var(--green);">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#127793; 新設事務所 — 追蹤起始後首次出現<span id="ffOpenedCount" style="color:var(--text-muted);font-weight:400;"></span>
-        </div>
-        <div class="ff-body" style="display:none;">
-          <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0;">
-            追蹤起始日後才在名冊上首次出現的事務所（分所歸戶）：所有成員都是追蹤期間才轉入／新掛號，沒有任何律師是追蹤前就在籍。<br>
-            其中<strong>改名／整併而來</strong>者（有歸零所把 6 成以上律師整批送進來）不是新開業，預設不列入，可切換檢視。
-          </div>
-          <div id="ffOpenedChips" class="chip-row" style="margin:10px 0;"></div>
-          <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
-            <table>
-              <thead><tr><th>事務所</th><th>首見日</th><th style="text-align:right;">現有律師</th><th>來源</th><th>成員</th></tr></thead>
-              <tbody id="ffOpenedBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
           追蹤機制：每日凌晨自動比對法務部律師登錄資料（一週完整刷新一輪全部律師），偵測事務所變更、新進律師與執業狀態變更。追蹤起始日 2026-07-03，此前的異動無法回溯；第一輪刷新會把 2026-04 以來累積的變動一次記入。<br>
           ※ 「事務所人才流動」各區塊為<strong>累積型縱向資料</strong>，時窗越長樣本越厚。
           事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
-          「事務所熄燈／新設」的改名判定（migration 146）：以「流失律師的最大單一去向 ≥ 6 成且該所仍有在職律師」認定整所遷移，
-          去向所本身是新設所記為<strong>改名</strong>、既有所記為<strong>併入</strong>，兩表各自預設濾掉這類招牌異動。
+          總表「狀態」欄的改名判定（migration 146）：以「流失律師的最大單一去向 ≥ 6 成且該所仍有在職律師」認定整所遷移，
+          去向所本身是新設所記為<strong>改名</strong>、既有所記為<strong>併入</strong>；改名/併入/轉未登錄屬招牌或登錄異動，非真實開關。
           分批搬遷（如博欽 5 人分 18 天轉入亞司特博欽）仍會被歸為同一組，故不設日期窗。<br>
-          企業法務、公職等非事務所去向歸入「進入/離開執業」，不計入跨所矩陣與淨流動排行。<br>
+          企業法務、公職等非事務所去向歸入「進入/離開執業」與總表「其他進出」，不計入跨所矩陣。<br>
           ※ 法務部名冊未登錄／不公開事務所者（空白或標示「律師未顯示」）視為<strong>未登錄</strong>，不是一間事務所，
           不列入任何排行與矩陣，也不計入「進入/離開執業」（未登錄不等於離開執業），僅在 KPI 副標與排行下方註記其數量。
         </div>
@@ -11010,64 +10954,89 @@ async function loadFirmMap() {
 }
 
 // ===== 事務所人才流動（挖角矩陣，RPC firm_flow_*，資料源 moj_lawyer_changes）=====
-// 熄燈／新設的歸零型態篩選（migration 146）：改名與併入只是招牌異動，預設不混進真熄燈
-let _ocClosed = [], _ocOpened = [];
-let _ocClosedKind = 'shutdown', _ocOpenedKind = 'new';
-const OC_CLOSED_KINDS = [
-  { k: 'shutdown', label: '真熄燈', color: 'var(--red)', desc: '名冊查無／停職／未執業／去向分散' },
-  { k: 'unlisted', label: '轉未登錄', color: 'var(--text-muted)', desc: '律師仍執業，名冊不再揭示所名' },
-  { k: 'merge', label: '併入既有所', color: 'var(--blue)', desc: '整批律師轉往既有事務所' },
-  { k: 'rename', label: '改名', color: 'var(--orange)', desc: '整批律師轉往同時新設的所' },
-];
-const OC_OPENED_KINDS = [
-  { k: 'new', label: '真新設', color: 'var(--green)', desc: '無歸零所整批轉入' },
-  { k: 'rename', label: '改名而來', color: 'var(--orange)', desc: '單一歸零所整批轉入' },
-  { k: 'merger', label: '整併而來', color: 'var(--blue)', desc: '多個歸零所整批轉入' },
-];
-const ocChipRow = (defs, rows, cur, fn) => [{ k: 'all', label: '全部', color: 'var(--text-muted)', desc: '' }]
-  .concat(defs).map(d => {
-    const n = d.k === 'all' ? rows.length : rows.filter(r => r.kind === d.k).length;
-    return `<button class="chip${cur === d.k ? ' active' : ''}" title="${escHtml(d.desc || '')}" onclick="${fn}('${d.k}')">${d.label} ${n}</button>`;
-  }).join('');
-const ocKindBadge = (defs, kind) => {
-  const d = defs.find(x => x.k === kind);
-  return d ? `<span style="font-size:0.7rem;color:${d.color};border:1px solid ${d.color};border-radius:4px;padding:0 4px;white-space:nowrap;">${d.label}</span>` : '';
+// 事務所異動總表（migration 147 firm_flow_overview；整併淨流排行/新血/熄燈/新設四表）
+let _ovRows = [], _ovFilter = 'all', _ovQuery = '', _ovSortK = 'net', _ovSortDir = -1;
+const OV_STATUS = {
+  closed_shutdown: { label: '熄燈',    color: 'var(--red)',        desc: '名冊查無／停職／未執業／去向分散' },
+  closed_unlisted: { label: '轉未登錄', color: 'var(--text-muted)', desc: '律師仍執業，名冊不再揭示所名' },
+  closed_merge:    { label: '併入',    color: 'var(--blue)',       desc: '整批律師轉往既有事務所' },
+  closed_rename:   { label: '改名',    color: 'var(--orange)',     desc: '整批律師轉往同時新設的所' },
+  opened_new:      { label: '新設',    color: 'var(--green)',      desc: '追蹤起始後首次出現，無歸零所整批轉入' },
+  opened_rename:   { label: '改名而來', color: 'var(--orange)',     desc: '單一歸零所整批轉入' },
+  opened_merger:   { label: '整併而來', color: 'var(--blue)',       desc: '多個歸零所整批轉入' },
 };
-function setOcClosedKind(k) { _ocClosedKind = k; renderOcClosed(); }
-function setOcOpenedKind(k) { _ocOpenedKind = k; renderOcOpened(); }
-
-function renderOcClosed() {
-  const rows = _ocClosedKind === 'all' ? _ocClosed : _ocClosed.filter(r => r.kind === _ocClosedKind);
-  const openedKeys = new Set(_ocOpened.map(o => o.firm_key));
-  const CAP = 150;
-  document.getElementById('ffClosedChips').innerHTML = ocChipRow(OC_CLOSED_KINDS, _ocClosed, _ocClosedKind, 'setOcClosedKind');
-  document.getElementById('ffClosedCount').textContent = _ocClosed.length
-    ? `（${rows.length} 所${rows.length === _ocClosed.length ? '' : ' / 共 ' + _ocClosed.length}）` : '';
-  document.getElementById('ffClosedBody').innerHTML = rows.length ? rows.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
-    <td>${firmCell(r.firm_key)}${openedKeys.has(r.firm_key) ? ' <span style="font-size:0.7rem;color:var(--orange);border:1px solid var(--orange);border-radius:4px;padding:0 4px;">追蹤期內新設</span>' : ''}</td>
-    <td style="white-space:nowrap;">${escHtml(r.closed_at || '')}</td>
-    <td style="text-align:right;font-weight:700;color:var(--red);">${r.departed}</td>
-    <td style="font-size:0.8rem;">${ocKindBadge(OC_CLOSED_KINDS, r.kind)}${r.dest_firm ? ` <span style="color:var(--text-muted);">→</span> ${firmCell(r.dest_firm)}<span style="color:var(--text-muted);">（${r.dest_moved} 位）</span>` : ''}</td>
-    <td style="font-size:0.8rem;color:var(--text-muted);">${ocNamesCell(r.names, r.departed > (r.names || []).length ? r.departed - r.names.length : 0)}</td></tr>`).join('') + ocMoreNote(rows.length, CAP)
-    : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">此型態無資料</td></tr>';
+const OV_FILTERS = [
+  { k: 'all',    label: '全部',          test: () => true },
+  { k: 'grow',   label: '擴張中',        test: r => r.net > 0 && !r.status.startsWith('closed_') },
+  { k: 'shrink', label: '收縮中',        test: r => r.net < 0 && !r.status.startsWith('closed_') },
+  { k: 'opened', label: '真新設',        test: r => r.status === 'opened_new' },
+  { k: 'closed', label: '真熄燈',        test: r => r.status === 'closed_shutdown' },
+  { k: 'sign',   label: '招牌/登錄異動', test: r => ['closed_rename', 'closed_merge', 'closed_unlisted', 'opened_rename', 'opened_merger'].includes(r.status) },
+];
+// 幅度＝淨變動 ÷ 追蹤起始推估規模（現有 − 淨）；無基期的新設所回 Infinity
+function ovPct(r) {
+  const base = r.active_n - r.net;
+  if (base <= 0) return r.net > 0 ? Infinity : 0;
+  return r.net / base;
 }
-
-function renderOcOpened() {
-  const rows = _ocOpenedKind === 'all' ? _ocOpened : _ocOpened.filter(r => r.kind === _ocOpenedKind);
-  const CAP = 150;
-  document.getElementById('ffOpenedChips').innerHTML = ocChipRow(OC_OPENED_KINDS, _ocOpened, _ocOpenedKind, 'setOcOpenedKind');
-  document.getElementById('ffOpenedCount').textContent = _ocOpened.length
-    ? `（${rows.length} 所${rows.length === _ocOpened.length ? '' : ' / 共 ' + _ocOpened.length}）` : '';
-  document.getElementById('ffOpenedBody').innerHTML = rows.length ? rows.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
-    <td>${firmCell(r.firm_key)}${r.active_n === 0 ? ' <span style="font-size:0.7rem;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;">已再歸零</span>' : ''}</td>
-    <td style="white-space:nowrap;">${escHtml(r.opened_at || '')}</td>
-    <td style="text-align:right;font-weight:700;color:var(--green);">${r.active_n}</td>
-    <td style="font-size:0.8rem;">${ocKindBadge(OC_OPENED_KINDS, r.kind)}${(r.from_firms || []).length ? ` <span style="color:var(--text-muted);">←</span> ${r.from_firms.map(f => firmCell(f)).join('、')}` : ''}</td>
-    <td style="font-size:0.8rem;color:var(--text-muted);">${ocNamesCell(r.names, r.active_n > (r.names || []).length ? r.active_n - r.names.length : 0)}</td></tr>`).join('') + ocMoreNote(rows.length, CAP)
-    : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">此型態無資料</td></tr>';
+function setOvFilter(k) { _ovFilter = k; renderOv(); }
+function setOvQuery(q) { _ovQuery = (q || '').trim(); renderOv(); }
+function setOvSort(k) {
+  if (_ovSortK === k) _ovSortDir = -_ovSortDir; else { _ovSortK = k; _ovSortDir = -1; }
+  renderOv();
 }
-const ocNamesCell = (arr, more) => (arr || []).map(n => lawyerLink(n)).join('、') + (more ? `<span style="color:var(--text-muted);">…等 ${more} 位</span>` : '');
-const ocMoreNote = (n, cap) => n > cap ? `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">…僅顯示前 ${cap} 所（共 ${n} 所）</td></tr>` : '';
+function renderOv() {
+  const f = OV_FILTERS.find(x => x.k === _ovFilter) || OV_FILTERS[0];
+  let rows = _ovRows.filter(f.test);
+  if (_ovQuery) rows = rows.filter(r => r.firm_key.includes(_ovQuery));
+  const val = r => _ovSortK === 'pct' ? ovPct(r) : (r[_ovSortK] ?? '');
+  rows = rows.slice().sort((a, b) => {
+    const x = val(a), y = val(b);
+    return ((x < y ? -1 : x > y ? 1 : 0) * _ovSortDir) || (b.net - a.net);
+  });
+  document.getElementById('ffOvChips').innerHTML = OV_FILTERS.map(d =>
+    `<button class="chip${_ovFilter === d.k ? ' active' : ''}" onclick="setOvFilter('${d.k}')">${d.label} ${_ovRows.filter(d.test).length}</button>`).join('');
+  document.getElementById('ffOvCount').textContent = _ovRows.length ? `（${rows.length} 所 / 共 ${_ovRows.length}）` : '';
+  document.querySelectorAll('.ov-sort').forEach(th => {
+    const on = th.dataset.k === _ovSortK;
+    th.style.color = on ? 'var(--gold)' : '';
+    th.textContent = th.textContent.replace(/\s*[\u25b2\u25bc]$/, '') + (on ? (_ovSortDir < 0 ? ' \u25bc' : ' \u25b2') : '');
+  });
+  const CAP = 250;
+  const badge = r => {
+    const d = OV_STATUS[r.status];
+    return d ? `<span title="${escHtml(d.desc)}" style="font-size:0.7rem;color:${d.color};border:1px solid ${d.color};border-radius:4px;padding:0 4px;white-space:nowrap;">${d.label}</span>`
+             : '<span style="color:var(--text-muted);">—</span>';
+  };
+  const pctCell = r => {
+    const p = ovPct(r);
+    if (p === Infinity) return '<span style="color:var(--green);">新</span>';
+    if (!p) return '<span style="color:var(--text-muted);">—</span>';
+    const v = Math.round(p * 100);
+    return `<span style="color:${p > 0 ? 'var(--green)' : 'var(--red)'};">${v > 0 ? '+' : ''}${v}%</span>`;
+  };
+  // 對手欄：熄燈側優先顯示去向、新設側顯示來源，一般所依淨方向取最大配對
+  const partner = r => {
+    if (r.dest_firm) return `<span style="color:var(--text-muted);">→</span> ${firmCell(r.dest_firm)}<span style="color:var(--text-muted);">（${r.dest_moved} 位）</span>`;
+    if ((r.from_firms || []).length) return `<span style="color:var(--text-muted);">←</span> ${r.from_firms.map(f => firmCell(f)).join('、')}`;
+    if (r.net >= 0 && r.top_src) return `<span style="color:var(--text-muted);">←</span> ${firmCell(r.top_src)}<span style="color:var(--text-muted);">（${r.top_src_n}）</span>`;
+    if (r.top_dst) return `<span style="color:var(--text-muted);">→</span> ${firmCell(r.top_dst)}<span style="color:var(--text-muted);">（${r.top_dst_n}）</span>`;
+    return '<span style="color:var(--text-muted);">—</span>';
+  };
+  document.getElementById('ffOvBody').innerHTML = rows.length ? rows.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+    <td>${firmCell(r.firm_key)}</td>
+    <td>${badge(r)}</td>
+    <td style="text-align:right;">${r.active_n || '<span style="color:var(--text-muted);">0</span>'}</td>
+    <td style="text-align:right;color:var(--green);" title="跨所轉入 ${r.in_firm}・企業/公職/未登錄轉入 ${r.other_in}">${r.inflow || ''}</td>
+    <td style="text-align:right;color:var(--red);" title="跨所轉出 ${r.out_firm}・轉非事務所/停業除名 ${r.other_out}">${r.outflow || ''}</td>
+    <td style="text-align:right;color:var(--blue);">${r.intake || ''}</td>
+    <td style="text-align:right;font-weight:700;color:${r.net > 0 ? 'var(--green)' : r.net < 0 ? 'var(--red)' : 'var(--text-muted)'};">${r.net > 0 ? '+' : ''}${r.net}</td>
+    <td style="text-align:right;">${pctCell(r)}</td>
+    <td style="font-size:0.8rem;">${partner(r)}</td>
+    <td style="white-space:nowrap;font-size:0.8rem;color:var(--text-muted);">${escHtml(r.last_at || '')}</td></tr>`).join('')
+    + (rows.length > CAP ? `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">…僅顯示前 ${CAP} 所（共 ${rows.length} 所）</td></tr>` : '')
+    : '<tr><td colspan="10" style="text-align:center;color:var(--text-muted);">無符合條件的事務所</td></tr>';
+}
 
 // 2026-07-15 起併入「律師區＞異動追蹤」頁（原產業分析獨立 tab 已移除），由 showTab('changes') lazy load =====
 let _ffLoaded = false;
@@ -11539,12 +11508,10 @@ async function loadFirmFlowOnce() {
   if (_ffLoaded) return;
   _ffLoaded = true;
   try {
-    const [sumRes, rankRes, matRes, intakeRes, ocRes] = await Promise.all([
+    const [sumRes, matRes, ovRes] = await Promise.all([
       db.rpc('firm_flow_summary'),
-      db.rpc('firm_flow_ranking'),
       db.rpc('firm_flow_matrix', { p_min: 2 }),
-      db.rpc('firm_intake_ranking'),
-      db.rpc('firm_open_close'),
+      db.rpc('firm_flow_overview'),
     ]);
     const s = sumRes.data || {};
     document.getElementById('ffSince').textContent = s.tracking_since || '-';
@@ -11558,17 +11525,6 @@ async function loadFirmFlowOnce() {
       ? `事務所→企業/公職・另 ${s.to_unknown} 去向未登錄` : '事務所→企業/公職';
     document.getElementById('ffKpiNew').textContent = (s.new_lawyers ?? 0).toLocaleString();
 
-    const rank = rankRes.data || [];
-    const inRows = rank.filter(r => r.net > 0).slice(0, 25);
-    const outRows = rank.filter(r => r.net < 0).slice(-25).reverse();
-    const rowHtml = r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
-      <td>${firmCell(r.firm_key)}</td>
-      <td style="text-align:right;color:var(--green);">${r.moved_in || ''}</td>
-      <td style="text-align:right;color:var(--red);">${r.moved_out || ''}</td>
-      <td style="text-align:right;font-weight:700;color:${r.net > 0 ? 'var(--green)' : 'var(--red)'};">${r.net > 0 ? '+' : ''}${r.net}</td></tr>`;
-    document.getElementById('ffInBody').innerHTML = inRows.length ? inRows.map(rowHtml).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
-    document.getElementById('ffOutBody').innerHTML = outRows.length ? outRows.map(rowHtml).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
-
     const mat = matRes.data || [];
     document.getElementById('ffMatrixBody').innerHTML = mat.length ? mat.map(m => `<tr${(isZheluFirm(m.from_firm) || isZheluFirm(m.to_firm)) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
       <td>${firmCell(m.from_firm)}</td>
@@ -11577,27 +11533,14 @@ async function loadFirmFlowOnce() {
       <td style="text-align:right;font-weight:700;color:${m.n >= 3 ? 'var(--red)' : 'var(--text)'};">${m.n}</td></tr>`).join('')
       : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">目前尚無 ≥ 2 人的團隊移動</td></tr>';
 
-    const intake = (intakeRes.data || []).slice(0, 30);
-    document.getElementById('ffIntakeBody').innerHTML = intake.length ? intake.map((r, i) => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
-      <td style="color:var(--text-muted);">${i + 1}</td>
-      <td>${firmCell(r.firm_key)}</td>
-      <td style="text-align:right;font-weight:700;color:var(--blue);">${r.intake}</td></tr>`).join('')
-      : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">尚無資料</td></tr>';
-
-    // 事務所熄燈 / 新設（migration 117 firm_open_close；146 加歸零型態）
-    if (ocRes.error) {
-      const msg = `<tr><td colspan="5" style="color:var(--text-muted);">尚未啟用（migration 117 未套用）：${escHtml(ocRes.error.message || '')}</td></tr>`;
-      document.getElementById('ffClosedBody').innerHTML = msg;
-      document.getElementById('ffOpenedBody').innerHTML = msg;
+    // 事務所異動總表（migration 147）
+    if (ovRes.error) {
+      document.getElementById('ffOvBody').innerHTML = `<tr><td colspan="10" style="color:var(--text-muted);">尚未啟用（migration 147 未套用）：${escHtml(ovRes.error.message || '')}</td></tr>`;
     } else {
-      const oc = ocRes.data || {};
-      _ocClosed = oc.closed || [];
-      _ocOpened = oc.opened || [];
-      // 146 未套用時 kind 缺漏 → 全部視為真熄燈／真新設，維持舊行為
-      _ocClosed.forEach(r => { if (!r.kind) r.kind = 'shutdown'; });
-      _ocOpened.forEach(r => { if (!r.kind) r.kind = 'new'; });
-      renderOcClosed();
-      renderOcOpened();
+      _ovRows = (ovRes.data || []).map(r => ({ ...r,
+        inflow: (r.in_firm || 0) + (r.other_in || 0),
+        outflow: (r.out_firm || 0) + (r.other_out || 0) }));
+      renderOv();
     }
   } catch (e) {
     _ffLoaded = false;
