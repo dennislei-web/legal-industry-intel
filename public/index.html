@@ -1114,7 +1114,7 @@
       <div class="card">
         <div class="card-title">&#128203; 家事律師名單</div>
         <div class="search-bar">
-          <input type="text" id="flSearch" placeholder="搜尋律師姓名或事務所..." oninput="renderFlTable()">
+          <input type="text" id="flSearch" placeholder="搜尋律師姓名或事務所（同步過濾總表與明細）..." oninput="renderFlTable()">
           <select id="flMinFilter" onchange="renderFlTable()">
             <option value="10" selected>家事案件 ≥ 10</option>
             <option value="30">家事案件 ≥ 30</option>
@@ -8916,7 +8916,13 @@ async function loadChanges(force) {
   renderChanges();
 }
 
-function filterChanges() { chgPage = 0; chgExpandDetail(); renderChanges(); }
+function filterChanges() {
+  chgPage = 0; chgExpandDetail(); renderChanges();
+  // 頂部搜尋同步過濾異動總表（總表內建搜尋框仍可獨立覆寫）
+  const kw = (document.getElementById('chgSearch').value || '').trim();
+  const ovInput = document.getElementById('ffOvSearch');
+  if (ovInput) { ovInput.value = kw; setOvQuery(kw); }
+}
 
 // 異動明細預設收合；使用者搜尋或選類型時自動展開（否則篩了看不到結果）
 function chgExpandDetail() {
@@ -10993,7 +10999,7 @@ function renderOv() {
     <td style="white-space:nowrap;font-size:0.8rem;color:var(--text-muted);">${escHtml(r.last_at || '')}</td>
     <td><button class="chip" style="padding:1px 8px;font-size:0.7rem;" title="查看該所逐筆異動" onclick="ovDrill('${escHtml(r.firm_key).replace(/'/g, "\\'")}')">明細</button></td></tr>`).join('')
     + (rows.length > CAP ? `<tr><td colspan="11" style="text-align:center;color:var(--text-muted);">…僅顯示前 ${CAP} 所（共 ${rows.length} 所）</td></tr>` : '')
-    : '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);">無符合條件的事務所</td></tr>';
+    : '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);">無符合條件的事務所（若搜尋的是律師姓名，請看下方「異動明細」）</td></tr>';
 }
 
 // 2026-07-15 起併入「律師區＞異動追蹤」頁（原產業分析獨立 tab 已移除），由 showTab('changes') lazy load =====
