@@ -2330,7 +2330,7 @@
         <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0;">
           每所一列，整併跨所進出、名冊新血、其他進出（企業/公職/未登錄、停業除名）與開關/招牌異動判定，
           流量欄隨上方時間窗變動；「狀態」「現有」恆為當前狀態。淨 = 流入＋新血−流出；幅度 = 淨 ÷ 期初推估規模。
-          點欄位標題排序，滑鼠停留流入/流出可見組成，「明細」鈕可下鑽該所逐筆異動。
+          點欄位標題排序；點流入/流出/新血數字展開律師名單（可再點入律師頁）；「明細」鈕下鑽該所逐筆異動。
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0;">
           <div id="ffOvChips" class="chip-row" style="margin:0;"></div>
@@ -10878,6 +10878,51 @@ function ovPct(r) {
   if (base <= 0) return r.net > 0 ? Infinity : 0;
   return r.net / base;
 }
+// 點流入/流出/新血數字 → 該列下方展開律師名單（mig 149 firm_flow_lawyers，依窗快取）
+const _ovLawCache = {};
+async function ovLawyers(el, fk) {
+  const tr = el.closest('tr');
+  const next = tr.nextElementSibling;
+  if (next && next.dataset && next.dataset.ovDetail != null) {
+    const wasSame = next.dataset.ovDetail === fk;
+    next.remove();
+    if (wasSame) return;   // 再點一次＝收合
+  }
+  const days = parseInt(document.getElementById('chgWindow').value, 10) || 0;
+  const det = document.createElement('tr');
+  det.dataset.ovDetail = fk;
+  det.innerHTML = '<td colspan="11" class="loading">載入中</td>';
+  tr.after(det);
+  const key = fk + '|' + days;
+  let data = _ovLawCache[key];
+  if (!data) {
+    const { data: d, error } = await db.rpc('firm_flow_lawyers', { p_firm: fk, p_days: days });
+    if (error) {
+      det.innerHTML = `<td colspan="11" style="color:var(--red);">載入失敗（migration 149 未套用？）：${escHtml(error.message || '')}</td>`;
+      return;
+    }
+    data = _ovLawCache[key] = d || {};
+  }
+  const officeTxt = o => isUnknownOffice(o) ? '<span style="color:var(--text-muted);">未登錄</span>' : firmCell(o);
+  const item = (e, arrow, otherHtml) => `<div style="padding:2px 0;white-space:nowrap;">
+    <span style="color:var(--text-muted);font-size:0.72rem;">${escHtml(e.at || '')}</span>
+    ${lawyerLink(e.name)}${otherHtml ? ` <span style="color:var(--text-muted);">${arrow}</span> ${otherHtml}` : ''}</div>`;
+  const groups = [];
+  const g = (title, color, arr, fn) => {
+    if ((arr || []).length) groups.push(`<div style="min-width:180px;">
+      <div style="font-size:0.75rem;color:${color};font-weight:700;margin-bottom:4px;">${title}（${arr.length}）</div>${arr.map(fn).join('')}</div>`);
+  };
+  g('跨所轉入', 'var(--green)', data.in_firm, e => item(e, '←', firmCell(e.other)));
+  g('其他轉入（企業/公職/未登錄）', 'var(--green)', data.other_in, e => item(e, '←', officeTxt(e.other)));
+  g('新血（名冊新增）', 'var(--blue)', data.intake, e => item(e, '', ''));
+  g('跨所轉出', 'var(--red)', data.out_firm, e => item(e, '→', firmCell(e.other)));
+  g('其他流出', 'var(--red)', data.other_out, e => item(e, '→',
+    e.kind === 'state' ? `<span style="color:var(--orange);">${escHtml(e.other || '')}</span>` : officeTxt(e.other)));
+  det.innerHTML = `<td colspan="11" style="background:var(--bg-row);padding:10px 16px;">
+    <div style="display:flex;gap:28px;flex-wrap:wrap;font-size:0.82rem;">${groups.join('')
+      || '<span style="color:var(--text-muted);">此期間無人員進出</span>'}</div></td>`;
+}
+
 // 下鑽：把所名塞進明細搜尋（firm_key 是原始所名前綴，substring 可命中含分所）
 function ovDrill(fk) {
   document.getElementById('chgSearch').value = fk;
@@ -10929,13 +10974,19 @@ function renderOv() {
     if (r.top_dst) return `<span style="color:var(--text-muted);">→</span> ${firmCell(r.top_dst)}<span style="color:var(--text-muted);">（${r.top_dst_n}）</span>`;
     return '<span style="color:var(--text-muted);">—</span>';
   };
+  const flowCell = (r, v, color, tip) => {
+    const fkEsc = escHtml(r.firm_key).replace(/'/g, "\\'");
+    return v
+      ? `<td style="text-align:right;color:${color};cursor:pointer;" title="${tip}・點擊展開律師名單" onclick="ovLawyers(this, '${fkEsc}')"><span style="border-bottom:1px dotted ${color};">${v}</span></td>`
+      : '<td style="text-align:right;"></td>';
+  };
   document.getElementById('ffOvBody').innerHTML = rows.length ? rows.slice(0, CAP).map(r => `<tr${isZheluFirm(r.firm_key) ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
     <td>${firmCell(r.firm_key)}</td>
     <td>${badge(r)}</td>
     <td style="text-align:right;">${r.active_n || '<span style="color:var(--text-muted);">0</span>'}</td>
-    <td style="text-align:right;color:var(--green);" title="跨所轉入 ${r.in_firm}・企業/公職/未登錄轉入 ${r.other_in}">${r.inflow || ''}</td>
-    <td style="text-align:right;color:var(--red);" title="跨所轉出 ${r.out_firm}・轉非事務所/停業除名 ${r.other_out}">${r.outflow || ''}</td>
-    <td style="text-align:right;color:var(--blue);">${r.intake || ''}</td>
+    ${flowCell(r, r.inflow, 'var(--green)', `跨所轉入 ${r.in_firm}・企業/公職/未登錄轉入 ${r.other_in}`)}
+    ${flowCell(r, r.outflow, 'var(--red)', `跨所轉出 ${r.out_firm}・轉非事務所/停業除名 ${r.other_out}`)}
+    ${flowCell(r, r.intake, 'var(--blue)', '名冊新增律師')}
     <td style="text-align:right;font-weight:700;color:${r.net > 0 ? 'var(--green)' : r.net < 0 ? 'var(--red)' : 'var(--text-muted)'};">${r.net > 0 ? '+' : ''}${r.net}</td>
     <td style="text-align:right;">${pctCell(r)}</td>
     <td style="font-size:0.8rem;">${partner(r)}</td>
