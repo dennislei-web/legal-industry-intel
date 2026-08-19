@@ -532,6 +532,30 @@
     .jstat .analysis-article .takeaway p { color: #e8eef7; }
     .jstat .analysis-article .ai-badge { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
 
+    /* ===================== FILTER CHIPS（異動總表/訴訟量能等篩選鈕） ===================== */
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .chip {
+      appearance: none; -webkit-appearance: none;
+      background: var(--ghost-bg); color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 4px 12px; font-size: 0.78rem; line-height: 1.4;
+      cursor: pointer; user-select: none; white-space: nowrap;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .chip:hover { background: var(--ghost-hover-bg); color: var(--text); border-color: var(--border-light); }
+    .chip.active {
+      background: var(--tab-active-bg); color: var(--gold-light);
+      border-color: var(--gold); font-weight: 600;
+    }
+    .chip .chip-n {
+      display: inline-block; margin-left: 5px; padding: 0 6px;
+      border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+      background: rgba(255,255,255,0.08); color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .chip.active .chip-n { background: rgba(201,168,76,0.25); color: var(--gold-light); }
+    .chip:hover .chip-n { color: var(--text); }
+
   </style>
 </head>
 <body>
@@ -10995,7 +11019,7 @@ function renderOv() {
     return ((x < y ? -1 : x > y ? 1 : 0) * _ovSortDir) || (b.net - a.net);
   });
   document.getElementById('ffOvChips').innerHTML = OV_FILTERS.map(d =>
-    `<button class="chip${_ovFilter === d.k ? ' active' : ''}" onclick="setOvFilter('${d.k}')">${d.label} ${_ovRows.filter(d.test).length}</button>`).join('');
+    `<button class="chip${_ovFilter === d.k ? ' active' : ''}" onclick="setOvFilter('${d.k}')">${d.label}<span class="chip-n">${_ovRows.filter(d.test).length}</span></button>`).join('');
   document.getElementById('ffOvCount').textContent = _ovRows.length ? `（${rows.length} 所 / 共 ${_ovRows.length}）` : '';
   document.querySelectorAll('.ov-sort').forEach(th => {
     const on = th.dataset.k === _ovSortK;
