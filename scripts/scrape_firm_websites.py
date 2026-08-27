@@ -11,10 +11,11 @@
 """
 import os
 import re
+import subprocess
 import time
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, quote
 from utils import get_supabase, log
 from website_verify import load_blocklist, host_blocked, homepage_of, verify_firm_website
 
@@ -43,16 +44,46 @@ EXCLUDE_DOMAINS = [
 LEGAL_KEYWORDS = ['law', 'legal', 'lawyer', 'attorney', 'firm', 'law-firm', 'lawfirm', '法律', '律師', '事務所']
 
 
+# 連續失敗的 DDG 請求數（成功回 200 即歸零）。連續大量失敗＝被限流/封鎖，
+# 繼續跑只會把整個待爬池空轉標記（2026-08 GH runner 與本機都踩過）。
+# 主迴圈據此進入冷卻等待，多次冷卻仍失敗才中止。
+DDG_FAIL_STREAK = 0
+DDG_FAIL_ABORT = int(os.environ.get('DDG_FAIL_ABORT', '12'))
+DDG_COOLDOWN_MIN = int(os.environ.get('DDG_COOLDOWN_MIN', '20'))   # 每次冷卻分鐘數
+DDG_MAX_COOLDOWNS = int(os.environ.get('DDG_MAX_COOLDOWNS', '8'))  # 冷卻次數上限
+
+
+def _ddg_fetch(query):
+    """用系統 curl 打 DDG。python requests 的 TLS 指紋會被 DDG 回 202 挑戰頁
+    （2026-08 實測），真 curl 的指紋則正常回 200。query 先 percent-encode，
+    argv 保持純 ASCII（Windows curl 對非 ASCII argv 會做 ANSI 轉換毀掉 UTF-8）。
+    回傳 (http_status, html)。"""
+    data = 'q=' + quote(query.encode('utf-8'), safe='')
+    r = subprocess.run(
+        ['curl', '-s', '-m', '15', '-X', 'POST', 'https://html.duckduckgo.com/html/',
+         '--data', data,
+         '-H', f"User-Agent: {HEADERS['User-Agent']}",
+         '-H', f"Accept-Language: {HEADERS['Accept-Language']}",
+         '-w', '\n%{http_code}'],
+        capture_output=True, timeout=25)
+    out = r.stdout.decode('utf-8', 'replace')
+    body, _, code = out.rpartition('\n')
+    return (int(code) if code.strip().isdigit() else 0), body
+
+
 def search_duckduckgo(query, retries=2):
     """用 DuckDuckGo HTML 版搜尋"""
-    url = 'https://html.duckduckgo.com/html/'
+    global DDG_FAIL_STREAK
     for attempt in range(retries):
         try:
-            resp = requests.post(url, data={'q': query}, headers=HEADERS, timeout=15)
-            if resp.status_code != 200:
+            status, html = _ddg_fetch(query)
+            if status != 200:
+                if attempt == retries - 1:
+                    log(f'  DDG 非 200: HTTP {status}')
                 time.sleep(1)
                 continue
-            soup = BeautifulSoup(resp.text, 'html.parser')
+            DDG_FAIL_STREAK = 0
+            soup = BeautifulSoup(html, 'html.parser')
             results = []
             for r in soup.select('.result'):
                 link = r.find('a', class_='result__a', href=True)
@@ -71,6 +102,7 @@ def search_duckduckgo(query, retries=2):
             if attempt == retries - 1:
                 log(f'  DDG 失敗: {e}')
             time.sleep(1)
+    DDG_FAIL_STREAK += 1
     return []
 
 
@@ -245,22 +277,25 @@ def main():
 
     # Step 2: 取得待爬的事務所
     log(f'\n=== 爬取官網 ===')
-    query = sb.table('firm_websites').select('id, firm_name')
-    if RETRY_MISSING:
-        # 爬已掃過但沒找到官網的
-        query = query.is_('website_url', 'null')
-    else:
-        # 只爬從未掃過的
-        query = query.eq('website_scraped', False)
-
+    # PostgREST 伺服器端 max-rows=1000，.limit(10000) 會被靜默截斷，必須 .range() 分頁
+    firms = []
+    start = 0
+    while True:
+        query = sb.table('firm_websites').select('id, firm_name')
+        if RETRY_MISSING:
+            # 爬已掃過但沒找到官網的
+            query = query.is_('website_url', 'null')
+        else:
+            # 只爬從未掃過的
+            query = query.eq('website_scraped', False)
+        r = query.order('id').range(start, start + 999).execute()
+        batch = r.data or []
+        firms.extend(batch)
+        if len(batch) < 1000 or (BATCH_SIZE > 0 and len(firms) >= BATCH_SIZE):
+            break
+        start += 1000
     if BATCH_SIZE > 0:
-        query = query.limit(BATCH_SIZE)
-    else:
-        # Supabase 默認 limit 1000，要手動分頁
-        query = query.limit(10000)
-
-    resp = query.execute()
-    firms = resp.data or []
+        firms = firms[:BATCH_SIZE]
     total = len(firms)
     log(f'本批次待爬: {total} 間 (BATCH_SIZE={BATCH_SIZE}, RETRY_MISSING={RETRY_MISSING})')
 
@@ -272,7 +307,38 @@ def main():
     errors = 0
     t0 = time.time()
 
+    global DDG_FAIL_STREAK
+    cooldowns = 0
+
+    # 開跑前先確認 DDG 未在封鎖狀態（被擋時開跑只會空轉標記整個池）
+    while True:
+        try:
+            probe_status, _ = _ddg_fetch('law firm')
+        except Exception:
+            probe_status = 0
+        if probe_status == 200:
+            break
+        cooldowns += 1
+        if cooldowns > DDG_MAX_COOLDOWNS:
+            log(f'✗ DDG 持續封鎖（HTTP {probe_status}），冷卻 {DDG_MAX_COOLDOWNS} 次仍未解，放棄本輪')
+            return
+        log(f'DDG 未解封（HTTP {probe_status}），冷卻 {DDG_COOLDOWN_MIN} 分鐘後重試'
+            f'（{cooldowns}/{DDG_MAX_COOLDOWNS}）')
+        time.sleep(DDG_COOLDOWN_MIN * 60)
+    log(f'DDG 探測 OK，開始爬取')
+    cooldowns = 0
+
     for idx, firm in enumerate(firms, 1):
+        if DDG_FAIL_STREAK >= DDG_FAIL_ABORT:
+            cooldowns += 1
+            if cooldowns > DDG_MAX_COOLDOWNS:
+                log(f'\n✗ DDG 連續失敗且冷卻 {DDG_MAX_COOLDOWNS} 次無效，中止本輪'
+                    f'（已處理 {idx - 1}/{total}，命中 {found}）')
+                break
+            log(f'DDG 連續 {DDG_FAIL_STREAK} 次失敗（疑似被限流），冷卻 {DDG_COOLDOWN_MIN} 分鐘'
+                f'（{cooldowns}/{DDG_MAX_COOLDOWNS}，進度 {idx - 1}/{total}）')
+            time.sleep(DDG_COOLDOWN_MIN * 60)
+            DDG_FAIL_STREAK = 0
         name = firm['firm_name']
         try:
             result = find_firm_website(name, blocklist, taken_urls)
@@ -295,6 +361,10 @@ def main():
             errors += 1
             if errors < 10:
                 log(f'  ✗ {name}: {e}')
+
+        # DDG 恢復正常就重置冷卻計數（上限只針對「連續」冷卻無效）
+        if DDG_FAIL_STREAK == 0:
+            cooldowns = 0
 
         # 進度報告
         if idx % 100 == 0:
