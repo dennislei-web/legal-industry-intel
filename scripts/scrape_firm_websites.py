@@ -9,6 +9,7 @@
   其他事務所占用的 URL；通過才寫入並標 verified=true。
   背景：v2 直接存搜尋第一名，混進大量黃頁/新聞/公會/他所網頁（見 migration 042/065）
 """
+import base64
 import os
 import re
 import subprocess
@@ -22,6 +23,10 @@ from website_verify import load_blocklist, host_blocked, homepage_of, verify_fir
 BATCH_SIZE = int(os.environ.get('BATCH_SIZE', '0'))  # 0 = 全部
 SCRAPE_DELAY = float(os.environ.get('SCRAPE_DELAY', '1.8'))  # 秒
 RETRY_MISSING = os.environ.get('RETRY_MISSING', 'false').lower() == 'true'  # 重試未找到官網的
+SEARCH_ENGINE = os.environ.get('SEARCH_ENGINE', 'ddg').lower()  # ddg | bing
+# 注意：bing 對無 cookie 爬蟲常回 200 但塞誘餌垃圾結果（2026-08 實測，CJK 尤甚），
+# 寫入靠首頁驗證擋住不會污染，但等於搜不到；長跑請用 ddg＋低請求率。
+QUERIES_PER_FIRM = int(os.environ.get('QUERIES_PER_FIRM', '3'))  # 每家最多發幾個 query（1=僅「所名 官網」，降請求率防限流）
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -106,6 +111,82 @@ def search_duckduckgo(query, retries=2):
     return []
 
 
+def _bing_fetch(query):
+    """用系統 curl 打 Bing 搜尋，回傳 (http_status, html)。argv 保持純 ASCII。"""
+    url = ('https://www.bing.com/search?q=' + quote(query.encode('utf-8'), safe='')
+           + '&setlang=zh-TW&count=10')
+    r = subprocess.run(
+        ['curl', '-s', '-m', '15', url,
+         '-H', f"User-Agent: {HEADERS['User-Agent']}",
+         '-H', f"Accept-Language: {HEADERS['Accept-Language']}",
+         '-w', '\n%{http_code}'],
+        capture_output=True, timeout=25)
+    out = r.stdout.decode('utf-8', 'replace')
+    body, _, code = out.rpartition('\n')
+    return (int(code) if code.strip().isdigit() else 0), body
+
+
+def _bing_real_url(href):
+    """Bing 結果連結是 bing.com/ck/a 轉址，真實 URL 以 base64url 藏在 u=a1<b64>"""
+    if 'bing.com/ck/' not in href:
+        return href
+    m = re.search(r'[?&]u=a1([A-Za-z0-9_-]+)', href)
+    if not m:
+        return None
+    s = m.group(1)
+    s += '=' * (-len(s) % 4)
+    try:
+        return base64.urlsafe_b64decode(s).decode('utf-8', 'replace')
+    except Exception:
+        return None
+
+
+def search_bing(query, retries=2):
+    """用 Bing 搜尋（DDG 被限流時的替代引擎）。共用 DDG_FAIL_STREAK 計數。"""
+    global DDG_FAIL_STREAK
+    for attempt in range(retries):
+        try:
+            status, html = _bing_fetch(query)
+            soup = BeautifulSoup(html, 'html.parser') if status == 200 else None
+            items = soup.select('li.b_algo') if soup else []
+            # Bing 被反爬時常回 200 但無結果區塊，視同失敗
+            if status != 200 or (not items and 'b_algo' not in html):
+                if attempt == retries - 1:
+                    log(f'  Bing 失敗: HTTP {status}, algo 區塊 {len(items)}')
+                time.sleep(1)
+                continue
+            DDG_FAIL_STREAK = 0
+            results = []
+            for li in items:
+                h2a = li.select_one('h2 a')
+                if not h2a:
+                    continue
+                href = _bing_real_url(h2a.get('href', ''))
+                if not href or not href.startswith('http'):
+                    continue
+                title = h2a.get_text(strip=True)
+                p = li.select_one('.b_caption p') or li.select_one('p')
+                desc = p.get_text(strip=True) if p else ''
+                results.append({'url': href, 'title': title, 'description': desc})
+            return results
+        except Exception as e:
+            if attempt == retries - 1:
+                log(f'  Bing 失敗: {e}')
+            time.sleep(1)
+    DDG_FAIL_STREAK += 1
+    return []
+
+
+def search_web(query):
+    """依 SEARCH_ENGINE 分派搜尋引擎"""
+    return search_bing(query) if SEARCH_ENGINE == 'bing' else search_duckduckgo(query)
+
+
+def _probe_fetch():
+    """探測目前引擎是否可用"""
+    return _bing_fetch('law firm') if SEARCH_ENGINE == 'bing' else _ddg_fetch('law firm')
+
+
 def score_candidate(url, title, description, firm_name, blocklist=None):
     """評分一個搜尋結果是否像官網 (0-100)"""
     domain = urlparse(url).netloc.lower()
@@ -158,11 +239,11 @@ def find_firm_website(firm_name, blocklist, taken_urls):
         f'{clean} 官網',
         f'"{clean}"',
         clean,
-    ]
+    ][:QUERIES_PER_FIRM]
     all_candidates = []
     seen_urls = set()
     for q in queries:
-        for r in search_duckduckgo(q):
+        for r in search_web(q):
             if r['url'] in seen_urls:
                 continue
             seen_urls.add(r['url'])
@@ -313,19 +394,19 @@ def main():
     # 開跑前先確認 DDG 未在封鎖狀態（被擋時開跑只會空轉標記整個池）
     while True:
         try:
-            probe_status, _ = _ddg_fetch('law firm')
+            probe_status, _ = _probe_fetch()
         except Exception:
             probe_status = 0
         if probe_status == 200:
             break
         cooldowns += 1
         if cooldowns > DDG_MAX_COOLDOWNS:
-            log(f'✗ DDG 持續封鎖（HTTP {probe_status}），冷卻 {DDG_MAX_COOLDOWNS} 次仍未解，放棄本輪')
+            log(f'✗ {SEARCH_ENGINE} 持續封鎖（HTTP {probe_status}），冷卻 {DDG_MAX_COOLDOWNS} 次仍未解，放棄本輪')
             return
-        log(f'DDG 未解封（HTTP {probe_status}），冷卻 {DDG_COOLDOWN_MIN} 分鐘後重試'
+        log(f'{SEARCH_ENGINE} 未解封（HTTP {probe_status}），冷卻 {DDG_COOLDOWN_MIN} 分鐘後重試'
             f'（{cooldowns}/{DDG_MAX_COOLDOWNS}）')
         time.sleep(DDG_COOLDOWN_MIN * 60)
-    log(f'DDG 探測 OK，開始爬取')
+    log(f'{SEARCH_ENGINE} 探測 OK，開始爬取')
     cooldowns = 0
 
     for idx, firm in enumerate(firms, 1):
@@ -335,7 +416,7 @@ def main():
                 log(f'\n✗ DDG 連續失敗且冷卻 {DDG_MAX_COOLDOWNS} 次無效，中止本輪'
                     f'（已處理 {idx - 1}/{total}，命中 {found}）')
                 break
-            log(f'DDG 連續 {DDG_FAIL_STREAK} 次失敗（疑似被限流），冷卻 {DDG_COOLDOWN_MIN} 分鐘'
+            log(f'{SEARCH_ENGINE} 連續 {DDG_FAIL_STREAK} 次失敗（疑似被限流），冷卻 {DDG_COOLDOWN_MIN} 分鐘'
                 f'（{cooldowns}/{DDG_MAX_COOLDOWNS}，進度 {idx - 1}/{total}）')
             time.sleep(DDG_COOLDOWN_MIN * 60)
             DDG_FAIL_STREAK = 0
