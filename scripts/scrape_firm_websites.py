@@ -13,6 +13,7 @@ import base64
 import os
 import re
 import subprocess
+import threading
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -56,6 +57,25 @@ DDG_FAIL_STREAK = 0
 DDG_FAIL_ABORT = int(os.environ.get('DDG_FAIL_ABORT', '12'))
 DDG_COOLDOWN_MIN = int(os.environ.get('DDG_COOLDOWN_MIN', '20'))   # 每次冷卻分鐘數
 DDG_MAX_COOLDOWNS = int(os.environ.get('DDG_MAX_COOLDOWNS', '8'))  # 冷卻次數上限
+
+# 看門狗：主迴圈曾出現無聲卡死（無 curl 子行程、疑似 supabase 連線在長冷卻後
+# 變殭屍且無逾時；py-spy 不支援 3.14 無法定位）。超過期限就 os._exit(3)
+# 讓外層 run_website_retry.py supervisor 以全新行程/連線重啟。
+WATCHDOG_DEADLINE = [time.time() + 600]
+
+
+def _bump_watchdog(seconds):
+    WATCHDOG_DEADLINE[0] = time.time() + seconds
+
+
+def _start_watchdog():
+    def _watch():
+        while True:
+            time.sleep(30)
+            if time.time() > WATCHDOG_DEADLINE[0]:
+                log(f'watchdog: 處理逾時卡死，強制結束（exit 3）交由 supervisor 重啟')
+                os._exit(3)
+    threading.Thread(target=_watch, daemon=True).start()
 
 
 def _ddg_fetch(query):
@@ -347,7 +367,13 @@ def fetch_taken_urls(sb):
 
 
 def main():
+    _start_watchdog()
     sb = get_supabase()
+    try:
+        # postgrest 預設逾時過長/可能無效，殭屍連線會無聲等待
+        sb.postgrest.session.timeout = 30
+    except Exception:
+        pass
 
     # Step 1: sync MOJ 事務所到 firm_websites
     sync_moj_firms_to_table(sb)
@@ -369,7 +395,9 @@ def main():
         else:
             # 只爬從未掃過的
             query = query.eq('website_scraped', False)
-        r = query.order('id').range(start, start + 999).execute()
+        # scraped_at 舊的優先（今天掃過的排最後）→ supervisor 重啟等於斷點續跑
+        r = (query.order('scraped_at', desc=False, nullsfirst=True)
+                  .order('id').range(start, start + 999).execute())
         batch = r.data or []
         firms.extend(batch)
         if len(batch) < 1000 or (BATCH_SIZE > 0 and len(firms) >= BATCH_SIZE):
@@ -393,6 +421,7 @@ def main():
 
     # 開跑前先確認 DDG 未在封鎖狀態（被擋時開跑只會空轉標記整個池）
     while True:
+        _bump_watchdog(300)
         try:
             probe_status, _ = _probe_fetch()
         except Exception:
@@ -405,11 +434,13 @@ def main():
             return
         log(f'{SEARCH_ENGINE} 未解封（HTTP {probe_status}），冷卻 {DDG_COOLDOWN_MIN} 分鐘後重試'
             f'（{cooldowns}/{DDG_MAX_COOLDOWNS}）')
+        _bump_watchdog(DDG_COOLDOWN_MIN * 60 + 300)
         time.sleep(DDG_COOLDOWN_MIN * 60)
     log(f'{SEARCH_ENGINE} 探測 OK，開始爬取')
     cooldowns = 0
 
     for idx, firm in enumerate(firms, 1):
+        _bump_watchdog(300)
         if DDG_FAIL_STREAK >= DDG_FAIL_ABORT:
             cooldowns += 1
             if cooldowns > DDG_MAX_COOLDOWNS:
@@ -418,6 +449,7 @@ def main():
                 break
             log(f'{SEARCH_ENGINE} 連續 {DDG_FAIL_STREAK} 次失敗（疑似被限流），冷卻 {DDG_COOLDOWN_MIN} 分鐘'
                 f'（{cooldowns}/{DDG_MAX_COOLDOWNS}，進度 {idx - 1}/{total}）')
+            _bump_watchdog(DDG_COOLDOWN_MIN * 60 + 300)
             time.sleep(DDG_COOLDOWN_MIN * 60)
             DDG_FAIL_STREAK = 0
         name = firm['firm_name']
