@@ -422,7 +422,12 @@ def main():
             DDG_FAIL_STREAK = 0
         name = firm['firm_name']
         try:
+            streak_before = DDG_FAIL_STREAK
             result = find_firm_website(name, blocklist, taken_urls)
+            if result is None and DDG_FAIL_STREAK > streak_before:
+                # 搜尋是「失敗」不是「查無」→ 不標 scraped，留給之後的輪次重試
+                time.sleep(SCRAPE_DELAY)
+                continue
             update = {'website_scraped': True, 'scraped_at': 'now()'}
             if result:
                 update['website_url'] = result['website_url']
