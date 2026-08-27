@@ -42,6 +42,19 @@ jobs:
         working-directory: scripts
         run: python scrape_firm_websites.py
 
+      - name: 重建事務所快取（前端「有官網」卡讀 moj_firm_stats_cache，不刷新不會反映新官網）
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
+          http_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 120 -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -d '{}') || true
+          echo "refresh_firm_stats_cache: HTTP $http_code"
+
       - name: 回寫資料來源最後爬取時間
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
