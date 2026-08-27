@@ -122,7 +122,8 @@ def fetch_homepage(homepage, timeout=15):
         idx = raw.rfind(_CURL_META_SEP)
         if idx == -1:
             return None, None
-        meta = raw[idx + len(_CURL_META_SEP):].decode('ascii', 'replace').strip()
+        # utf-8：url_effective 可能是中文 IDN 網域，ascii 會把它毀成 �
+        meta = raw[idx + len(_CURL_META_SEP):].decode('utf-8', 'replace').strip()
         body_raw = raw[:idx]
         final_url, _, code = meta.rpartition(' ')
         status = int(code) if code.isdigit() else 0
