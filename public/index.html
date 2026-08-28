@@ -291,6 +291,19 @@
     /* AI 分析內文的量條（renderMarkdown 由 █░ 文字轉出） */
     .aibar { display: inline-block; width: 120px; height: 9px; border-radius: 5px; background: rgba(255,255,255,0.10); border: 1px solid var(--border); vertical-align: middle; overflow: hidden; margin: 0 4px 2px 2px; }
     .aibar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--blue), var(--gold)); }
+    /* AI 分析排版（.ai-md scope） */
+    .ai-md h2 { font-size: 1.02rem; color: var(--gold); border-left: 3px solid var(--gold); padding-left: 10px; margin: 24px 0 10px; }
+    .ai-md strong { color: var(--gold); font-weight: 600; }
+    .ai-md .ai-hl { background: rgba(201,168,76,0.26); color: #ffe9b3; padding: 0 5px; border-radius: 4px; }
+    .ai-md .ai-tldr { border: 1px solid rgba(201,168,76,0.45); background: rgba(201,168,76,0.07); border-radius: 10px; padding: 14px 16px 8px; margin: 10px 0 20px; }
+    .ai-md .ai-tldr h2 { border-left: none; padding-left: 0; margin: 0 0 8px; }
+    .ai-md .ai-lede { border-left: 3px solid var(--blue); background: rgba(79,142,247,0.08); padding: 7px 10px; border-radius: 0 8px 8px 0; margin: 8px 0; }
+    .ai-md .ai-flow { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; line-height: 1.6; }
+    .ai-md .ai-step { background: rgba(79,142,247,0.14); border: 1px solid rgba(79,142,247,0.5); border-radius: 20px; padding: 2px 10px; font-size: 0.82rem; white-space: nowrap; }
+    .ai-md .ai-arrow { color: var(--text-muted); padding: 0 2px; }
+    .ai-md table { border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; }
+    .ai-md th, .ai-md td { border: 1px solid var(--border); padding: 5px 10px; }
+    .ai-md th { background: rgba(255,255,255,0.06); color: var(--gold); }
 
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
@@ -6919,6 +6932,19 @@ function renderMarkdown(text) {
     const pct = Math.round(full.length / total * 100);
     return `<span class="aibar" title="${pct}%"><i style="width:${pct}%"></i></span>`;
   });
+  // ==重點== → 螢光標示
+  html = html.replace(/==([^=<>]{1,120}?)==/g, '<mark class="ai-hl">$1</mark>');
+  // 「⚡ 30 秒速讀」整段 → 卡片
+  html = html.replace(/<h2[^>]*>[^<]*⚡[\s\S]*?(?=<h2|$)/, m => `<div class="ai-tldr">${m}</div>`);
+  // 每節開頭「一句話：」→ callout
+  html = html.replace(/<p><strong>一句話：/g, '<p class="ai-lede"><strong>一句話：');
+  // 含 ≥2 個「 → 」且各段有中文的流程鏈 → step pills
+  html = html.replace(/>([^<>]*? → [^<>]*? → [^<>]*?)</g, (m, line) => {
+    const parts = line.split(/\s*→\s*/).map(p => p.trim()).filter(Boolean);
+    if (parts.length < 3 || !parts.every(p => /[一-鿿]/.test(p))) return m;
+    const pills = parts.map(p => `<span class="ai-step">${p}</span>`).join('<span class="ai-arrow">→</span>');
+    return `><span class="ai-flow">${pills}</span><`;
+  });
   return html;
 }
 
@@ -6930,7 +6956,7 @@ async function loadFirmAnalysis(firmName) {
   if (profile?.ai_analysis) {
     body.innerHTML = `
       <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">分析時間: ${formatDate(profile.ai_analyzed_at)}</div>
-      <div style="line-height:1.7;">${renderMarkdown(profile.ai_analysis)}</div>
+      <div class="ai-md" style="line-height:1.7;">${renderMarkdown(profile.ai_analysis)}</div>
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">
         提示：如需更深入的分析，請在 Claude Code 開啟 <code>/legal-research</code> 輸入「分析 ${escHtml(firmName)}」
       </div>
