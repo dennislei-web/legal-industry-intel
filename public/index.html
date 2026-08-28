@@ -288,6 +288,9 @@
     .loading { text-align: center; padding: 40px; color: var(--text-muted); }
     .loading::after { content: ''; display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 8px; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* AI 分析內文的量條（renderMarkdown 由 █░ 文字轉出） */
+    .aibar { display: inline-block; width: 120px; height: 9px; border-radius: 5px; background: rgba(255,255,255,0.10); border: 1px solid var(--border); vertical-align: middle; overflow: hidden; margin: 0 4px 2px 2px; }
+    .aibar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--blue), var(--gold)); }
 
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
@@ -6902,11 +6905,21 @@ async function saveFirmNotes(firmName) {
 // Markdown 渲染（使用 marked.js，fallback 簡單換行）
 function renderMarkdown(text) {
   if (!text) return '';
+  let html;
   if (typeof marked !== 'undefined') {
     marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(text);
+    html = marked.parse(text);
+  } else {
+    html = escHtml(text).replace(/\n/g, '<br>');
   }
-  return escHtml(text).replace(/\n/g, '<br>');
+  // AI 分析的文字量條（█░）→ CSS 漸層量條（DB 內容保持純文字可攜）
+  html = html.replace(/(█*)(░*)/g, (m, full, empty) => {
+    const total = full.length + empty.length;
+    if (total < 3) return m;
+    const pct = Math.round(full.length / total * 100);
+    return `<span class="aibar" title="${pct}%"><i style="width:${pct}%"></i></span>`;
+  });
+  return html;
 }
 
 async function loadFirmAnalysis(firmName) {
