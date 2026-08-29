@@ -488,12 +488,21 @@ def main():
     elif cmd == 'backfill-amount':
         # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）。
         # 「已有」的判準＝該月已有高等法院金額列——高院金額欄位置與地院差一欄，
-        # 2026-08 前的舊解析全漏（地院列都在，不能只看整月有無資料）
-        r = requests.get(f'{SUPABASE_URL}/rest/v1/closed_case_amount_rep'
-                         f'?select=yyyymm&court_name=like.*高等法院*&limit=100000',
-                         headers=HEADERS_SB, timeout=60)
-        r.raise_for_status()
-        have = {x['yyyymm'] for x in r.json()}
+        # 2026-08 前的舊解析全漏（地院列都在，不能只看整月有無資料）。
+        # PostgREST max-rows 上限 1000，須用 Range 分頁讀完（全量 ~2000 列）
+        have = set()
+        off = 0
+        while True:
+            r = requests.get(f'{SUPABASE_URL}/rest/v1/closed_case_amount_rep'
+                             f'?select=yyyymm&court_name=like.*高等法院*&order=yyyymm',
+                             headers={**HEADERS_SB, 'Range': f'{off}-{off + 999}'}, timeout=60)
+            r.raise_for_status()
+            batch = r.json()
+            have |= {x['yyyymm'] for x in batch}
+            if len(batch) < 1000:
+                break
+            off += 1000
+        have.add('202307')  # 官方 202307 月包不含高院民訴檔（源頭缺，2026-08 重下載確認），重跑無益
         todo = sorted(set(datasets) - have)
         print(f'待回填金額 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
