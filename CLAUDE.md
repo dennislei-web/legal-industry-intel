@@ -237,6 +237,11 @@
   不入 git，重建需重爬）。無排程，年更手動跑 `run`
 - 前端：事務所 modal 概覽「國際評鑑排名」卡＋律師 modal「國際評鑑上榜」卡（RPC
   `lawyer_awards(p_name)`，只回已歸戶中文名）
+- **深層內容（mig 177）**：`firm_award_highlights` = L500 firm×領域頁的 key_clients（380 條、
+  理律去重 86 家）／work highlights（101 件、22 件含交易金額，musd 換算粗略僅供量級）／
+  practice_heads，`scripts/l500_highlights.py` 年更。AI 分析非訟側用法見 REVENUE_RULES.md
+  「非訟側 v1」：客戶基本盤下限＋deal 量級佐證，**highlights 是 submission 每領域 ~3 件精選、
+  金額是標的非律師費，禁止 Σ標的×費率當年營收**
 - **口徑**：質性聲譽排名（submission＋客戶訪談），無金額、一年一更、submission 偏差
   （未上榜≠不強）、台灣覆蓋僅涉外大所 ~40 家；AI 分析用法見
   `docs/firm-analysis-spec/FORMAT.md` 第三節（企業非訟型判定佐證）
