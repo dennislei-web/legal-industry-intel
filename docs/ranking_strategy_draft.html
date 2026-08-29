@@ -1,0 +1,206 @@
+<title>喆律國際評鑑申請策略</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#FBF9F7; --ink:#211C1B; --ink-2:#5C534F; --line:#E5DDD8;
+  --accent:#A6262C; --accent-soft:#F6E9E8; --card:#FFFFFF;
+  --gold:#8A6D2F; --gold-soft:#F3EDDD;
+  --ok:#2E6B45; --ok-soft:#E7F0E9; --warn:#8A6D2F; --bad:#8C4A46;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#191514; --ink:#EFE8E3; --ink-2:#B0A49D; --line:#3A322F;
+    --accent:#E06A63; --accent-soft:#3A2523; --card:#221D1B;
+    --gold:#CBA75A; --gold-soft:#332C1D;
+    --ok:#7FBF95; --ok-soft:#22312A; --warn:#CBA75A; --bad:#D89390;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#191514; --ink:#EFE8E3; --ink-2:#B0A49D; --line:#3A322F;
+  --accent:#E06A63; --accent-soft:#3A2523; --card:#221D1B;
+  --gold:#CBA75A; --gold-soft:#332C1D;
+  --ok:#7FBF95; --ok-soft:#22312A; --warn:#CBA75A; --bad:#D89390;
+}
+body{background:var(--paper);color:var(--ink);font-family:'Noto Sans TC',"PingFang TC","Microsoft JhengHei",sans-serif;
+  line-height:1.75;font-size:15.5px;margin:0;padding:0 20px 80px;}
+.wrap{max-width:780px;margin:0 auto;}
+header{padding:56px 0 28px;border-bottom:3px solid var(--accent);}
+.eyebrow{color:var(--accent);font-size:12.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;margin:0 0 14px;}
+h1{font-family:'Noto Serif TC',serif;font-weight:900;font-size:34px;line-height:1.35;margin:0 0 10px;text-wrap:balance;}
+.meta{color:var(--ink-2);font-size:13px;margin:0;}
+h2{font-family:'Noto Serif TC',serif;font-weight:700;font-size:22px;margin:56px 0 6px;line-height:1.4;text-wrap:balance;}
+h2 .no{color:var(--accent);font-size:14px;letter-spacing:.1em;display:block;margin-bottom:4px;}
+h3{font-size:16px;font-weight:700;margin:30px 0 8px;}
+p{margin:10px 0;}
+.lede{font-size:16.5px;}
+strong{font-weight:700;}
+em{font-style:normal;background:linear-gradient(transparent 68%, var(--accent-soft) 68%);}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:24px 0 8px;}
+.kpi{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--accent);padding:14px 16px;}
+.kpi b{font-family:'Noto Serif TC',serif;font-size:24px;display:block;font-variant-numeric:tabular-nums;}
+.kpi span{font-size:12.5px;color:var(--ink-2);line-height:1.5;display:block;}
+.tblwrap{overflow-x:auto;margin:18px 0;}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px;}
+th{font-size:12px;letter-spacing:.08em;color:var(--ink-2);text-transform:uppercase;text-align:left;
+  border-bottom:2px solid var(--ink);padding:8px 10px;font-weight:700;white-space:nowrap;}
+td{border-bottom:1px solid var(--line);padding:9px 10px;vertical-align:top;}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;}
+tr.hl td{background:var(--accent-soft);}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 9px;border-radius:99px;white-space:nowrap;}
+.pill.ok{background:var(--ok-soft);color:var(--ok);}
+.pill.warn{background:var(--gold-soft);color:var(--gold);}
+.pill.na{background:var(--line);color:var(--ink-2);}
+.pill.p1{background:var(--accent);color:#fff;}
+.pill.p2{background:var(--accent-soft);color:var(--accent);}
+.pill.p3{background:var(--gold-soft);color:var(--gold);}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin:20px 0;}
+.card{background:var(--card);border:1px solid var(--line);padding:18px 20px;}
+.card h4{margin:0 0 4px;font-size:15.5px;font-weight:700;}
+.card .sub{font-size:12.5px;color:var(--ink-2);margin:0 0 10px;}
+.card p{font-size:13.5px;margin:8px 0;}
+.card ul{font-size:13.5px;margin:8px 0;padding-left:20px;}
+ul,ol{padding-left:24px;}
+li{margin:6px 0;}
+li::marker{color:var(--accent);font-weight:700;}
+.note{background:var(--card);border-left:4px solid var(--gold);padding:14px 18px;font-size:13.5px;margin:20px 0;color:var(--ink-2);}
+.note b{color:var(--ink);}
+.warnbox{background:var(--accent-soft);border-left:4px solid var(--accent);padding:14px 18px;font-size:13.5px;margin:20px 0;}
+.src{font-size:12px;color:var(--ink-2);}
+.timeline{margin:20px 0;border-left:3px solid var(--line);padding-left:0;list-style:none;}
+.timeline li{margin:0;padding:10px 0 10px 22px;position:relative;}
+.timeline li::before{content:"";position:absolute;left:-8px;top:19px;width:13px;height:13px;border-radius:50%;
+  background:var(--paper);border:3px solid var(--accent);}
+.timeline .when{font-weight:700;font-variant-numeric:tabular-nums;display:block;font-size:14px;}
+.timeline .what{font-size:13.5px;color:var(--ink-2);}
+.timeline li.due::before{background:var(--accent);}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-2);}
+a{color:var(--accent);}
+@media (max-width:640px){h1{font-size:27px;}h2{font-size:19.5px;}}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">Zhelu Law · Rankings Strategy</p>
+  <h1>喆律法律事務所<br>國際評鑑申請策略備忘</h1>
+  <p class="meta">Chambers（Greater China Region）｜Legal 500（Asia Pacific）｜IFLR1000｜asialaw<br>
+  2026-08-29 · 依 legal-industry-intel 資料庫（firm_awards 四源 450 列、裁判書官方統計）＋各機構官網研究彙整</p>
+</header>
+
+<h2><span class="no">摘要</span>結論先講</h2>
+<p class="lede">四大評鑑的 ranking submission <strong>全部免費</strong>（付費的是 profile 廣告，兩回事）。上榜靠的不是案件量，而是<em>明星個人＋利基敘事＋機構客戶 referee</em> 三件事——業鑫、明理、尚澄全是這個公式。喆律的最大結構性難題：<strong>本所最強的家事業務（離婚全國第 1，量體是第 2 名的 4.8 倍）在四源的台灣分類裡沒有對應類別</strong>；而有類別的勞動領域，喆律訴訟量僅全國第 29。因此建議的路徑是：<strong>先投 Legal 500「Labour and employment」＋ asialaw（門檻最低、有 Firms to watch／Notable 緩衝層），同步以「高資產離婚／跨境家事」包進 Dispute resolution 敘事</strong>，Chambers 走「個人先上榜」的業鑫路徑，目標放 2–3 年。</p>
+
+<div class="kpis">
+  <div class="kpi"><b>離婚 №1</b><span>喆律 504 件全國第一（第 2 名 104 件）｜DB：firm_cause_ranking 近5年</span></div>
+  <div class="kpi"><b>僱傭 №29</b><span>勞動案由僅 29 件（明理 357、業鑫 332）｜DB 同上</span></div>
+  <div class="kpi"><b>0 / 4 源</b><span>喆律目前未在任何一源上榜｜DB：firm_awards</span></div>
+  <div class="kpi"><b>NT$0</b><span>四源 ranking submission 均免費｜各機構官網</span></div>
+</div>
+
+<h2><span class="no">壹</span>四機構 submission 制度對照</h2>
+<div class="tblwrap">
+<table>
+<tr><th>機構（指南）</th><th>下輪截止</th><th>發布</th><th>格式與referee</th><th>台灣領域</th><th>喆律適用</th></tr>
+<tr><td><strong>Chambers</strong><br><span class="src">Greater China Region 2027</span></td>
+  <td class="num">2026-01-23 起分波<br><span class="src">（本輪已過，備 2028）</span></td><td class="num">約每年 1 月</td>
+  <td>官方範本（Word/Excel 或 MyAccount 線上）＋獨立 referee 試算表，建議 <strong>20–30 位</strong>；訪談匿名保密</td>
+  <td class="num">10 類</td><td><span class="pill warn">中期目標</span></td></tr>
+<tr class="hl"><td><strong>Legal 500</strong><br><span class="src">Asia Pacific</span></td>
+  <td class="num">2026-06-08<br><span class="src">（已過；下輪約 2027 年 6 月初）</span></td><td class="num">11 月中</td>
+  <td>submission 範本（限 .docx）＋客戶 referee 表（限 .xlsx）；referee 非強制但重要</td>
+  <td class="num">13 類</td><td><span class="pill ok">首選</span></td></tr>
+<tr><td><strong>IFLR1000</strong></td>
+  <td class="num">2026-03-06<br><span class="src">（年年約 3 月初）</span></td><td class="num">分批</td>
+  <td>每領域一份表、最多 10 件 deals；2026 起與 IFLR Awards 合併投件</td>
+  <td class="num">5 類<br><span class="src">全為金融</span></td><td><span class="pill na">不適用</span></td></tr>
+<tr class="hl"><td><strong>asialaw</strong></td>
+  <td class="num">研究 2 月底開放<br>4 月上旬截止<span class="src">（2026 輪為 4/10）</span></td><td class="num">9–10 月</td>
+  <td>線上平台（submissions.legalbenchmarkinggroup.com）；submission＋referee 同日截止；4–6 月訪談</td>
+  <td class="num">18 類</td><td><span class="pill ok">首選</span></td></tr>
+</table>
+</div>
+<p class="src">來源：chambers.com/info/submissions、legal500.com AP submissions 頁、iflr.com 研究公告、asialaw.com Timeline 頁（2026-08-29 查證）。Chambers GCR 2027 首波截止日出自 Chambers 官方社群公告；各領域分波日期需登入 MyAccount 查研究時程表。</p>
+
+<div class="note"><b>免費 vs 付費，跟同仁講清楚：</b>ranking submission（投件參加評鑑研究）四源都免費、不投白不投；機構業務會來推銷的「enhanced profile／directory listing」是另一回事——那是上榜之後的曝光加購，<b>買了不會影響 band，不買也不會被降</b>（四源方法論皆明文）。</div>
+
+<h2><span class="no">貳</span>喆律的牌：資料庫怎麼說</h2>
+<p>以本站裁判書官方統計（近 5 年滾動）盤點喆律可打的牌：</p>
+<ul>
+<li><strong>家事＝壓倒性第一，但無處可投。</strong>「離婚」案由喆律 504 件、38 位律師參與，全國第 1，第 2 名（安鑫）僅 104 件。然而 Chambers GCR、L500 AP、asialaw 的台灣分類<em>都沒有 Family／Private Client 類</em>；Chambers 另冊 High Net Worth guide（Private Wealth Law）目前查無台灣分區（中國、香港有——推測台灣未覆蓋，可去信 Chambers 研究團隊確認）。</li>
+<li><strong>勞動量體不足以正面對決。</strong>「僱傭」案由喆律 29 件（11 位律師）排第 29；明理 357 件、業鑫 332 件、宇恒 245 件。用訴訟量敘事打 Employment 打不贏 boutique，要換角度（見下節）。</li>
+<li><strong>全所結構是 B2C 訴訟機器。</strong>約 60 位執業律師；雷皓明個人近 5 年出庭 2,447 件（民事 1,439／家事 752／刑事 233），為全所敘事核心。刑辯側孫少輔（139 件刑事）、黃世欣（116 件）可撐刑事量能——但四源台灣也無 White-collar crime 類。</li>
+</ul>
+<p class="src">來源：DB lawyers_with_stats（firm_name=喆律）、firm_cause_ranking RPC（僱傭／離婚）、firm_awards practice_area 清單。</p>
+
+<h2><span class="no">參</span>同型態所是怎麼上榜的</h2>
+<div class="cards">
+<div class="card"><h4>業鑫法律事務所 <span class="pill warn">Chambers「Lawyers only」</span></h4>
+  <p class="sub">勞動 boutique｜DB 僱傭案由全國 №2（332 件）</p>
+  <p>注意：DB 顯示業鑫在 Chambers Employment 2026 是「<strong>Lawyers only</strong>」——所本身未列 band，是<strong>陳業鑫個人 Band 3</strong>。上榜引擎是他的履歷（前勞動法庭法官、台北市勞動局長），不是所的案件量。</p>
+  <p><strong>啟示：</strong>Chambers 有「個人先上、所後上」的路徑。喆律可先推一位律師卡個人榜。</p></div>
+<div class="card"><h4>明理法律事務所 <span class="pill warn">Chambers Employment Band 4</span></h4>
+  <p class="sub">勞動 boutique｜DB 僱傭案由全國 №1（357 件）</p>
+  <p>陳金泉個人 Band 2、所 Band 4。數十年勞動法專著＋<strong>勞方側（employee-side）代理</strong>的清楚定位——證明評鑑不是只認雇主側顧問所。</p>
+  <p><strong>啟示：</strong>employee-side 也能上 Chambers；喆律的受僱者案件量可以是敘事資產而非包袱。</p></div>
+<div class="card"><h4>有澤（Stellex） <span class="pill ok">三源全開花</span></h4>
+  <p class="sub">中型精品所｜Chambers Employment Band 1＋劉志鵬 Star Individual</p>
+  <p>Chambers 四領域（Employment B1／DR B3／TMT B3／不動產 B2）、L500 五領域、asialaw 六領域。錨是劉志鵬（台灣勞動法權威）＋跨領域團隊敘事。另一個細節：其 L500 頁 key clients／work highlights <strong>全部留空</strong>——投件材料可以整包標註保密，不影響上榜。</p>
+  <p><strong>啟示：</strong>B2C 客戶隱私不是投件障礙，選 confidential 即可。</p></div>
+<div class="card"><h4>尚澄（Enlighten） <span class="pill ok">利基卡位模範</span></h4>
+  <p class="sub">小所｜Chambers Banking &amp; Finance Band 3、蔡昆洲個人連續 5 年上榜</p>
+  <p>以 FinTech／虛擬資產利基敘事擠進 Banking &amp; Finance 大分類（DB 顯示三源都有：Chambers B3、L500 Tier 3、asialaw Notable）。人少沒關係，敘事窄而尖。</p>
+  <p><strong>啟示：</strong>小所要贏在「這個利基我最懂」，不是「我什麼都做」。喆律的對應利基＝legal tech／消費者法律平台。</p></div>
+</div>
+
+<h2><span class="no">肆</span>機構 × 領域優先序</h2>
+<div class="tblwrap">
+<table>
+<tr><th>優先</th><th>目標</th><th>為什麼</th><th>目標名次（首輪）</th></tr>
+<tr><td><span class="pill p1">P1</span></td><td><strong>asialaw · Labour and employment ＋ Dispute resolution</strong></td>
+  <td>台灣覆蓋 18 類最寬、競爭密度最低（勞動榜僅 12 家）、有「Notable」入門層；線上平台投件成本最低，適合當第一次練兵</td><td class="num">Notable</td></tr>
+<tr><td><span class="pill p1">P1</span></td><td><strong>Legal 500 · Labour and employment</strong></td>
+  <td>有「Firms to watch」緩衝層（博仲 2026 即以此入榜）；L500 明文歡迎敘事型投件；勞動榜 Tier 3 有國巨等中小所前例</td><td class="num">Firms to watch</td></tr>
+<tr><td><span class="pill p2">P2</span></td><td><strong>L500 · Dispute resolution</strong>（把家事包進來）</td>
+  <td>家事無類別的變通解：把高資產離婚、跨境親權、遺產繼承訴訟寫進 DR 的 work highlights，敘事「全台最大個人爭議解決平台」＋離婚全國第一的官方數據</td><td class="num">Firms to watch</td></tr>
+<tr><td><span class="pill p2">P2</span></td><td><strong>Chambers GCR · Employment</strong></td>
+  <td>走業鑫路徑：先推個人。需先累積 1–2 年雇主側顧問實績與機構 referee，2028 guide（2027 年初截止）再投較實際</td><td class="num">個人 ranked</td></tr>
+<tr><td><span class="pill p3">P3</span></td><td><strong>L500 · TMT ／ Data protection</strong></td>
+  <td>若 legal tech／平台敘事成熟（網路誹謗、數位性暴力、個資爭訟＋自家平台工程），是差異化縫隙；有澤 Data protection Tier 2 證明中型所可入</td><td class="num">觀察</td></tr>
+<tr><td><span class="pill na">—</span></td><td>IFLR1000</td><td>台灣僅 5 類全為金融交易（banking／資本市場／M&amp;A／重整），與喆律業務無交集，不投</td><td class="num">—</td></tr>
+</table>
+</div>
+<div class="warnbox"><strong>對家事類別缺口的長線動作：</strong>可正式去信 Chambers（GCR 研究團隊）與 L500 建議增設 Taiwan「Family／Private Wealth」分類——評鑑機構會依市場投件量與需求開新類（中國即有 Private Client/Wealth Management 類）。就算短期不成，這封信本身就是讓研究員記住「台灣家事＝喆律」的免費操作。<span class="src">（推測性建議，成功率低但成本近零）</span></div>
+
+<h2><span class="no">伍</span>Submission 材料清單</h2>
+<h3>1. Work highlights 選案原則（每領域 15–20 件，L500/asialaw 敘事型；Chambers 分 publishable／confidential 兩區）</h3>
+<ul>
+<li><strong>反直覺重點：不要選「量」，要選「事」。</strong>研究員看的是複雜度、金額、新穎性、社會影響。選案優先序：媒體報導過的案件 &gt; 最高法院／高院層級 &gt; 新法適用首例（跟蹤騷擾、數位性暴力、勞動事件法程序）&gt; 高標的金額（本站 lawyer_case_amount_stats 可直接撈 200 萬+案件當清單底稿）。</li>
+<li>勞動領域：優先放<strong>雇主側顧問案</strong>（B2B 霸凌防治線的企業客戶案件是現成素材）＋集體性案件（大量解僱、工會爭議）；受僱者側放指標性勝訴。</li>
+<li>個人客戶案件一律標 confidential（有澤示範全保密照樣 Band 1），描述寫「某上市公司高階經理人離職競業案」即可。</li></ul>
+<h3>2. Referee 名單（Chambers 要 20–30 位；L500 用 .xlsx 表；asialaw 同步截止）</h3>
+<ul>
+<li><strong>B2C 所的痛點在這裡：研究員要訪談的是能講出專業評價的人</strong>，散客不合用。可用池：B2B 霸凌線企業窗口（HR／法務）、顧問合約企業、法律 010 平台端合作對象、保險公司／資產管理公司轉介窗口、共同辦案或對造的他所律師（peer referee 也計入）、商務仲介（會計師、地政士）。</li>
+<li>每領域至少 8–10 位、且當年度真的有往來；投件前逐一電話知會（研究員 email 回覆率是常見死因）。</li></ul>
+<h3>3. 敘事包裝（B2C 所的差異化）</h3>
+<ul>
+<li><strong>量化管理＝喆律獨有故事：</strong>自建案件管理系統、諮詢轉換數據、AI 輔助文書——包裝成「台灣最大規模的個人爭議解決平台、以數據治理品質」。評鑑近年偏好 legal tech／innovation 角度（L500 另有 innovation 特輯）。</li>
+<li>用官方數據說話：離婚案件全國第一、近 5 年出庭 ○○ 件——裁判書是公開可驗證來源，比自報數字有力。</li>
+<li>錨定個人：雷皓明（媒體聲量＋2,447 件）為 firm-wide 臉孔；勞動與家事各指定一位 practice head 讓研究員有明確訪談對象。</li></ul>
+
+<h2><span class="no">陸</span>年度時程表（以 2026-09 起算）</h2>
+<ul class="timeline">
+<li><span class="when">2026-09 ～ 2026-12｜準備期</span><span class="what">拍板投件領域與 practice head；建 work highlights 案件庫（每領域 20 件）；referee 名單 30+ 建檔並知會；註冊 Chambers MyAccount、L500 帳號、asialaw 平台帳號；下載三家官方範本</span></li>
+<li class="due"><span class="when">2027-01 下旬｜Chambers GCR 2028 首波截止（若決定投）</span><span class="what">參考 2027 輪首波 1/23；各領域分波日期以 MyAccount 研究時程表為準</span></li>
+<li class="due"><span class="when">2027-02 底 ～ 04-10 前後｜asialaw 2027 研究期</span><span class="what">2 月底開放、4 月上旬 submission＋referee 同步截止；3 月中有官方 webinar 可看</span></li>
+<li><span class="when">2027-04 ～ 06｜asialaw 訪談期</span><span class="what">研究員可能聯繫 practice head 與 referee；提前演練訪談口徑</span></li>
+<li class="due"><span class="when">2027-06 上旬｜Legal 500 AP 截止</span><span class="what">參考 2026 輪為 6/8；submission（.docx）＋client referee（.xlsx）同日；6 月底起追蹤研究期</span></li>
+<li><span class="when">2027-09 ～ 10｜asialaw 2027 發布</span><span class="what">首個放榜點；無論結果，向研究員要 feedback 供下輪修正</span></li>
+<li><span class="when">2027-11 中｜L500 AP 台灣榜發布</span></li>
+<li><span class="when">2028-01｜Chambers GCR 2028 發布</span><span class="what">發布後把四源結果回灌本站 firm_awards（年更爬蟲），檢討下一輪</span></li>
+</ul>
+
+<footer>
+<p><strong>資料來源分級</strong>｜<b>官網查證</b>：四機構 deadline、格式、免費政策（chambers.com、legal500.com、iflr.com、asialaw.com，2026-08-29 查證；Chambers GCR 分波細節需登入確認）。<b>DB</b>：firm_awards／firm_award_highlights（mig 175/177，2026-08 爬）、firm_cause_ranking、lawyers_with_stats（裁判書官方統計，近 5 年滾動）。<b>推測</b>：Chambers HNW 未覆蓋台灣（查無分區，未獲官方證實）、各機構下輪確切日期（依歷年慣例外推）、家事類別增設建議。</p>
+<p>本備忘由 legal-industry-intel 專案產出 · 2026-08-29 · 內部文件</p>
+</footer>
+</div>
