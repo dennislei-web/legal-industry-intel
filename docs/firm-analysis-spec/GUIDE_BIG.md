@@ -56,7 +56,7 @@ cd C:\projects\legal-industry-intel\scripts\_batch408\v2 && python upload_one.py
 
 ## 判斷規則（品質底線）
 - **所長**：必須是 slim dossier 名冊裡真實存在的人（大所看官網「所長／執行長／managing partner／主持律師」頁）。官網只有英文品牌名時不得音譯推測中文名。無法確認寫 `-` 並在 notes 說明。
-- **前司法官**：只認 dossier `ex_judicial_lawyers`（firm_name 相符）＋官網明確寫出且與名冊**姓名核對通過**者。法官助理／書記官／檢察事務官／考上未任職**不算**。大所常有前大法官／前部長，務必姓名核對。
+- **前司法官**：僅兩通道採認：(1) dossier `ex_judicial_lawyers` 中 **confidence=high 且 firm_name 相符**者；(2) 官網具名載明且與名冊**姓名核對通過**者。confidence=medium/conflict 一律不採認、不寫入 ex_judicial 欄（可在正文中性提及「有訊號但未採認」）。法官助理／書記官／檢察事務官／考上未任職**不算**。大所常有前大法官／前部長，務必姓名核對。
 - **查無就寫「查無」**，禁止編造。`name_ambiguous=true` 者案量是同名合併值，引用要標註。
 - **WebSearch**：大所可用，**最多 2 次**，僅用於確認創所年份、所長／合夥人結構、重大案件或前司法官身分。結果必須與 dossier 名冊姓名核對。
 
