@@ -225,6 +225,24 @@
 後兩張是 admin-only。**migration 編號是跨兩個 repo 的單一序列——開新號前要同時看
 兩邊的最大編號**。
 
+## 國際法律評鑑資料線（migration 175/176，2026-08-29 四源全開）
+
+- `firm_awards` 表：source（chambers/legal500/iflr1000/asialaw）× year × practice_area × firm，
+  band＋`ranked_lawyers` jsonb（name_en＋歸戶中文 name）。四源共 450 列、事務所歸戶 90%+、
+  上榜律師中文歸戶 71.8%（188/262）
+- 爬蟲：`scripts/chambers_awards.py`（Chambers，Angular ng-state）＋`scripts/rating_awards.py`
+  （L500/IFLR/asialaw，SSR HTML）；所名對照＋人工律師名單在 `scripts/chambers_firm_map.py`
+  （**Lexcel=惇安不是常在；常在英文名是 Tsar & Tsai**——查證陷阱都記在該檔註解）；
+  律師歸戶 `scripts/award_lawyer_match.py`（官網雙語對照快取 `.chambers_cache/lawyer_pairs.json`
+  不入 git，重建需重爬）。無排程，年更手動跑 `run`
+- 前端：事務所 modal 概覽「國際評鑑排名」卡＋律師 modal「國際評鑑上榜」卡（RPC
+  `lawyer_awards(p_name)`，只回已歸戶中文名）
+- **口徑**：質性聲譽排名（submission＋客戶訪談），無金額、一年一更、submission 偏差
+  （未上榜≠不強）、台灣覆蓋僅涉外大所 ~40 家；AI 分析用法見
+  `docs/firm-analysis-spec/FORMAT.md` 第三節（企業非訟型判定佐證）
+- 年度注意：asialaw 站上不標年度，2026 版約每年 9 月發布，發布後把 `scrape_asialaw` 的
+  year 改掉重跑；IFLR 年度自頁面「YYYY Edition」自動抓
+
 ## 010 合作律師 tab（migration 073）
 
 - 律師區子頁 `law010`（喆律校友會旁）：法律010 平台合作律師 × MOJ 現職所 × 官方案量

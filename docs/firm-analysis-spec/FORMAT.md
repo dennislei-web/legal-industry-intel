@@ -52,6 +52,14 @@ metadata 之後、七節之前，固定加：
 
 ## 三、非訟業務
 - 可觀測訊號：獨董席次、專利商標代理量（TIPO 專利公開落後 18 個月，近兩年專利數字標「尚未公開完全」）
+- **國際評鑑排名（`firm_awards` 表，2026-08 起）**：Chambers Greater China／Legal 500 AP／
+  IFLR1000／asialaw 四源的 practice area × band。用法：
+  - 上榜（尤其 Corporate/M&A、Capital Markets、Banking 的 Band 1-2／Tier 1-2／Outstanding）
+    ＝企業非訟型判定的直接佐證，補「非訟主業不可觀測」的盲區
+  - band 年度升降＝非訟動能 proxy（資料累積多年後才可用，首年僅存量）
+  - 口徑：質性聲譽評比（submission＋客戶訪談）、無金額、一年一更、有 submission 偏差
+    （**未上榜≠不強**，缺席可能只是沒投件）；台灣覆蓋僅涉外大所 ~40 家，
+    中小所查無屬常態、不得當負面訊號寫
 - 官網宣稱業務 vs 訊號佐證（宣稱有但查無訊號要指出）
 - 查無訊號時明寫：「無可觀測非訟訊號，推定以訴訟為主」
 
