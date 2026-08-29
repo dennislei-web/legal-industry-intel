@@ -187,9 +187,14 @@
   找「新台幣」欄通吃；**closed_case_stats.py 的 parse_line 仍是寫死 c[28]/c[29]，
   高院金額全漏**（closed_case_amount_rep/amount_sum 無高院，待修）。最高法院民訴版式
   仍不相容（date 檢查自然擋掉，appeal3 恆 0）
-- 同趟另出 `lawyer_case_fee_stats`（mig 172，收費模型 v2 供 firm_dossier 批次分析）：
+- 同趟另出 `lawyer_case_fee_stats`（mig 172/173，收費模型 v2 供 firm_dossier 批次分析）：
   律師×月的 cases_200plus／surcharge_base_sum=Σmax(0,金額−200萬)／appeal2_cases
-  （JID 代碼 TPH/TCH/TNH/KSH/HLH/KMH 開頭）／appeal3_cases（TPS，恆 0）
+  （JID 代碼 TPH/TCH/TNH/KSH/HLH/KMH 開頭）／appeal3_cases（TPS，恆 0）／
+  **surcharge_capped_sum**（mig 173：單案標的 cap 1 億後再算超額，逐案套 cap 才正確，
+  聚合後無法回推；未 cap 版在極端大案失真——李杰峰 15 件超額 95.5 億→加費 1.4 億）
+- **前端**：律師 modal「💰 訴訟標的金額分布」卡（`renderCaseAmountCard`，六桶橫條＋
+  200萬+件數＋審級），資料直讀兩表按 name（無 RPC）。同名律師是合併值（沿用
+  `name_ambiguous` 標 *）
 - 取代 mig 170 `lawyer_amount_month_stats`（裁判書全文 regex 抽取：1-10萬桶高估 ~6 倍、
   月樣本量僅 join 口徑 1/5.6）的分析口徑；舊表暫留、**前端兩者皆未接**
 - 無排程：新資料月的 clients collect 跑完後手動 `python lawyer_case_amount.py run <ym>`

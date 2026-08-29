@@ -7030,7 +7030,7 @@ async function showLawyerDetail(name, certNumber) {
   }
 
   // 並行撈：MOJ 詳細、官方彙總（含 by_year/cats jsonb）、逐法院月紀錄（畫像圖表用）、配對關係
-  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [], exJud = [], lawyerChanges = [];
+  let moj = null, stat = null, pairs = null, yearTrend = null, causeStat = null, clientConc = null, indepDirs = [], govTen = [], tipoAg = [], exJud = [], lawyerChanges = [], amountRows = [], feeRows = [];
   const courtRows = [];
   const tasks = [
     db.from('lawyer_judgment_stats').select('*').eq('name', name).maybeSingle()
@@ -7048,6 +7048,10 @@ async function showLawyerDetail(name, certNumber) {
       .then(r => { clientConc = r.data; }),
     db.from('lawyer_cause_stats').select('*').eq('name', name).maybeSingle()
       .then(r => { causeStat = r.data; }),
+    db.from('lawyer_case_amount_stats').select('ym,bucket,cases').eq('name', name)
+      .then(r => { amountRows = r.data || []; }),
+    db.from('lawyer_case_fee_stats').select('ym,cases_200plus,appeal2_cases,appeal3_cases').eq('name', name)
+      .then(r => { feeRows = r.data || []; }),
     db.rpc('lawyer_pair_summary', { p_name: name, p_limit: 12 })
       .then(r => { pairs = r.data; }),
     db.rpc('lawyer_year_trend', { p_name: name })
@@ -7191,7 +7195,7 @@ async function showLawyerDetail(name, certNumber) {
             ? row('全國執業', `<span style="color:var(--green);font-weight:600;">&#10003; 已登錄</span> <span title="全律會全國執業名冊之登錄效期（起迄月）；已登錄者可於全國執業" style="cursor:help;">${escHtml(l.practice_start_date)}${l.practice_end_date ? ' ~ ' + escHtml(l.practice_end_date) : ''}</span>`)
             : row('全國執業', '<span style="color:var(--text-muted);" title="全律會全國執業名冊查無。可能僅於主區域公會執業，或有向全律會登錄個別跨區執業（跨區登錄無公開名冊，無法查證）">— 未登錄<span style="font-size:0.75rem;">（跨區狀態無公開資料）</span></span>')}
           ${moj?.state_desc && moj.state_desc !== '正常' ? row('狀態', `<span style="color:var(--orange);">${escHtml(moj.state_desc)}</span>`) : ''}
-          ${moj?.discipline ? row('懲戒記錄', `<span style="color:var(--red);">⚠ ${escHtml(moj.discipline)}</span>`) : ''}
+          ${moj?.discipline ? row('懲戒記錄', renderDisciplineCell(moj.discipline)) : ''}
         </tbody>
       </table>
     </div>
@@ -7276,6 +7280,8 @@ async function showLawyerDetail(name, certNumber) {
     ${renderClientCard(clientConc, l.name_ambiguous)}
 
     ${renderCauseCard(causeStat, l.name_ambiguous)}
+
+    ${renderCaseAmountCard(amountRows, feeRows, l.name_ambiguous)}
 
     ${renderPairCard(pairs)}
 
@@ -7676,6 +7682,77 @@ function renderCauseCard(cs, ambiguous) {
           <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">最常見原始案由 Top 10</div>
           ${rawRows}
         </div>
+      </div>
+    </div>`;
+}
+
+// 懲戒記錄欄（moj_lawyers.discipline 存的是 MOJ 原始 HTML 片段：
+// <a href='../discipline/{ID}' target='_self'>1.警告 112年度台覆字第12號</a><br />，可多筆串接）
+// 原本整串 escHtml 直出會把標籤當文字顯示；改抽出 ID＋顯示文字，重建成 MOJ 決議書深層連結
+// （https://lawyerbc.moj.gov.tw/discipline/{ID}，2026-08-29 實測可直接開決議書頁）。
+function renderDisciplineCell(raw) {
+  const re = /<a[^>]*href=['"][^'"]*\/discipline\/([A-Za-z0-9]+)['"][^>]*>([\s\S]*?)<\/a>/g;
+  const items = [];
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const text = m[2].replace(/<[^>]*>/g, '').trim();
+    if (text) items.push({ id: m[1], text });
+  }
+  if (!items.length) {
+    const plain = String(raw).replace(/<br\s*\/?>/gi, '　').replace(/<[^>]*>/g, '').trim();
+    return plain ? `<span style="color:var(--red);">&#9888; ${escHtml(plain)}</span>` : '';
+  }
+  return `<span style="color:var(--red);">&#9888; ${items.map(it =>
+    `<a href="https://lawyerbc.moj.gov.tw/discipline/${encodeURIComponent(it.id)}" target="_blank" rel="noopener noreferrer" style="color:var(--red);text-decoration:underline;" title="開啟法務部律師懲戒決議書">${escHtml(it.text)}</a>`
+  ).join('<br>')}</span>`;
+}
+
+// 訴訟標的金額分布卡（lawyer_case_amount_stats mig 171 ＋ lawyer_case_fee_stats mig 172）
+// 口徑：終結案件微資料官方登錄標的金額 × 裁判書律師名按 JID join（非全文抽取），
+// 民事訴訟＋家事訴訟檔、金額>0 才入桶。無資料（非財產訴訟為主／未 join 上）時不顯示。
+const AMT_BUCKET_ORDER = ['1-10萬', '10-50萬', '50-100萬', '100-500萬', '500-1000萬', '1000萬+'];
+const AMT_BUCKET_COLORS = ['rgba(79,142,247,0.45)', 'rgba(79,142,247,0.6)', 'rgba(69,183,209,0.7)',
+  'rgba(76,175,130,0.75)', 'rgba(201,168,76,0.8)', 'rgba(224,146,60,0.85)'];
+
+function renderCaseAmountCard(amountRows, feeRows, ambiguous) {
+  if (!amountRows || !amountRows.length) return '';
+  const byBucket = {};
+  let total = 0;
+  for (const r of amountRows) {
+    byBucket[r.bucket] = (byBucket[r.bucket] || 0) + r.cases;
+    total += r.cases;
+  }
+  if (!total) return '';
+  const yms = amountRows.map(r => r.ym).sort();
+  const fmtYm = s => `${s.slice(0, 4)}/${s.slice(4)}`;
+  const sum = (rows, k) => rows.reduce((s, r) => s + (r[k] || 0), 0);
+  const c200 = sum(feeRows || [], 'cases_200plus');
+  const ap2 = sum(feeRows || [], 'appeal2_cases');
+  const ap3 = sum(feeRows || [], 'appeal3_cases');
+  const ap1 = Math.max(0, total - ap2 - ap3);
+  const max = Math.max(...AMT_BUCKET_ORDER.map(b => byBucket[b] || 0));
+  const bars = AMT_BUCKET_ORDER.map((b, i) => {
+    const n = byBucket[b] || 0;
+    const w = max ? Math.max(n ? 4 : 0, Math.round(n / max * 100)) : 0;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:0.85rem;">
+      <span style="width:78px;flex-shrink:0;${n ? '' : 'color:var(--text-muted);'}">${b}</span>
+      <span style="flex:1;min-width:60px;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><span style="display:block;height:100%;width:${w}%;background:${AMT_BUCKET_COLORS[i]};"></span></span>
+      <span style="width:86px;text-align:right;color:var(--text-muted);flex-shrink:0;">${n ? n.toLocaleString() : '-'}${n ? `（${Math.round(n / total * 100)}%）` : ''}</span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#128176; 訴訟標的金額分布 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">司法院終結案件微資料之<b>官方登錄標的金額</b>，民事＋家事訴訟案件${ambiguous ? '，同名合併值 *' : ''}</span></div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">
+        有標的金額案件 <b style="color:var(--text);">${total.toLocaleString()}</b> 件（${fmtYm(yms[0])}~${fmtYm(yms[yms.length - 1])} 終結）｜
+        200 萬以上 <b style="color:var(--text);">${c200.toLocaleString()}</b> 件（${Math.round(c200 / total * 100)}%）｜
+        審級：一審 ${ap1.toLocaleString()}／二審 ${ap2.toLocaleString()}${ap3 ? `／三審 ${ap3.toLocaleString()}` : ''}
+      </div>
+      ${bars}
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">
+        僅計有登錄標的金額之財產訴訟（刑事、非訟、非財產家事事件不在內），
+        故件數少於「近 5 年出庭」總數；金額為<b>起訴標的</b>非判決結果或律師收費。
+        三審（最高法院）微資料版式不同未納入。
       </div>
     </div>`;
 }

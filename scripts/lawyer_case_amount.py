@@ -56,6 +56,7 @@ os.makedirs(WORK_DIR, exist_ok=True)
 TABLE = 'lawyer_case_amount_stats'
 FEE_TABLE = 'lawyer_case_fee_stats'  # mig 172：收費模型 v2 聚合（200萬超額/審級）
 SURCHARGE_THRESHOLD = 2_000_000
+SURCHARGE_CAP = 100_000_000  # mig 173：單案計費標的上限 1 億（逐案套 cap 後才加總）
 APPEAL2_PREFIXES = ('TPH', 'TCH', 'TNH', 'KSH', 'HLH', 'KMH')  # 高等法院系
 APPEAL3_PREFIXES = ('TPS',)  # 最高法院（微資料無民訴版式，實務恆 0）
 FILE_TYPES = ('民事訴訟', '家事訴訟')
@@ -197,8 +198,9 @@ def run_month(ym, fileset_id):
         raise RuntimeError(f'{ym} 月包疑似殘缺（民訴+家訴有金額案僅 {len(cases)}），中止')
 
     agg = defaultdict(int)  # (name, bucket) → cases；微資料每案一列，天然去重
-    # 收費模型聚合（mig 172）：name → [200萬+件數, Σ超額標的, 二審件數, 三審件數]
-    fee = defaultdict(lambda: [0, 0, 0, 0])
+    # 收費模型聚合（mig 172/173）：
+    # name → [200萬+件數, Σ超額標的, 二審件數, 三審件數, Σ超額標的(cap 1億)]
+    fee = defaultdict(lambda: [0, 0, 0, 0, 0])
     joined = 0
     no_cache = 0
     for k4, jym, amount in cases:
@@ -211,7 +213,9 @@ def run_month(ym, fileset_id):
             continue
         joined += 1
         b = amount_bucket(amount)
-        surcharge = max(0, int(round(amount)) - SURCHARGE_THRESHOLD)
+        amt_i = int(round(amount))
+        surcharge = max(0, amt_i - SURCHARGE_THRESHOLD)
+        surcharge_capped = max(0, min(amt_i, SURCHARGE_CAP) - SURCHARGE_THRESHOLD)
         lvl = 2 if k4[0].startswith(APPEAL2_PREFIXES) else \
               3 if k4[0].startswith(APPEAL3_PREFIXES) else 1
         for name in lawyers:
@@ -221,12 +225,14 @@ def run_month(ym, fileset_id):
             f[1] += surcharge
             f[2] += lvl == 2
             f[3] += lvl == 3
+            f[4] += surcharge_capped
     rows = [{'ym': ym, 'name': n, 'bucket': b, 'cases': v} for (n, b), v in agg.items()]
     print(f'  有金額案 {len(cases)}（版式跳過 {skipped}、裁判月無快取 {no_cache}）→ '
           f'join {joined} 案、{len(rows)} 列（律師案次 {sum(agg.values())}）')
 
     fee_rows = [{'ym': ym, 'name': n, 'cases_200plus': f[0], 'surcharge_base_sum': f[1],
-                 'appeal2_cases': f[2], 'appeal3_cases': f[3]} for n, f in fee.items()]
+                 'appeal2_cases': f[2], 'appeal3_cases': f[3],
+                 'surcharge_capped_sum': f[4]} for n, f in fee.items()]
 
     # 重跑冪等：先刪該月再插（兩表同一趟）
     headers = {**HEADERS_SB, 'Content-Type': 'application/json', 'Prefer': 'return=minimal'}
