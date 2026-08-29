@@ -16118,7 +16118,7 @@ async function showCourtDetail(name) {
             '<div style="margin-top:10px;font-size:11px;color:var(--text-muted);line-height:1.6;">' +
             '口徑：僅民事／家事「訴訟」且填有新台幣訴訟標的金額之終結案件（非財產訴訟多無金額欄、不納入）。' +
             '委任＝原告或被告任一造有律師代理（含法律扶助）。金額為<strong>訴訟標的</strong>金額（起訴請求額），非成交或判賠額。' +
-            '資料源：司法院開放資料終結案件月包，全國各級法院合計。</div>';
+            '資料源：司法院開放資料終結案件月包，涵蓋全國地方法院＋高等法院（含分院）合計（最高法院版式不同、未納入）。</div>';
         if (repcurveChart) { repcurveChart.destroy(); repcurveChart = null; }
         const sumEl = document.getElementById('repcurveSummary');
         if (!data.length) { sumEl.textContent = '此條件無資料。'; return; }

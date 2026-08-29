@@ -9,6 +9,8 @@
   欄位：0控制碼 1法院別 2案號年 3字別 4號 5案由 6-8法官名 9-12原審
         13原告有律師 14被告有律師 15-17終結年月日 18-21終結情形1-4
         22-25得上訴/抗告 26-27上訴/結果 28幣別 29標的金額 ...
+  （高院系民訴檔幣別/金額在欄 27/28，parse_line 掃「新台幣」欄通吃兩版式；
+   最高法院民訴版式整體不同，被日期防呆擋掉、不納入）
 版式防呆：15-17 必須是合理民國日期，不符的列跳過並計數（保護版式漂移/其他檔型）。
 court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）。
 
@@ -172,11 +174,13 @@ def parse_line(line):
     d_rep = c[14] == '1'
     outcome = c[18].strip() or '未填'
     amount = None
-    if c[28] == '新台幣':
-        try:
-            amount = float(c[29])
-        except ValueError:
-            pass
+    # 金額欄位置版式不同：地院=欄28/29、高院=欄27/28（左移一欄）——
+    # 掃整列找「新台幣」欄（exact match）取下一欄，兩版式通吃；
+    # 最高法院民訴版式整體不同，已被上面的日期防呆擋掉
+    try:
+        amount = float(c[c.index('新台幣') + 1])
+    except (ValueError, IndexError):
+        pass
     return p_rep, d_rep, outcome, amount, norm_cause(c[5])
 
 
@@ -482,12 +486,14 @@ def main():
             run_month(ym, datasets[ym])
             time.sleep(1)
     elif cmd == 'backfill-amount':
-        # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）
-        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/closed_case_amount_months',
-                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
-                          json={}, timeout=60)
+        # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）。
+        # 「已有」的判準＝該月已有高等法院金額列——高院金額欄位置與地院差一欄，
+        # 2026-08 前的舊解析全漏（地院列都在，不能只看整月有無資料）
+        r = requests.get(f'{SUPABASE_URL}/rest/v1/closed_case_amount_rep'
+                         f'?select=yyyymm&court_name=like.*高等法院*&limit=100000',
+                         headers=HEADERS_SB, timeout=60)
         r.raise_for_status()
-        have = set(r.json() or [])
+        have = {x['yyyymm'] for x in r.json()}
         todo = sorted(set(datasets) - have)
         print(f'待回填金額 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
