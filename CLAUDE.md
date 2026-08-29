@@ -172,6 +172,28 @@
 - 視窗滾動更新：手動跑 `python client_concentration.py run <START> <END>`（新月份 collect 快取即可，
   舊月快取還在就不會重下載）；無排程，資料月更後想更新再跑
 
+## 律師×訴訟標的金額（migration 171，join 口徑）
+
+- `scripts/lawyer_case_amount.py` → `lawyer_case_amount_stats`（ym×律師×金額桶案件數）：
+  終結案件微資料月包（民訴＋家訴檔，**每列倒數第二欄自帶完整 JID**、官方登錄標的金額）
+  × `{ym}_clients.jsonl.gz`（client_concentration collect 產物）按 JID 前 4 段
+  （法院代碼,年,字別,號）join；clients 側**全 cat 收**（民訴檔含高院家事二審）。
+  202503 試跑：有委任民訴案 join 率 97.8%（含家事 cat 99.1%）。已回填 202111~202606
+  （clients 快取起點=202111，硬邊界）。上傳前 DELETE 該月再 INSERT，重跑冪等。
+  ⚠️ **快取要按該案 JID 的裁判月查、不是終結月**——2025-08 起約 1/3 案件裁判月早於
+  終結月（宣示後隔月才報結），只查終結月快取 join 率會從 ~99% 掉到 ~60%；
+  join 邏輯改版後用 `refill` 模式全區重跑
+- **金額欄版式陷阱**：高院系民訴檔金額在欄 27/28、地院在 28/29（差一欄）——本管線掃整列
+  找「新台幣」欄通吃；**closed_case_stats.py 的 parse_line 仍是寫死 c[28]/c[29]，
+  高院金額全漏**（closed_case_amount_rep/amount_sum 無高院，待修）。最高法院民訴版式
+  仍不相容（date 檢查自然擋掉，appeal3 恆 0）
+- 同趟另出 `lawyer_case_fee_stats`（mig 172，收費模型 v2 供 firm_dossier 批次分析）：
+  律師×月的 cases_200plus／surcharge_base_sum=Σmax(0,金額−200萬)／appeal2_cases
+  （JID 代碼 TPH/TCH/TNH/KSH/HLH/KMH 開頭）／appeal3_cases（TPS，恆 0）
+- 取代 mig 170 `lawyer_amount_month_stats`（裁判書全文 regex 抽取：1-10萬桶高估 ~6 倍、
+  月樣本量僅 join 口徑 1/5.6）的分析口徑；舊表暫留、**前端兩者皆未接**
+- 無排程：新資料月的 clients collect 跑完後手動 `python lawyer_case_amount.py run <ym>`
+
 ## 司法人力：書記官（migration 104）
 
 - 三表：`clerk_staff_stats`（審級×年 104–114）/ `clerk_court_snapshot`（114 年各法院 29 個）/

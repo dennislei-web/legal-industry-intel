@@ -22,6 +22,7 @@ scripts/.lawsnote_browser/
 # Scripts cache (含敏感名單)
 scripts/_*.json
 scripts/.official_stats_work/
+scripts/.lca_work/
 
 # 政府標案爬蟲中間資料
 scripts/_gov_tenders_*.json
