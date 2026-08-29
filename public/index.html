@@ -6445,6 +6445,8 @@ async function showFirmDetail(firmName) {
       <div class="chart-container" style="height:160px;"><canvas id="firmSeniorityChart"></canvas></div>
     </div>
 
+    <div id="firmAwardsCard"></div>
+
     ${litTotal ? `
     <!-- 官方訴訟戰力 -->
     <div class="card" style="margin-bottom:16px;">
@@ -6586,6 +6588,97 @@ async function showFirmDetail(firmName) {
 
   // 概覽：近期人員異動卡（即時讀 moj_lawyer_changes，與 AI 分析文脫鉤避免過時）
   loadFirmMovesCard(firmName);
+
+  // 概覽：國際評鑑獎項卡（firm_awards，mig 175）
+  loadFirmAwardsCard(firmName);
+}
+
+// ============================================================
+// 國際評鑑（mig 175/176）：Chambers / Legal 500 / IFLR1000 / asialaw
+// ============================================================
+const AWARD_SRC = {
+  chambers: { label: 'Chambers', pub: 'Greater China Region' },
+  legal500: { label: 'Legal 500', pub: 'Asia Pacific' },
+  iflr1000: { label: 'IFLR1000', pub: '' },
+  asialaw:  { label: 'asialaw', pub: '' },
+};
+const AWARD_FOOTNOTE = '※ 質性聲譽評比（事務所 submission＋客戶訪談），一年一更、無案量金額；有 submission 偏差（未上榜≠不強），台灣覆蓋以涉外大所為主，適合作為<b>非訟業務</b>（併購/資本市場/法遵）的聲譽訊號。';
+
+function awardBandChip(pa, band, rank) {
+  const color = rank === 1 ? 'var(--gold)' : rank === 2 ? 'var(--blue)' : 'var(--text-muted)';
+  return `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border:1px solid ${color};border-radius:10px;font-size:0.72rem;color:${color};">${escHtml(pa)}・${escHtml(band)}</span>`;
+}
+
+async function loadFirmAwardsCard(firmName) {
+  const el = document.getElementById('firmAwardsCard');
+  if (!el) return;
+  try {
+    const { data, error } = await db.from('firm_awards')
+      .select('source,year,practice_area,band,band_rank,ranked_lawyers')
+      .eq('firm_name', firmName)
+      .order('band_rank').order('practice_area');
+    if (error || !data?.length) { el.innerHTML = ''; return; }
+    const bySrc = {};
+    const lawyerSeen = new Map(); // 顯示名 → 最佳 band 排序
+    data.forEach(r => {
+      (bySrc[r.source] = bySrc[r.source] || []).push(r);
+      (r.ranked_lawyers || []).forEach(lw => {
+        const disp = lw.name || lw.name_en;
+        const ord = lw.rank_order ?? 9;
+        if (!lawyerSeen.has(disp) || ord < lawyerSeen.get(disp).ord) lawyerSeen.set(disp, { ord, zh: !!lw.name });
+      });
+    });
+    const srcRows = Object.entries(bySrc).map(([src, rows]) => {
+      const meta = AWARD_SRC[src] || { label: src, pub: '' };
+      const yr = rows[0].year;
+      const chips = rows.filter(r => r.band !== 'Lawyers only')
+        .map(r => awardBandChip(r.practice_area, r.band, r.band_rank)).join('');
+      return `<div style="margin-bottom:8px;">
+        <div style="font-size:0.78rem;font-weight:600;margin-bottom:2px;">${escHtml(meta.label)} ${meta.pub ? escHtml(meta.pub) + ' ' : ''}${yr}</div>
+        <div>${chips || '<span style="font-size:0.72rem;color:var(--text-muted);">（僅個人律師上榜）</span>'}</div>
+      </div>`;
+    }).join('');
+    const lws = [...lawyerSeen.entries()].sort((a, b) => a[1].ord - b[1].ord);
+    const lwHtml = lws.length ? `
+      <div style="font-size:0.75rem;color:var(--text-muted);margin:8px 0 4px;">上榜律師（${lws.length} 位）</div>
+      <div style="font-size:0.85rem;line-height:1.9;">${lws.map(([disp, m]) =>
+        m.zh ? `<a href="#" onclick="closeFirmModal();showLawyerDetail('${escHtml(disp).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);margin-right:10px;">${escHtml(disp)}</a>`
+             : `<span style="color:var(--text-muted);margin-right:10px;" title="尚未歸戶中文名冊">${escHtml(disp)}</span>`).join('')}</div>` : '';
+    el.innerHTML = `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">&#127942; 國際評鑑排名 <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">非訟聲譽訊號</span></div>
+      ${srcRows}
+      ${lwHtml}
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:10px;line-height:1.6;">${AWARD_FOOTNOTE}</div>
+    </div>`;
+  } catch (e) { el.innerHTML = ''; }
+}
+
+async function loadLawyerAwardsCard(name) {
+  const el = document.getElementById('lawyerAwardsCard');
+  if (!el) return;
+  try {
+    const { data, error } = await db.rpc('lawyer_awards', { p_name: name });
+    if (error || !data?.length) { el.innerHTML = ''; return; }
+    const rows = data.map(r => {
+      const meta = AWARD_SRC[r.source] || { label: r.source };
+      return `<tr>
+        <td style="padding:6px 12px;white-space:nowrap;">${escHtml(meta.label)} ${r.year}</td>
+        <td style="padding:6px 12px;">${escHtml(r.practice_area)}</td>
+        <td style="padding:6px 12px;font-weight:600;color:var(--gold);">${escHtml(r.lawyer_band || '-')}</td>
+        <td style="padding:6px 12px;color:var(--text-muted);font-size:0.8rem;">${escHtml(r.firm_name || r.firm_name_en)}</td>
+      </tr>`;
+    }).join('');
+    el.innerHTML = `
+    <div class="card" style="margin-bottom:16px;border-left:3px solid var(--gold);">
+      <div class="card-title">&#127942; 國際評鑑上榜</div>
+      <div style="overflow-x:auto;"><table style="width:100%;font-size:0.85rem;">
+        <thead><tr style="color:var(--text-muted);font-size:0.72rem;"><th style="text-align:left;padding:4px 12px;">評鑑</th><th style="text-align:left;padding:4px 12px;">領域</th><th style="text-align:left;padding:4px 12px;">分級</th><th style="text-align:left;padding:4px 12px;">上榜時所屬</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">${AWARD_FOOTNOTE}</div>
+    </div>`;
+  } catch (e) { el.innerHTML = ''; }
 }
 
 // ============================================================
@@ -7356,6 +7449,8 @@ async function showLawyerDetail(name, certNumber) {
     </div>
     `}
 
+    <div id="lawyerAwardsCard"></div>
+
     ${renderLawyerFirmHistoryCard(lawyerChanges)}
 
     ${renderExJudicialCard(exJud, exJudJMonths, exJudPros, exJudGaz)}
@@ -7460,6 +7555,9 @@ async function showLawyerDetail(name, certNumber) {
   `;
 
   if (stat?.cases_total) renderLawyerCharts(stat, courtRows, yearTrend);
+
+  // 國際評鑑徽章卡（mig 176，非同步填入）
+  loadLawyerAwardsCard(l.name);
 }
 
 // ============================================================
