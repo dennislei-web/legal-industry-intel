@@ -6370,6 +6370,9 @@ async function showFirmDetail(firmName) {
     </div>
     ` : ''}
 
+    <!-- 近期人員異動（moj_lawyer_changes 即時，開啟後非同步填入） -->
+    <div id="firmMovesCard" style="display:none;"></div>
+
     ${firmIndep.length ? `
     <!-- 上市櫃/興櫃獨立董事 -->
     <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
@@ -6556,6 +6559,74 @@ async function showFirmDetail(firmName) {
     loadFirmLitYears(firmName);
     loadFirmLitMoves(firmName);
   }
+
+  // 概覽：近期人員異動卡（即時讀 moj_lawyer_changes，與 AI 分析文脫鉤避免過時）
+  loadFirmMovesCard(firmName);
+}
+
+// ============================================================
+// 概覽 tab：近期人員異動卡（moj_lawyer_changes，2026-07-03 起追蹤）
+// ============================================================
+async function loadFirmMovesCard(firmName) {
+  try {
+    const { data: chg, error } = await db.from('moj_lawyer_changes')
+      .select('name, change_type, old_office, new_office, changed_at')
+      .or(`old_office.eq.${firmName},old_office.like.${firmName}%,new_office.eq.${firmName},new_office.like.${firmName}%`)
+      .order('changed_at', { ascending: false })
+      .limit(120);
+    if (error || firmName !== _currentFirmName) return;
+    const el = document.getElementById('firmMovesCard');
+    if (!el) return;
+    const isFirm = o => !!o && (o === firmName || o.startsWith(firmName));
+    // 同一律師多筆只取最新；分所間調動（兩邊皆本所）與純狀態異動不列
+    const seen = new Set(), rows = [];
+    (chg || []).forEach(c => {
+      if (!c.name || seen.has(c.name)) return;
+      const fromF = isFirm(c.old_office), toF = isFirm(c.new_office);
+      let kind = null;
+      if (c.change_type === 'firm_change' && toF && !fromF) kind = 'in';
+      else if (c.change_type === 'firm_change' && fromF && !toF) kind = 'out';
+      else if (c.change_type === 'new_lawyer' && toF) kind = 'new';
+      else if (c.change_type === 'state_change' && (c.new_office || '').startsWith('名冊查無') && fromF) kind = 'dereg';
+      if (!kind) return;
+      seen.add(c.name);
+      rows.push({ ...c, kind });
+    });
+    if (!rows.length) return;
+    const nIn = rows.filter(r => r.kind === 'in' || r.kind === 'new').length;
+    const nOut = rows.filter(r => r.kind === 'out' || r.kind === 'dereg').length;
+    const net = nIn - nOut;
+    const KIND = {
+      in:    { sym: '＋', color: 'var(--green)',  lbl: '轉入' },
+      new:   { sym: '＋', color: 'var(--green)',  lbl: '新進' },
+      out:   { sym: '－', color: 'var(--red)',    lbl: '轉出' },
+      dereg: { sym: '⚠', color: 'var(--orange)', lbl: '推定除名' },
+    };
+    el.innerHTML = `
+    <div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px;">
+      <div class="card-title" style="color:var(--blue);">🔄 近期人員異動（${rows.length} 位｜淨流 ${net > 0 ? '+' : ''}${net}）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">MOJ 名冊逐日比對（2026-07-03 起追蹤）— 即時資料，AI 分析文不再列逐筆明細</div>
+      <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:88px;">日期</th><th style="width:70px;">異動</th><th>律師</th><th>對象所</th></tr></thead>
+          <tbody>${rows.slice(0, 40).map(r => {
+            const k = KIND[r.kind];
+            const other = r.kind === 'in' ? (r.old_office || '（新登錄）')
+                        : r.kind === 'out' ? (r.new_office || '（未登錄新所）')
+                        : r.kind === 'new' ? '（新進律師）' : '（MOJ 名冊查無）';
+            return `<tr>
+              <td style="font-size:0.78rem;">${(r.changed_at || '').slice(0, 10)}</td>
+              <td style="color:${k.color};font-size:0.82rem;white-space:nowrap;">${k.sym} ${k.lbl}</td>
+              <td>${lawyerLink(r.name, 'font-weight:600;')}</td>
+              <td style="font-size:0.78rem;color:var(--text-muted);">${escHtml(other)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+      ${rows.length > 40 ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px;">僅列最近 40 筆</div>` : ''}
+    </div>`;
+    el.style.display = '';
+  } catch (e) { console.log('firm moves card error:', e); }
 }
 
 // ============================================================
