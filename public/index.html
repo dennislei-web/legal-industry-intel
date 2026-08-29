@@ -7052,10 +7052,12 @@ async function loadFirmAnalysis(firmName) {
     body.innerHTML = `
       <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">分析時間: ${formatDate(profile.ai_analyzed_at)}</div>
       <div class="ai-md" style="line-height:1.7;">${renderMarkdown(profile.ai_analysis)}</div>
+      <div id="firmBigCasesCard" style="display:none;"></div>
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">
         提示：如需更深入的分析，請在 Claude Code 開啟 <code>/legal-research</code> 輸入「分析 ${escHtml(firmName)}」
       </div>
     `;
+    loadFirmBigCases(firmName);
   } else {
     body.innerHTML = `
       <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
@@ -7067,6 +7069,64 @@ async function loadFirmAnalysis(firmName) {
       </div>
     `;
   }
+}
+
+// ============================================================
+// AI 分析 tab：1 億+ 標的案件明細卡（big_amount_cases，mig 174 即時查）
+// ============================================================
+async function loadFirmBigCases(firmName) {
+  try {
+    const { data: lw } = await db.from('lawyers_combined').select('name')
+      .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`).limit(500);
+    if (firmName !== _currentFirmName) return;
+    const names = [...new Set((lw || []).map(r => r.name).filter(Boolean))];
+    if (!names.length) return;
+    const { data: cases, error } = await db.rpc('firm_big_cases', { p_names: names });
+    if (error || firmName !== _currentFirmName || !cases || !cases.length) return;
+    const el = document.getElementById('firmBigCasesCard');
+    if (!el) return;
+    const nameSet = new Set(names);
+    const CAMP = { P: '原告方', D: '被告方' };
+    const fmtAmt = a => a >= 1e8 ? (a / 1e8).toFixed(2).replace(/\.00$/, '') + ' 億' : Math.round(a / 1e4).toLocaleString() + ' 萬';
+    const rowsHtml = cases.map(c => {
+      const p = (c.jid || '').split(',');
+      const caseNo = p.length >= 5 ? `${p[1]}年度${p[2]}字第${p[3]}號` : c.jid;
+      const jdate = p.length >= 5 ? `${p[4].slice(0, 4)}-${p[4].slice(4, 6)}-${p[4].slice(6, 8)}` : '';
+      const mine = (c.detail || []).filter(d => nameSet.has(d.name));
+      const others = (c.detail || []).length - mine.length;
+      const lawyerCell = mine.map(d =>
+        `${lawyerLink(d.name, 'font-weight:600;')}<span style="font-size:0.72rem;color:${d.camp === 'P' ? 'var(--green)' : 'var(--orange)'};">（${CAMP[d.camp] || d.camp || '?'}）</span>`
+      ).join('、') + (others > 0 ? `<span style="font-size:0.72rem;color:var(--text-muted);">＋他所 ${others} 位</span>` : '');
+      const parties = [...new Set(mine.flatMap(d => d.parties || []))];
+      const partyCell = parties.length ? parties.slice(0, 4).map(escHtml).join('、') + (parties.length > 4 ? `…等 ${parties.length} 名` : '') : '<span style="color:var(--text-muted);">—</span>';
+      const lvl = ['', '一審', '二審', '三審'][c.appeal_level] || '';
+      return `<tr>
+        <td style="white-space:nowrap;font-weight:700;color:var(--gold);">${fmtAmt(c.amount)}</td>
+        <td style="font-size:0.82rem;">${partyCell}</td>
+        <td style="font-size:0.82rem;">${lawyerCell}</td>
+        <td style="font-size:0.78rem;white-space:nowrap;">${lvl}<div style="color:var(--text-muted);">${escHtml(c.court || '')}</div></td>
+        <td style="font-size:0.78rem;">${escHtml(c.title || '')}<div style="color:var(--text-muted);white-space:nowrap;">${caseNo}（${jdate}）</div></td>
+      </tr>`;
+    }).join('');
+    const tableHtml = `
+      <div class="table-wrap" style="max-height:340px;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:80px;">標的金額</th><th>本所代理當事人</th><th>本所律師（立場）</th><th style="width:110px;">審級/法院</th><th>案由/字號</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">
+        口徑：司法院終結案件微資料官方登錄標的（202111 起）× 裁判書律師紀錄；訴訟標的≠實際收費基礎（機構/巨額求償案多為固定或比例計酬）；同名律師可能誤歸，引用前請核對。
+      </div>`;
+    const head = `<div class="card-title" style="color:var(--gold);">💰 1 億+ 標的案件明細（${cases.length} 件）</div>`;
+    el.innerHTML = `
+    <div class="card" style="border-left:3px solid var(--gold);margin-top:16px;">
+      ${cases.length > 5
+        ? `${head}<details><summary style="cursor:pointer;font-size:0.82rem;color:var(--text-muted);padding:4px 0;">共 ${cases.length} 件，最大 ${fmtAmt(cases[0].amount)} — 點擊展開明細</summary>${tableHtml}</details>`
+        : `${head}${tableHtml}`}
+    </div>`;
+    el.style.display = '';
+  } catch (e) { console.log('firm big cases error:', e); }
 }
 
 function closeFirmModal() {
