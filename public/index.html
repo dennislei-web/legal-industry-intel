@@ -2513,12 +2513,15 @@
         <div class="card-title">&#128142; 精品專業型利基變現 — 高單價路徑</div>
         <div style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:16px;margin-top:8px;">
           <div>
-            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">利基分群 × 人均營收中位（萬/年）</div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">利基分群 × 人均營收中位（萬/年）<span style="font-weight:400;color:var(--text-muted);font-size:0.72rem;">　點長條篩選右表</span></div>
             <div class="chart-container" style="height:280px;"><canvas id="drNicheChart"></canvas></div>
           </div>
           <div>
-            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">人均營收 TOP 15 精品所</div>
-            <div class="table-wrap"><table>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span id="drPremTitle">人均營收 TOP 15 精品所</span>
+              <button id="drPremReset" onclick="selectDrNiche(null)" style="display:none;padding:2px 10px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.72rem;">✕ 清除篩選</button>
+            </div>
+            <div class="table-wrap" style="max-height:480px;overflow-y:auto;"><table>
               <thead><tr><th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th></tr></thead>
               <tbody id="drPremBody"></tbody>
             </table></div>
@@ -11724,6 +11727,7 @@ function renderIsTypeList(t) {
 
 // ===== 產業深度報告（admin-only tab；firm_analysis_facts 聚合＋B2C 全解剖）=====
 let _drLoaded = false, _drB2c = [], _drSortK = 'rev', _drSortDir = -1;
+let _drPremAll = [], _drNicheBuckets = {}, _drNicheSel = null;
 const _drRev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
 const _drMed = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 async function loadDeepReportOnce() {
@@ -11818,10 +11822,15 @@ async function loadDeepReportOnce() {
       const hit = new Set();
       Object.entries(KW).forEach(([k, v]) => { if ((r.practice_focus || '').includes(k)) hit.add(v); });
       hit.forEach(v => {
-        (buckets[v] = buckets[v] || { n: 0, pc: [] }).n++;
-        if (_drRev(r) != null) buckets[v].pc.push(_drRev(r) / Math.max(r.lawyer_count || 1, 1));
+        const b = (buckets[v] = buckets[v] || { n: 0, pc: [], rows: [] });
+        b.n++;
+        b.rows.push(r);
+        if (_drRev(r) != null) b.pc.push(_drRev(r) / Math.max(r.lawyer_count || 1, 1));
       });
     });
+    _drPremAll = prem;
+    _drNicheBuckets = buckets;
+    _drNicheSel = null;
     const bl = Object.entries(buckets).filter(([, v]) => v.pc.length >= 3).sort((a, b) => _drMed(b[1].pc) - _drMed(a[1].pc));
     if (chartInstances['drNicheChart']) chartInstances['drNicheChart'].destroy();
     const nctx = document.getElementById('drNicheChart')?.getContext('2d');
@@ -11834,19 +11843,14 @@ async function loadDeepReportOnce() {
         },
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          onClick: (e, els) => { if (els?.length) selectDrNiche(bl[els[0].index][0]); },
+          onHover: (e, els) => { if (e?.native?.target) e.native.target.style.cursor = els?.length ? 'pointer' : 'default'; },
           plugins: { legend: { display: false } },
           scales: { x: { ticks: { color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
         }
       });
     }
-    // 人均 TOP 15（排除營收口徑異常的離群：人均 > 1 億/人視為異常）
-    const premTop = prem.filter(r => _drRev(r) != null)
-      .map(r => ({ r, pc: _drRev(r) / Math.max(r.lawyer_count || 1, 1) }))
-      .filter(x => x.pc < 10000)
-      .sort((a, b) => b.pc - a.pc).slice(0, 15);
-    document.getElementById('drPremBody').innerHTML = premTop.map(({ r, pc }) =>
-      `<tr><td>${firmLink(r.firm)}</td><td style="text-align:right;">${r.lawyer_count}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(pc).toLocaleString()}</td><td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td></tr>`
-    ).join('');
+    renderDrPremTable();
 
     // --- 戰略意涵（數字動態帶入） ---
     const adsList = _drB2c.filter(r => r.ads > 0).sort((a, b) => (b.lawyer_count || 0) - (a.lawyer_count || 0));
@@ -11858,6 +11862,35 @@ async function loadDeepReportOnce() {
       `<strong>4. 精品利基是人效天花板。</strong>不動產、金融、刑辯利基的人均營收中位 ${bl.length ? bl.slice(0, 3).map(([k, v]) => `${k} ${Math.round(_drMed(v.pc))} 萬`).join('、') : '-'}，全數高於 B2C 中位——高單價利基所是挖角與合署的優先目標池。`,
     ].map(s => `<div style="margin-bottom:8px;">${s}</div>`).join('');
   } catch (e) { _drLoaded = false; console.error('產業深度報告載入失敗', e); }
+}
+
+function selectDrNiche(niche) {
+  _drNicheSel = (_drNicheSel === niche) ? null : niche;
+  const ch = chartInstances['drNicheChart'];
+  if (ch) {
+    ch.data.datasets[0].backgroundColor = ch.data.labels.map(l =>
+      _drNicheSel == null ? 'rgba(212,175,55,0.5)' : (l.startsWith(_drNicheSel + '（') ? 'rgba(212,175,55,0.9)' : 'rgba(212,175,55,0.2)'));
+    ch.update();
+  }
+  renderDrPremTable();
+}
+
+function renderDrPremTable() {
+  const sel = _drNicheSel;
+  const pool = sel ? (_drNicheBuckets[sel]?.rows || []) : _drPremAll;
+  // 排除營收口徑異常的離群：人均 > 1 億/人視為異常
+  const rows = pool.filter(r => _drRev(r) != null)
+    .map(r => ({ r, pc: _drRev(r) / Math.max(r.lawyer_count || 1, 1) }))
+    .filter(x => x.pc < 10000)
+    .sort((a, b) => b.pc - a.pc);
+  const top = sel ? rows : rows.slice(0, 15);
+  const titleEl = document.getElementById('drPremTitle');
+  if (titleEl) titleEl.textContent = sel ? `${sel} 利基精品所（${top.length} 所，依人均排序）` : '人均營收 TOP 15 精品所';
+  const resetBtn = document.getElementById('drPremReset');
+  if (resetBtn) resetBtn.style.display = sel ? '' : 'none';
+  document.getElementById('drPremBody').innerHTML = top.map(({ r, pc }) =>
+    `<tr><td>${firmLink(r.firm)}</td><td style="text-align:right;">${r.lawyer_count}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(pc).toLocaleString()}</td><td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td></tr>`
+  ).join('') || '<tr><td colspan="4" style="color:var(--text-muted);">此利基無營收可估的事務所</td></tr>';
 }
 
 function renderDrB2cTable() {
