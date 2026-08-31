@@ -42,19 +42,98 @@ def to_wan(val, unit):
 
 
 AMT = r'([\d,]+(?:\.\d+)?)\s*(億|萬)'
+RANGE = re.compile(r'([\d,]+(?:\.\d+)?)\s*(億|萬)?\s*(?:元)?\s*[–~～\-]\s*([\d,]+(?:\.\d+)?)\s*(億|萬)')
+AMT_ONE = re.compile(AMT)
 
 
-def parse_rev_range(line):
-    """從一行文字抽『保守～樂觀』區間，回 (low_wan, high_wan) 或 None"""
-    pairs = re.findall(AMT, line)
-    if not pairs:
+def _rng_val(m2):
+    u1 = m2.group(2) or m2.group(4)
+    lo = to_wan(num(m2.group(1)), u1)
+    hi = to_wan(num(m2.group(3)), m2.group(4))
+    if 0 < lo <= hi and hi / max(lo, 1) < 20:  # 排除抓到係數/件數的荒謬區間
+        return (lo, hi)
+    return None
+
+
+FIVE_Y = re.compile(r'[5５五]\s*年|累計')
+PER_Y = re.compile(r'[／/]\s*年|每年|年化|年營收')
+
+
+def _parse_rev_line(l, header=''):
+    """單一合計行 → 年化 (low_wan, high_wan) 或 None。header＝表格標頭行（僅表格列用）。
+    表格列只看短值格（避開說明欄行情數字）；表頭標「5年」口徑且值格未標「/年」→ ÷5。
+    散文行「年化」標記後的區間優先（「5 年營收」的年營收是 5 年值、不算標記）；
+    無標記時取最後一個合計字樣後的區間，行含「5 年/累計」且區間後未緊跟「／年」→ ÷5。"""
+    cells = [c.strip() for c in l.split('|')]
+    if l.lstrip().startswith('|') and len(cells) >= 4:
+        if not re.search(r'合計|總計', cells[1]):
+            return None  # 表格列但標籤不是合計（合計字樣在說明欄）→ 整行跳過
+        tbl5 = bool(FIVE_Y.search(header)) and not PER_Y.search(header)
+        vals = []
+        for c in cells[2:]:
+            if len(c) > 40:
+                continue  # 長格＝說明欄，內含行情/件數雜訊
+            div = 5.0 if tbl5 and not PER_Y.search(c) else 1.0
+            mr = RANGE.search(c)
+            if mr:
+                v = _rng_val(mr)
+                if v:
+                    return (v[0] / div, v[1] / div)  # 單格即區間（如「約 1,300～1,900 萬/年」）
+            ma = AMT_ONE.search(c)
+            if ma:
+                vals.append(to_wan(num(ma.group(1)), ma.group(2)) / div)
+        if len(vals) == 2 and 0 < vals[0] <= vals[1] and vals[1] / max(vals[0], 1) < 20:
+            return (vals[0], vals[1])
         return None
-    # 「1.05 億～1.48 億」或「5,700萬…8,100萬」→ 取頭尾兩個金額
-    vals = [to_wan(num(v), u) for v, u in pairs]
-    # 排除明顯是乘數/件數的行（此函式只吃已篩選過的行）
-    if len(vals) == 1:
-        return (vals[0], vals[0])
-    return (min(vals[0], vals[-1]), max(vals[0], vals[-1]))
+    last_hj = None
+    for mh in re.finditer(r'合計|總計', l):
+        last_hj = mh
+    for mk in re.finditer(r'年化|年營收', l):
+        if mk.start() <= last_hj.start():
+            continue  # 合計字樣前的年化是分項值（如「年化得標僅約20–30萬…合計約3,600–4,800萬」）
+        if mk.group(0) == '年營收' and re.search(r'[0-9５五]\s*$', l[:mk.start()]):
+            continue  # 「5 年營收」= 5 年值，非年化標記
+        m2 = RANGE.search(l, mk.end())
+        if m2:
+            v = _rng_val(m2)
+            if v:
+                return v
+    m2 = RANGE.search(l, last_hj.end()) or RANGE.search(l)
+    if m2:
+        v = _rng_val(m2)
+        if v:
+            tail = l[m2.end():m2.end() + 12]
+            if FIVE_Y.search(l) and not re.search(r'[／/]\s*年|每年', tail):
+                return (v[0] / 5.0, v[1] / 5.0)
+            return v
+    return None
+
+
+def parse_rev_sec6(sec6):
+    """第六節 → 年化 (low_wan, high_wan) 或 None。
+    先剔除 <details> 摺疊（v2.1 的通用計算邏輯區，內含中間計算合計行）；
+    「三側合計/小計/加總」行優先（全所口徑），沒有再走一般合計行，皆由後往前。"""
+    body = re.sub(r'<details>.*?(</details>|\Z)', '', sec6, flags=re.S)
+    lines = body.split('\n')
+    cands = []  # (行, 所屬表格標頭行)
+    for i, l in enumerate(lines):
+        if not re.search(r'合計|總計', l):
+            continue
+        header = ''
+        if l.lstrip().startswith('|'):
+            j = i
+            while j > 0 and lines[j - 1].lstrip().startswith('|'):
+                j -= 1
+            header = lines[j]
+        cands.append((l, header))
+    for only_3side in (True, False):
+        for l, header in reversed(cands):
+            if only_3side and '三側' not in l:
+                continue
+            v = _parse_rev_line(l, header)
+            if v:
+                return v
+    return None
 
 
 def extract(a):
@@ -74,24 +153,12 @@ def extract(a):
     f['court_n'] = int(num(m.group(1))) if m else ''
     m = re.search(r'近\s*5\s*年[^｜|\n]*?([\d,]+)\s*件', scale_line)
     f['cases_5y'] = int(num(m.group(1))) if m else ''
-    # 營收：第六節切片，找合計行
+    # 營收：第六節切片，找合計行（年化優先；5 年累計 ÷5；表格列走值欄）
     sec6 = ''
     m = re.search(r'\n## 六[、.].*?(?=\n## 七|\Z)', a, re.S)
     if m:
         sec6 = m.group(0)
-    # 只認「合計/總計」行內的明確區間「約 X–Y 億/萬」（首數字單位可省略），取最後一個合計行
-    RANGE = re.compile(r'([\d,]+(?:\.\d+)?)\s*(億|萬)?\s*(?:元)?\s*[–~～\-]\s*([\d,]+(?:\.\d+)?)\s*(億|萬)')
-    rev = None
-    cands = [l for l in sec6.split('\n') if re.search(r'合計|總計', l)]
-    for l in reversed(cands):
-        m2 = RANGE.search(l)
-        if m2:
-            u1 = m2.group(2) or m2.group(4)
-            lo = to_wan(num(m2.group(1)), u1)
-            hi = to_wan(num(m2.group(3)), m2.group(4))
-            if 0 < lo <= hi and hi / max(lo, 1) < 20:  # 排除抓到係數/件數的荒謬區間
-                rev = (lo, hi)
-                break
+    rev = parse_rev_sec6(sec6)
     f['rev_low_wan'], f['rev_high_wan'] = (round(rev[0]), round(rev[1])) if rev else ('', '')
     # 掛名判定（第二節）
     sec2 = ''
