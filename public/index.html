@@ -2475,6 +2475,62 @@
     </div>
 
     <!-- ==================== TAB: ALUMNI (喆律校友會) ==================== -->
+    <!-- ==================== TAB: DEEPREPORT 產業深度報告（admin-only；資料源 firm_analysis_facts mig 179） ==================== -->
+    <div id="tab-deepreport" class="tab-content">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128202; 市場結構速覽 — 前 300 大全覆蓋（398 家）</div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
+          <div class="kpi-card"><div class="kpi-label">可比推估營收</div><div class="kpi-value" id="drKpiTotal">-</div><div class="kpi-sub" id="drKpiTotalSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">CR10 / CR100</div><div class="kpi-value" id="drKpiCr">-</div><div class="kpi-sub">頭部集中度</div></div>
+          <div class="kpi-card"><div class="kpi-label">推估 ≥1 億</div><div class="kpi-value" style="color:var(--gold);" id="drKpiRich">-</div><div class="kpi-sub">5 人以上所</div></div>
+          <div class="kpi-card"><div class="kpi-label">接班風險亮燈</div><div class="kpi-value" style="color:var(--red);" id="drKpiSucc">-</div><div class="kpi-sub">速讀最大風險點名</div></div>
+          <div class="kpi-card"><div class="kpi-label">有廣告碼</div><div class="kpi-value" id="drKpiAds">-</div><div class="kpi-sub">5 人以上所（官網主域）</div></div>
+        </div>
+        <div style="font-size:0.8rem;line-height:1.8;margin-top:10px;" id="drRecap"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127919; B2C 行銷型全解剖 — 喆律的同型態對手池</div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:8px;">
+          <div class="kpi-card"><div class="kpi-label">B2C 行銷型（5人+）</div><div class="kpi-value" id="drB2cN">-</div><div class="kpi-sub" id="drB2cNSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">合計推估營收</div><div class="kpi-value" id="drB2cRev">-</div><div class="kpi-sub">/年</div></div>
+          <div class="kpi-card"><div class="kpi-label">人均營收中位</div><div class="kpi-value" id="drB2cPc">-</div><div class="kpi-sub" id="drB2cPcSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">真投廣告碼</div><div class="kpi-value" style="color:var(--gold);" id="drB2cAds">-</div><div class="kpi-sub">FB Pixel / Google Ads</div></div>
+        </div>
+        <div style="font-size:0.82rem;font-weight:600;margin:12px 0 6px;">量產 vs 賺錢：年人均案量 × 人均營收（氣泡=律師人數，綠=喆律，點開詳情）</div>
+        <div class="chart-container" style="height:380px;"><canvas id="drScatter"></canvas></div>
+        <div style="font-size:0.82rem;font-weight:600;margin:14px 0 6px;">全體明細（點欄位排序，點所名開詳情）</div>
+        <div class="table-wrap" style="max-height:520px;overflow-y:auto;"><table>
+          <thead><tr id="drB2cHead">
+            <th data-k="firm">事務所</th><th data-k="region">地區</th><th data-k="lawyer_count" style="text-align:right;">人數</th>
+            <th data-k="cases_5y" style="text-align:right;">近5年案量</th><th data-k="percase" style="text-align:right;">年人均</th>
+            <th data-k="rev" style="text-align:right;">推估營收(萬/年)</th><th data-k="percap" style="text-align:right;">人均(萬)</th>
+            <th data-k="ads" style="text-align:center;">廣告碼</th><th data-k="g_reviews" style="text-align:right;">評論</th><th data-k="founded_year" style="text-align:right;">成立</th>
+          </tr></thead>
+          <tbody id="drB2cBody"></tbody>
+        </table></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128142; 精品專業型利基變現 — 高單價路徑</div>
+        <div style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:16px;margin-top:8px;">
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">利基分群 × 人均營收中位（萬/年）</div>
+            <div class="chart-container" style="height:280px;"><canvas id="drNicheChart"></canvas></div>
+          </div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">人均營收 TOP 15 精品所</div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th></tr></thead>
+              <tbody id="drPremBody"></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129504; 戰略意涵</div>
+        <div style="font-size:0.84rem;line-height:2;" id="drInsights"></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">口徑：營收＝訴訟行情公式＋可觀測非訟推估（非財報）；廣告碼掃描僅及官網主域（站外品牌站不可見）；資料集 firm_analysis_facts 隨分析批次重灌。本頁 admin 限定。</div>
+      </div>
+    </div>
     <div id="tab-alumni" class="tab-content">
       <div class="kpi-grid" id="alumniKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px;"></div>
       <div class="card" style="margin-bottom:16px;">
@@ -11664,6 +11720,168 @@ function renderIsTypeList(t) {
   document.getElementById('isTypeList').innerHTML =
     `<div style="font-weight:600;margin-bottom:4px;">${escHtml(t)}（${list.length} 家）</div>` +
     list.map(r => `${firmLink(r.firm)} <span style="color:var(--text-muted);">${r.lawyer_count || '-'}人${r.tagline ? '｜' + escHtml(r.tagline) : ''}</span>`).join('<br>');
+}
+
+// ===== 產業深度報告（admin-only tab；firm_analysis_facts 聚合＋B2C 全解剖）=====
+let _drLoaded = false, _drB2c = [], _drSortK = 'rev', _drSortDir = -1;
+const _drRev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
+const _drMed = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+async function loadDeepReportOnce() {
+  if (_drLoaded) return;
+  _drLoaded = true;
+  try {
+    const { data, error } = await db.from('firm_analysis_facts').select('*').range(0, 999);
+    if (error || !data?.length) { console.log('deepreport facts error:', error); _drLoaded = false; return; }
+    const top = data.filter(r => (r.lawyer_count || 0) >= 5);
+    const rv = top.filter(r => _drRev(r) != null).sort((a, b) => _drRev(b) - _drRev(a));
+    const tot = rv.reduce((s, r) => s + _drRev(r), 0);
+
+    // --- 市場結構速覽 ---
+    document.getElementById('drKpiTotal').textContent = (tot / 10000).toFixed(0) + ' 億';
+    document.getElementById('drKpiTotalSub').textContent = `可比 ${rv.length} 家/年`;
+    const cr = k => Math.round(100 * rv.slice(0, k).reduce((s, r) => s + _drRev(r), 0) / tot);
+    document.getElementById('drKpiCr').textContent = cr(10) + '% / ' + cr(100) + '%';
+    document.getElementById('drKpiRich').textContent = rv.filter(r => _drRev(r) >= 10000).length + ' 家';
+    document.getElementById('drKpiSucc').textContent = top.filter(r => r.succession_risk === 1).length + ' 家';
+    document.getElementById('drKpiAds').textContent = top.filter(r => r.fb_pixel === 1 || r.google_ads === 1).length + ' 家';
+    const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
+    const tShare = TYPES.map(t => `${t.replace('型', '')} ${Math.round(100 * top.filter(r => r.type === t).length / top.length)}%`).join('、');
+    const exj = top.filter(r => (r.ex_judicial_n || 0) > 0);
+    document.getElementById('drRecap').innerHTML =
+      `型態組成（5 人以上 ${top.length} 家）：${tShare}。規模化幾乎只發生在企業非訟（30 人以上 12 家中佔 8 家）；` +
+      `掛名制度僅約 12%（真集中 40%、分散 42%）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
+      `頭部市場的數位獲客滲透率不到 5% —— 前 300 大裡真的掛廣告碼的所是極少數。`;
+
+    // --- B2C 全解剖 ---
+    const b2c = top.filter(r => r.type === 'B2C行銷型');
+    _drB2c = b2c.map(r => ({
+      ...r,
+      rev: _drRev(r),
+      percap: _drRev(r) != null ? _drRev(r) / Math.max(r.lawyer_count || 1, 1) : null,
+      percase: r.cases_5y ? r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / 5 : null,
+      ads: (r.fb_pixel === 1 ? 1 : 0) + (r.google_ads === 1 ? 1 : 0),
+    }));
+    const withRev = _drB2c.filter(r => r.rev != null);
+    document.getElementById('drB2cN').textContent = b2c.length + ' 家';
+    document.getElementById('drB2cNSub').textContent = `全樣本 ${data.filter(r => r.type === 'B2C行銷型').length} 家`;
+    document.getElementById('drB2cRev').textContent = (withRev.reduce((s, r) => s + r.rev, 0) / 10000).toFixed(1) + ' 億';
+    const pcMed = _drMed(withRev.map(r => r.percap));
+    const refMed = _drMed(top.filter(r => r.type === '傳統轉介型' && _drRev(r) != null).map(r => _drRev(r) / Math.max(r.lawyer_count || 1, 1)));
+    document.getElementById('drB2cPc').textContent = Math.round(pcMed) + ' 萬';
+    document.getElementById('drB2cPcSub').textContent = `傳統轉介中位 ${Math.round(refMed)} 萬`;
+    document.getElementById('drB2cAds').textContent = _drB2c.filter(r => r.ads > 0).length + ' 家';
+
+    // 散點：量產 vs 賺錢
+    const pts = _drB2c.filter(r => r.percap != null && r.percase != null);
+    if (chartInstances['drScatter']) chartInstances['drScatter'].destroy();
+    const sctx = document.getElementById('drScatter')?.getContext('2d');
+    if (sctx) {
+      chartInstances['drScatter'] = new Chart(sctx, {
+        type: 'bubble',
+        data: {
+          datasets: [{
+            data: pts.map(r => ({ x: +r.percase.toFixed(1), y: Math.round(r.percap), r: Math.max(4, Math.sqrt(r.lawyer_count) * 2.2), firm: r.firm, n: r.lawyer_count })),
+            backgroundColor: pts.map(r => isZheluFirm(r.firm) ? 'rgba(76,175,130,0.85)' : 'rgba(69,183,209,0.45)'),
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          onClick: (e, els, chart) => { if (els?.length) showFirmDetail(chart.data.datasets[0].data[els[0].index].firm); },
+          onHover: (e, els) => { if (e?.native?.target) e.native.target.style.cursor = els?.length ? 'pointer' : 'default'; },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => { const d = c.raw; return `${d.firm}（${d.n}人）：年人均 ${d.x} 件、人均 ${d.y} 萬/年`; } } }
+          },
+          scales: {
+            x: { ticks: { color: '#8899aa' }, title: { display: true, text: '年人均案量（件）', color: '#8899aa' }, beginAtZero: true },
+            y: { ticks: { color: '#8899aa' }, title: { display: true, text: '人均推估營收（萬/年）', color: '#8899aa' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+    document.getElementById('drB2cHead').querySelectorAll('th').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.onclick = () => {
+        const k = th.dataset.k;
+        _drSortDir = (_drSortK === k) ? -_drSortDir : -1;
+        _drSortK = k;
+        renderDrB2cTable();
+      };
+    });
+    renderDrB2cTable();
+
+    // --- 精品利基 ---
+    const prem = top.filter(r => r.type === '精品專業型');
+    const KW = { '刑': '刑事辯護', '家事': '家事', '商務': '商務/公司', '不動產': '不動產', '勞': '勞資', '智慧財產': 'IP', '專利': 'IP', '醫': '醫療', '工程': '工程', '金融': '金融', '稅': '稅務', '海': '海商' };
+    const buckets = {};
+    prem.forEach(r => {
+      const hit = new Set();
+      Object.entries(KW).forEach(([k, v]) => { if ((r.practice_focus || '').includes(k)) hit.add(v); });
+      hit.forEach(v => {
+        (buckets[v] = buckets[v] || { n: 0, pc: [] }).n++;
+        if (_drRev(r) != null) buckets[v].pc.push(_drRev(r) / Math.max(r.lawyer_count || 1, 1));
+      });
+    });
+    const bl = Object.entries(buckets).filter(([, v]) => v.pc.length >= 3).sort((a, b) => _drMed(b[1].pc) - _drMed(a[1].pc));
+    if (chartInstances['drNicheChart']) chartInstances['drNicheChart'].destroy();
+    const nctx = document.getElementById('drNicheChart')?.getContext('2d');
+    if (nctx) {
+      chartInstances['drNicheChart'] = new Chart(nctx, {
+        type: 'bar',
+        data: {
+          labels: bl.map(([k, v]) => `${k}（${v.n}所）`),
+          datasets: [{ data: bl.map(([, v]) => Math.round(_drMed(v.pc))), backgroundColor: 'rgba(212,175,55,0.5)' }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
+        }
+      });
+    }
+    // 人均 TOP 15（排除營收口徑異常的離群：人均 > 1 億/人視為異常）
+    const premTop = prem.filter(r => _drRev(r) != null)
+      .map(r => ({ r, pc: _drRev(r) / Math.max(r.lawyer_count || 1, 1) }))
+      .filter(x => x.pc < 10000)
+      .sort((a, b) => b.pc - a.pc).slice(0, 15);
+    document.getElementById('drPremBody').innerHTML = premTop.map(({ r, pc }) =>
+      `<tr><td>${firmLink(r.firm)}</td><td style="text-align:right;">${r.lawyer_count}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(pc).toLocaleString()}</td><td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td></tr>`
+    ).join('');
+
+    // --- 戰略意涵（數字動態帶入） ---
+    const adsList = _drB2c.filter(r => r.ads > 0).sort((a, b) => (b.lawyer_count || 0) - (a.lawyer_count || 0));
+    const caseMed = _drMed(_drB2c.filter(r => r.percase != null).map(r => r.percase));
+    document.getElementById('drInsights').innerHTML = [
+      `<strong>1. 真正的同構對手只有 ${adsList.length} 家。</strong>B2C 行銷型 ${b2c.length} 家裡，官網真的掛廣告碼（Pixel/Ads）的僅 ${adsList.length} 家：${adsList.map(r => firmLink(r.firm)).join('、')}——其餘多為內容/口碑導流，不是真數位投放。`,
+      `<strong>2. 量產不等於賺錢。</strong>B2C 型年人均案量中位 ${caseMed.toFixed(0)} 件（全體約 25 件）但人均營收中位 ${Math.round(pcMed)} 萬反而低於傳統轉介（${Math.round(refMed)} 萬）——多數同型態所靠債務/車禍等低單價案型堆量。維持家事/刑辯高單價案型組合，比衝案量更關鍵。`,
+      `<strong>3. 對手情報有盲區（雙向）。</strong>喆律官網主域掃不到廣告碼——投放都在站外品牌站（法律010 等）；同理，我們掃別家也可能漏掉其站外品牌矩陣，明細表的「廣告碼」欄是下限口徑。`,
+      `<strong>4. 精品利基是人效天花板。</strong>不動產、金融、刑辯利基的人均營收中位 ${bl.length ? bl.slice(0, 3).map(([k, v]) => `${k} ${Math.round(_drMed(v.pc))} 萬`).join('、') : '-'}，全數高於 B2C 中位——高單價利基所是挖角與合署的優先目標池。`,
+    ].map(s => `<div style="margin-bottom:8px;">${s}</div>`).join('');
+  } catch (e) { _drLoaded = false; console.error('產業深度報告載入失敗', e); }
+}
+
+function renderDrB2cTable() {
+  const k = _drSortK, dir = _drSortDir;
+  const rows = _drB2c.slice().sort((a, b) => {
+    const va = a[k], vb = b[k];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string') return va.localeCompare(vb, 'zh-Hant') * dir;
+    return (va - vb) * dir;
+  });
+  document.getElementById('drB2cBody').innerHTML = rows.map(r => `<tr${isZheluFirm(r.firm) ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
+    <td>${firmLink(r.firm, isZheluFirm(r.firm) ? 'font-weight:700;' : '')}</td>
+    <td style="font-size:0.76rem;">${escHtml(r.region || '-')}</td>
+    <td style="text-align:right;">${r.lawyer_count ?? '-'}</td>
+    <td style="text-align:right;">${r.cases_5y != null ? r.cases_5y.toLocaleString() : '-'}</td>
+    <td style="text-align:right;">${r.percase != null ? r.percase.toFixed(0) : '-'}</td>
+    <td style="text-align:right;color:var(--gold);">${r.rev != null ? `${r.rev_low_wan.toLocaleString()}–${r.rev_high_wan.toLocaleString()}` : '-'}</td>
+    <td style="text-align:right;font-weight:600;">${r.percap != null ? Math.round(r.percap) : '-'}</td>
+    <td style="text-align:center;">${r.ads > 0 ? '&#9989;' : '<span style="color:var(--text-muted);">-</span>'}</td>
+    <td style="text-align:right;">${r.g_reviews ?? '-'}</td>
+    <td style="text-align:right;font-size:0.76rem;">${r.founded_year ?? '-'}</td>
+  </tr>`).join('');
 }
 
 // ===== 事務所版圖（案類 × 法院 → 事務所排名，RPC firm_court_ranking）=====
