@@ -11524,8 +11524,15 @@ function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMa
 let _fmGroups = [];  // cause_group_list 快取（Phase B 案由種類）
 
 async function initFirmMap() {
+  // 排行先開（預設組合走 firm_map_default_cache 快取表，秒回），三個下拉並行載入不擋渲染
+  loadFirmMap();
+  const [courtsRes, groupsRes, yrsRes] = await Promise.allSettled([
+    db.rpc('lms_court_list').range(0, 199),
+    db.rpc('cause_group_list').range(0, 499),
+    db.rpc('lms_year_list'),
+  ]);
   try {
-    const { data: courts } = await db.rpc('lms_court_list').range(0, 199);
+    const courts = courtsRes.status === 'fulfilled' ? courtsRes.value.data : null;
     const sel = document.getElementById('fmCourtSel');
     if (courts?.length) {
       sel.innerHTML = '<option value="">全部法院</option>' +
@@ -11533,20 +11540,19 @@ async function initFirmMap() {
     }
   } catch (e) { console.log('lms_court_list error:', e); }
   try {
-    const { data: groups } = await db.rpc('cause_group_list').range(0, 499);
+    const groups = groupsRes.status === 'fulfilled' ? groupsRes.value.data : null;
     _fmGroups = groups || [];
     renderFmGroupOptions();
   } catch (e) { console.log('cause_group_list error:', e); }
   try {
     // 年度下拉（近 5 年滾動窗內的西元年；首尾為部分年，標注月份範圍）
-    const { data: yrs } = await db.rpc('lms_year_list');
+    const yrs = yrsRes.status === 'fulfilled' ? yrsRes.value.data : null;
     const ysel = document.getElementById('fmYearSel');
     if (yrs?.length) {
       ysel.innerHTML = '<option value="">近 5 年總計</option>' +
         yrs.map(y => `<option value="${y.yr}">${y.yr}${(y.mm_min === '01' && y.mm_max === '12') ? '' : `（${+y.mm_min}-${+y.mm_max}月）`}</option>`).join('');
     }
   } catch (e) { console.log('lms_year_list error:', e); }
-  loadFirmMap();
 }
 
 // 案由種類下拉跟著案類篩選連動（選了案類只列該案類的種類）
@@ -11575,9 +11581,19 @@ async function loadFirmMap() {
 
   // 選了案由種類 → 走 Phase B firm_cause_ranking（全國口徑，法院篩選不適用）
   document.getElementById('fmCourtSel').disabled = !!group;
-  const { data: rows, error } = group
-    ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000, p_year: year }).range(0, 999)
-    : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court, p_year: year }).range(0, 999);
+  let rows, error;
+  if (!group && !cat && !court && !year) {
+    // 預設組合走快取表（mig 178，日更），秒回；快取空時 fallback RPC 現算
+    ({ data: rows, error } = await db.from('firm_map_default_cache')
+      .select('rank,firm_name,cases,lawyer_count').order('rank').range(0, 999));
+    if (error || !rows?.length) {
+      ({ data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: null, p_court: null, p_year: null }).range(0, 999));
+    }
+  } else {
+    ({ data: rows, error } = group
+      ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000, p_year: year }).range(0, 999)
+      : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court, p_year: year }).range(0, 999));
+  }
   if (error || !rows?.length) {
     console.log('firm_court_ranking error:', error);
     body.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
