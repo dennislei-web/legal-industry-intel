@@ -10,6 +10,7 @@
 個別律師查詢需要 CAPTCHA，留待後續實作。
 """
 import json
+import time
 import requests
 from datetime import datetime
 from utils import get_supabase, log, scrape_start, scrape_end, polite_delay
@@ -44,12 +45,32 @@ GUILD_REGION_MAP = {
 }
 
 
+# GitHub runner 偶發連不到 lawyerbc（Errno 101 Network is unreachable，2026-08-23、08-30
+# 兩次週更都是首次連線就死）。同 host 的 moj_licno_scan.py 有 retry 所以沒事，這裡補上。
+RETRY_DELAYS = [15, 30, 60, 120]
+
+
+def _get_json(path):
+    """帶退避重試的 GET；連線類錯誤才重試，HTTP 4xx/5xx 直接拋"""
+    last_err = None
+    for attempt in range(len(RETRY_DELAYS) + 1):
+        try:
+            resp = requests.get(f'{BASE_URL}{path}', headers=HEADERS, timeout=30)
+            resp.raise_for_status()
+            return resp.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_err = e
+            if attempt < len(RETRY_DELAYS):
+                wait = RETRY_DELAYS[attempt]
+                log(f'  ! 連線失敗 ({attempt + 1}/{len(RETRY_DELAYS) + 1})，{wait} 秒後重試: {e}')
+                time.sleep(wait)
+    raise RuntimeError(f'連線 {path} 重試 {len(RETRY_DELAYS) + 1} 次仍失敗: {last_err}')
+
+
 def fetch_guild_summary():
     """取得各律師公會會員人數統計"""
     log('取得各公會會員統計...')
-    resp = requests.get(f'{BASE_URL}/cert/sdlyguild/summary', headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _get_json('/cert/sdlyguild/summary')
 
     if data.get('status') != 1:
         raise Exception(f"API 回應異常: {data}")
@@ -63,9 +84,7 @@ def fetch_guild_summary():
 def fetch_guild_info():
     """取得各律師公會聯絡資訊"""
     log('取得各公會聯絡資訊...')
-    resp = requests.get(f'{BASE_URL}/cert/sdlyguild/info', headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _get_json('/cert/sdlyguild/info')
 
     if data.get('status') != 1:
         raise Exception(f"API 回應異常: {data}")
@@ -75,9 +94,7 @@ def fetch_guild_info():
 
 def fetch_update_date():
     """取得資料最後更新日期"""
-    resp = requests.get(f'{BASE_URL}/cert/lyinfosd/notice/upDate', headers=HEADERS, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    data = _get_json('/cert/lyinfosd/notice/upDate')
     return data.get('data', '')
 
 
