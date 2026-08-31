@@ -2525,7 +2525,7 @@
               <thead><tr id="drPremHead"><th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th></tr></thead>
               <tbody id="drPremBody"></tbody>
             </table></div>
-            <div id="drPremNote" style="display:none;font-size:0.7rem;color:var(--text-muted);margin-top:6px;">加權分＝該領域案由群占比 × 全所人均營收（萬/年）；占比分母為近 5 年可歸戶案由群件數，<span style="opacity:0.7;">灰字</span>=樣本 &lt;30 件。案由群映射為下限口徑（如不動產僅計租賃+買賣）；「—」=無案由資料，排最後。</div>
+            <div id="drPremNote" style="display:none;font-size:0.7rem;color:var(--text-muted);margin-top:6px;"></div>
           </div>
         </div>
       </div>
@@ -11748,8 +11748,10 @@ function drNicheShare(firm, niche) {
   let num = 0;
   (map.groups || []).forEach(g => { num += +(cs.groups?.[g] || 0); });
   (map.cats || []).forEach(c => { num += +(cs.cats?.[c] || 0); });
-  return { share: num / cs.total, total: +cs.total };
+  return { share: num / cs.total, n: num, total: +cs.total };
 }
+// 入榜門檻：該領域占比 ≥5% 且該領域件數 ≥10（低占比=非該領域玩家，不參與排序）
+const DR_NICHE_MIN_SHARE = 0.05, DR_NICHE_MIN_N = 10;
 const _drRev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
 const _drMed = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 async function loadDeepReportOnce() {
@@ -11908,24 +11910,32 @@ function renderDrPremTable() {
   const sel = _drNicheSel;
   const pool = sel ? (_drNicheBuckets[sel]?.rows || []) : _drPremAll;
   // 排除營收口徑異常的離群：人均 > 1 億/人視為異常
-  const rows = pool.filter(r => _drRev(r) != null)
+  let rows = pool.filter(r => _drRev(r) != null)
     .map(r => {
       const pc = _drRev(r) / Math.max(r.lawyer_count || 1, 1);
       const sh = sel ? drNicheShare(r.firm, sel) : null;
-      return { r, pc, share: sh?.share ?? null, total: sh?.total ?? 0, score: sh ? pc * sh.share : null };
+      // 加權分＝占比^1.5 × 人均：指數 >1 讓占比主導排序，占比接近時才由人均決勝
+      return { r, pc, share: sh?.share ?? null, n: sh?.n ?? 0, total: sh?.total ?? 0, score: sh ? Math.pow(sh.share, 1.5) * pc : null };
     })
     .filter(x => x.pc < 10000);
-  // 有選利基 → 依「占比×人均」加權分排序（無案由資料者墊底）；未選 → 純人均 TOP 15
-  rows.sort((a, b) => sel
-    ? ((b.score ?? -1) - (a.score ?? -1))
-    : (b.pc - a.pc));
+  let excluded = 0;
+  if (sel) {
+    const qualified = rows.filter(x => x.share != null && x.share >= DR_NICHE_MIN_SHARE && x.n >= DR_NICHE_MIN_N);
+    excluded = rows.length - qualified.length;
+    rows = qualified.sort((a, b) => b.score - a.score);
+  } else {
+    rows.sort((a, b) => b.pc - a.pc);
+  }
   const top = sel ? rows : rows.slice(0, 15);
   const titleEl = document.getElementById('drPremTitle');
-  if (titleEl) titleEl.textContent = sel ? `${sel} 利基精品所（${top.length} 所，依 占比×人均 加權）` : '人均營收 TOP 15 精品所';
+  if (titleEl) titleEl.textContent = sel ? `${sel} 利基精品所（${top.length} 所，占比加權排序）` : '人均營收 TOP 15 精品所';
   const resetBtn = document.getElementById('drPremReset');
   if (resetBtn) resetBtn.style.display = sel ? '' : 'none';
   const noteEl = document.getElementById('drPremNote');
-  if (noteEl) noteEl.style.display = sel ? '' : 'none';
+  if (noteEl) {
+    noteEl.style.display = sel ? '' : 'none';
+    if (sel) noteEl.innerHTML = `加權分＝占比<sup>1.5</sup> × 全所人均營收（萬/年），占比為主、人均為輔。入榜門檻：該領域占比 ≥${Math.round(DR_NICHE_MIN_SHARE * 100)}% 且 ≥${DR_NICHE_MIN_N} 件${excluded ? `——<strong>${excluded} 所</strong>因占比過低/件數不足/無案由資料未列入` : ''}。占比分母為近 5 年可歸戶案由群件數，<span style="opacity:0.7;">灰字</span>=樣本 &lt;30 件；案由群映射為下限口徑（如不動產僅計租賃+買賣）。`;
+  }
   const headEl = document.getElementById('drPremHead');
   if (headEl) headEl.innerHTML = sel
     ? '<th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th style="text-align:right;">占比</th><th style="text-align:right;">加權分</th>'
@@ -11941,7 +11951,7 @@ function renderDrPremTable() {
       cells.push(`<td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td>`);
     }
     return `<tr>${cells.join('')}</tr>`;
-  }).join('') || `<tr><td colspan="${sel ? 5 : 4}" style="color:var(--text-muted);">此利基無營收可估的事務所</td></tr>`;
+  }).join('') || `<tr><td colspan="${sel ? 5 : 4}" style="color:var(--text-muted);">${sel ? '無符合門檻（占比 ≥5% 且 ≥10 件）的事務所' : '此利基無營收可估的事務所'}</td></tr>`;
 }
 
 function renderDrB2cTable() {
