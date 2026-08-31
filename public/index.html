@@ -2522,9 +2522,10 @@
               <button id="drPremReset" onclick="selectDrNiche(null)" style="display:none;padding:2px 10px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.72rem;">✕ 清除篩選</button>
             </div>
             <div class="table-wrap" style="max-height:480px;overflow-y:auto;"><table>
-              <thead><tr><th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th></tr></thead>
+              <thead><tr id="drPremHead"><th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th></tr></thead>
               <tbody id="drPremBody"></tbody>
             </table></div>
+            <div id="drPremNote" style="display:none;font-size:0.7rem;color:var(--text-muted);margin-top:6px;">加權分＝該領域案由群占比 × 全所人均營收（萬/年）；占比分母為近 5 年可歸戶案由群件數，<span style="opacity:0.7;">灰字</span>=樣本 &lt;30 件。案由群映射為下限口徑（如不動產僅計租賃+買賣）；「—」=無案由資料，排最後。</div>
           </div>
         </div>
       </div>
@@ -11727,7 +11728,28 @@ function renderIsTypeList(t) {
 
 // ===== 產業深度報告（admin-only tab；firm_analysis_facts 聚合＋B2C 全解剖）=====
 let _drLoaded = false, _drB2c = [], _drSortK = 'rev', _drSortDir = -1;
-let _drPremAll = [], _drNicheBuckets = {}, _drNicheSel = null;
+let _drPremAll = [], _drNicheBuckets = {}, _drNicheSel = null, _drCauseShares = {};
+// 利基 → 案由群/案類映射（占比分子；group 層無法涵蓋者為下限口徑）
+const DR_NICHE_MAP = {
+  '刑事辯護': { cats: ['刑事'] },
+  '家事': { cats: ['家事'] },
+  '工程': { groups: ['承攬'] },
+  '勞資': { groups: ['僱傭'] },
+  '金融': { groups: ['證券金融犯罪', '洗錢防制法'] },
+  '稅務': { groups: ['稅捐', '行政'] },
+  'IP': { groups: ['智財刑事'] },
+  '商務/公司': { groups: ['合夥', '委任', '背信', '證券金融犯罪', '偽造有價證券'] },
+  '不動產': { groups: ['租賃', '買賣'] },
+  '醫療': { groups: ['藥事', '過失致死'] },
+};
+function drNicheShare(firm, niche) {
+  const cs = _drCauseShares[firm], map = DR_NICHE_MAP[niche];
+  if (!cs || !map || !cs.total) return null;
+  let num = 0;
+  (map.groups || []).forEach(g => { num += +(cs.groups?.[g] || 0); });
+  (map.cats || []).forEach(c => { num += +(cs.cats?.[c] || 0); });
+  return { share: num / cs.total, total: +cs.total };
+}
 const _drRev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
 const _drMed = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 async function loadDeepReportOnce() {
@@ -11736,6 +11758,13 @@ async function loadDeepReportOnce() {
   try {
     const { data, error } = await db.from('firm_analysis_facts').select('*').range(0, 999);
     if (error || !data?.length) { console.log('deepreport facts error:', error); _drLoaded = false; return; }
+    // 各所案由群組成（mig 180 RPC；利基加權排序用）——失敗時降級回純人均排序
+    try {
+      const { data: cs, error: csErr } = await db.rpc('firm_cause_shares');
+      _drCauseShares = {};
+      if (!csErr && cs?.length) cs.forEach(r => { _drCauseShares[r.firm] = r; });
+      else console.log('firm_cause_shares error:', csErr);
+    } catch (e) { _drCauseShares = {}; console.log('firm_cause_shares fail:', e); }
     const top = data.filter(r => (r.lawyer_count || 0) >= 5);
     const rv = top.filter(r => _drRev(r) != null).sort((a, b) => _drRev(b) - _drRev(a));
     const tot = rv.reduce((s, r) => s + _drRev(r), 0);
@@ -11880,17 +11909,39 @@ function renderDrPremTable() {
   const pool = sel ? (_drNicheBuckets[sel]?.rows || []) : _drPremAll;
   // 排除營收口徑異常的離群：人均 > 1 億/人視為異常
   const rows = pool.filter(r => _drRev(r) != null)
-    .map(r => ({ r, pc: _drRev(r) / Math.max(r.lawyer_count || 1, 1) }))
-    .filter(x => x.pc < 10000)
-    .sort((a, b) => b.pc - a.pc);
+    .map(r => {
+      const pc = _drRev(r) / Math.max(r.lawyer_count || 1, 1);
+      const sh = sel ? drNicheShare(r.firm, sel) : null;
+      return { r, pc, share: sh?.share ?? null, total: sh?.total ?? 0, score: sh ? pc * sh.share : null };
+    })
+    .filter(x => x.pc < 10000);
+  // 有選利基 → 依「占比×人均」加權分排序（無案由資料者墊底）；未選 → 純人均 TOP 15
+  rows.sort((a, b) => sel
+    ? ((b.score ?? -1) - (a.score ?? -1))
+    : (b.pc - a.pc));
   const top = sel ? rows : rows.slice(0, 15);
   const titleEl = document.getElementById('drPremTitle');
-  if (titleEl) titleEl.textContent = sel ? `${sel} 利基精品所（${top.length} 所，依人均排序）` : '人均營收 TOP 15 精品所';
+  if (titleEl) titleEl.textContent = sel ? `${sel} 利基精品所（${top.length} 所，依 占比×人均 加權）` : '人均營收 TOP 15 精品所';
   const resetBtn = document.getElementById('drPremReset');
   if (resetBtn) resetBtn.style.display = sel ? '' : 'none';
-  document.getElementById('drPremBody').innerHTML = top.map(({ r, pc }) =>
-    `<tr><td>${firmLink(r.firm)}</td><td style="text-align:right;">${r.lawyer_count}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(pc).toLocaleString()}</td><td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td></tr>`
-  ).join('') || '<tr><td colspan="4" style="color:var(--text-muted);">此利基無營收可估的事務所</td></tr>';
+  const noteEl = document.getElementById('drPremNote');
+  if (noteEl) noteEl.style.display = sel ? '' : 'none';
+  const headEl = document.getElementById('drPremHead');
+  if (headEl) headEl.innerHTML = sel
+    ? '<th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th style="text-align:right;">占比</th><th style="text-align:right;">加權分</th>'
+    : '<th>事務所</th><th style="text-align:right;">人數</th><th style="text-align:right;">人均(萬/年)</th><th>利基</th>';
+  document.getElementById('drPremBody').innerHTML = top.map(({ r, pc, share, total, score }) => {
+    const cells = [`<td>${firmLink(r.firm)}</td>`, `<td style="text-align:right;">${r.lawyer_count}</td>`,
+      `<td style="text-align:right;${sel ? '' : 'font-weight:600;color:var(--gold);'}">${Math.round(pc).toLocaleString()}</td>`];
+    if (sel) {
+      const dim = total < 30 ? 'color:var(--text-muted);' : '';
+      cells.push(`<td style="text-align:right;${dim}" title="近5年案由群 ${total.toLocaleString()} 件">${share == null ? '—' : (100 * share).toFixed(1) + '%'}</td>`);
+      cells.push(`<td style="text-align:right;font-weight:600;color:var(--gold);${dim}">${score == null ? '—' : Math.round(score).toLocaleString()}</td>`);
+    } else {
+      cells.push(`<td style="font-size:0.76rem;">${escHtml((r.practice_focus || '').split(',').slice(0, 3).join('、'))}</td>`);
+    }
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('') || `<tr><td colspan="${sel ? 5 : 4}" style="color:var(--text-muted);">此利基無營收可估的事務所</td></tr>`;
 }
 
 function renderDrB2cTable() {
