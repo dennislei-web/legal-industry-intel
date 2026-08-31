@@ -857,6 +857,56 @@
         <div class="chart-container" style="height:420px;"><canvas id="chartExJudFirms"></canvas></div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑＝官網彙整名單 ∪ 裁判書具名自動比對（同名已剔除、檢察官具名有審理期遞延），同一人跨身分只計一次，下限估計；點長條或事務所名稱可開啟該所詳情。</div>
       </div>
+      <!-- 產業結構分析（AI 深度分析 398 家；firm_analysis_facts，mig 179） -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129517; 產業結構分析 — AI 深度分析 398 家</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">前 300 大所（≥5 位律師）100% 覆蓋；型態/營收/集中度由 AI 逐所分析抽取，營收為模型推估區間非財報。</div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:8px;">
+          <div class="kpi-card">
+            <div class="kpi-label">已分析事務所</div>
+            <div class="kpi-value" id="isKpiN">-</div>
+            <div class="kpi-sub">前 300 大全覆蓋</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">推估營收 ≥1 億</div>
+            <div class="kpi-value" style="color:var(--gold);" id="isKpiRev">-</div>
+            <div class="kpi-sub" id="isKpiRevSub">-</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">掛名制度比例</div>
+            <div class="kpi-value" id="isKpiGuaming">-</div>
+            <div class="kpi-sub">5 人以上所（啟發式抽取）</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">接班風險亮燈</div>
+            <div class="kpi-value" style="color:var(--red);" id="isKpiSucc">-</div>
+            <div class="kpi-sub">最大風險點名接班/高齡</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1.2fr);gap:16px;margin-top:12px;">
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">六型態分布（點型態列出該型態事務所）</div>
+            <div class="chart-container" style="height:230px;"><canvas id="isTypeChart"></canvas></div>
+            <div id="isTypeList" style="font-size:0.78rem;line-height:1.9;max-height:180px;overflow-y:auto;margin-top:6px;"></div>
+          </div>
+          <div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">推估年營收 TOP 20（區間中點，滑鼠看區間）</div>
+            <div class="chart-container" style="height:420px;"><canvas id="isRevChart"></canvas></div>
+          </div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">接班風險亮燈（15 位律師以上，點名開啟該所詳情）</div>
+          <div id="isSuccChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+        </div>
+        <div style="margin-top:14px;">
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">型態別體質（5 人以上所，中位數）</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>型態</th><th style="text-align:right;">家數</th><th style="text-align:right;">所營收中位(萬/年)</th><th style="text-align:right;">人均營收(萬)</th><th style="text-align:right;">年人均案量</th><th style="text-align:right;">有廣告碼</th></tr></thead>
+            <tbody id="isTypeTable"></tbody>
+          </table></div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑：營收=訴訟行情公式＋可觀測非訟訊號推估（企業非訟型真實非訟收入不可見故低估）；掛名/接班為分析文字啟發式抽取，僅呈現聚合；資料集 firm_analysis_facts 隨分析批次重灌。</div>
+      </div>
       <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；ids/loader 不變） -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127963;&#65039; 事務所版圖 — 案類 × 法院競爭位置</div>
@@ -4745,6 +4795,7 @@ function loadFirmOverviewOnce() {
   _foLoaded = true;
   loadOffices().then(loadExJudFirmChart);  // KPI 群元素已移到本頁；聯集 merge 完成後畫法檢轉任圖
   loadFirmSizeChart();    // 規模分布圖＋律師人數 TOP 10（自舊總覽移入）
+  loadIndustryStructure(); // 產業結構分析（AI 分析 398 家，firm_analysis_facts）
   loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
   loadFoFlowSnapshot();
   initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
@@ -11516,6 +11567,98 @@ async function fetchAllTable(table, orders, filters) {
 }
 
 const isZheluFirm = f => !!f && f.includes('喆律');
+
+// ===== 產業結構分析（firm_analysis_facts，mig 179；AI 分析 398 家的結構化聚合）=====
+let _isLoaded = false, _isRows = [];
+async function loadIndustryStructure() {
+  if (_isLoaded) return;
+  _isLoaded = true;
+  try {
+    const { data, error } = await db.from('firm_analysis_facts').select('*').range(0, 999);
+    if (error || !data?.length) { console.log('firm_analysis_facts error:', error); return; }
+    _isRows = data;
+    const top = data.filter(r => (r.lawyer_count || 0) >= 5);
+    const rev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
+
+    // KPI
+    document.getElementById('isKpiN').textContent = data.length.toLocaleString();
+    const rich = top.filter(r => rev(r) >= 10000);
+    document.getElementById('isKpiRev').textContent = rich.length + ' 家';
+    const parsed = top.filter(r => rev(r) != null);
+    document.getElementById('isKpiRevSub').textContent = `可比 ${parsed.length} 家合計約 ${(parsed.reduce((s, r) => s + rev(r), 0) / 10000).toFixed(0)} 億/年`;
+    const conc = top.filter(r => r.concentration && r.concentration !== '不明');
+    const gm = conc.filter(r => r.concentration === '掛名制度');
+    document.getElementById('isKpiGuaming').textContent = conc.length ? Math.round(100 * gm.length / conc.length) + '%' : '-';
+    const succ = top.filter(r => r.succession_risk === 1);
+    document.getElementById('isKpiSucc').textContent = succ.length + ' 家';
+
+    // 六型態分布（點 bar 列清單）
+    const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
+    const cnt = TYPES.map(t => data.filter(r => r.type === t).length);
+    if (chartInstances['isTypeChart']) chartInstances['isTypeChart'].destroy();
+    const tctx = document.getElementById('isTypeChart')?.getContext('2d');
+    if (tctx) {
+      chartInstances['isTypeChart'] = new Chart(tctx, {
+        type: 'bar',
+        data: { labels: TYPES, datasets: [{ data: cnt, backgroundColor: 'rgba(69,183,209,0.55)' }] },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          onClick: (e, els) => { if (els?.length) renderIsTypeList(TYPES[els[0].index]); },
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
+        }
+      });
+    }
+
+    // 營收 TOP 20（中點排序，tooltip 顯示區間）
+    const rv = top.filter(r => rev(r) != null).sort((a, b) => rev(b) - rev(a)).slice(0, 20);
+    if (chartInstances['isRevChart']) chartInstances['isRevChart'].destroy();
+    const rctx = document.getElementById('isRevChart')?.getContext('2d');
+    if (rctx) {
+      chartInstances['isRevChart'] = new Chart(rctx, {
+        type: 'bar',
+        data: {
+          labels: rv.map(r => r.firm),
+          datasets: [{ data: rv.map(r => +(rev(r) / 10000).toFixed(2)), backgroundColor: rv.map(r => isZheluFirm(r.firm) ? 'rgba(76,175,130,0.75)' : 'rgba(212,175,55,0.5)') }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          ...chartNameClick(n => showFirmDetail(n)),
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => { const r = rv[c.dataIndex]; return `推估 ${(r.rev_low_wan / 10000).toFixed(1)}–${(r.rev_high_wan / 10000).toFixed(1)} 億/年`; } } }
+          },
+          scales: { x: { ticks: { color: '#8899aa' }, title: { display: true, text: '億/年（區間中點）', color: '#8899aa' }, beginAtZero: true }, y: { ticks: { color: '#8899aa', font: { size: 11 } } } }
+        }
+      });
+    }
+
+    // 接班風險 chips（15 人以上）
+    const chips = succ.filter(r => r.lawyer_count >= 15).sort((a, b) => b.lawyer_count - a.lawyer_count);
+    document.getElementById('isSuccChips').innerHTML = chips.map(r =>
+      firmLink(r.firm, 'display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:12px;font-size:0.78rem;', `${escHtml(r.firm)} <span style="color:var(--text-muted);">${r.lawyer_count}人</span>`)
+    ).join('') || '<span style="color:var(--text-muted);font-size:0.78rem;">無</span>';
+
+    // 型態別體質表
+    const med = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+    document.getElementById('isTypeTable').innerHTML = TYPES.map(t => {
+      const g = top.filter(r => r.type === t && rev(r) != null);
+      if (!g.length) return '';
+      const mRev = med(g.map(r => rev(r)));
+      const mPer = med(g.map(r => rev(r) / Math.max(r.lawyer_count || 1, 1)));
+      const mCase = med(g.filter(r => r.cases_5y).map(r => r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / 5));
+      const ads = g.filter(r => r.fb_pixel === 1 || r.google_ads === 1).length;
+      return `<tr><td>${escHtml(t)}</td><td style="text-align:right;">${g.length}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(mRev).toLocaleString()}</td><td style="text-align:right;">${Math.round(mPer)}</td><td style="text-align:right;">${Math.round(mCase)}</td><td style="text-align:right;">${ads}</td></tr>`;
+    }).join('');
+  } catch (e) { _isLoaded = false; console.error('產業結構分析載入失敗', e); }
+}
+
+function renderIsTypeList(t) {
+  const list = _isRows.filter(r => r.type === t).sort((a, b) => (b.lawyer_count || 0) - (a.lawyer_count || 0));
+  document.getElementById('isTypeList').innerHTML =
+    `<div style="font-weight:600;margin-bottom:4px;">${escHtml(t)}（${list.length} 家）</div>` +
+    list.map(r => `${firmLink(r.firm)} <span style="color:var(--text-muted);">${r.lawyer_count || '-'}人${r.tagline ? '｜' + escHtml(r.tagline) : ''}</span>`).join('<br>');
+}
 
 // ===== 事務所版圖（案類 × 法院 → 事務所排名，RPC firm_court_ranking）=====
 let _fmLoaded = false;
