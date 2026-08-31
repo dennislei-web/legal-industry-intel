@@ -298,6 +298,10 @@
     .ai-md .ai-tldr { border: 1px solid rgba(201,168,76,0.45); background: rgba(201,168,76,0.07); border-radius: 10px; padding: 14px 16px 8px; margin: 10px 0 20px; }
     .ai-md .ai-tldr h2 { border-left: none; padding-left: 0; margin: 0 0 8px; }
     .ai-md .ai-lede { border-left: 3px solid var(--blue); background: rgba(79,142,247,0.08); padding: 7px 10px; border-radius: 0 8px 8px 0; margin: 8px 0; }
+    .ai-md details { border: 1px solid rgba(148,163,184,0.25); background: rgba(148,163,184,0.05); border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+    .ai-md details summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; user-select: none; }
+    .ai-md details summary:hover { color: var(--gold); }
+    .ai-md details[open] summary { color: var(--gold); margin-bottom: 6px; }
     .ai-md .ai-flow { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; line-height: 1.6; }
     .ai-md .ai-step { background: rgba(79,142,247,0.14); border: 1px solid rgba(79,142,247,0.5); border-radius: 20px; padding: 2px 10px; font-size: 0.82rem; white-space: nowrap; }
     .ai-md .ai-arrow { color: var(--text-muted); padding: 0 2px; }
@@ -3999,6 +4003,7 @@ const SECTIONS = {
     { tab: 'inhouse', label: '企業法務雷達' },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
     { tab: 'law010', label: '010 合作律師', adminOnly: true },
+    { tab: 'deepreport', label: '產業深度報告', adminOnly: true },
   ],
   judge: [
     { tab: 'judge-overview', label: '總覽' },
@@ -4106,6 +4111,7 @@ function showTab(tab) {
   if (tab === 'overview') loadLawyerRankCardsOnce();
   if (tab === 'lawyers') loadLawyers();
   if (tab === 'firm-overview') loadFirmOverviewOnce();
+  if (tab === 'deepreport') loadDeepReportOnce();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') { loadChanges(); loadFirmFlow(); }
   if (tab === 'inhouse') loadInhouseOnce();
