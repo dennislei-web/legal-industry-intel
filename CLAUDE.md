@@ -277,11 +277,15 @@
   → 把子頁在 section 間搬移只需改 `SECTIONS`（div 不必實體移動）
 - **2026-09-01 IA 重整（P0 去重＋P1 搬移）**：第一層 8 區 → 6 區＝
   律師與事務所（5 tab）／司法人員（8 tab：法官總覽/法官名錄/法院/專業法庭/檢察官/檢察署/書記官/異動與懲戒，
-  原「檢察官」「書記官」第一層併入）／司法統計（4 tab）／產業分析（12 tab，分兩組）／
+  原「檢察官」「書記官」第一層併入）／司法統計（4 tab）／產業分析（11 tab，分兩組）／
   喆律戰情（admin-only：校友會/010/深度報告/併購觀察名單）／系統（資料來源＋帳號管理）。
   - `SECTIONS` 項可帶 `group` 屬性，showSection render 時 group 變化插入分組標籤
-    （產業分析＝「訴訟與需求端」「鄰接市場與人力」兩組）；企業客戶版圖/企業法務雷達自律師區移入產業分析
-  - `gotoTab(sec, tab, sub)` 第三參數直達三層子分頁（domain 子分頁／jstat-topics 專題）
+    （產業分析＝「市場與需求端」「鄰接市場與人力」兩組——2026-09-01 使用者反饋後調整：
+    「產值與市場」移組首（總體錢的視角在前）、原組名「訴訟與需求端」改「市場與需求端」；
+    「企業客戶版圖」＋「企業法務雷達」合併為單一 tab「**企業版圖**」＝`tab-corpmap` 內兩個
+    `corp-subpanel`（clients=外部委任裁判書口徑／inhouse=內部法務名冊口徑，`switchCorpTab`
+    各自 lazy load、navState.corp 記憶；`tab-inhouse` div 已刪，12→11 tab）
+  - `gotoTab(sec, tab, sub)` 第三參數直達三層子分頁（domain 子分頁／jstat-topics 專題／corpmap 雙視角）
   - **內容合併**：檢察官總覽（ovPros* KPI＋4 圖卡）併入「檢察官」tab 頁頂（原 kpiPros* 四卡與
     loadProsecutorKpis 已刪）；懲戒彈劾整段併入「異動與懲戒」（tab-judge-discipline div 已刪，
     loadJudgeDiscipline 隨 changes 觸發）；「委任門檻」單圖併入 司法統計＞案由細分 尾端
