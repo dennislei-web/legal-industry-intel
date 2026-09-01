@@ -880,7 +880,7 @@
       <!-- 產業結構分析（AI 深度分析 398 家；firm_analysis_facts，mig 179） -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#129517; 產業結構分析 — AI 深度分析 398 家</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">前 300 大所（≥5 位律師）100% 覆蓋；型態/營收/集中度由 AI 逐所分析抽取，營收為模型推估區間非財報。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">前 300 大所（≥5 位律師）100% 覆蓋；型態/營收/集中度由 AI 逐所分析抽取，營收為模型推估區間非財報。頭部口徑提醒：本區 398 家佔全市場署名案量僅 28%（2025），營收約 45–50%——其餘 72% 案量由約 8,200 位長尾出庭律師交付（試算 130–240 億/年），詳見 產業分析＞產值與市場＞市場規模拆解。</div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:8px;">
           <div class="kpi-card">
             <div class="kpi-label">已分析事務所</div>
@@ -1694,7 +1694,7 @@
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128176; 近 4 次普查：法律服務業收入／家數／從業員工（95→110 年）</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
-          收入 15 年 249 → 409 億（+64%），但<strong>家數（+38%）與人力（+63%）幾乎同步成長</strong>——平均每家、每人產值 15 年間近乎原地踏步（勞動生產力 5 年僅 +0.79%）。這是一個<strong>靠增加人力擴張、單位效率停滯</strong>的行業。
+          收入 15 年 249 → 409 億（+64%），但<strong>家數（+38%）與人力（+63%）幾乎同步成長</strong>——平均每家、每人產值 15 年間近乎原地踏步（勞動生產力 5 年僅 +0.79%）。這是一個<strong>靠增加人力擴張、單位效率停滯</strong>的行業。對照本站裁判署名量：2021→2025 全市場律師署名件 +50%、出庭律師數 +17%——人均「案量」在升而普查人均「產值」原地，暗示單價受壓、或普查（最近一次＝110 年）尚未反映近 4 年量能成長。
         </div>
         <div class="chart-container" style="height:320px;"><canvas id="vlTrendChart"></canvas></div>
       </div>
@@ -1748,7 +1748,8 @@
             1. 普查行業 691「法律服務業」＝律師＋<strong>地政士＋專利商標代理＋公證人</strong>事務所的合計，「律師業佔比」無官方拆分（本頁用拉桿處理）。<br>
             2. <strong>營業稅資料不適用</strong>：律師為執行業務者免辦營業登記，財政部稅籍「律師事務服務」細類 112 年僅 5 家、年銷售額 4,400 萬——那是極少數公司化登記的法律服務公司，不是律師業。<br>
             3. 執行業務者（9A）所得統計<strong>不分業別公開</strong>，無法從報稅資料直接得出律師業總收入。<br>
-            4. 需求端對照：全國 13,000+ 執業登錄律師中約 1,400 位登錄在企業／機構內（見 本區＞企業版圖＞企業法務雷達）——金融業 in-house 化最深，一般產業絕大多數企業無內部律師，法務需求必然外包。
+            4. 需求端對照：全國 13,000+ 執業登錄律師中約 1,400 位登錄在企業／機構內（見 本區＞企業版圖＞企業法務雷達）——金融業 in-house 化最深，一般產業絕大多數企業無內部律師，法務需求必然外包。<br>
+            5. 本站「署名件」口徑（裁判書律師署名）＝含各審級、兩造與裁定，不含偵查辯護／調解／純非訟——與普查「事務所收入」、委任率法「委任案」互為不同切面，對帳前先對口徑。
           </div>
         </div>
       </div>
@@ -13812,6 +13813,14 @@ function msLitTotal() {
   return { lo: s('lo') * f.lo / 1e4, hi: s('hi') * f.hi / 1e4, mid: s('mid') * f.mid / 1e4,
     laf: { lo: s('lafLo') * f.lo / 1e4, hi: s('lafHi') * f.hi / 1e4, mid: s('lafMid') * f.mid / 1e4 } };  // 億
 }
+function msLitFull() {  // 全口徑＝任一造合計 × 付費造數係數（兩造分別委任各算一份）
+  const t = msLitTotal(), pf = _msV('lit_paying_factor');
+  return { lo: t.lo * pf.lo, hi: t.hi * pf.hi, mid: t.mid * pf.mid };
+}
+function msLitSign() {  // 署名件法（獨立三角驗證）：萬件 × 萬元/件 ＝ 億
+  const v = _msV('lit_sign_volume'), f = _msV('lit_sign_fee');
+  return { lo: v.lo * f.lo, hi: v.hi * f.hi, mid: v.mid * f.mid };
+}
 // 量×價配對型 segment（ip / landagent / notary）
 const MS_PAIR_SEGS = [
   { seg: 'ip', icon: '&#8482;', title: '商標專利（進台灣 prosecution）', badge: 'C', badgeCls: 'ms-c',
@@ -13911,9 +13920,15 @@ function renderMarket() {
     _msIn('lit_laf_share_civ', 'low', _msAssump['lit_laf_share_civ'].low, '1') + '–' + _msIn('lit_laf_share_civ', 'high', _msAssump['lit_laf_share_civ'].high, '1') +
     '%、刑事線（含指定辯護） ' + _msIn('lit_laf_share_cri', 'low', _msAssump['lit_laf_share_cri'].low, '1') + '–' + _msIn('lit_laf_share_cri', 'high', _msAssump['lit_laf_share_cri'].high, '1') +
     '%、法扶酬金 ' + _msIn('lit_laf_fee', 'low', _msAssump['lit_laf_fee'].low, '0.5') + '–' + _msIn('lit_laf_fee', 'high', _msAssump['lit_laf_fee'].high, '0.5') + ' 萬/件</div>' +
-    '上訴審係數 ' + _msIn('lit_appeal_factor', 'low', _msAssump['lit_appeal_factor'].low, '0.05') + '–' +
+    '<div style="margin-bottom:6px;">上訴審係數 ' + _msIn('lit_appeal_factor', 'low', _msAssump['lit_appeal_factor'].low, '0.05') + '–' +
     _msIn('lit_appeal_factor', 'high', _msAssump['lit_appeal_factor'].high, '0.05') +
-    ' 倍　→　訴訟市場合計 <strong id="msLitSum" style="color:var(--gold);"></strong>';
+    ' 倍　→　<span class="ms-badge ms-c">任一造口徑</span>合計 <strong id="msLitSum" style="color:var(--gold);"></strong></div>' +
+    '<div style="margin-bottom:6px;">付費造數係數 ' + _msIn('lit_paying_factor', 'low', _msAssump['lit_paying_factor'].low, '0.05') + '–' +
+    _msIn('lit_paying_factor', 'high', _msAssump['lit_paying_factor'].high, '0.05') +
+    ' 倍（兩造分別委任各算一份）　→　<strong>全口徑</strong> <strong id="msLitFullOut" style="color:var(--gold);"></strong></div>' +
+    '<div style="color:var(--text-muted);">獨立驗證・署名件法：全市場署名 ' + _msIn('lit_sign_volume', 'both', _msAssump['lit_sign_volume'].low, '0.1') +
+    ' 萬件/年 × 有效單價 ' + _msIn('lit_sign_fee', 'low', _msAssump['lit_sign_fee'].low, '0.5') + '–' + _msIn('lit_sign_fee', 'high', _msAssump['lit_sign_fee'].high, '0.5') +
+    ' 萬 ＝ <strong id="msLitSignOut"></strong>（署名口徑：含各審級/兩造/裁定，不含偵查辯護與調解）</div>';
   document.getElementById('msLitActions').innerHTML = msActionsHtml('lit');
   // --- 配對型 segment 卡 + 勞資/仲裁/法顧/標案卡 ---
   document.getElementById('msSegGrid').innerHTML =
@@ -14008,6 +14023,11 @@ function msRecalc() {
   const litSum = document.getElementById('msLitSum');
   if (litSum) litSum.innerHTML = _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '（中位 ' + _msFmtE(lt.mid) +
     '，其中<span style="color:#5fc9e7;">法扶酬金 ' + _msFmtE(lt.laf.mid) + '</span>／自費 ' + _msFmtE(lt.mid - lt.laf.mid) + '）';
+  const ltf = msLitFull(), lts = msLitSign();
+  const eFull = document.getElementById('msLitFullOut');
+  if (eFull) eFull.textContent = _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '（中位 ' + _msFmtE(ltf.mid) + '）';
+  const eSign = document.getElementById('msLitSignOut');
+  if (eSign) eSign.textContent = _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '（中位 ' + _msFmtE(lts.mid) + '）';
   // 配對型 subtotal
   MS_PAIR_SEGS.forEach(d => {
     const el = document.getElementById('msSub_' + d.seg);
@@ -14072,16 +14092,18 @@ function msRecalc() {
   const gt = msGrandTotal();
   const topLine = msLitRows().sort((a, b) => b.mid - a.mid)[0];
   document.getElementById('msKpis').innerHTML =
-    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(gt.mid) + '</div><div class="kpi-sub">區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(gt.mid) + '</div><div class="kpi-sub">區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '｜訴訟改全口徑＝' + _msFmtE(gt.mid - lt.mid + ltf.mid) + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);">' + (gt.mid / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">訴訟市場（中位）</div><div class="kpi-value">' + _msFmtE(lt.mid) + '</div><div class="kpi-sub">最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造中位）</div><div class="kpi-value">' + _msFmtE(lt.mid) + '</div><div class="kpi-sub">最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟全口徑（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</div><div class="kpi-sub">署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>';
   document.getElementById('msRecon').innerHTML =
-    'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
-    '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，行業年成長約 3–4%，比較時心裡先打個折。<br>' +
-    '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶不另立市場——訴訟委任率口徑「含法扶」，且法扶件已改按<strong>法扶酬金</strong>計價（非市場行情），計價與普查口徑一致。<br>' +
-    '・<strong>缺口＝沒被案件統計看見的市場</strong>：非訟文件與意見書、盡職調查、契約審閱、家事非訟（監護/繼承非訟）、強制執行代理、刑事偵查階段辯護、談判與法遵顧問——bottom-up 與普查的差額大致就是這一塊加上單價假設的誤差。<br>' +
-    '・訴訟微資料委任率「任一造」口徑對市場規模是保守的：雙方都委任時是兩份委任費，本模型只算一份——訴訟市場實際規模比表列估計再高一截。';
+    'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '，訴訟以任一造保守口徑計入），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
+    '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，且本站署名量 2021→2025 <strong>+50%</strong>（出庭律師僅 +17%），市場在真實擴張，比較時心裡先打個折。<br>' +
+    '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶件按<strong>法扶酬金</strong>計價，與普查口徑一致。<br>' +
+    '・<strong>訴訟全口徑（2026-09 新增）</strong>：委任率「任一造」口徑＝雙方委任只算一份，乘付費造數係數後全口徑 <strong style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</strong>（' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）；獨立的<strong>署名件法</strong>（署名量 × 有效單價）驗證得 <strong>' + _msFmtE(lts.mid) + '</strong>（' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '）——兩法交集，訴訟服務年支出合理帶約 <strong>150 – 270 億、中間帶 ~200 億</strong>。合計卡維持保守口徑以利與普查對帳。<br>' +
+    '・<strong>頭部 vs 長尾（2026-09 快照）</strong>：AI 深度分析 398 家（前 300 大全覆蓋）推估合計 ~174 億，但僅佔 2025 全市場署名案量 <strong>28%</strong>；其餘 <strong>72%</strong>（約 22.7 萬件）由約 <strong>8,200 位</strong>長尾出庭律師交付（人均案量 27.7 件 ≈ 頭部 30.6），試算 130 – 240 億——頭尾合計約 300 – 410 億，與普查量級相容。頭部溢價在單價與非訟，不在案量。<br>' +
+    '・<strong>缺口＝沒被案件統計看見的市場</strong>：非訟文件與意見書、盡職調查、契約審閱、家事非訟、強制執行代理、刑事偵查階段辯護、談判與法遵顧問——bottom-up 與普查的差額大致就是這一塊加上單價假設的誤差。';
 }
 async function msSave(seg) {
   const st = document.getElementById('msStatus_' + seg);
