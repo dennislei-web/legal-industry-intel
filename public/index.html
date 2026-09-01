@@ -1763,7 +1763,8 @@
         <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
           由下而上（bottom-up）把各法律服務市場拆成「<strong>量（官方統計）× 委任率 × 單價（行情假設）</strong>」推估年規模，並與「官方產值」頁的普查錨點（110 年 409 億）互相對帳。信心分級：<span class="ms-badge ms-a">A 官方金額</span><span class="ms-badge ms-b">B 法定費率</span><span class="ms-badge ms-c">C 行情推估</span>。<strong>行情數字（含刑事委任率）都可以直接改</strong>——改完按該卡「儲存」寫回資料庫（全站共用、跨裝置一致），「還原預設」可回到本站初始假設。
         </div>
-        <div class="kpi-grid" id="msKpis" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr));margin-bottom:16px;"></div>
+        <div class="kpi-grid" id="msKpis" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr));margin-bottom:10px;"></div>
+        <div id="msCaliberStrip" style="margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:16px;">
           <div class="card-title">&#128202; 各市場年規模總覽（億元，低—高區間，│＝中位）</div>
           <div id="msOverview" style="padding:4px 0;"><div class="loading">載入中</div></div>
@@ -14149,11 +14150,12 @@ function msRecalc() {
     '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);font-size:1.35rem;">' + (gt.lo / 408.69 * 100).toFixed(0) + ' – ' + (gt.hi / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">中位 ' + (gt.mid / 408.69 * 100).toFixed(0) + '%；普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造）</div><div class="kpi-value" style="font-size:1.35rem;">' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(lt.mid) + '｜最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">訴訟全口徑</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(ltf.mid) + '｜署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>';
+  document.getElementById('msCaliberStrip').innerHTML =
     (function () {
       const gf = { lo: gt.lo - lt.lo + ltf.lo, hi: gt.hi - lt.hi + ltf.hi, mid: gt.mid - lt.mid + ltf.mid };
       const pct = v => (v / 408.69 * 100).toFixed(0);
-      return '<div style="grid-column:1/-1;font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
+      return '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
         '&#128257; <strong style="color:var(--text);">同一張總表、兩種訴訟口徑</strong>：' +
         '<strong style="color:var(--gold);">保守版 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</strong>（中位 ' + _msFmtE(gt.mid) + '；訴訟只算一份委任＝任一造 ' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '）＝普查 ' + pct(gt.lo) + ' – ' + pct(gt.hi) + '%　&#8596;　' +
         '<strong style="color:var(--gold);">全口徑版 ' + _msFmtE(gf.lo) + ' – ' + _msFmtE(gf.hi) + '</strong>（中位 ' + _msFmtE(gf.mid) + '；訴訟算兩造各付＝' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）＝普查 ' + pct(gf.lo) + ' – ' + pct(gf.hi) + '%。' +
