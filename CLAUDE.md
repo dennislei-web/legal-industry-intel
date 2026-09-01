@@ -129,8 +129,10 @@
   `cause_court_top_lawyers`；名單走 `cause_top_lawyers(p_year)` 單發。
   **前端一律 server-side 篩選、嚴禁拉全量**（PostgREST 對 RPC 的 `.range()` 是每頁重跑
   整個函數，049 時代曾造成 tab 載入 30s+）。專業法庭 famLawyersBlock 僅剩導向卡
-  （`_dlPresetCat` 預選家事）。**family_lawyer_* 4 張 cache 表（mig 049/055）前端已下線**、
-  暫留 DB 觀察一輪後另開 migration 清理（`refresh_family_lawyer_stats()` 仍在 refresh_stats 鏈）
+  （`_dlPresetCat` 預選家事）。**family_lawyer_* cache 家族已全數退役（mig 183，2026-09-01 核可）**：
+  4 張表＋6 個 RPC（refresh_family_lawyer_stats／family_lawyer_stats／by_court／by_year 系列）DROP，
+  refresh 鏈（judgment_stats.py refresh_stats、judgment-causefill.yml）同步拔除；
+  `family_judge_stats()`/`family_cases_by_year()` 屬法官統計、保留
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
 - 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
 - **Phase B 案由層（migration 069/070）**：parse 帶 JTITLE → `lawyer_month_stats.causes` /
@@ -297,8 +299,9 @@
     兩個 `chg-subpanel`（`switchChgTab`、navState.chg；KPI/時間窗/搜尋共用置頂；
     總表「明細」鈕 ovDrill 自動切分頁；明細卡不再收合、chgType 移入明細分頁）
   - P2-2 司法統計總覽動態化：mig 181 `jstat_overview_stats()`（court_case_stats 年×分類，
-    民國 90 年起；月報 vs 開放資料口徑差異見 migration 註解）。**靜態月報三圖仍並列，
-    待使用者核可差異表後才刪**（核可後總數趨勢與訴訟市場重複部分改連結卡）
+    民國 90 年起；月報 vs 開放資料口徑差異見 migration 註解）。**靜態月報三圖已於 2026-09-01
+    經使用者核可差異表後移除**（buildKPIs/buildOverviewCharts 已刪、總覽不再 fetch 靜態 JSON、
+    一審訴訟口徑改連結卡導向訴訟市場；judicial_stats.json 仍供 各法院比較/案件專題）
   - P3-1 header 全站搜尋：`gsSearch` debounce 300ms 並行查 lawyers_with_stats/judges_combined/
     prosecutor_stats/moj_firm_stats_cache，點擊開對應 modal（檢察官無 modal→跳名錄帶搜尋）；
     未登入時 table 類（檢察官/事務所）RLS 回空、view 類可查，屬預期
