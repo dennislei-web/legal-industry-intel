@@ -2959,19 +2959,47 @@
     <!-- ==================== TABS: JSTAT (司法統計，7 個分頁) ==================== -->
         <!-- Tab: 總覽 -->
         <div class="tab-content jstat" id="tab-jstat-overview">
+      <!-- 動態版（IA 重整 P2-2）：court_case_stats（開放資料 43994）→ RPC jstat_overview_stats（mig 181），月更 -->
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">資料來源：<a href="https://opendata.judicial.gov.tw/" target="_blank" style="color:var(--blue);">司法院開放資料</a>「各級法院各案類新收及終結件數統計」（民國 90 年起，每月自動更新）<span id="jstat_dynAsOf"></span></div>
+      <div class="kpi-grid" id="jstat_kpiGridDyn"></div>
+            <div class="chart-grid">
+                <div class="chart-card full">
+                    <div class="chart-title">歷年各類案件新收總數趨勢（民國 90 年起）</div>
+                    <div class="chart-container"><canvas id="jstat_chartTotalTrendDyn"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title"><span id="jstat_dynDistYear">最新年</span>案件類型分布</div>
+                    <div class="chart-container"><canvas id="jstat_chartTypeDistDyn"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">歷年案件量年增率</div>
+                    <div class="sub-tabs" id="jstat_growthRateTabsDyn" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                    <div class="chart-container"><canvas id="jstat_chartGrowthRateDyn"></canvas></div>
+                </div>
+            </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.7;margin:4px 0 20px;">
+        口徑：各級法院合計、開放資料原生案類。「民事」含訴訟／非訟（支付命令等）／督促保全調解，不含執行；「強制執行」＝民事執行處全部程序（含併案、保全執行，比月報「強制執行」寬約 5–7%）；
+        最高法院新收在來源恆為 0（僅填終結），故民事／刑事未含三審新收；公證、提存、憲法法庭、公設辯護等非裁判業務不在本資料集（總量比月報口徑少約 5%）。
+      </div>
+      <!-- 靜態舊版（統計月報 104-114、年更）：與上方動態版並列比對中，經使用者核可後移除 -->
+      <div class="card" style="margin-bottom:16px;border-left:3px solid var(--orange);">
+        <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.7;">
+          ⚠ 以下為<strong>靜態舊版</strong>（司法院統計月報 104–114 年、年更），與上方動態版<strong>並列比對中</strong>；口徑差異：月報含公證／提存等非裁判業務與最高法院新收、「民事」「強制執行」分類歸屬不同。比對核可後本區將移除。
+        </div>
+      </div>
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">資料來源：<a href="https://www.judicial.gov.tw/tw/lp-1789-1.html" target="_blank" style="color:var(--blue);">司法院統計處</a>統計月報（民國 104–114 年）｜最後更新：114 年 12 月</div>
       <div class="kpi-grid" id="jstat_kpiGrid"></div>
             <div class="chart-grid">
                 <div class="chart-card full">
-                    <div class="chart-title">歷年各類案件新收總數趨勢</div>
+                    <div class="chart-title">歷年各類案件新收總數趨勢（靜態舊版）</div>
                     <div class="chart-container"><canvas id="jstat_chartTotalTrend"></canvas></div>
                 </div>
                 <div class="chart-card">
-                    <div class="chart-title">114 年案件類型分布</div>
+                    <div class="chart-title">114 年案件類型分布（靜態舊版）</div>
                     <div class="chart-container"><canvas id="jstat_chartTypeDistribution"></canvas></div>
                 </div>
                 <div class="chart-card">
-                    <div class="chart-title">歷年案件量年增率</div>
+                    <div class="chart-title">歷年案件量年增率（靜態舊版）</div>
                     <div class="sub-tabs" id="jstat_growthRateTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
                         <button class="sub-tab-btn active" data-category="total">總量</button>
                         <button class="sub-tab-btn" data-category="civil_only">民事（不含家事）</button>
@@ -16162,6 +16190,144 @@ async function showCourtDetail(name) {
         });
     }
 
+    // ===== 總覽動態版（IA 重整 P2-2）：RPC jstat_overview_stats（court_case_stats 年×分類聚合，民國 90 年起）=====
+    let _jsDynLoaded = false;
+    async function loadJstatOverviewDyn() {
+        if (_jsDynLoaded) return; _jsDynLoaded = true;
+        try {
+            const { data, error } = await db.rpc('jstat_overview_stats');
+            if (error) throw error;
+            if (!data || !data.length) throw new Error('無資料');
+            buildOverviewDyn(data);
+        } catch (e) {
+            _jsDynLoaded = false;  // 失敗可重試（再點一次分頁）
+            const grid = document.getElementById('jstat_kpiGridDyn');
+            if (grid) grid.innerHTML = '<div style="grid-column:1/-1;color:var(--red);padding:14px 18px;border:1px solid var(--red);border-radius:8px;">⚠️ 動態統計載入失敗（' + escHtml(e.message || String(e)) + '）— 再點一次分頁即可重試</div>';
+        }
+    }
+
+    const DYN_SEGS = [
+        { key: '民事', color: COLORS.blue },
+        { key: '家事', color: COLORS.purple },
+        { key: '刑事', color: COLORS.red },
+        { key: '強制執行', color: COLORS.orange },
+        { key: '行政訴訟', color: COLORS.teal },
+        { key: '少年', color: COLORS.pink },
+        { key: '其他', color: COLORS.gray },
+    ];
+
+    function buildOverviewDyn(rows) {
+        // 主題色（動態版可能早於靜態 JSON fetch 完成，故此處自行設定一次）
+        const cs = getComputedStyle(document.body);
+        Chart.defaults.color = cs.getPropertyValue('--text-muted').trim() || '#8899aa';
+        Chart.defaults.borderColor = cs.getPropertyValue('--border').trim() || '#1e3050';
+        // pivot：{year_tw: {seg: nc}}；months 取該年最大值（<12=年度未完，排除於圖表與 KPI）
+        const byYear = {}, monthsOf = {};
+        rows.forEach(r => {
+            (byYear[r.year_tw] = byYear[r.year_tw] || {})[r.segment] = (byYear[r.year_tw][r.segment] || 0) + Number(r.new_cases || 0);
+            monthsOf[r.year_tw] = Math.max(monthsOf[r.year_tw] || 0, r.months || 0);
+        });
+        const allYears = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+        const years = allYears.filter(y => monthsOf[y] >= 12);
+        const partial = allYears.filter(y => monthsOf[y] < 12);
+        if (!years.length) return;
+        const latest = years[years.length - 1];
+        const asOf = document.getElementById('jstat_dynAsOf');
+        if (asOf) asOf.textContent = `｜統計至民國 ${latest} 年` + (partial.length ? `（${partial.join('、')} 年資料未滿 12 個月，暫不納入）` : '');
+        const segsUsed = DYN_SEGS.filter(s => years.some(y => (byYear[y][s.key] || 0) > 0));
+        const totalOf = y => segsUsed.reduce((sum, s) => sum + (byYear[y][s.key] || 0), 0);
+
+        // KPI：最新完整年 總量＋民事＋家事＋刑事＋強執（各配年增率）
+        const prev = years[years.length - 2];
+        const kpi = (label, cur, pre, cls) => {
+            const pct = pre ? ((cur - pre) / pre * 100).toFixed(1) : null;
+            return `<div class="kpi-card ${cls || ''}">
+                <div class="kpi-label">${label}</div>
+                <div class="kpi-value">${formatNumber(cur)}</div>
+                ${pct != null ? `<div class="kpi-change ${parseFloat(pct) > 0 ? 'up' : 'down'}">較前年 ${parseFloat(pct) > 0 ? '↑' : '↓'} ${Math.abs(pct)}%</div>` : ''}
+            </div>`;
+        };
+        const g = (y, k) => (byYear[y] && byYear[y][k]) || 0;
+        document.getElementById('jstat_kpiGridDyn').innerHTML =
+            kpi(`${latest + 1911} 年案件總數`, totalOf(latest), prev ? totalOf(prev) : null, '') +
+            kpi('民事案件新收', g(latest, '民事'), g(prev, '民事'), 'accent') +
+            kpi('家事案件新收', g(latest, '家事'), g(prev, '家事'), 'purple') +
+            kpi('刑事案件新收', g(latest, '刑事'), g(prev, '刑事'), 'green') +
+            kpi('強制執行新收', g(latest, '強制執行'), g(prev, '強制執行'), 'orange');
+
+        // 趨勢：stacked bar（西元標籤，與靜態版一致）
+        new Chart(document.getElementById('jstat_chartTotalTrendDyn'), {
+            type: 'bar',
+            data: {
+                labels: years.map(y => y + 1911),
+                datasets: segsUsed.map(s => ({ label: s.key, data: years.map(y => g(y, s.key)), backgroundColor: s.color, stack: 'stack' })),
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => (v / 1000000).toFixed(1) + 'M' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + formatNumber(ctx.raw) + ' 件' } } }
+            }
+        });
+
+        // 分布：最新完整年 doughnut
+        const distYearEl = document.getElementById('jstat_dynDistYear');
+        if (distYearEl) distYearEl.textContent = `${latest + 1911} 年`;
+        new Chart(document.getElementById('jstat_chartTypeDistDyn'), {
+            type: 'doughnut',
+            data: {
+                labels: segsUsed.map(s => s.key),
+                datasets: [{ data: segsUsed.map(s => g(latest, s.key)), backgroundColor: segsUsed.map(s => s.color) }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    tooltip: { callbacks: { label: ctx => ctx.label + ': ' + formatNumber(ctx.raw) + ' 件 (' + (ctx.raw / totalOf(latest) * 100).toFixed(1) + '%)' } },
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // 年增率：分類切換（總量＋各分類）
+        const growthCats = [{ key: '__total', label: '總量', val: y => totalOf(y) }]
+            .concat(segsUsed.filter(s => s.key !== '其他').map(s => ({ key: s.key, label: s.key, val: y => g(y, s.key) })));
+        const tabsEl = document.getElementById('jstat_growthRateTabsDyn');
+        tabsEl.innerHTML = growthCats.map((c, i) =>
+            `<button class="sub-tab-btn${i === 0 ? ' active' : ''}" data-category="${c.key}">${c.label}</button>`).join('');
+        const rateOf = c => years.slice(1).map((y, i) => {
+            const pre = c.val(years[i]);
+            return pre ? ((c.val(y) - pre) / pre * 100).toFixed(2) : 0;
+        });
+        let curCat = growthCats[0];
+        const dynGrowth = new Chart(document.getElementById('jstat_chartGrowthRateDyn'), {
+            type: 'bar',
+            data: { labels: years.slice(1).map(y => y + 1911), datasets: [{ label: '年增率 (%)', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } },
+                plugins: { tooltip: { callbacks: { label: ctx => curCat.label + ' 年增率: ' + ctx.raw + '%' } } }
+            }
+        });
+        const updDynGrowth = c => {
+            curCat = c;
+            const rates = rateOf(c);
+            dynGrowth.data.datasets[0].data = rates;
+            dynGrowth.data.datasets[0].backgroundColor = rates.map(v => parseFloat(v) >= 0 ? COLORS_ALPHA(COLORS.red, 0.7) : COLORS_ALPHA(COLORS.green, 0.7));
+            dynGrowth.data.datasets[0].borderColor = rates.map(v => parseFloat(v) >= 0 ? COLORS.red : COLORS.green);
+            dynGrowth.update();
+        };
+        updDynGrowth(curCat);
+        tabsEl.querySelectorAll('.sub-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabsEl.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                updDynGrowth(growthCats.find(c => c.key === btn.dataset.category) || growthCats[0]);
+            });
+        });
+    }
+
     function buildCivilCharts(data) {
         const years = data.district_civil_by_year.map(d => d.year_ad);
         const civil = data.district_civil_by_year;
@@ -17383,6 +17549,7 @@ async function showCourtDetail(name) {
 
     window.loadJstatTab = function(tab) {
         const key = tab.replace(/^jstat-/, '');
+        if (key === 'overview') loadJstatOverviewDyn();  // 動態版（RPC，獨立於靜態 JSON，各自容錯）
         if (!jstatFetch) {
             // cache-buster：避免 CDN/瀏覽器快取到部署中的 404 或舊檔
             jstatFetch = fetch('data/judicial_stats.json?v=' + Date.now())
