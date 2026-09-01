@@ -952,7 +952,8 @@ def refresh_stats():
                 # 折行截斷清洗：先清 judge_month_stats 源頭再重算各彙總（migration 134）
                 'clean_judge_name_truncations',
                 'refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
-                'refresh_lawyer_judgment_stats', 'refresh_family_lawyer_stats',
+                # refresh_family_lawyer_stats 已退役（mig 183；領域律師版圖改掛 refresh_lawyer_cause_stats 尾端）
+                'refresh_lawyer_judgment_stats',
                 'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats',
                 'refresh_judge_changes',
                 # judge_changes 是 TRUNCATE 重建，遷調配對欄要跟著補（migration 084）

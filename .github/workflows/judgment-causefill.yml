@@ -78,7 +78,7 @@ jobs:
           H = {'apikey': key, 'Authorization': f'Bearer {key}'}
           for rpc in ('refresh_lawyer_cause_stats', 'refresh_judge_judgment_stats',
                       'refresh_prosecutor_stats', 'refresh_lawyer_judgment_stats',
-                      'refresh_family_lawyer_stats', 'refresh_lawyer_region_stats',
+                      'refresh_lawyer_region_stats',
                       'refresh_firm_stats_cache', 'refresh_ex_judicial_lawyers'):
               r = requests.post(f'{url}/rest/v1/rpc/{rpc}', json={},
                                 headers={**H, 'Content-Type': 'application/json'}, timeout=900)
