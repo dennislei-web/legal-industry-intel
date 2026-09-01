@@ -169,6 +169,28 @@
   lawyer_judgment_stats.cases_5yr（MOJ 名冊姓名唯一者歸戶）÷ MOJ 人數，Lawsnote 案件數
   自此完全退出 UI 與統計鏈
 
+## 所級案件量去重（migration 186，2026-09-01）
+
+- **問題**：所級案量 = SUM(lawyer_month_stats.case_count) 會把同判決多位同所律師各計 1 件；
+  全口徑實測（202504 單月）主要所灌水率 30~65%（謙聖 41%／喆律 39%／理律 57%），
+  且**協作型大所與掛名所都中招**——「掛名制度/真集中」標記量的是集中度不是重複率
+- **pair 表（mig 170）估不準**：只收「同一個代理人 label 帶多人」格式，掛名主流的
+  「同方各掛一個 label」（跨 block）全漏——喆律 pair 估 12% vs 判決層實測 37%；
+  謙聖 87.7% 案量在刑事共同辯護，民家 lidx 快取也蓋不到，去重必須回判決層全口徑
+- **兩表**：`lawyer_group_month_stats`（ym×同判決律師集合 text[]，>=2 人、全案類＋
+  判決裁定、跨當事人方合併、永久保存；parse() 產 agg.json 的 lawyer_group key）＋
+  `firm_dedup_month_stats`（ym×firm_key：nominal/dup/dedup/lawyer_n；
+  dedup = nominal − Σ(同判決同所 k 人 − 1)）
+- **refresh_firm_dedup_stats(p_ym)**：歸戶同 moj_firm_statistics 142 口徑（現職唯一名、
+  分所合併、按現任名冊回溯）。⚠️ **p_ym=NULL 全量 ~10s 會撞 PostgREST authenticator 的
+  8s statement_timeout（函數層 SET 蓋不掉已武裝的頂層計時器），只能走
+  `supabase db query`**；單月增量 ~5s 可走 RPC——refresh_stats() 的
+  `refresh_firm_dedup()` 與 groupfill CI 都逐月打單月版
+- 回填：`judgment-groupfill.yml`（202101–202504 分 5 shard）；月更 run 自動增量。
+  `python judgment_stats.py groupfill <起> <迄>` 冪等（已上傳月跳過）
+- **下游尚未接**（2026-09-01 報告後待使用者確認）：firm_analysis_facts.cases_5y/avg_cases、
+  儀表板產業結構、firm_cause_shares footnote、ai_analysis 文字、concentration 重分桶
+
 ## 訴訟客戶集中度（migration 071）
 
 - `scripts/client_concentration.py` → `lawyer_client_concentration` 表（律師 modal「訴訟客戶集中度」卡）
