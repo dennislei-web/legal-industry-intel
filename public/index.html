@@ -9075,7 +9075,7 @@ async function showJudgeDetail(name, court) {
       (r.case_count || 0) <= 2 && !mi.some((m, j) => j !== i && Math.abs(m - mi[i]) <= 6));
     const kept = isolated.every(Boolean) ? rows : rows.filter((_, i) => !isolated[i]);
     ghostMonths += rows.length - kept.length;
-    const s = spans[c] = { first: kept[0].yyyymm, last: kept[0].yyyymm, cases: 0 };
+    const s = spans[c] = { first: kept[0].yyyymm, last: kept[0].yyyymm, cases: 0, months: kept.length };
     kept.forEach(r => {
       if (r.yyyymm < s.first) s.first = r.yyyymm;
       if (r.yyyymm > s.last) s.last = r.yyyymm;
@@ -9084,17 +9084,37 @@ async function showJudgeDetail(name, court) {
   });
   const spanRows = Object.entries(spans).sort((a, b) => a[1].first.localeCompare(b[1].first));
   const multiCourt = spanRows.length > 1;
-  const sameNameCourts = judgeSameNameCourts(spanRows, changes, court, transfers);
-  // 前院清單（主軌跡扣掉本院與同名院，最近的前院在前）：上訴維持率卡分院並列用
-  const prevCourts = spanRows
+  // 幽靈院防呆（孤立月規則的補位）：整院長期低密度署名——連續 ≥6 個月、月均 ≤3 件、且不到
+  // 本人常態院（最高密度院）的 10%——是本人裁判被上訴後，上訴審判決書「附件／原審全文」持續
+  // 誤抓原審署名所致，非該院任職。孤立月規則只殺前後無鄰居的單月，抓不到這種長跨度細水流；
+  // 不排除的話幽靈院會佔住錨定位、把真身反過來拆成「同名的另一位」（時瑋辰個案）。
+  // 審級條件不可省：誤抓成因是上訴審引用原審全文，故幽靈院必然審級高於常態院。少了它，
+  // 離島小院（連江月均中位數 4.7）的真任職會被當成幽靈殺掉。
+  const spanDens = s => s.cases / Math.max(1, s.months);
+  const courtTier = c => /^最高/.test(c) ? 3 : /高等/.test(c) ? 2 : 1;
+  const topSpan = spanRows.slice().sort((a, b) => spanDens(b[1]) - spanDens(a[1]))[0];
+  const topDens = topSpan ? spanDens(topSpan[1]) : 0;
+  const topTier = topSpan ? courtTier(topSpan[0]) : 1;
+  const ghostCourts = new Set(spanRows
+    .filter(([c, s]) => s.months >= 6 && spanDens(s) <= 3
+      && spanDens(s) < topDens * 0.1 && courtTier(c) > topTier)
+    .map(([c]) => c));
+  const realSpanRows = spanRows.filter(([c]) => !ghostCourts.has(c));
+  // 錨定院：本院若本身是幽靈院，改以常態院為錨，否則同名拆分會以幽靈區間為基準，把真身判成另一人
+  const anchorCourt = !ghostCourts.has(court) ? court : (topSpan || [court])[0];
+  const sameNameCourts = judgeSameNameCourts(realSpanRows, changes, anchorCourt, transfers);
+  // 前院清單（主軌跡扣掉本院、同名院與幽靈院，最近的前院在前）：上訴維持率卡分院並列用
+  const prevCourts = realSpanRows
     .filter(([c]) => c !== court && !sameNameCourts.has(c))
     .sort((a, b) => b[1].last.localeCompare(a[1].last))
     .map(([c]) => c);
 
   // 全期首見（跨院，同名合併；早於本院首見時於基本資料補一列，避免「年資推估」與「本院首見」看似矛盾）
-  const firstEver = knownRows.length
-    ? { ym: knownRows.reduce((a, r) => r.yyyymm < a ? r.yyyymm : a, '999999'),
-        court: knownRows.reduce((a, r) => r.yyyymm < a.yyyymm ? r : a, { yyyymm: '999999' }).court_name }
+  // 幽靈院不納入（誤抓署名不代表執業起點）
+  const firstEverRows = knownRows.filter(r => !ghostCourts.has(r.court_name));
+  const firstEver = firstEverRows.length
+    ? { ym: firstEverRows.reduce((a, r) => r.yyyymm < a ? r.yyyymm : a, '999999'),
+        court: firstEverRows.reduce((a, r) => r.yyyymm < a.yyyymm ? r : a, { yyyymm: '999999' }).court_name }
     : null;
 
   // 家事專責度（近 5 年本院署名的家事佔比）
@@ -9110,10 +9130,13 @@ async function showJudgeDetail(name, court) {
   if (jc?.rank && jc.rank !== '法官') badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--gold) 20%, transparent);color:var(--gold);">${escHtml(jc.rank)}</span>`);
   if (stat) badges.push('<span class="badge" style="background:var(--green-dim);color:var(--green);">裁判書統計</span>');
   if (jc?.has_lawsnote) badges.push('<span class="badge badge-orange">Lawsnote</span>');
+  if (ghostCourts.has(court)) {
+    badges.push(`<span class="badge badge-orange" style="cursor:help;" title="本院署名共 ${spans[court].cases} 件、散在 ${spans[court].months} 個月（月均 ${spanDens(spans[court]).toFixed(1)} 件），遠低於本人常態審判院的密度，研判為其裁判被上訴後、上訴審判決書附件誤抓原審署名，而非在本院任職；常態任職院為 ${escHtml(anchorCourt)}（詳生涯軌跡卡）">&#9888; 本院係誤抓署名</span>`);
+  }
   if (sameNameCourts.size) {
-    badges.push(`<span class="badge badge-orange" style="cursor:help;" title="以下 ${sameNameCourts.size} 個法院的署名期間與本院任期重疊超過 6 個月，同一人不可能同時在兩院常態署名，推定為同名的另一位法官：${escHtml([...sameNameCourts].join('、'))}（詳生涯軌跡卡）；本頁配對、案由、合議庭均已鎖定本院資料">疑似同名 ×${sameNameCourts.size}</span>`);
-  } else if (multiCourt) {
-    badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);cursor:help;" title="此姓名曾於 ${spanRows.length} 個法院署名，署名區間互不重疊，推定為同一人歷次轉調（有官方遷調決議者於生涯軌跡卡標註）；本頁配對、案由、合議庭均已鎖定本院資料">跨院軌跡 ×${spanRows.length}</span>`);
+    badges.push(`<span class="badge badge-orange" style="cursor:help;" title="以下 ${sameNameCourts.size} 個法院的署名期間與${escHtml(anchorCourt)}任期重疊超過 6 個月，同一人不可能同時在兩院常態署名，推定為同名的另一位法官：${escHtml([...sameNameCourts].join('、'))}（詳生涯軌跡卡）；本頁配對、案由、合議庭均已鎖定本院資料">疑似同名 ×${sameNameCourts.size}</span>`);
+  } else if (realSpanRows.length > 1) {
+    badges.push(`<span class="badge" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted);cursor:help;" title="此姓名曾於 ${realSpanRows.length} 個法院常態署名，署名區間互不重疊，推定為同一人歷次轉調（有官方遷調決議者於生涯軌跡卡標註）；本頁配對、案由、合議庭均已鎖定本院資料">跨院軌跡 ×${realSpanRows.length}</span>`);
   }
   const judgeDisc = disciplines.filter(d => d.role !== '檢察官');
   const judgeImp = impeachments.filter(d => d.role !== '檢察官');
@@ -9194,7 +9217,7 @@ async function showJudgeDetail(name, court) {
 
     ${renderJudgePairsCard(pairs, copanel, court)}
 
-    ${renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths)}
+    ${renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths, sameNameCourts, ghostCourts, anchorCourt)}
 
     ${jc?.lawsnote_url ? `
     <div style="text-align:center;margin-top:12px;">
@@ -9565,7 +9588,8 @@ function renderJudgePairsCard(pairs, copanel, court) {
     </div>`;
 }
 
-// 同名仲裁（與 mig 089 max_overlap 同口徑）：他院署名區間與本院重疊 >6 個月＝不可能是同一人
+// 同名仲裁（與 mig 089 max_overlap 同口徑）：他院署名區間與錨定院重疊 >6 個月＝不可能是同一人
+// 錨定院＝本院，但本院若被判為幽靈院（長期低密度誤抓署名）則改用最高密度院，spanRows 亦已濾除幽靈院
 // 並沿遷調/推定邊傳遞（如 屏東→新北 銜接到重疊的新北，一併歸入）；徽章列與生涯軌跡卡共用
 // 官方邊否決：與本院經人審會遷調/支援邊（judge_transfers＋judge_changes 官方欄）串接者
 // 確認為同一人，即使區間重疊也不拆（重疊視為幽靈署名殘留，非兩人）
@@ -9608,11 +9632,10 @@ function judgeSameNameCourts(spanRows, changes, court, transfers) {
 }
 
 // 生涯軌跡卡：逐院署名區間 × 異動事件（官方遷調邊藍字連人審會決議、推定灰字）
-// 重疊同名者拆到「疑似同名法官」區塊
-function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths) {
+// 重疊同名者拆到「疑似同名法官」區塊；長期低密度的幽靈院拆到「誤抓署名」區塊（皆由呼叫端判定）
+function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, transfers, ghostMonths, others, ghostCourts, anchorCourt) {
   if (!spanRows.length) return '';
   const fmtM = m => m ? m.slice(0, 4) + '-' + m.slice(4, 6) : '-';
-  const others = judgeSameNameCourts(spanRows, changes, court, transfers);
   const row = ([c, s], dim) => {
     const notes = (changes || []).filter(r => r.court_name === c)
       .map(r => jchgXferCell(r))
@@ -9625,9 +9648,10 @@ function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, trans
       <td style="font-size:0.82rem;">${notes.join('<br>') || '<span style="color:var(--text-muted);">—</span>'}</td>
     </tr>`;
   };
-  const mainSpans = spanRows.filter(([c]) => !others.has(c));
+  const mainSpans = spanRows.filter(([c]) => !others.has(c) && !ghostCourts.has(c));
   const mainRows = mainSpans.map(sp => row(sp, false)).join('');
   const otherRows = spanRows.filter(([c]) => others.has(c)).map(sp => row(sp, true)).join('');
+  const ghostRows = spanRows.filter(([c]) => ghostCourts.has(c)).map(sp => row(sp, true)).join('');
   // 主軌跡跨院合計（≥2 院才顯示；件數為幽靈月排除後口徑）
   const totalRow = mainSpans.length > 1 ? `<tr style="border-top:2px solid var(--border);">
       <td style="font-size:0.85rem;font-weight:600;">跨院合計（${mainSpans.length} 院）</td>
@@ -9645,11 +9669,22 @@ function renderJudgeCareerCard(name, spanRows, changes, court, multiCourt, trans
         </table>
       </div>
       ${multiCourt && mainRows ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">&#9888; 跨院軌跡以同名串接：有官方遷調註記（可連人審會決議原文）者為確認，其餘可能混入同名法官；法院名可點擊切換至該院檔案。</div>' : ''}
+      ${ghostCourts.has(court) ? `<div style="font-size:0.75rem;color:var(--orange);margin-top:6px;">&#9888; 本頁法院（${escHtml(court)}）的署名研判為誤抓（見下方「疑似誤抓署名」），本人常態任職院為 <b>${escHtml(anchorCourt)}</b>；同名判定已改以該院為基準。</div>` : ''}
       ${ghostMonths ? `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">已排除 ${ghostMonths} 個孤立署名月（該院前後 6 個月內無其他署名且當月 &le;2 件，多為上訴審判決附件誤抓原審署名）。</div>` : ''}
+      ${ghostRows ? `
+      <div style="margin-top:14px;">
+        <div style="font-size:0.82rem;font-weight:600;color:var(--orange);margin-bottom:2px;">&#9888; 疑似誤抓署名（非該院任職）</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">以下法院的署名雖跨越多年，但月均 &le;3 件、不到本人常態審判院密度的 10%，不符任職法官的辦案節奏；研判為其裁判被上訴後，上訴審判決書的附件／原審全文持續誤抓原審署名，故不列入生涯軌跡與跨院合計。</div>
+        <div class="table-wrap">
+          <table>
+            <tbody>${ghostRows}</tbody>
+          </table>
+        </div>
+      </div>` : ''}
       ${otherRows ? `
       <div style="margin-top:14px;">
         <div style="font-size:0.82rem;font-weight:600;color:var(--orange);margin-bottom:2px;">&#9888; 疑似另一位同名法官</div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">以下法院的署名期間與本院任期重疊超過 6 個月（或與重疊院有遷調銜接），同一人不可能同時在兩院常態署名，推定為同名的另一位「${escHtml(name)}」；點法院名可開啟該院檔案。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;">以下法院的署名期間與${escHtml(anchorCourt)}任期重疊超過 6 個月（或與重疊院有遷調銜接），同一人不可能同時在兩院常態署名，推定為同名的另一位「${escHtml(name)}」；點法院名可開啟該院檔案。</div>
         <div class="table-wrap">
           <table>
             <tbody>${otherRows}</tbody>
