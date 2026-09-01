@@ -13934,7 +13934,7 @@ function msGovLatest() {  // 政府標案：最近完整年（排除進行中年
 function msSegList() {
   const lb = msLaborTotal(), ar = msArbTotal();
   return [
-    { name: '訴訟市場（含上訴審）', cls: 'ms-c', v: msLitTotal(), include: true },
+    { name: '訴訟市場（任一造，含上訴審）', cls: 'ms-c', v: msLitTotal(), include: true },
     { name: '商標專利', cls: 'ms-c', v: msPairTotal('ip'), include: true },
     { name: '地政士', cls: 'ms-c', v: msPairTotal('landagent'), include: true },
     { name: '常年法顧（模型引用）', cls: 'ms-c', v: msRetainer(), include: true },
@@ -14112,6 +14112,7 @@ function msRecalc() {
   const gov = msGovLatest();
   const ip = msIpSplit();
   const bars = segs.map(s => ({ name: s.name, cls: s.cls, lo: s.v.lo, hi: s.v.hi, mid: s.v.mid }))
+    .concat([{ name: '訴訟全口徑（對照，不計入）', cls: 'ms-c', lo: ltf.lo, hi: ltf.hi, mid: ltf.mid }])
     .concat(gov ? [{ name: '政府標案（對照，不計入）', cls: 'ms-a', lo: +gov.amount / 1e8, hi: +gov.amount / 1e8, mid: +gov.amount / 1e8 }] : [])
     .sort((a, b) => b.mid - a.mid);
   // 同條雙色堆疊：訴訟＝自費｜法扶酬金、商標專利＝專利｜商標（依中位占比切分色帶）
