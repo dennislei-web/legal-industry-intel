@@ -990,6 +990,7 @@
         ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
+        <br>※ <strong>出庭數＝律師人次（名目口徑）</strong>：同一判決本所多人共同署名各計 1 人次，共同署名多的所（掛名制度所與協作型大所）數字偏高——主要所名目對去重灌水率 30～57%，本區排名對這類所偏有利。去重素材（mig 186）無法院×案類維度，本區無法逐條件去重；<strong>所級去重案量</strong>見事務所詳情（點所名）與「產業結構分析」區。
       </div>
       <div class="grid-2">
         <div class="card">
@@ -2239,7 +2240,7 @@
                 <th style="cursor:pointer" onclick="sortOffices('lawyer_count')">律師人數 <span id="sortIcon_o_lawyer_count">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('main_region')">主要地區 <span id="sortIcon_o_main_region">↕</span></th>
                 <th>主持律師</th>
-                <th style="cursor:pointer" onclick="sortOffices('avg_cases')" title="官方近 5 年出庭數 ÷ 法務部律師人數（公開裁判書，下限估計）">平均案件數 <span id="sortIcon_o_avg_cases">↕</span></th>
+                <th style="cursor:pointer" onclick="sortOffices('avg_cases')" title="官方近 5 年出庭數 ÷ 法務部律師人數（公開裁判書，下限估計）。名目口徑：同判決同所多人共同署名各計 1 件，共同署名多的所偏高；去重案量點入該所詳情查看">平均案件數* <span id="sortIcon_o_avg_cases">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_age')">平均年齡 <span id="sortIcon_o__avg_age">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('_avg_sen')">平均年資 <span id="sortIcon_o__avg_sen">↕</span></th>
                 <th style="cursor:pointer" onclick="sortOffices('founded_year')" title="來源：事務所官網/公開資料，人工與 AI 研究彙整，僅涵蓋部分事務所">成立年份 <span id="sortIcon_o_founded_year">↕</span></th>
