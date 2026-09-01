@@ -13934,7 +13934,7 @@ function msGovLatest() {  // 政府標案：最近完整年（排除進行中年
 function msSegList() {
   const lb = msLaborTotal(), ar = msArbTotal();
   return [
-    { name: '訴訟市場（任一造，含上訴審）', cls: 'ms-c', v: msLitTotal(), include: true },
+    { name: '訴訟市場（全口徑，含上訴審）', cls: 'ms-c', v: msLitFull(), include: true },
     { name: '商標專利', cls: 'ms-c', v: msPairTotal('ip'), include: true },
     { name: '地政士', cls: 'ms-c', v: msPairTotal('landagent'), include: true },
     { name: '常年法顧（模型引用）', cls: 'ms-c', v: msRetainer(), include: true },
@@ -14112,13 +14112,12 @@ function msRecalc() {
   const gov = msGovLatest();
   const ip = msIpSplit();
   const bars = segs.map(s => ({ name: s.name, cls: s.cls, lo: s.v.lo, hi: s.v.hi, mid: s.v.mid }))
-    .concat([{ name: '訴訟全口徑（對照，不計入）', cls: 'ms-c', lo: ltf.lo, hi: ltf.hi, mid: ltf.mid }])
     .concat(gov ? [{ name: '政府標案（對照，不計入）', cls: 'ms-a', lo: +gov.amount / 1e8, hi: +gov.amount / 1e8, mid: +gov.amount / 1e8 }] : [])
     .sort((a, b) => b.mid - a.mid);
   // 同條雙色堆疊：訴訟＝自費｜法扶酬金、商標專利＝專利｜商標（依中位占比切分色帶）
   const litBar = bars.find(b => b.name.indexOf('訴訟市場') === 0);
   if (litBar) litBar.parts = [
-    { label: '自費', mid: lt.mid - lt.laf.mid, color: 'var(--gold)' },
+    { label: '自費（含兩造加成）', mid: ltf.mid - lt.laf.mid, color: 'var(--gold)' },
     { label: '法扶酬金', mid: lt.laf.mid, color: '#5fc9e7' }];
   const ipBar = bars.find(b => b.name.indexOf('商標專利') === 0);
   if (ipBar) ipBar.parts = [
@@ -14142,31 +14141,23 @@ function msRecalc() {
       '<div class="ms-bar-mid" style="left:' + m.toFixed(2) + '%;background:' + colorOf(b) + ';"></div></div>' +
       '<div style="white-space:nowrap;">' + _msFmtE(b.lo) + ' – ' + _msFmtE(b.hi) + '</div></div>';
   }).join('') +
-  '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">雙色列（懸停看金額）：訴訟市場＝自費｜<span style="color:#5fc9e7;">■ 法扶酬金</span>；商標專利＝專利｜<span style="color:#9b7ef7;">■ 商標</span>（依中位占比切分）。</div>';
+  '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">雙色列（懸停看金額）：訴訟市場＝自費（含兩造加成）｜<span style="color:#5fc9e7;">■ 法扶酬金</span>；商標專利＝專利｜<span style="color:#9b7ef7;">■ 商標</span>（依中位占比切分）。</div>';
   // KPI + 對帳
   const gt = msGrandTotal();
-  const topLine = msLitRows().sort((a, b) => b.mid - a.mid)[0];
   document.getElementById('msKpis').innerHTML =
-    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(gt.mid) + '｜訴訟以任一造保守計入</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(gt.mid) + '｜訴訟以全口徑計入（兩造各付）</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);font-size:1.35rem;">' + (gt.lo / 408.69 * 100).toFixed(0) + ' – ' + (gt.hi / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">中位 ' + (gt.mid / 408.69 * 100).toFixed(0) + '%；普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造）</div><div class="kpi-value" style="font-size:1.35rem;">' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(lt.mid) + '｜最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">訴訟全口徑</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(ltf.mid) + '｜署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟市場（全口徑）</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(ltf.mid) + '｜署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>';
   document.getElementById('msCaliberStrip').innerHTML =
-    (function () {
-      const gf = { lo: gt.lo - lt.lo + ltf.lo, hi: gt.hi - lt.hi + ltf.hi, mid: gt.mid - lt.mid + ltf.mid };
-      const pct = v => (v / 408.69 * 100).toFixed(0);
-      return '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
-        '&#128257; <strong style="color:var(--text);">同一張總表、兩種訴訟口徑</strong>：' +
-        '<strong style="color:var(--gold);">保守版 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</strong>（中位 ' + _msFmtE(gt.mid) + '；訴訟只算一份委任＝任一造 ' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '）＝普查 ' + pct(gt.lo) + ' – ' + pct(gt.hi) + '%　&#8596;　' +
-        '<strong style="color:var(--gold);">全口徑版 ' + _msFmtE(gf.lo) + ' – ' + _msFmtE(gf.hi) + '</strong>（中位 ' + _msFmtE(gf.mid) + '；訴訟算兩造各付＝' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）＝普查 ' + pct(gf.lo) + ' – ' + pct(gf.hi) + '%。' +
-        '普查 409 億＝2021 年<strong>整個法律服務業</strong>（律師＋地政士＋專利商標＋公證，含非訟/法顧）收入——對帳對象是合計卡，不是訴訟單項；差額＝案件統計看不到的非訟市場＋4 年時間差。</div>';
-    })();
+    '<div style="font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
+    '&#128257; <strong style="color:var(--text);">口徑說明</strong>：訴訟市場以<strong>全口徑</strong>計入合計——兩造各自委任各算一份，由委任案基準（任一造 ' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '）× 付費造數係數推得，另以<strong>署名件法</strong>（署名量 × 有效單價＝' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '）獨立驗證，兩法交集帶約 150 – 270 億。' +
+    '普查 409 億＝2021 年<strong>整個法律服務業</strong>（律師＋地政士＋專利商標＋公證，含非訟/法顧）收入；本頁合計可能超過普查，因為量體是 2025 年（署名量 4 年 +50%、市場實質擴張），與普查未拆出的非訟缺口互相抵銷。</div>';
   document.getElementById('msRecon').innerHTML =
-    'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '，訴訟以任一造保守口徑計入），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
+    'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '，訴訟以全口徑計入），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
     '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，且本站署名量 2021→2025 <strong>+50%</strong>（出庭律師僅 +17%），市場在真實擴張，比較時心裡先打個折。<br>' +
     '・<strong>已排除的重複計算</strong>：勞資訴訟端（已含於訴訟市場勞動僱傭線）、政府標案（與非訟/法顧重疊、僅列對照）；法扶件按<strong>法扶酬金</strong>計價，與普查口徑一致。<br>' +
-    '・<strong>訴訟全口徑（2026-09 新增）</strong>：委任率「任一造」口徑＝雙方委任只算一份，乘付費造數係數後全口徑 <strong style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</strong>（' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）；獨立的<strong>署名件法</strong>（署名量 × 有效單價）驗證得 <strong>' + _msFmtE(lts.mid) + '</strong>（' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '）——兩法交集，訴訟服務年支出合理帶約 <strong>150 – 270 億、中間帶 ~200 億</strong>。合計卡維持保守口徑以利與普查對帳。<br>' +
+    '・<strong>訴訟＝全口徑（2026-09 起）</strong>：委任案基準（任一造＝雙方委任只算一份）' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '，乘付費造數係數後全口徑 <strong style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</strong>（' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）直接計入合計；獨立的<strong>署名件法</strong>（署名量 × 有效單價）驗證得 <strong>' + _msFmtE(lts.mid) + '</strong>（' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '）——兩法交集，訴訟服務年支出合理帶約 <strong>150 – 270 億、中間帶 ~200 億</strong>。<br>' +
     '・<strong>頭部 vs 長尾（2026-09 快照）</strong>：AI 深度分析 398 家（前 300 大全覆蓋）推估合計 ~174 億，但僅佔 2025 全市場署名案量 <strong>28%</strong>；其餘 <strong>72%</strong>（約 22.7 萬件）由約 <strong>8,200 位</strong>長尾出庭律師交付（人均案量 27.7 件 ≈ 頭部 30.6），試算 130 – 240 億——頭尾合計約 300 – 410 億，與普查量級相容。頭部溢價在單價與非訟，不在案量。<br>' +
     '・<strong>缺口＝沒被案件統計看見的市場</strong>：非訟文件與意見書、盡職調查、契約審閱、家事非訟、強制執行代理、刑事偵查階段辯護、談判與法遵顧問——bottom-up 與普查的差額大致就是這一塊加上單價假設的誤差。';
 }
