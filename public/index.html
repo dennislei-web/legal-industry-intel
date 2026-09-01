@@ -1748,7 +1748,7 @@
             1. 普查行業 691「法律服務業」＝律師＋<strong>地政士＋專利商標代理＋公證人</strong>事務所的合計，「律師業佔比」無官方拆分（本頁用拉桿處理）。<br>
             2. <strong>營業稅資料不適用</strong>：律師為執行業務者免辦營業登記，財政部稅籍「律師事務服務」細類 112 年僅 5 家、年銷售額 4,400 萬——那是極少數公司化登記的法律服務公司，不是律師業。<br>
             3. 執行業務者（9A）所得統計<strong>不分業別公開</strong>，無法從報稅資料直接得出律師業總收入。<br>
-            4. 需求端對照：全國 13,000+ 執業登錄律師中約 1,400 位登錄在企業／機構內（見 本區＞企業法務雷達）——金融業 in-house 化最深，一般產業絕大多數企業無內部律師，法務需求必然外包。
+            4. 需求端對照：全國 13,000+ 執業登錄律師中約 1,400 位登錄在企業／機構內（見 本區＞企業版圖＞企業法務雷達）——金融業 in-house 化最深，一般產業絕大多數企業無內部律師，法務需求必然外包。
           </div>
         </div>
       </div>
@@ -2255,6 +2255,14 @@
 
     <!-- ==================== TAB: CORPMAP (企業客戶版圖，mig 112/113：corp_* 表＋MV＋RPC) ==================== -->
     <div id="tab-corpmap" class="tab-content">
+      <!-- 企業版圖（2026-09-01 合併 企業客戶版圖＋企業法務雷達）：同一企業端視角的兩個口徑——
+           外部委任（裁判書：公司當事人×代理律師）／內部法務（名冊：登錄在企業的律師） -->
+      <div id="corpSubTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="sub-tab-btn active" data-corp="clients" onclick="switchCorpTab('clients')">企業客戶版圖（外部委任）</button>
+        <button class="sub-tab-btn" data-corp="inhouse" onclick="switchCorpTab('inhouse')">企業法務雷達（內部法務）</button>
+      </div>
+
+      <div id="tab-corp-clients" class="corp-subpanel">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         從裁判書（<strong>2020-01 ～ 2026-04</strong>，民事＋行政）反推「哪些事務所手上有最多<strong>企業客戶</strong>」——公司當事人歸戶 × 具名代理律師 × 現職事務所。另附<strong>無代理缺口榜</strong>：常訟卻幾乎不請律師的公司＝法顧／委任滲透率缺口的 BD 訊號。點事務所、律師、公司名都可下鑽。
       </div>
@@ -2338,10 +2346,10 @@
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
         ※ 資料源：本站裁判書月包（scripts/corp_party_stats.py 解析，2020-01～2026-04 民事＋行政），公司名已正規化歸戶（去空白／括號註記、臺→台）；「代表企業客戶」取各所案件量前 5。排行以 materialized view 預聚合（mig 113），資料回填後需執行 refresh_corp_ranking() 更新。2026-07-29 已用修正版 parser（只抽當事人欄、名稱驗證）全量重解析 76 個月並重建，現為公司×年 21.1 萬列、公司×律師配對 23.0 萬列；已知殘量：極少數公司名帶「債」等前綴、同名歸戶混同（見警語）。裁判書未具名的程序（和解、調解、未公開裁判）不在內，屬<strong>下限口徑</strong>。
       </div>
-    </div>
+      </div><!-- /tab-corp-clients -->
 
-    <!-- ==================== TAB: INHOUSE (企業法務雷達，migration 096：inhouse_* RPC) ==================== -->
-    <div id="tab-inhouse" class="tab-content">
+      <!-- 企業法務雷達（migration 096：inhouse_* RPC；2026-09-01 併入企業版圖） -->
+      <div id="tab-corp-inhouse" class="corp-subpanel" style="display:none;">
       <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
         從法務部名冊反查登錄在<strong>企業／金融／機構</strong>（而非事務所）的執業律師。⚠️ 僅計「保留執業登錄」者＝<strong>嚴重下限</strong>（多數企業法務不維持登錄）；價值在「誰在養登錄律師」的雇主雷達與世代結構訊號。雇主名已歸戶（統一(股)公司寫法、合併分公司/分會）。
       </div>
@@ -2365,6 +2373,7 @@
           <div id="ihMoves" style="max-height:340px;overflow-y:auto;padding-right:4px;"></div>
         </div>
       </div>
+      </div><!-- /tab-corp-inhouse -->
     </div>
 
     <!-- ==================== TAB: CHANGES (異動追蹤) ==================== -->
@@ -4077,7 +4086,7 @@ async function loadOverviewFast() {
 // ============================================================
 // 2026-09-01 IA 重整（P1）：8 區收成 6 區——
 //   檢察官＋書記官 併入「司法人員」（原法官區）；懲戒彈劾併入異動追蹤tab；
-//   企業客戶版圖/企業法務雷達 移到 產業分析（需求端組）；
+//   企業客戶版圖/企業法務雷達 移到 產業分析（需求端組；2026-09-01 再合併為「企業版圖」單一 tab 雙 corp-subpanel）；
 //   喆律校友會/010/深度報告/併購觀察 集中到 admin-only「喆律戰情」區；
 //   資料來源＋帳號管理 收成「系統」區。tab-content div 全是同層 siblings，搬移只改本表。
 const SECTIONS = {
@@ -4105,13 +4114,13 @@ const SECTIONS = {
     { tab: 'jstat-topics', label: '案件專題' },
   ],
   // 產業分析分兩組呈現（group 變化時 render 插入分隔）：
-  //   訴訟與需求端（常看）／鄰接市場（年更、低頻）＋人力供給
+  //   市場與需求端（常看；產值總覽居首、訴訟量次之——2026-09-01 調序）／鄰接市場（年更、低頻）＋人力供給
+  //   企業版圖＝原「企業客戶版圖」＋「企業法務雷達」合併（頁內 corp-subpanel 雙視角）
   industry: [
-    { tab: 'domain', label: '訴訟市場', group: '訴訟與需求端' },
-    { tab: 'value', label: '產值與市場', group: '訴訟與需求端' },
-    { tab: 'corpmap', label: '企業客戶版圖', group: '訴訟與需求端' },
-    { tab: 'inhouse', label: '企業法務雷達', group: '訴訟與需求端' },
-    { tab: 'govtender', label: '政府標案', group: '訴訟與需求端' },
+    { tab: 'value', label: '產值與市場', group: '市場與需求端' },
+    { tab: 'domain', label: '訴訟市場', group: '市場與需求端' },
+    { tab: 'corpmap', label: '企業版圖', group: '市場與需求端' },
+    { tab: 'govtender', label: '政府標案', group: '市場與需求端' },
     { tab: 'supply', label: '供給預測', group: '鄰接市場與人力' },
     { tab: 'laf', label: '法扶市場', group: '鄰接市場與人力' },
     { tab: 'adr', label: '調解與仲裁', group: '鄰接市場與人力' },
@@ -4177,8 +4186,8 @@ function showTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
-  // 圖表分頁頁頂章節索引（domain/topics/changes 走子分頁、由各自 switcher 產生）
-  if (content && tab !== 'domain' && tab !== 'jstat-topics' && tab !== 'changes') buildSectionIndex(content);
+  // 圖表分頁頁頂章節索引（domain/topics/changes/corpmap 走子分頁、由各自 switcher 產生）
+  if (content && tab !== 'domain' && tab !== 'jstat-topics' && tab !== 'changes' && tab !== 'corpmap') buildSectionIndex(content);
   document.querySelectorAll('#subTabsBar .tab-btn').forEach(btn =>
     btn.classList.toggle('active', btn.id === 'tabBtn_' + tab));
 
@@ -4204,8 +4213,7 @@ function showTab(tab) {
   if (tab === 'deepreport') loadDeepReportOnce();
   if (tab === 'offices') loadOffices();
   if (tab === 'changes') { initChgTab(); loadChanges(); loadFirmFlow(); }
-  if (tab === 'inhouse') loadInhouseOnce();
-  if (tab === 'corpmap') loadCorpmapOnce();
+  if (tab === 'corpmap') initCorpTab();  // 企業版圖：clients/inhouse 由 switchCorpTab 各自 lazy load
   if (tab === 'alumni' && isAdmin) loadAlumni();
   if (tab === 'law010' && isAdmin) loadLaw010();
   if (tab === 'judges') loadJudges();
@@ -4628,6 +4636,7 @@ window.gotoTab = function(sec, tab, sub) {
   // 第三參數：直達三層子分頁（訴訟市場 domain-subpanel / 案件專題 jstat-subpanel）
   if (sub && tab === 'domain' && typeof switchDomainTab === 'function') switchDomainTab(sub);
   if (sub && tab === 'jstat-topics' && typeof switchJstatTopic === 'function') switchJstatTopic(sub);
+  if (sub && tab === 'corpmap' && typeof switchCorpTab === 'function') switchCorpTab(sub);
 };
 
 // ===== 全站搜尋（IA 重整 P3-1）：header 一框搜 律師/法官/檢察官/事務所，點擊開對應 modal =====
@@ -9696,7 +9705,7 @@ const SOURCE_PAGES = {
     { sec: 'lawyer', tab: 'lawyers', label: '律師＞律師名錄（名冊主源）' },
     { sec: 'lawyer', tab: 'offices', label: '律師＞事務所名錄' },
     { sec: 'lawyer', tab: 'changes', label: '律師＞事務所異動追蹤' },
-    { sec: 'industry', tab: 'inhouse', label: '產業分析＞企業法務雷達' },
+    { sec: 'industry', tab: 'corpmap', label: '產業分析＞企業版圖（法務雷達）' },
     { sec: 'zhelu', tab: 'alumni', label: '喆律戰情＞喆律校友會' },
   ],
   '全聯會律師名單': [
@@ -12537,6 +12546,26 @@ const cmLwLink = n => `<a href="#" onclick="showCorpLawyer('${cmQ(n)}');return f
 const cmKindBadge = k => k === 'org'
   ? '<span style="font-size:0.72rem;color:var(--purple,#9b7ef7);border:1px solid var(--purple,#9b7ef7);border-radius:10px;padding:1px 6px;">法人</span>'
   : '<span style="font-size:0.72rem;color:var(--blue);border:1px solid var(--blue);border-radius:10px;padding:1px 6px;">企業</span>';
+
+// 企業版圖頁內 sub-tab（2026-09-01 合併）：clients=企業客戶版圖（外部委任）/ inhouse=企業法務雷達（內部法務）
+let _corpTabInit = false;
+const CORP_SUBTABS = ['clients', 'inhouse'];
+function initCorpTab() {
+  if (_corpTabInit) return; _corpTabInit = true;
+  switchCorpTab(CORP_SUBTABS.includes(navState.corp) ? navState.corp : 'clients');
+}
+window.switchCorpTab = function(k) {
+  navState.corp = k;
+  saveNavState();
+  document.querySelectorAll('#corpSubTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.corp === k));
+  CORP_SUBTABS.forEach(t => {
+    const el = document.getElementById('tab-corp-' + t);
+    if (el) el.style.display = (t === k) ? 'block' : 'none';
+  });
+  if (k === 'clients') loadCorpmapOnce();
+  else if (k === 'inhouse') loadInhouseOnce();
+  buildSectionIndex(document.getElementById('tab-corp-' + k));
+};
 
 async function loadCorpmapOnce() {
   if (_cmLoaded) return;
