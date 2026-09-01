@@ -167,6 +167,11 @@
     .gs-item .gs-sub { font-size: 0.72rem; color: var(--text-muted); }
     .gs-note { padding: 10px 14px; color: var(--text-muted); font-size: 0.82rem; }
 
+    /* 司法統計總覽＞深度文章入口卡（IA 重整 P3-2） */
+    .jstat-article-card { display: block; padding: 14px 16px; background: var(--bg-main); border: 1px solid var(--border);
+      border-radius: 10px; text-decoration: none; color: var(--text); transition: border-color .15s, transform .15s; }
+    .jstat-article-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+
     .theme-toggle {
       background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text-muted);
       width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -2999,6 +3004,34 @@
       <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.7;margin:4px 0 20px;">
         口徑：各級法院合計、開放資料原生案類。「民事」含訴訟／非訟（支付命令等）／督促保全調解，不含執行；「強制執行」＝民事執行處全部程序（含併案、保全執行，比月報「強制執行」寬約 5–7%）；
         最高法院新收在來源恆為 0（僅填終結），故民事／刑事未含三審新收；公證、提存、憲法法庭、公設辯護等非裁判業務不在本資料集（總量比月報口徑少約 5%）。
+      </div>
+
+      <!-- 深度文章入口（IA 重整 P3-2）：三層直達 案件專題 各 subpanel 的 AI 深度分析 -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">&#128214; 深度文章 — 十年司法數據解讀</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:10px;">
+          <a href="#" class="jstat-article-card" onclick="gotoTab('jstat','jstat-topics','civil');return false;">
+            <div style="font-weight:700;font-size:0.9rem;">民事案件</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px;line-height:1.6;">十年來的社會訊號 — 損害賠償與借貸訴訟的結構翻轉</div>
+            <div style="font-size:0.75rem;color:var(--blue);margin-top:8px;">閱讀全文 →</div>
+          </a>
+          <a href="#" class="jstat-article-card" onclick="gotoTab('jstat','jstat-topics','family');return false;">
+            <div style="font-weight:700;font-size:0.9rem;">家事案件</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px;line-height:1.6;">高齡化浪潮與家庭關係的轉變</div>
+            <div style="font-size:0.75rem;color:var(--blue);margin-top:8px;">閱讀全文 →</div>
+          </a>
+          <a href="#" class="jstat-article-card" onclick="gotoTab('jstat','jstat-topics','criminal');return false;">
+            <div style="font-weight:700;font-size:0.9rem;">刑事案件</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px;line-height:1.6;">台灣犯罪型態的世代交替</div>
+            <div style="font-size:0.75rem;color:var(--blue);margin-top:8px;">閱讀全文 →</div>
+          </a>
+          <a href="#" class="jstat-article-card" onclick="gotoTab('jstat','jstat-topics','enforcement');return false;">
+            <div style="font-weight:700;font-size:0.9rem;">強制執行</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px;line-height:1.6;">社會信用體系的最後防線</div>
+            <div style="font-size:0.75rem;color:var(--blue);margin-top:8px;">閱讀全文 →</div>
+          </a>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">AI 洞察文章，位於「案件專題」各分頁圖表之後；點卡片直達對應專題。</div>
       </div>
       <!-- 靜態舊版（統計月報 104-114、年更）：與上方動態版並列比對中，經使用者核可後移除 -->
       <div class="card" style="margin-bottom:16px;border-left:3px solid var(--orange);">
@@ -16110,7 +16143,12 @@ async function showCourtDetail(name) {
     const tabBuilders = {
         overview: buildOverviewCharts,
         organs: (d) => { buildOrganCharts(d); buildEfficiencyCharts(d); },
-        topics: (d) => { jstatTopicData = d; switchJstatTopic('civil'); },
+        // 首建時尊重當前 active 子分頁（gotoTab 三層直達可能已先切走，勿硬蓋回 civil）
+        topics: (d) => {
+            jstatTopicData = d;
+            const cur = document.querySelector('#jstat_topicTabs .sub-tab-btn.active')?.dataset.topic || 'civil';
+            switchJstatTopic(cur);
+        },
     };
 
 
