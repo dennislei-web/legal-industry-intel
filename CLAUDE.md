@@ -186,10 +186,23 @@
   8s statement_timeout（函數層 SET 蓋不掉已武裝的頂層計時器），只能走
   `supabase db query`**；單月增量 ~5s 可走 RPC——refresh_stats() 的
   `refresh_firm_dedup()` 與 groupfill CI 都逐月打單月版
-- 回填：`judgment-groupfill.yml`（202101–202504 分 5 shard）；月更 run 自動增量。
-  `python judgment_stats.py groupfill <起> <迄>` 冪等（已上傳月跳過）
-- **下游尚未接**（2026-09-01 報告後待使用者確認）：firm_analysis_facts.cases_5y/avg_cases、
-  儀表板產業結構、firm_cause_shares footnote、ai_analysis 文字、concentration 重分桶
+- 回填：`judgment-groupfill.yml`（202101–202504 分 5 shard＋202505–202605 補 2 shard，
+  月更 run 自動增量）。`python judgment_stats.py groupfill <起> <迄>` 冪等（已上傳月跳過）。
+  ⚠️ **名目端是從 lawyer_month_stats 全期灌的**：firm_dedup_month_stats 的 ym 涵蓋
+  ＝lawyer_month_stats 全月份（202101 起），group 素材沒到的月 dup=0、dedup=名目——
+  驗收要看 lawyer_group_month_stats 的 distinct ym 數（=名目資料月數），不是 dedup cache 表
+- **下游已接（2026-09-01，mig 188）**：
+  - `firm_dedup_totals` view（所級跨月合計，security_invoker）——facts_extract 與前端 AI tab 都讀它
+  - `firm_analysis_facts`：cases_5y 語意改「202101 起去重合計」（無歸戶時退回 AI 文名目值）、
+    avg_cases 改年化去重人均；新欄 cases_nominal/dup_rate/dedup_months（全窗月數，年化分母）。
+    源頭 scripts/_batch408/v2/facts_extract.py＋upload_facts.py 已同步改（重灌不會蓋回舊口徑）
+  - concentration 重分桶：dup_rate≥40% 時按 top1 署名占比（lawyers_with_stats 名目）分
+    掛名制度（top1≥40%）vs 協作型大所（分散），<40% 沿用 AI 文字啟發式
+  - 前端：產業結構區/deepreport 案量改讀去重＋年化分母用 dedup_months；事務所 modal
+    訴訟戰力卡合計改去重（名目留 footnote）、近 10 年趨勢 2021 起 dedup 序列（2021 前名目藍灰柱）；
+    firm_cause_shares 利基卡加名目口徑 footnote（案由層無去重素材，勿做案由層去重）；
+    AI 分析 tab 頂部加去重 banner（重複率 ≥30% 加強警示）
+  - **未做**：ai_analysis 文字批次重寫（擇機，dup_rate>30% 的所優先——前端 banner 已先擋）
 
 ## 訴訟客戶集中度（migration 071）
 

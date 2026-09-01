@@ -895,7 +895,7 @@
           <div class="kpi-card">
             <div class="kpi-label">掛名制度比例</div>
             <div class="kpi-value" id="isKpiGuaming">-</div>
-            <div class="kpi-sub">5 人以上所（啟發式抽取）</div>
+            <div class="kpi-sub" title="同判決同所共同署名重複率 ≥40% 且案量集中於 top1 律師者判掛名；重複率高但分散者為協作型大所，不算掛名">5 人以上所（重複率×集中度）</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-label">接班風險亮燈</div>
@@ -925,7 +925,7 @@
             <tbody id="isTypeTable"></tbody>
           </table></div>
         </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑：營收=訴訟行情公式＋可觀測非訟訊號推估（企業非訟型真實非訟收入不可見故低估）；掛名/接班為分析文字啟發式抽取，僅呈現聚合；資料集 firm_analysis_facts 隨分析批次重灌。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑：營收=訴訟行情公式＋可觀測非訟訊號推估（企業非訟型真實非訟收入不可見故低估）；案量為<strong>去重口徑</strong>（同判決同所共同署名只計 1 件，2021/01 起合計，mig 186）；掛名=署名重複率×top1 集中度判定，接班為分析文字啟發式抽取，僅呈現聚合；資料集 firm_analysis_facts 隨分析批次重灌。</div>
       </div>
       <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；ids/loader 不變） -->
       <div class="card" style="margin-bottom:16px;">
@@ -2521,7 +2521,7 @@
         <div class="table-wrap" style="max-height:520px;overflow-y:auto;"><table>
           <thead><tr id="drB2cHead">
             <th data-k="firm">事務所</th><th data-k="region">地區</th><th data-k="lawyer_count" style="text-align:right;">人數</th>
-            <th data-k="cases_5y" style="text-align:right;">近5年案量</th><th data-k="percase" style="text-align:right;">年人均</th>
+            <th data-k="cases_5y" style="text-align:right;" title="同判決同所共同署名去重後的 distinct 判決數，2021/01 起合計（mig 186）">案量(去重)</th><th data-k="percase" style="text-align:right;">年人均</th>
             <th data-k="rev" style="text-align:right;">推估營收(萬/年)</th><th data-k="percap" style="text-align:right;">人均(萬)</th>
             <th data-k="ads" style="text-align:center;">廣告碼</th><th data-k="g_reviews" style="text-align:right;">評論</th><th data-k="founded_year" style="text-align:right;">成立</th>
           </tr></thead>
@@ -2547,11 +2547,12 @@
             <div id="drPremNote" style="display:none;font-size:0.7rem;color:var(--text-muted);margin-top:6px;"></div>
           </div>
         </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:8px;">※ 利基占比（firm_cause_shares）為<strong>名目署名口徑</strong>——案由層無同判決共同署名的去重素材，同所多人共同署名各計 1 件；占比分子分母同口徑，比例仍可比，件數絕對值偏高。</div>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#129504; 戰略意涵</div>
         <div style="font-size:0.84rem;line-height:2;" id="drInsights"></div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">口徑：營收＝訴訟行情公式＋可觀測非訟推估（非財報）；廣告碼掃描僅及官網主域（站外品牌站不可見）；資料集 firm_analysis_facts 隨分析批次重灌。本頁 admin 限定。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">口徑：營收＝訴訟行情公式＋可觀測非訟推估（非財報）；案量為去重口徑（同判決同所共同署名只計 1 件，2021/01 起合計）；廣告碼掃描僅及官網主域（站外品牌站不可見）；資料集 firm_analysis_facts 隨分析批次重灌。本頁 admin 限定。</div>
       </div>
     </div>
     <div id="tab-alumni" class="tab-content">
@@ -6884,6 +6885,23 @@ async function showFirmDetail(firmName) {
     }
   } catch (e) { console.log('firm official stats error:', e); }
 
+  // 所級去重案量（mig 186）：同判決同所共同署名只計 1 件；firm_key 截到第一個
+  // 「法律/律師事務所」（分所合併，口徑同 refresh_firm_dedup_stats）；素材 2021/01 起
+  let dedupRows = [];
+  try {
+    const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
+    const { data: ddr } = await db.from('firm_dedup_month_stats')
+      .select('ym,nominal_cases,dup_cases,dedup_cases').eq('firm_key', fk).range(0, 199);
+    dedupRows = ddr || [];
+  } catch (e) { console.log('firm dedup stats error:', e); }
+  const dedupByYear = {}, dedupTot = { nominal: 0, dedup: 0 };
+  dedupRows.forEach(r => {
+    const y = r.ym.slice(0, 4);
+    const o = (dedupByYear[y] = dedupByYear[y] || { nominal: 0, dedup: 0 });
+    o.nominal += r.nominal_cases; o.dedup += r.dedup_cases;
+    dedupTot.nominal += r.nominal_cases; dedupTot.dedup += r.dedup_cases;
+  });
+
   // 上市櫃獨董席次（含分所，firm_indep_directorships view 已過濾為覆核確認者）
   let firmIndep = [];
   try {
@@ -6926,7 +6944,8 @@ async function showFirmDetail(firmName) {
   const litTotal = litAgg5.total;
   _firmLit = {
     names: litLawyers.map(s => s.name),
-    agg5: litAgg5, totalLawyers: allLawyers.length, yearRows: null
+    agg5: litAgg5, totalLawyers: allLawyers.length, yearRows: null,
+    dedupByYear, dedupTot: dedupRows.length ? dedupTot : null
   };
 
   // 統計
@@ -7093,7 +7112,7 @@ async function showFirmDetail(firmName) {
         </select>
         <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400;">公開裁判書下限估計；同名律師不計入</span>
       </div>
-      <div style="font-size:0.72rem;color:var(--text-muted);margin:-4px 0 10px;line-height:1.5;">※ 按<strong>現任名冊</strong>回溯：轉入律師帶入其過往案量、已離所者不計；年份切得越早，與「當年實際陣容」落差越大。</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin:-4px 0 10px;line-height:1.5;">※ 按<strong>現任名冊</strong>回溯：轉入律師帶入其過往案量、已離所者不計；年份切得越早，與「當年實際陣容」落差越大。合計案量為<strong>去重口徑</strong>（同一裁判書多位本所律師共同署名只計 1 件，素材 2021/01 起）；律師個人數字與 Top1/Top3 依賴度仍為名目署名口徑。</div>
       <div id="firmLitBody"></div>
       <div id="firmLitTrend"></div>
       <div id="firmLitMoves"></div>
@@ -7493,7 +7512,11 @@ function renderFirmLitTrend() {
   for (let y = thisYear - 9; y <= thisYear; y++) years.push(String(y));
   const byYear = {};
   _firmLit.yearRows.forEach(r => { byYear[r.yr] = r; });
-  const vals = years.map(y => byYear[y]?.total || 0);
+  // 2021 起改用去重序列（同判決同所共同署名只計 1 件）；2021 前無去重素材維持名目、另色標示
+  const ddY = _firmLit.dedupByYear || {};
+  const isDedup = years.map(y => !!ddY[y]?.dedup);
+  const vals = years.map((y, i) => isDedup[i] ? ddY[y].dedup : (byYear[y]?.total || 0));
+  const nomVals = years.map(y => ddY[y]?.nominal ?? (byYear[y]?.total || 0));
   const nLaw = years.map(y => byYear[y]?.n_lawyers || 0);
   if (!vals.some(v => v > 0)) { el.innerHTML = ''; return; }
 
@@ -7504,12 +7527,12 @@ function renderFirmLitTrend() {
   el.innerHTML = `
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
       <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span>近 10 年出庭量趨勢</span>
+        <span>近 10 年案量趨勢${isDedup.some(Boolean) ? '（2021 起為去重值）' : ''}</span>
         ${yoy !== null ? `<span class="badge" style="color:${yoy >= 0 ? 'var(--green)' : 'var(--orange)'};">${years[iLast]} 年 ${yoy >= 0 ? '+' : ''}${yoy}% vs ${years[iLast - 1]}</span>` : ''}
         <span style="font-size:0.7rem;">點長條可切換上方年度</span>
       </div>
       <div class="chart-container" style="height:190px;"><canvas id="firmLitTrendChart"></canvas></div>
-      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">※ ${thisYear} 年為未滿年度（裁判書開放資料約落後 2 個月），不宜與往年直接比較；早年數字同樣按<strong>現任名冊</strong>回溯。本圖為<strong>曆年</strong>口徑，上方「近 5 年」為資料最新月往前滾動 60 個月，兩者加總不會相等。</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">※ ${thisYear} 年為未滿年度（裁判書開放資料約落後 2 個月），不宜與往年直接比較；早年數字同樣按<strong>現任名冊</strong>回溯。${isDedup.some(Boolean) ? '2021 起為<strong>去重案量</strong>（同判決本所多人共同署名只計 1 件）、2021 前為名目值（藍灰柱），跨這條線比較會低估成長。' : ''}本圖為<strong>曆年</strong>口徑，上方「近 5 年」為資料最新月往前滾動 60 個月，兩者加總不會相等。</div>
     </div>`;
 
   const ctx = document.getElementById('firmLitTrendChart')?.getContext('2d');
@@ -7522,7 +7545,8 @@ function renderFirmLitTrend() {
       labels: years,
       datasets: [{
         data: vals,
-        backgroundColor: years.map(y => isPartial(y) ? 'rgba(201,168,76,0.25)' : 'rgba(201,168,76,0.65)'),
+        backgroundColor: years.map((y, i) => isPartial(y) ? 'rgba(201,168,76,0.25)'
+          : (isDedup[i] || !isDedup.some(Boolean)) ? 'rgba(201,168,76,0.65)' : 'rgba(136,153,170,0.45)'),
         borderColor: years.map(y => isPartial(y) ? 'rgba(201,168,76,0.6)' : 'transparent'),
         borderWidth: years.map(y => isPartial(y) ? 1 : 0),
         borderRadius: 4
@@ -7542,7 +7566,9 @@ function renderFirmLitTrend() {
         tooltip: {
           callbacks: {
             title: items => items[0].label + ' 年' + (isPartial(items[0].label) ? '（未滿年度）' : ''),
-            label: c => `出庭 ${Number(c.parsed.y).toLocaleString()} 件`,
+            label: c => isDedup[c.dataIndex]
+              ? `去重 ${Number(c.parsed.y).toLocaleString()} 件（名目 ${Number(nomVals[c.dataIndex]).toLocaleString()}）`
+              : `出庭 ${Number(c.parsed.y).toLocaleString()} 件（名目）`,
             afterLabel: c => nLaw[c.dataIndex] ? `有出庭律師 ${nLaw[c.dataIndex]} 位` : ''
           }
         }
@@ -7570,12 +7596,23 @@ function renderFirmLitBody(mode) {
     el.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px 0;">該年度無公開裁判書出庭紀錄</div>';
     return;
   }
+  // 去重案量（mig 186）：5yr 模式的去重窗＝2021/01 起（素材起點，非滾動 60 月）；
+  // 年份模式取該年；2021 前或查無歸戶＝只有名目值
+  const dd = _firmLit.dedupTot ? (mode === '5yr' ? _firmLit.dedupTot : _firmLit.dedupByYear?.[mode]) : null;
+  const caseCell = dd && dd.dedup
+    ? `<div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" title="同一裁判書多位本所律師共同署名只計 1 件（distinct 判決數）">合計案量（去重）${mode === '5yr' ? '<span style="font-size:0.65rem;">2021/01 起</span>' : ''}</div>
+          <div style="font-size:1.6rem;font-weight:700;color:var(--gold);">${dd.dedup.toLocaleString()}</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);">名目（律師人次）${dd.nominal.toLocaleString()}・重複率 ${dd.nominal ? Math.round((dd.nominal - dd.dedup) * 100 / dd.nominal) : 0}%${mode === '5yr' ? `｜近 5 年名目 ${agg.total.toLocaleString()}` : ''}</div>
+        </div>`
+    : `<div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">合計出庭<span style="font-size:0.65rem;">（名目）</span></div>
+          <div style="font-size:1.6rem;font-weight:700;color:var(--gold);">${agg.total.toLocaleString()}</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);">此${mode === '5yr' ? '所' : '年'}無去重素材（2021/01 起才有），同判決共同署名各計 1 件</div>
+        </div>`;
   el.innerHTML = `
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;">
-        <div>
-          <div style="font-size:0.75rem;color:var(--text-muted);">合計出庭</div>
-          <div style="font-size:1.6rem;font-weight:700;color:var(--gold);">${agg.total.toLocaleString()}</div>
-        </div>
+        ${caseCell}
         <div>
           <div style="font-size:0.75rem;color:var(--text-muted);">有出庭律師</div>
           <div style="font-size:1.6rem;font-weight:700;">${agg.lawyers.length}<span style="font-size:0.85rem;color:var(--text-muted);"> / ${_firmLit.totalLawyers}</span></div>
@@ -7778,9 +7815,22 @@ async function loadFirmAnalysis(firmName) {
   body.innerHTML = '<div class="loading">載入 AI 分析...</div>';
   const { data: profile } = await db.from('firm_profiles').select('ai_analysis, ai_analyzed_at').eq('firm_name', firmName).maybeSingle();
 
+  // 口徑標注（mig 186）：分析文中的案量/營收以名目署名數為基礎；重複率高的所文中數字偏高
+  let dedupBanner = '';
+  try {
+    const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
+    const { data: dt } = await db.from('firm_dedup_totals').select('nominal_total,dup_total,dedup_total').eq('firm_key', fk).maybeSingle();
+    if (dt?.nominal_total) {
+      const pct = Math.round(dt.dup_total * 100 / dt.nominal_total);
+      dedupBanner = `<div style="padding:8px 12px;margin-bottom:12px;border:1px solid ${pct >= 30 ? 'var(--orange)' : 'var(--border)'};border-radius:8px;font-size:0.76rem;line-height:1.6;color:var(--text-muted);">
+        ⚖️ <strong>案量口徑提醒</strong>：本文撰寫時案量為<strong>名目署名數</strong>（同判決本所多人共同署名各計 1 件）。去重後（2021/01 起）：名目 ${dt.nominal_total.toLocaleString()} → <strong style="color:var(--gold);">去重 ${dt.dedup_total.toLocaleString()} 件</strong>（重複率 ${pct}%${pct >= 30 ? '，文中案量/量產結論明顯偏高，請以去重值為準' : ''}）。</div>`;
+    }
+  } catch (e) { /* 無去重資料就不標 */ }
+
   if (profile?.ai_analysis) {
     body.innerHTML = `
       <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;">分析時間: ${formatDate(profile.ai_analyzed_at)}</div>
+      ${dedupBanner}
       <div class="ai-md" style="line-height:1.7;">${renderMarkdown(profile.ai_analysis)}</div>
       <div id="firmBigCasesCard" style="display:none;"></div>
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">
@@ -11996,7 +12046,8 @@ async function loadIndustryStructure() {
       if (!g.length) return '';
       const mRev = med(g.map(r => rev(r)));
       const mPer = med(g.map(r => rev(r) / Math.max(r.lawyer_count || 1, 1)));
-      const mCase = med(g.filter(r => r.cases_5y).map(r => r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / 5));
+      // 去重案量年化：dedup_months=去重口徑全窗月數（202101 起）；無去重歸戶的舊值退回 5 年名目
+      const mCase = med(g.filter(r => r.cases_5y).map(r => r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / (r.dedup_months ? r.dedup_months / 12 : 5)));
       const ads = g.filter(r => r.fb_pixel === 1 || r.google_ads === 1).length;
       return `<tr><td>${escHtml(t)}</td><td style="text-align:right;">${g.length}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(mRev).toLocaleString()}</td><td style="text-align:right;">${Math.round(mPer)}</td><td style="text-align:right;">${Math.round(mCase)}</td><td style="text-align:right;">${ads}</td></tr>`;
     }).join('');
@@ -12066,9 +12117,11 @@ async function loadDeepReportOnce() {
     const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
     const tShare = TYPES.map(t => `${t.replace('型', '')} ${Math.round(100 * top.filter(r => r.type === t).length / top.length)}%`).join('、');
     const exj = top.filter(r => (r.ex_judicial_n || 0) > 0);
+    const concKnown = top.filter(r => r.concentration && r.concentration !== '不明');
+    const concPct = b => concKnown.length ? Math.round(100 * concKnown.filter(r => r.concentration === b).length / concKnown.length) : 0;
     document.getElementById('drRecap').innerHTML =
       `型態組成（5 人以上 ${top.length} 家）：${tShare}。規模化幾乎只發生在企業非訟（30 人以上 12 家中佔 8 家）；` +
-      `掛名制度僅約 12%（真集中 40%、分散 42%）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
+      `掛名制度約 ${concPct('掛名制度')}%（協作型大所 ${concPct('協作型大所')}%、真集中 ${concPct('真集中')}%、分散 ${concPct('分散/非掛名')}%——署名重複率×top1 集中度判定）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
       `頭部市場的數位獲客滲透率不到 5% —— 前 300 大裡真的掛廣告碼的所是極少數。`;
 
     // --- B2C 全解剖 ---
@@ -12077,7 +12130,7 @@ async function loadDeepReportOnce() {
       ...r,
       rev: _drRev(r),
       percap: _drRev(r) != null ? _drRev(r) / Math.max(r.lawyer_count || 1, 1) : null,
-      percase: r.cases_5y ? r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / 5 : null,
+      percase: r.cases_5y ? r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / (r.dedup_months ? r.dedup_months / 12 : 5) : null,
       ads: (r.fb_pixel === 1 ? 1 : 0) + (r.google_ads === 1 ? 1 : 0),
     }));
     const withRev = _drB2c.filter(r => r.rev != null);
@@ -12252,7 +12305,7 @@ function renderDrB2cTable() {
     <td>${firmLink(r.firm, isZheluFirm(r.firm) ? 'font-weight:700;' : '')}</td>
     <td style="font-size:0.76rem;">${escHtml(r.region || '-')}</td>
     <td style="text-align:right;">${r.lawyer_count ?? '-'}</td>
-    <td style="text-align:right;">${r.cases_5y != null ? r.cases_5y.toLocaleString() : '-'}</td>
+    <td style="text-align:right;"${r.cases_nominal != null ? ` title="名目（律師人次）${r.cases_nominal.toLocaleString()} 件、重複率 ${r.dup_rate}%"` : ''}>${r.cases_5y != null ? r.cases_5y.toLocaleString() : '-'}</td>
     <td style="text-align:right;">${r.percase != null ? r.percase.toFixed(0) : '-'}</td>
     <td style="text-align:right;color:var(--gold);">${r.rev != null ? `${r.rev_low_wan.toLocaleString()}–${r.rev_high_wan.toLocaleString()}` : '-'}</td>
     <td style="text-align:right;font-weight:600;">${r.percap != null ? Math.round(r.percap) : '-'}</td>
