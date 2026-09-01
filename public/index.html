@@ -1024,6 +1024,7 @@
         <button class="sub-tab-btn active" data-domain="mkt-trend" onclick="switchDomainTab('mkt-trend')">市場趨勢</button>
         <button class="sub-tab-btn" data-domain="region-market" onclick="switchDomainTab('region-market')">地區供需</button>
         <button class="sub-tab-btn" data-domain="cause-supply" onclick="switchDomainTab('cause-supply')">案由供需</button>
+        <button class="sub-tab-btn" data-domain="domain-lawyers" onclick="switchDomainTab('domain-lawyers')">領域律師版圖</button>
       </div>
 
     <!-- ===== 子分頁: 市場趨勢（官方新收 court_case_stats + 律師活動變化） ===== -->
@@ -1172,6 +1173,67 @@
           市場面兩欄來自終結案件微資料（民事訴訟檔，最新完整年；3 年變化為完整年對完整年），
           <strong>僅民事有市場對照</strong>——刑事/家事的官方分組與判決書案由分組口徑不同，不硬對。
           集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
+        </div>
+      </div>
+    </div>
+
+    <!-- 領域律師版圖（IA 重整 P3-3，mig 182）：任選案由種類看 法院常勝軍＋律師名單（原家事律師版圖泛化） -->
+    <div id="tab-domain-lawyers" class="domain-subpanel" style="display:none;">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 領域律師版圖 — 任選訴訟領域看法院常勝軍與律師名單</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;">
+          原「家事律師版圖」泛化：79 個案由種類（同案由供需的分組）任選。案量以公開裁判書抽取＝下限估計、同名律師合併（標「同名多筆」者不歸事務所）。
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+          <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
+          <div id="dlCatChips" class="chip-row" style="margin:0;"></div>
+        </div>
+        <div class="search-bar" style="margin-bottom:0;">
+          <select id="dlGroupSelect" onchange="dlGroupChange()" style="min-width:240px;"></select>
+          <select id="dlYearSelect" onchange="dlYearChange()" style="min-width:180px;">
+            <option value="">全部年度（近 5 年滾動）</option>
+          </select>
+        </div>
+      </div>
+      <div class="kpi-grid" id="dlKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        <div class="kpi-card"><div class="kpi-label">領域判決件數</div><div class="kpi-value" id="dlKpiTotal">-</div><div class="kpi-sub">近 5 年滾動</div></div>
+        <div class="kpi-card"><div class="kpi-label">供給律師數</div><div class="kpi-value" id="dlKpiLawyers" style="color:var(--blue);">-</div><div class="kpi-sub">近 5 年有出庭</div></div>
+        <div class="kpi-card"><div class="kpi-label">領域量最大律師</div><div class="kpi-value" id="dlKpiTop" style="color:var(--gold);font-size:1.3rem;">-</div><div class="kpi-sub" id="dlKpiTopSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">喆律該領域案量</div><div class="kpi-value" id="dlKpiZhelu" style="color:var(--green);">-</div><div class="kpi-sub" id="dlKpiZheluSub">近 5 年・<span id="dlKpiZheluN">-</span> 位律師</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#127963;&#65039; 法院視角 — 各法院的領域常勝軍</div>
+        <div class="search-bar">
+          <select id="dlCourtSelect" onchange="dlCourtChange()" style="min-width:260px;">
+            <option value="">選擇法院...</option>
+          </select>
+        </div>
+        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th style="text-align:right;">該法院件數</th></tr></thead>
+            <tbody id="dlCourtBody"><tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">法院視角固定近 5 年滾動視窗（不隨年度下拉切換），顯示前 100 名。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">&#128203; 領域律師名單 <span id="dlListMeta" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
+        <div class="search-bar">
+          <input type="text" id="dlSearch" placeholder="於名單內搜尋姓名或事務所..." oninput="dlRenderList()">
+        </div>
+        <div class="table-wrap" style="max-height:560px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th style="text-align:right;">件數</th><th style="text-align:right;" title="該領域件數 ÷ 該律師同期全部出庭件數">專注度</th></tr></thead>
+            <tbody id="dlListBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">顯示 TOP 250（搜尋亦於此範圍內）；「專注度」＝該領域件數佔該律師同期全部出庭件數比例。</div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div style="font-size:0.75rem;color:var(--text-muted);line-height:1.7;">
+          ※ 案件量以「訴訟代理人/辯護人 ○○○律師」自公開裁判書抽取（案由層自 2021-05 起、滾動 60 月），裁定與不公開裁判不計，數字為下限估計、僅供相對比較；
+          一案多位律師各自計數。事務所歸屬以法務部名冊姓名唯一對應為準，同名多筆律師不歸屬。
+          種類分組與「案由供需」一致（mapping 單一真實源 cause_map.py）；「其他○○」為剩餘桶，解讀前建議先到案由供需點開明細。
         </div>
       </div>
     </div>
@@ -2097,87 +2159,16 @@
         結案天數為估算值（裁判日 − 案號年度起算日），法官的平均結案天數為其全部案件之平均（專責法官可視為該類均值），僅供相對比較。
       </div>
       <div id="famLawyersBlock">
-      <div style="font-size:0.9rem;font-weight:700;color:var(--gold);margin:22px 0 10px;border-top:1px solid var(--border);padding-top:16px;">&#9878;&#65039; 家事律師版圖 <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted);">（原 產業分析＞訴訟市場＞家事律師，2026-09-01 併入本頁；家事類限定）</span></div>
-      <div class="search-bar" style="margin-bottom:14px;">
-        <select id="flYearSelect" onchange="flYearChange()" style="min-width:220px;">
-          <option value="">全部年度（2020-01 起合計）</option>
-        </select>
-      </div>
-      <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
-        <div class="kpi-card">
-          <div class="kpi-label">家事量最大律師</div>
-          <div class="kpi-value" id="flKpiTop" style="color:var(--gold);font-size:1.3rem;">-</div>
-          <div class="kpi-sub" id="flKpiTopSub">-</div>
+      <!-- 家事律師版圖已泛化為「領域律師版圖」（IA 重整 P3-3，mig 182）：本處僅留導向卡；
+           family_lawyer_* cache 表暫留 DB 觀察一輪後另行清理 -->
+      <div class="card" style="margin-top:22px;">
+        <div class="card-title">&#9878;&#65039; 家事律師版圖 → 已升級為「領域律師版圖」</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);line-height:1.8;margin-top:6px;">
+          原本家事限定的「法院常勝軍＋律師名單」已泛化成<strong>任選訴訟領域</strong>（離婚、監護、繼承、損害賠償、詐欺……79 個種類）都能查，
+          並移至 產業分析＞訴訟市場。點下方按鈕直達（已預選家事類）。
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">家事律師人數</div>
-          <div class="kpi-value" id="flKpiCount" style="color:var(--blue);">-</div>
-          <div class="kpi-sub">家事案件 ≥ 10 件</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">喆律家事案量</div>
-          <div class="kpi-value" id="flKpiZhelu" style="color:var(--green);">-</div>
-          <div class="kpi-sub" id="flKpiZheluSub">5 年合計</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">喆律家事律師</div>
-          <div class="kpi-value" id="flKpiZheluN" style="color:var(--green);">-</div>
-          <div class="kpi-sub">出現於家事裁判</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">有代理家事律師</div>
-          <div class="kpi-value" id="flKpiAny">-</div>
-          <div class="kpi-sub" id="flKpiAnySub">≥ 3 件</div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">&#127963;&#65039; 法院視角 — 各法院的家事常勝軍</div>
-        <div class="search-bar">
-          <select id="flCourtSelect" onchange="renderFlCourtTable()" style="min-width:240px;">
-            <option value="">選擇法院...</option>
-          </select>
-        </div>
-        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th>該法院家事案件</th></tr></thead>
-            <tbody id="flCourtTableBody"><tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title">&#128203; 家事律師名單</div>
-        <div class="search-bar">
-          <input type="text" id="flSearch" placeholder="搜尋律師姓名或事務所（同步過濾總表與明細）..." oninput="renderFlTable()">
-          <select id="flMinFilter" onchange="renderFlTable()">
-            <option value="10" selected>家事案件 ≥ 10</option>
-            <option value="30">家事案件 ≥ 30</option>
-            <option value="1">全部</option>
-          </select>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>律師</th>
-                <th>事務所</th>
-                <th style="cursor:pointer" onclick="sortFl('family_cases')">家事案件 <span id="flSort_family_cases">↓</span></th>
-                <th style="cursor:pointer" onclick="sortFl('family_share')">家事佔比 <span id="flSort_family_share">↕</span></th>
-                <th style="cursor:pointer" onclick="sortFl('total_cases')">總案件 <span id="flSort_total_cases">↕</span></th>
-                <th>主要法院</th>
-                <th style="cursor:pointer" onclick="sortFl('n_courts')">活躍法院數 <span id="flSort_n_courts">↕</span></th>
-                <th>最近出現</th>
-              </tr>
-            </thead>
-            <tbody id="flTableBody">
-              <tr><td colspan="8" class="loading">載入中</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div id="flTableNote" style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;"></div>
-      </div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 案件量以「訴訟代理人/辯護人 ○○○律師」自公開裁判書抽取（2020-01 起），家事裁定多數不公開，數字為下限估計、僅供相對比較。
-        事務所歸屬以法務部名冊姓名唯一對應為準，同名多筆律師不歸屬（表中標「同名多筆」）。
+        <a href="#" onclick="_dlPresetCat='家事';gotoTab('industry','domain','domain-lawyers');return false;"
+           style="display:inline-block;margin-top:12px;background:var(--bg-row);border:1px solid var(--border);border-radius:8px;padding:8px 18px;font-size:0.85rem;color:var(--blue);text-decoration:none;">前往 領域律師版圖（家事類）→</a>
       </div>
     </div>
     </div>
@@ -11388,12 +11379,9 @@ function switchFamCat(key, force) {
   document.querySelectorAll('#famCatTabs .sub-tab-btn').forEach(b =>
     b.classList.toggle('active', b.id === 'famCatBtn_' + key));
 
-  // 家事律師版圖區塊（2026-09-01 自 訴訟市場＞家事律師 併入）：僅家事類顯示（資料源 family_* cache 家事限定）
+  // 家事律師版圖已泛化為「領域律師版圖」（P3-3，訴訟市場）：此處僅剩導向卡，家事類才顯示
   const flBlock = document.getElementById('famLawyersBlock');
-  if (flBlock) {
-    flBlock.style.display = (key === 'family') ? '' : 'none';
-    if (key === 'family') loadFamLawyersOnce();
-  }
+  if (flBlock) flBlock.style.display = (key === 'family') ? '' : 'none';
 
   // 文案（KPI/圖卡/表頭/佔比篩選/caveat）依類別重設
   const el = id => document.getElementById(id);
@@ -11706,49 +11694,194 @@ function renderFamTable() {
 }
 
 // ============================================================
-// FAM-LAWYERS (家事律師版圖)
+// DOMAIN-LAWYERS 領域律師版圖（IA 重整 P3-3，mig 182；原「家事律師版圖」泛化）
+// 資料源：全國名單/年度=cause_top_lawyers / lawyer_cause_year_stats（mig 093/098）、
+//   法院視角=lawyer_cause_court_stats（mig 182，47.6 萬列——一律 server-side 篩選，嚴禁拉全量）
 // ============================================================
-let _flLoaded = false;
-let _flRows = [];       // 目前顯示切片（每位律師）
-let _flByCourt = [];    // 目前顯示切片（律師×法院）
-let _flYearCache = {};  // 年度切片快取（'' = 全部年度）
-let flSortCol = 'family_cases';
-let flSortAsc = false;
+let _dlLoaded = false;
+let _dlGroups = [];        // cause_group_list：[{cat, cause_group}]
+let _dlSupply = {};        // cause_supply_stats：group → {total_cases, lawyers}
+let _dlCat = '民事';       // 當前案類 chip
+let _dlListRows = [];      // 名單快取（當前 group×year）
+let _dlFirmMap = {};       // 名單律師 → 事務所（lawyers_combined 唯一名歸戶；'AMBIG'=同名多筆）
+window._dlPresetCat = null;  // 外部入口預選案類（如專業法庭家事導向卡）
 
-function loadFamLawyersOnce() {
-  if (_flLoaded) return;
-  _flLoaded = true;
-  loadFamLawyers();
+function loadDomainLawyersOnce() {
+  if (_dlLoaded) { dlApplyPreset(); return; }
+  _dlLoaded = true;
+  initDomainLawyers();
+}
+function dlApplyPreset() {
+  // init 尚未完成（RPC 未回）時保留 preset，交給 initDomainLawyers 尾端套用
+  if (!window._dlPresetCat || !_dlGroups.length) return;
+  if (window._dlPresetCat !== _dlCat) dlSelectCat(window._dlPresetCat);
+  window._dlPresetCat = null;
 }
 
-// RPC 回傳受 max-rows=1000 限制，用 range 分批抓完
-// 注意：PostgREST 對 RPC 的 range 分頁是每頁重跑整個函數，只適合小結果集
-async function fetchAllRpc(fn, args) {
-  let all = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.rpc(fn, args).range(from, from + 999);
-    if (error) { console.log(fn + ' error:', error); break; }
-    if (!data?.length) break;
-    all = all.concat(data);
-    if (data.length < 1000) break;
-  }
-  return all;
+async function initDomainLawyers() {
+  try {
+    const [gl, sup, yl] = await Promise.all([
+      db.rpc('cause_group_list'),
+      db.rpc('cause_supply_stats'),
+      db.rpc('cause_year_list'),
+    ]);
+    _dlGroups = gl.data || [];
+    (sup.data || []).forEach(r => { _dlSupply[r.cause_group] = r; });
+    const ysel = document.getElementById('dlYearSelect');
+    (yl.data || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.yr; opt.textContent = `${r.yr} 年`;
+      ysel.appendChild(opt);
+    });
+    if (window._dlPresetCat) { _dlCat = window._dlPresetCat; window._dlPresetCat = null; }
+    dlSelectCat(_dlCat);
+  } catch (e) { console.log('domain lawyers init error:', e); }
 }
 
-// 讀表版分批抓完（走索引分頁；orders 需含唯一鍵確保分頁穩定；filters 為 eq 條件）
-async function fetchAllTable(table, orders, filters) {
-  let all = [];
-  for (let from = 0; ; from += 1000) {
-    let q = db.from(table).select('*');
-    (filters || []).forEach(f => { q = q.eq(f.col, f.val); });
-    orders.forEach(o => { q = q.order(o.col, { ascending: !!o.asc }); });
-    const { data, error } = await q.range(from, from + 999);
-    if (error) { console.log(table + ' error:', error); break; }
-    if (!data?.length) break;
-    all = all.concat(data);
-    if (data.length < 1000) break;
+// 案類 chips ＋ 種類下拉（按供給件數排序，剩餘桶「其他○○」「特別法」沉底，同案由供需慣例）
+const dlIsResidual = g => /^其他/.test(g) || g === '特別法';
+const DL_CAT_ORDER = ['民事', '刑事', '家事', '行政', '少年', '懲戒', '其他'];
+function dlSelectCat(cat) {
+  _dlCat = cat;
+  const dlCatOrd = c => { const i = DL_CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
+  const cats = [...new Set(_dlGroups.map(g => g.cat))].sort((a, b) => dlCatOrd(a) - dlCatOrd(b));
+  document.getElementById('dlCatChips').innerHTML = cats.map(c =>
+    `<button class="chip${c === cat ? ' active' : ''}" onclick="dlSelectCat('${c}')">${escHtml(c)}</button>`).join('');
+  const groups = _dlGroups.filter(g => g.cat === cat)
+    .map(g => g.cause_group)
+    .sort((a, b) => (dlIsResidual(a) - dlIsResidual(b)) || ((_dlSupply[b]?.total_cases || 0) - (_dlSupply[a]?.total_cases || 0)));
+  const sel = document.getElementById('dlGroupSelect');
+  sel.innerHTML = groups.map(g =>
+    `<option value="${escHtml(g)}">${escHtml(g)}（${Number(_dlSupply[g]?.total_cases || 0).toLocaleString()} 件）</option>`).join('');
+  dlGroupChange();
+}
+
+async function dlGroupChange() {
+  const g = document.getElementById('dlGroupSelect').value;
+  if (!g) return;
+  // KPI（供給統計現成 map）
+  const sup = _dlSupply[g] || {};
+  document.getElementById('dlKpiTotal').textContent = Number(sup.total_cases || 0).toLocaleString();
+  document.getElementById('dlKpiLawyers').textContent = Number(sup.lawyers || 0).toLocaleString();
+  // 法院下拉（RPC 直查物化表）
+  const sel = document.getElementById('dlCourtSelect');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">選擇法院...</option>';
+  db.rpc('cause_court_list', { p_group: g }).then(({ data }) => {
+    (data || []).forEach(r => {
+      const opt = document.createElement('option');
+      opt.value = r.court_name;
+      opt.textContent = `${r.court_name}（${Number(r.total).toLocaleString()} 件・${r.lawyers} 位）`;
+      sel.appendChild(opt);
+    });
+    if (prev && (data || []).some(r => r.court_name === prev)) { sel.value = prev; }
+    dlCourtChange();
+  });
+  // 喆律 KPI（firm_name 已在物化表歸戶，單發 like 查詢；跨法院同律師去重）
+  db.from('lawyer_cause_court_stats').select('name,case_count')
+    .eq('cause_group', g).like('firm_name', '%喆律%')
+    .then(({ data }) => {
+      const rows = data || [];
+      document.getElementById('dlKpiZhelu').textContent = rows.reduce((s, r) => s + r.case_count, 0).toLocaleString();
+      document.getElementById('dlKpiZheluN').textContent = new Set(rows.map(r => r.name)).size;
+    });
+  dlYearChange();
+}
+
+// 名單：cause_top_lawyers 單發（p_year null=近5年滾動／給年=該年；SECURITY DEFINER，share 兩模式都有）
+async function dlYearChange() {
+  const g = document.getElementById('dlGroupSelect').value;
+  const y = document.getElementById('dlYearSelect').value;
+  if (!g) return;
+  const tbody = document.getElementById('dlListBody');
+  tbody.innerHTML = '<tr><td colspan="5" class="loading">載入中</td></tr>';
+  try {
+    const { data, error } = await db.rpc('cause_top_lawyers',
+      { p_group: g, p_limit: 250, p_year: y ? parseInt(y, 10) : null });
+    if (error) throw error;
+    const rows = data || [];
+    _dlListRows = rows;
+    await dlEnsureFirms(rows.map(r => r.name));
+    // TOP1 KPI
+    if (rows.length) {
+      document.getElementById('dlKpiTop').innerHTML = lawyerLink(rows[0].name, 'color:inherit;');
+      const f = _dlFirmMap[rows[0].name];
+      document.getElementById('dlKpiTopSub').innerHTML =
+        `${Number(rows[0].cases).toLocaleString()} 件${f && f !== 'AMBIG' ? '・' + firmLink(f, 'color:inherit;') : ''}`;
+    } else {
+      document.getElementById('dlKpiTop').textContent = '-';
+      document.getElementById('dlKpiTopSub').textContent = '-';
+    }
+    document.getElementById('dlListMeta').textContent = y ? `（${y} 年）` : '（近 5 年滾動）';
+    dlRenderList();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" class="loading">載入失敗：${escHtml(e.message || '')}</td></tr>`;
   }
-  return all;
+}
+
+// 名單事務所欄：lawyers_combined 唯一名歸戶（同 firm_cause_ranking 口徑）；分批 in() 防 URL 過長
+async function dlEnsureFirms(names) {
+  const need = [...new Set(names)].filter(n => !(n in _dlFirmMap));
+  for (let i = 0; i < need.length; i += 100) {
+    const batch = need.slice(i, i + 100);
+    const { data } = await db.from('lawyers_combined').select('name,firm_name').in('name', batch);
+    const seen = {};
+    (data || []).forEach(r => {
+      if (!seen[r.name]) seen[r.name] = new Set();
+      if (r.firm_name) seen[r.name].add(r.firm_name);
+    });
+    batch.forEach(n => {
+      const s = seen[n];
+      _dlFirmMap[n] = !s || !s.size ? '' : (s.size > 1 ? 'AMBIG' : [...s][0]);
+    });
+  }
+}
+
+function dlRenderList() {
+  const tbody = document.getElementById('dlListBody');
+  if (!tbody) return;
+  const q = (document.getElementById('dlSearch')?.value || '').trim();
+  let rows = _dlListRows;
+  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (_dlFirmMap[r.name] || '').includes(q));
+  tbody.innerHTML = rows.length ? rows.map(r => {
+    const f = _dlFirmMap[r.name] || '';
+    const zhelu = isZheluFirm(f);
+    const firmCellTxt = f === 'AMBIG' ? '<span style="color:var(--text-muted);">同名多筆</span>' : (f ? firmLink(f) : '-');
+    return `<tr${zhelu ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+      <td style="color:var(--text-muted);">${r.rank}</td>
+      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td style="font-size:0.85rem;">${firmCellTxt}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;">${r.share != null ? Math.round(r.share * 100) + '%' : '-'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty-state"><div class="msg">無符合條件的律師</div></td></tr>';
+}
+
+// 法院常勝軍：RPC 單發 TOP 100（固定近 5 年滾動視窗）
+async function dlCourtChange() {
+  const g = document.getElementById('dlGroupSelect').value;
+  const court = document.getElementById('dlCourtSelect').value;
+  const tbody = document.getElementById('dlCourtBody');
+  if (!court) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
+  const { data, error } = await db.rpc('cause_court_top_lawyers', { p_group: g, p_court: court, p_limit: 100 });
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="4" class="loading">載入失敗：${escHtml(error.message)}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = (data || []).map(r => {
+    const zhelu = isZheluFirm(r.firm_name);
+    const firm = r.firm_name ? firmLink(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
+    return `<tr${zhelu ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
+      <td style="color:var(--text-muted);">${r.rank}</td>
+      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
+      <td style="font-size:0.85rem;">${firm}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty-state"><div class="msg">該法院無資料</div></td></tr>';
 }
 
 const isZheluFirm = f => !!f && f.includes('喆律');
@@ -14951,7 +15084,7 @@ function loadCauseSupplyOnce() { if (_csLoaded) return; _csLoaded = true; initCa
 // 訴訟市場：市場趨勢 / 地區供需 / 案由供需 收攏為子分頁（builder 不動，各自 lazy-load 一次）
 // （「家事律師」子分頁已於 2026-09-01 併入 法官區＞專業法庭 famLawyersBlock）
 let _domainInit = false;
-const DOMAIN_TABS = ['mkt-trend', 'region-market', 'cause-supply'];
+const DOMAIN_TABS = ['mkt-trend', 'region-market', 'cause-supply', 'domain-lawyers'];
 function initDomainTab() {
   if (_domainInit) return; _domainInit = true;
   switchDomainTab(DOMAIN_TABS.includes(navState.domain) ? navState.domain : 'mkt-trend');
@@ -14967,6 +15100,7 @@ window.switchDomainTab = function(d) {
   if (d === 'mkt-trend') loadMarketTrendOnce();
   else if (d === 'region-market') loadRegionMarketOnce();
   else if (d === 'cause-supply') loadCauseSupplyOnce();
+  else if (d === 'domain-lawyers') loadDomainLawyersOnce();
   buildSectionIndex(document.getElementById('tab-' + d));
 };
 
@@ -15248,165 +15382,8 @@ function closeCauseGroupModal() {
   document.getElementById('causeGroupModal').style.display = 'none';
 }
 
-async function loadFamLawyers() {
-  try {
-    // 年度下拉（家事年 cache 的年度清單，migration 055）
-    db.rpc('family_lawyer_years').then(({ data: yrs, error }) => {
-      if (error) { console.log('family_lawyer_years error:', error); return; }
-      const ysel = document.getElementById('flYearSelect');
-      if (!ysel || !yrs?.length) return;
-      yrs.forEach(r => {
-        const opt = document.createElement('option');
-        opt.value = r.year; opt.textContent = r.year + ' 年';
-        ysel.appendChild(opt);
-      });
-    });
-
-    // 讀 cache 表（migration 049，refresh_family_lawyer_stats() 月更）
-    const [rows, byCourt] = await Promise.all([
-      fetchAllTable('family_lawyer_stats_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }]),
-      fetchAllTable('family_lawyer_by_court_cache', [{ col: 'family_cases' }, { col: 'name', asc: true }, { col: 'court_name', asc: true }]),
-    ]);
-    _flYearCache[''] = { rows, byCourt };
-    renderFamAll('', rows, byCourt);
-  } catch (e) { console.log('fam lawyers error:', e); }
-}
-
-// 年度切換：抓該年切片（migration 055 年 cache 表），結果留在記憶體、切回不重抓
-async function flYearChange() {
-  const y = document.getElementById('flYearSelect').value;
-  try {
-    if (!_flYearCache[y]) {
-      const tbody = document.getElementById('flTableBody');
-      if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="loading">載入中</td></tr>';
-      const [rows, byCourt] = await Promise.all([
-        fetchAllTable('family_lawyer_year_cache',
-          [{ col: 'family_cases' }, { col: 'name', asc: true }],
-          [{ col: 'year', val: y }]),
-        fetchAllTable('family_lawyer_by_court_year_cache',
-          [{ col: 'family_cases' }, { col: 'name', asc: true }, { col: 'court_name', asc: true }],
-          [{ col: 'year', val: y }]),
-      ]);
-      _flYearCache[y] = { rows, byCourt };
-    }
-    const s = _flYearCache[y];
-    renderFamAll(y, s.rows, s.byCourt);
-  } catch (e) { console.log('fl year change error:', e); }
-}
-
-function renderFamAll(year, rows, byCourt) {
-  _flRows = rows;
-  _flByCourt = byCourt;
-  const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
-  const el = id => document.getElementById(id);
-  const periodLabel = year ? `${year} 年` : '2020 起合計';
-
-    // KPI
-    if (rows.length) {
-      const top = rows[0];
-      el('flKpiTop').innerHTML = lawyerLink(top.name, 'color:inherit;');
-      el('flKpiTopSub').innerHTML = `${Number(top.family_cases).toLocaleString()} 件・${top.firm_name ? firmLink(top.firm_name, 'color:inherit;') : ''}`;
-    } else {
-      el('flKpiTop').textContent = '-';
-      el('flKpiTopSub').textContent = '-';
-    }
-    el('flKpiCount').textContent = rows.filter(r => r.family_cases >= 10).length.toLocaleString();
-    const zhelu = rows.filter(r => isZheluFirm(r.firm_name));
-    el('flKpiZhelu').textContent = zhelu.reduce((s, r) => s + Number(r.family_cases), 0).toLocaleString();
-    el('flKpiZheluSub').textContent = periodLabel;
-    el('flKpiZheluN').textContent = zhelu.length;
-    el('flKpiAny').textContent = rows.length.toLocaleString();
-    el('flKpiAnySub').textContent = year ? '≥ 1 件' : '≥ 3 件';
-
-    // 「家事案件量 TOP 10 律師」「事務所家事版圖 TOP 10」兩卡已下架（2026-09-01）：
-    // 與 律師總覽＞訴訟領域律師 TOP 10（選家事）、事務所總覽＞事務所版圖（家事案類）重複；
-    // 名單表本身可按家事案件排序，前十名即 TOP 10
-
-    // 法院下拉（按該院家事總量排序；切年度時重建並保留原選擇）
-    const courtTotals = {};
-    byCourt.forEach(r => { courtTotals[r.court_name] = (courtTotals[r.court_name] || 0) + Number(r.family_cases); });
-    const sel = el('flCourtSelect');
-    const prevCourt = sel.value;
-    sel.innerHTML = '<option value="">選擇法院...</option>';
-    Object.entries(courtTotals).sort((a, b) => b[1] - a[1]).forEach(([c, n]) => {
-      const opt = document.createElement('option');
-      opt.value = c; opt.textContent = `${c}（${n.toLocaleString()} 件）`;
-      sel.appendChild(opt);
-    });
-    if (prevCourt && courtTotals[prevCourt] != null) sel.value = prevCourt;
-    renderFlCourtTable();
-
-    renderFlTable();
-}
-
-function renderFlCourtTable() {
-  const court = document.getElementById('flCourtSelect').value;
-  const tbody = document.getElementById('flCourtTableBody');
-  if (!court) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr>';
-    return;
-  }
-  const firmByName = {};
-  _flRows.forEach(r => { firmByName[r.name] = r.firm_name || (r.firm_ambiguous ? '（同名多筆）' : ''); });
-  const rows = _flByCourt.filter(r => r.court_name === court)
-    .sort((a, b) => b.family_cases - a.family_cases).slice(0, 30);
-  tbody.innerHTML = rows.map((r, i) => {
-    const firm = firmByName[r.name] || '';
-    const zhelu = isZheluFirm(firm);
-    return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
-      <td style="color:var(--text-muted);">${i + 1}</td>
-      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
-      <td style="font-size:0.85rem;">${firm && firm !== '（同名多筆）' ? firmLink(firm) : escHtml(firm)}</td>
-      <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" class="empty-state"><div class="msg">該法院無資料</div></td></tr>';
-}
-
-function sortFl(col) {
-  if (flSortCol === col) flSortAsc = !flSortAsc;
-  else { flSortCol = col; flSortAsc = false; }
-  ['family_cases', 'family_share', 'total_cases', 'n_courts'].forEach(c => {
-    const ic = document.getElementById('flSort_' + c);
-    if (ic) ic.textContent = c === flSortCol ? (flSortAsc ? '↑' : '↓') : '↕';
-  });
-  renderFlTable();
-}
-
-function renderFlTable() {
-  const tbody = document.getElementById('flTableBody');
-  if (!tbody) return;
-  const q = (document.getElementById('flSearch')?.value || '').trim();
-  const minFam = parseInt(document.getElementById('flMinFilter')?.value || '10', 10);
-  let rows = _flRows.filter(r => r.family_cases >= minFam);
-  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.firm_name || '').includes(q));
-  rows.sort((a, b) => {
-    const va = a[flSortCol] ?? -Infinity, vb = b[flSortCol] ?? -Infinity;
-    return flSortAsc ? va - vb : vb - va;
-  });
-  const shown = rows.slice(0, 300);
-  if (!shown.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="msg">無符合條件的律師</div></td></tr>';
-    document.getElementById('flTableNote').textContent = '';
-    return;
-  }
-  tbody.innerHTML = shown.map(r => {
-    const zhelu = isZheluFirm(r.firm_name);
-    const firm = r.firm_name ? firmLink(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
-    const lastYm = r.last_ym ? `${r.last_ym.slice(0, 4)}-${r.last_ym.slice(4)}` : '-';
-    return `<tr${zhelu ? ' style="background:var(--green-dim);"' : ''}>
-      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
-      <td style="font-size:0.85rem;">${firm}</td>
-      <td style="text-align:center;font-weight:600;color:var(--gold);">${Number(r.family_cases).toLocaleString()}</td>
-      <td style="text-align:center;">${Math.round(r.family_share * 100)}%</td>
-      <td style="text-align:center;">${Number(r.total_cases).toLocaleString()}</td>
-      <td style="font-size:0.85rem;">${escHtml(r.top_court || '-')}</td>
-      <td style="text-align:center;">${r.n_courts}</td>
-      <td style="text-align:center;font-size:0.85rem;">${lastYm}</td>
-    </tr>`;
-  }).join('');
-  document.getElementById('flTableNote').textContent =
-    `符合條件 ${rows.length} 位` + (rows.length > 300 ? '（僅顯示前 300 位，可用搜尋縮小範圍）' : '');
-}
+// （家事律師版圖 loadFamLawyers/flYearChange/renderFamAll/renderFlCourtTable/sortFl/renderFlTable
+//   已於 2026-09-01 隨 P3-3 泛化為「領域律師版圖」而移除；family_lawyer_* cache 表暫留 DB）
 
 // ============================================================
 // JUDGES (法官)
