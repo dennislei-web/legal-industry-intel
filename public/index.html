@@ -8973,7 +8973,7 @@ async function showJudgeDetail(name, court) {
   }
 
   // 並行撈：名冊+整合統計、逐月署名、常對到律師、案由、合議庭圈、異動事件、懲戒與彈劾紀錄
-  let jc = null, pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [], transfers = [];
+  let jc = null, jcAll = [], pairs = null, causes = null, copanel = [], changes = [], disciplines = [], impeachments = [], appealStats = [], evalMatches = [], transfers = [];
   let crmRows = [], crmStatus = null; // 喆律 CRM 內部紀錄（RLS 綁單一帳號，非擁有者回空 → 卡片不現身）
   let exjRole = []; // 已登錄律師名冊（雙重身分切換 pill 用）
   let gazEvents = []; // 公報任免紀錄（2000 前退場司法官經歷回補）
@@ -8988,8 +8988,9 @@ async function showJudgeDetail(name, court) {
       .then(r => { crmRows = r.data || []; }),
     db.from('crm_crawl_status').select('*').eq('id', 1).maybeSingle()
       .then(r => { crmStatus = r.data || null; }).catch(() => {}),
-    db.from('judges_combined').select('*').eq('name', name).eq('court_name', court).limit(1)
-      .then(r => { jc = r.data?.[0] || null; }),
+    // 同名全院一起撈：本院列給 jc，has_jy 的院集合供幽靈院判定豁免（名冊＝權威，見下方 rosterCourts）
+    db.from('judges_combined').select('*').eq('name', name)
+      .then(r => { jcAll = r.data || []; jc = jcAll.find(x => x.court_name === court) || null; }),
     db.from('judge_disciplines').select('*').eq('name', name)
       .order('decided_date', { ascending: false })
       .then(r => { disciplines = r.data || []; }),
@@ -9090,14 +9091,20 @@ async function showJudgeDetail(name, court) {
   // 不排除的話幽靈院會佔住錨定位、把真身反過來拆成「同名的另一位」（時瑋辰個案）。
   // 審級條件不可省：誤抓成因是上訴審引用原審全文，故幽靈院必然審級高於常態院。少了它，
   // 離島小院（連江月均中位數 4.7）的真任職會被當成幽靈殺掉。
+  // 月數 ≥6，或月數 ≥2 但區間跨度 >6 個月（稀疏散佈型，如最高法院 3 個月各 1 件卻橫跨兩年）
+  // 名冊豁免：司法院現任名冊有該人於該院＝權威證據，一律不判幽靈。最高行政法院裁判書公開量
+  // 天生極少（現任法官在該院常只有 2-3 個月各 1 件），少了這條豁免會把 6 位現任大法官級法官殺掉。
   const spanDens = s => s.cases / Math.max(1, s.months);
+  const spanRange = s => ymIdx(s.last) - ymIdx(s.first) + 1;
   const courtTier = c => /^最高/.test(c) ? 3 : /高等/.test(c) ? 2 : 1;
+  const rosterCourts = new Set(jcAll.filter(x => x.has_jy).map(x => x.court_name));
   const topSpan = spanRows.slice().sort((a, b) => spanDens(b[1]) - spanDens(a[1]))[0];
   const topDens = topSpan ? spanDens(topSpan[1]) : 0;
   const topTier = topSpan ? courtTier(topSpan[0]) : 1;
   const ghostCourts = new Set(spanRows
-    .filter(([c, s]) => s.months >= 6 && spanDens(s) <= 3
-      && spanDens(s) < topDens * 0.1 && courtTier(c) > topTier)
+    .filter(([c, s]) => (s.months >= 6 || (s.months >= 2 && spanRange(s) > 6))
+      && spanDens(s) <= 3 && spanDens(s) < topDens * 0.1
+      && courtTier(c) > topTier && !rosterCourts.has(c))
     .map(([c]) => c));
   const realSpanRows = spanRows.filter(([c]) => !ghostCourts.has(c));
   // 錨定院：本院若本身是幽靈院，改以常態院為錨，否則同名拆分會以幽靈區間為基準，把真身判成另一人
