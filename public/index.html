@@ -14150,11 +14150,15 @@ function msRecalc() {
     '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造中位）</div><div class="kpi-value">' + _msFmtE(lt.mid) + '</div><div class="kpi-sub">最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">訴訟全口徑（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</div><div class="kpi-sub">署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>' +
-    '<div style="grid-column:1/-1;font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
-    '&#128257; <strong style="color:var(--text);">同一張總表、兩種訴訟口徑</strong>：' +
-    '<strong style="color:var(--gold);">保守版 ' + _msFmtE(gt.mid) + '</strong>（訴訟只算一份委任＝任一造 ' + _msFmtE(lt.mid) + '）＝普查 ' + (gt.mid / 408.69 * 100).toFixed(0) + '%　&#8596;　' +
-    '<strong style="color:var(--gold);">全口徑版 ' + _msFmtE(gt.mid - lt.mid + ltf.mid) + '</strong>（訴訟算兩造各付＝' + _msFmtE(ltf.mid) + '）＝普查 ' + ((gt.mid - lt.mid + ltf.mid) / 408.69 * 100).toFixed(0) + '%。' +
-    '普查 409 億＝2021 年<strong>整個法律服務業</strong>（律師＋地政士＋專利商標＋公證，含非訟/法顧）收入——對帳對象是合計卡，不是訴訟單項；差額＝案件統計看不到的非訟市場＋4 年時間差。</div>';
+    (function () {
+      const gf = { lo: gt.lo - lt.lo + ltf.lo, hi: gt.hi - lt.hi + ltf.hi, mid: gt.mid - lt.mid + ltf.mid };
+      const pct = v => (v / 408.69 * 100).toFixed(0);
+      return '<div style="grid-column:1/-1;font-size:0.78rem;color:var(--text-muted);line-height:1.8;background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 12px;">' +
+        '&#128257; <strong style="color:var(--text);">同一張總表、兩種訴訟口徑</strong>：' +
+        '<strong style="color:var(--gold);">保守版 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</strong>（中位 ' + _msFmtE(gt.mid) + '；訴訟只算一份委任＝任一造 ' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '）＝普查 ' + pct(gt.lo) + ' – ' + pct(gt.hi) + '%　&#8596;　' +
+        '<strong style="color:var(--gold);">全口徑版 ' + _msFmtE(gf.lo) + ' – ' + _msFmtE(gf.hi) + '</strong>（中位 ' + _msFmtE(gf.mid) + '；訴訟算兩造各付＝' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '）＝普查 ' + pct(gf.lo) + ' – ' + pct(gf.hi) + '%。' +
+        '普查 409 億＝2021 年<strong>整個法律服務業</strong>（律師＋地政士＋專利商標＋公證，含非訟/法顧）收入——對帳對象是合計卡，不是訴訟單項；差額＝案件統計看不到的非訟市場＋4 年時間差。</div>';
+    })();
   document.getElementById('msRecon').innerHTML =
     'bottom-up 七大市場合計中位 <strong style="color:var(--gold);">' + _msFmtE(gt.mid) + '</strong>（區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '，訴訟以任一造保守口徑計入），對上 110 年普查 <strong>408.69 億</strong>＝約 <strong>' + (gt.mid / 408.69 * 100).toFixed(0) + '%</strong>。讀法：<br>' +
     '・普查＝2021 年、含律師＋地政士＋專利商標＋公證人事務所全部收入；本頁量體多為 ' + escHtml(String(_msLines.year || '')) + ' 年——時間差 4 年，且本站署名量 2021→2025 <strong>+50%</strong>（出庭律師僅 +17%），市場在真實擴張，比較時心裡先打個折。<br>' +
