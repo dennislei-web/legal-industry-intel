@@ -19,9 +19,10 @@ KEY = env.get('SUPABASE_SERVICE_KEY') or env.get('SUPABASE_KEY')
 H = {'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json'}
 
 INT_COLS = {'lawyer_count', 'avg_cases', 'founded_year', 'roster_n', 'court_n', 'cases_5y',
+            'cases_nominal', 'dedup_months',
             'rev_low_wan', 'rev_high_wan', 'succession_risk', 'ex_judicial_n', 'g_reviews',
             'fb_pixel', 'google_ads', 'gov_tender_amt', 'indep_seats', 'awards_n'}
-NUM_COLS = {'g_rating'}
+NUM_COLS = {'g_rating', 'dup_rate'}
 
 rows = []
 for r in csv.DictReader(io.open(SRC, encoding='utf-8'), delimiter='\t'):

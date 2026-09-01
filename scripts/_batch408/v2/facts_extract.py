@@ -58,6 +58,14 @@ def _rng_val(m2):
 FIVE_Y = re.compile(r'[5５五]\s*年|累計')
 PER_Y = re.compile(r'[／/]\s*年|每年|年化|年營收')
 
+# 歸戶 key 口徑同 mig 186 refresh_firm_dedup_stats()：截到第一個「法律/律師事務所」（分所合併）
+FIRM_KEY_RE = re.compile(r'^(.+?(?:法律|律師)事務所)')
+
+
+def firm_key_of(name):
+    m = FIRM_KEY_RE.match(name or '')
+    return m.group(1) if m else (name or '')
+
 
 def _parse_rev_line(l, header=''):
     """單一合計行 → 年化 (low_wan, high_wan) 或 None。header＝表格標頭行（僅表格列用）。
@@ -185,6 +193,29 @@ def extract(a):
 def main():
     rows = getall('/rest/v1/firm_profiles?select=firm_name,ai_analysis,practice_focus,founded_year,ex_judicial_officers&ai_analysis=not.is.null')
     cache = {r['firm_name']: r for r in getall('/rest/v1/moj_firm_stats_cache?select=firm_name,lawyer_count,main_region,avg_cases')}
+    # 去重口徑（mig 186/188）：202101 起所級名目/去重合計；年化分母用全窗月數（非各所活躍月數，
+    # 否則零星活躍的小所會被高估）
+    # view 是 GROUP BY 聚合，分頁必須帶 order（無序分頁每頁重算、行序不穩會漏列）
+    dedup = {r['firm_key']: r for r in getall('/rest/v1/firm_dedup_totals?select=*&order=firm_key')}
+    if dedup:
+        yms = sorted(set([r['ym_from'] for r in dedup.values()] + [r['ym_to'] for r in dedup.values()]))
+        lo, hi = yms[0], yms[-1]
+        window_months = (int(hi[:4]) - int(lo[:4])) * 12 + int(hi[4:]) - int(lo[4:]) + 1
+    else:
+        window_months = 0
+    # top1 署名占比（concentration 重分桶用；名目 mention 口徑即可，量的是集中度）
+    top1 = {}
+    _fsum, _fmax = {}, {}
+    for r in getall('/rest/v1/lawyers_with_stats?select=firm_name,official_cases_5yr,name_ambiguous&official_cases_5yr=gt.0&order=name'):
+        if r.get('name_ambiguous') or not r.get('firm_name'):
+            continue
+        k = firm_key_of(r['firm_name'])
+        v = r['official_cases_5yr'] or 0
+        _fsum[k] = _fsum.get(k, 0) + v
+        _fmax[k] = max(_fmax.get(k, 0), v)
+    for k, s in _fsum.items():
+        if s > 0:
+            top1[k] = _fmax[k] / s
     gplaces = {r['firm_name']: r for r in getall('/rest/v1/firm_google_places?select=firm_name,rating,reviews_count')}
     dsig = {r['firm_name']: r for r in getall('/rest/v1/firm_digital_signals?select=*')}
     gov = {}
@@ -214,7 +245,7 @@ def main():
                 pass
 
     out = []
-    miss = {'type': 0, 'scale': 0, 'rev': 0}
+    miss = {'type': 0, 'scale': 0, 'rev': 0, 'dedup': 0}
     for r in rows:
         nm = r['firm_name']
         a = r['ai_analysis'] or ''
@@ -228,9 +259,24 @@ def main():
             miss['scale'] += 1
         if f['rev_low_wan'] == '':
             miss['rev'] += 1
+        if not dedup.get(firm_key_of(nm)):
+            miss['dedup'] += 1
         c = cache.get(nm, {})
         g = gplaces.get(nm, {})
         d = dsig.get(nm, {})
+        # 去重口徑接線（mig 188）：cases_5y 語意改「202101 起去重合計」、avg_cases 改年化去重人均；
+        # concentration 在 dup 率 >=40% 時按 top1 署名占比重分桶（掛名 vs 協作型大所）
+        fk = firm_key_of(nm)
+        dd = dedup.get(fk)
+        dup_rate = ''
+        if dd and dd['nominal_total']:
+            dup_rate = round(dd['dup_total'] / dd['nominal_total'] * 100, 1)
+            if dup_rate >= 40:
+                t1 = top1.get(fk)
+                if t1 is not None:
+                    f['concentration'] = '掛名制度' if t1 >= 0.4 else '協作型大所'
+                else:
+                    f['concentration'] = '掛名制度' if f['concentration'] in ('掛名制度', '真集中') else '協作型大所'
         sig = []
         for k, tag in (('fb_url', 'fb'), ('line_url', 'line'), ('ig_url', 'ig'), ('yt_url', 'yt')):
             if d.get(k):
@@ -242,12 +288,17 @@ def main():
             'firm': nm,
             'lawyer_count': c.get('lawyer_count', ''),
             'region': c.get('main_region', '') or f['region_txt'],
-            'avg_cases': c.get('avg_cases', ''),
+            'avg_cases': (round(dd['dedup_total'] / window_months * 12 / c['lawyer_count'])
+                          if dd and window_months and c.get('lawyer_count')
+                          else c.get('avg_cases', '')),
             'type': f['type'],
             'founded_year': r.get('founded_year') or '',
             'roster_n': f['roster_n'],
             'court_n': f['court_n'],
-            'cases_5y': f['cases_5y'],
+            'cases_5y': dd['dedup_total'] if dd else f['cases_5y'],  # 有歸戶＝202101 起去重合計；無＝AI 文名目值
+            'cases_nominal': dd['nominal_total'] if dd else '',
+            'dup_rate': dup_rate,
+            'dedup_months': window_months if dd else '',
             'rev_low_wan': f['rev_low_wan'],
             'rev_high_wan': f['rev_high_wan'],
             'concentration': f['concentration'],
@@ -270,8 +321,8 @@ def main():
         fp.write('\t'.join(cols) + '\n')
         for o in out:
             fp.write('\t'.join(str(o[c]) for c in cols) + '\n')
-    print('rows=%d  miss_type=%d miss_scale=%d miss_rev=%d  -> %s' % (
-        len(out), miss['type'], miss['scale'], miss['rev'], dst))
+    print('rows=%d  miss_type=%d miss_scale=%d miss_rev=%d miss_dedup=%d window=%d月  -> %s' % (
+        len(out), miss['type'], miss['scale'], miss['rev'], miss['dedup'], window_months, dst))
 
 
 if __name__ == '__main__':
