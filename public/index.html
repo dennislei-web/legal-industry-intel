@@ -14145,10 +14145,10 @@ function msRecalc() {
   const gt = msGrandTotal();
   const topLine = msLitRows().sort((a, b) => b.mid - a.mid)[0];
   document.getElementById('msKpis').innerHTML =
-    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(gt.mid) + '</div><div class="kpi-sub">區間 ' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '｜訴訟以任一造保守計入</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);">' + (gt.mid / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造中位）</div><div class="kpi-value">' + _msFmtE(lt.mid) + '</div><div class="kpi-sub">最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
-    '<div class="kpi-card"><div class="kpi-label">訴訟全口徑（中位）</div><div class="kpi-value" style="color:var(--gold);">' + _msFmtE(ltf.mid) + '</div><div class="kpi-sub">署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">bottom-up 合計</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(gt.lo) + ' – ' + _msFmtE(gt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(gt.mid) + '｜訴訟以任一造保守計入</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">vs 普查錨點 409 億</div><div class="kpi-value" style="color:var(--blue);font-size:1.35rem;">' + (gt.lo / 408.69 * 100).toFixed(0) + ' – ' + (gt.hi / 408.69 * 100).toFixed(0) + '%</div><div class="kpi-sub">中位 ' + (gt.mid / 408.69 * 100).toFixed(0) + '%；普查＝110 年（2021）；本頁量＝' + escHtml(String(_msLines.year || '')) + ' 年</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟市場（任一造）</div><div class="kpi-value" style="font-size:1.35rem;">' + _msFmtE(lt.lo) + ' – ' + _msFmtE(lt.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(lt.mid) + '｜最大線：' + (topLine ? escHtml(topLine.line) + ' ' + _msFmtE(topLine.mid / 1e4) : '-') + '</div></div>' +
+    '<div class="kpi-card"><div class="kpi-label">訴訟全口徑</div><div class="kpi-value" style="color:var(--gold);font-size:1.35rem;">' + _msFmtE(ltf.lo) + ' – ' + _msFmtE(ltf.hi) + '</div><div class="kpi-sub">中位 ' + _msFmtE(ltf.mid) + '｜署名件法驗證 ' + _msFmtE(lts.lo) + ' – ' + _msFmtE(lts.hi) + '；交集帶約 150–270 億</div></div>' +
     '<div class="kpi-card"><div class="kpi-label">政府標案（' + (gov ? gov.award_year : '-') + '）</div><div class="kpi-value" style="color:var(--green);">' + (gov ? _msFmtE(+gov.amount / 1e8) : '-') + '</div><div class="kpi-sub">A 級官方決標金額，對照用</div></div>' +
     (function () {
       const gf = { lo: gt.lo - lt.lo + ltf.lo, hi: gt.hi - lt.hi + ltf.hi, mid: gt.mid - lt.mid + ltf.mid };
