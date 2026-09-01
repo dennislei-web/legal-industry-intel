@@ -203,6 +203,14 @@
     firm_cause_shares 利基卡加名目口徑 footnote（案由層無去重素材，勿做案由層去重）；
     AI 分析 tab 頂部加去重 banner（重複率 ≥30% 加強警示）
   - **未做**：ai_analysis 文字批次重寫（擇機，dup_rate>30% 的所優先——前端 banner 已先擋）
+- **事務所版圖去重（mig 189/190，2026-09-01）**：`lawyer_group_court_month_stats`
+  （ym×court×cat×律師集合；判決只屬一法院一案類，聚掉維度＝mig 186 舊表，parse 同趟產兩表）
+  ＋`firm_court_dup_month_stats`（dup cache，⚠️ 歸戶用 047 排行口徑 lawyers_combined
+  截「事務所」，**不是** mig 186 moj fk——排行名目/去重必須同套歸戶才能相減）。
+  `firm_court_ranking` v3 加 dup/dedup 欄、rank 按 dedup；`firm_map_default_cache`
+  （mig 178 預設快取）同步補欄。前端 dup cache 有值才切去重呈現、案由種類路徑維持名目。
+  groupfill 冪等改看新表（重跑會重灌兩表）；workflow refresh 步驟改動態月份範圍
+  （原寫死 (2025,4) 曾漏刷 202505+）＋雙 RPC 逐月刷
 
 ## 訴訟客戶集中度（migration 071）
 

@@ -957,7 +957,7 @@
             <div class="kpi-sub">此案類×法院</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">喆律出庭數</div>
+            <div class="kpi-label">喆律案量</div>
             <div class="kpi-value" style="color:var(--green);" id="fmKpiZheluCases">-</div>
             <div class="kpi-sub" id="fmKpiCasesSub">近 5 年</div>
           </div>
@@ -990,7 +990,7 @@
         ※ 僅公開裁判書（下限估計）；家事裁定等多不公開，家事佔比重的所被低估更多，跨所比較限同案類內才公平。
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
-        <br>※ <strong>出庭數＝律師人次（名目口徑）</strong>：同一判決本所多人共同署名各計 1 人次，共同署名多的所（掛名制度所與協作型大所）數字偏高——主要所名目對去重灌水率 30～57%，本區排名對這類所偏有利。去重素材（mig 186）無法院×案類維度，本區無法逐條件去重；<strong>所級去重案量</strong>見事務所詳情（點所名）與「產業結構分析」區。
+        <br>※ 案量為<strong>去重口徑</strong>（同一判決同所多人共同署名只計 1 件，素材 2021/01 起，mig 189）——排名按去重值排序，名目（律師人次）與重複率見滑鼠提示。<strong>例外</strong>：選了「案由種類」時為名目口徑（案由層無去重素材）；去重資料未回填完成時亦暫以名目呈現。
       </div>
       <div class="grid-2">
         <div class="card">
@@ -12385,7 +12385,7 @@ async function loadFirmMap() {
   if (!group && !cat && !court && !year) {
     // 預設組合走快取表（mig 178，日更），秒回；快取空時 fallback RPC 現算
     ({ data: rows, error } = await db.from('firm_map_default_cache')
-      .select('rank,firm_name,cases,lawyer_count').order('rank').range(0, 999));
+      .select('rank,firm_name,cases,lawyer_count,dup_cases,dedup_cases').order('rank').range(0, 999));
     if (error || !rows?.length) {
       ({ data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: null, p_court: null, p_year: null }).range(0, 999));
     }
@@ -12401,12 +12401,22 @@ async function loadFirmMap() {
     return;
   }
 
+  // 去重呈現（mig 189）：dup cache 有值才切換；案由種類路徑（firm_cause_ranking）
+  // 無去重素材維度，維持名目
+  const hasDedup = rows.some(r => (r.dup_cases || 0) > 0);
+  const fmVal = r => hasDedup && r.dedup_cases != null ? Number(r.dedup_cases) : Number(r.cases);
+  document.getElementById('fmCasesTh').textContent =
+    (hasDedup ? '案量去重' : '出庭數') + (year ? `(${year})` : '(近5年)');
+
   // KPI：喆律競爭位置
   const zhelu = rows.find(r => isZheluFirm(r.firm_name));
   document.getElementById('fmKpiZheluRank').textContent = zhelu ? '#' + zhelu.rank : '未上榜';
-  document.getElementById('fmKpiZheluCases').textContent = zhelu ? Number(zhelu.cases).toLocaleString() : '0';
+  document.getElementById('fmKpiZheluCases').textContent = zhelu ? fmVal(zhelu).toLocaleString() : '0';
+  document.getElementById('fmKpiCasesSub').textContent =
+    (year ? year + ' 年' : '近 5 年') + (hasDedup ? '・去重' + (zhelu && zhelu.dup_cases ? `（名目 ${Number(zhelu.cases).toLocaleString()}）` : '') : '');
   document.getElementById('fmKpiTop1').textContent = rows[0].firm_name;
-  document.getElementById('fmKpiTop1Sub').textContent = Number(rows[0].cases).toLocaleString() + ' 件';
+  document.getElementById('fmKpiTop1Sub').textContent = fmVal(rows[0]).toLocaleString() + ' 件' +
+    (hasDedup && rows[0].dup_cases ? `（名目 ${Number(rows[0].cases).toLocaleString()}）` : '');
   document.getElementById('fmKpiFirms').textContent = rows.length >= 1000 ? '1,000+' : rows.length.toLocaleString();
 
   // TOP 20 橫條圖（喆律綠色）
@@ -12419,14 +12429,21 @@ async function loadFirmMap() {
       data: {
         labels: top.map(r => r.firm_name),
         datasets: [{
-          data: top.map(r => r.cases),
+          data: top.map(r => fmVal(r)),
           backgroundColor: top.map(r => isZheluFirm(r.firm_name) ? 'rgba(76,175,130,0.75)' : 'rgba(69,183,209,0.55)'),
         }]
       },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         ...chartNameClick(n => showFirmDetail(n)),
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: c => {
+            const r = top[c.dataIndex];
+            return hasDedup && r.dup_cases
+              ? `去重 ${fmVal(r).toLocaleString()} 件（名目 ${Number(r.cases).toLocaleString()}、重複率 ${Math.round(r.dup_cases * 100 / r.cases)}%）`
+              : `${fmVal(r).toLocaleString()} 件${hasDedup ? '' : '（名目）'}`;
+          }
+        } } },
         scales: {
           x: { ticks: { color: '#8899aa' }, beginAtZero: true },
           y: { ticks: { color: '#8899aa', font: { size: 11 } } }
@@ -12443,7 +12460,7 @@ async function loadFirmMap() {
     return `<tr${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
       <td>${r.rank}</td>
       <td>${firmLink(r.firm_name, z ? 'font-weight:700;' : '')}</td>
-      <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);"${hasDedup && r.dup_cases ? ` title="名目（律師人次）${Number(r.cases).toLocaleString()} 件、重複率 ${Math.round(r.dup_cases * 100 / r.cases)}%"` : ''}>${fmVal(r).toLocaleString()}</td>
       <td style="text-align:right;">${r.lawyer_count}</td>
     </tr>`;
   }).join('');

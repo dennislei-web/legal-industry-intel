@@ -1,9 +1,10 @@
 name: 所級去重素材回填（groupfill）
 
-# mig 186：同一裁判書共同署名律師集合 → lawyer_group_month_stats（所級案量去重用）。
+# mig 186/189：同一裁判書共同署名律師集合 → lawyer_group_month_stats（所級去重）＋
+# lawyer_group_court_month_stats（法院×案類維度，事務所版圖去重）。
 # 模式同 judgment-doctypefill.yml：groupfill 冪等（已上傳月自動跳過、失敗月重 dispatch 補），
-# 只傳一張新表（其餘月表內容不變；pair 三表滾動視窗不重灌）。
-# 全量 = 202101-202504（去重口徑起點，與 mig 170 pair 表同窗）。
+# 只傳兩張 group 表（其餘月表內容不變；pair 三表滾動視窗不重灌）。
+# 全量 = 202101 起到名目資料最新月（去重口徑起點 202101）；default ranges 過時可用 inputs 覆蓋。
 
 on:
   workflow_dispatch:
@@ -11,7 +12,7 @@ on:
       ranges_json:
         description: '月份區間 shards（JSON array，格式 "起-迄"）'
         required: false
-        default: '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202504"]'
+        default: '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202512","202601-202605"]'
 
 concurrency:
   group: judgment-groupfill
@@ -24,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        range: ${{ fromJSON(github.event.inputs.ranges_json || '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202504"]') }}
+        range: ${{ fromJSON(github.event.inputs.ranges_json || '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202512","202601-202605"]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,26 +77,36 @@ jobs:
           url = os.environ['SUPABASE_URL'].strip()
           key = os.environ['SUPABASE_SERVICE_KEY'].strip()
           H = {'apikey': key, 'Authorization': f'Bearer {key}'}
-          # 逐月打單月增量版（全量 p_ym=NULL ~10s 會撞 PostgREST 8s statement_timeout）
+          # 逐月打單月增量版（全量 p_ym=NULL ~10s 會撞 PostgREST 8s statement_timeout）。
+          # 範圍動態取自名目月表（寫死迄月曾漏刷 202505+，2026-09-01 事故）；
+          # 素材齊全檢查看 mig 189 新表（lawyer_group_court_month_stats）。
+          def edge(order):
+              r = requests.get(f'{url}/rest/v1/lawyer_month_stats',
+                               params={'select': 'yyyymm', 'order': f'yyyymm.{order}', 'limit': 1},
+                               headers=H, timeout=30)
+              return r.json()[0]['yyyymm']
+          lo, hi = edge('asc'), edge('desc')
+          if lo < '202101': lo = '202101'   # 去重口徑起點
           missing, bad = [], []
-          y, m = 2021, 1
-          while (y, m) <= (2025, 4):
+          y, m = int(lo[:4]), int(lo[4:])
+          while (y, m) <= (int(hi[:4]), int(hi[4:])):
               ym = f'{y}{m:02d}'
-              r = requests.get(f'{url}/rest/v1/lawyer_group_month_stats',
+              r = requests.get(f'{url}/rest/v1/lawyer_group_court_month_stats',
                                params={'ym': f'eq.{ym}', 'select': 'ym', 'limit': 1},
                                headers=H, timeout=30)
               if not r.json():
                   missing.append(ym)
               else:
-                  r = requests.post(f'{url}/rest/v1/rpc/refresh_firm_dedup_stats',
-                                    json={'p_ym': ym},
-                                    headers={**H, 'Content-Type': 'application/json'}, timeout=60)
-                  if not r.ok:
-                      bad.append(ym)
-                      print(f'refresh {ym}: HTTP {r.status_code} {r.text[:120]}')
+                  for rpc in ('refresh_firm_dedup_stats', 'refresh_firm_court_dup'):
+                      r = requests.post(f'{url}/rest/v1/rpc/{rpc}',
+                                        json={'p_ym': ym},
+                                        headers={**H, 'Content-Type': 'application/json'}, timeout=60)
+                      if not r.ok:
+                          bad.append(f'{ym}:{rpc}')
+                          print(f'refresh {ym} {rpc}: HTTP {r.status_code} {r.text[:120]}')
               m += 1
               if m > 12: y, m = y + 1, 1
-          print('缺 lawyer_group 的月份:', missing or '無 ✅')
+          print('缺 lawyer_group_court 的月份:', missing or '無 ✅')
           print('refresh 失敗的月份:', bad or '無 ✅')
           if missing or bad:
               sys.exit(1)  # 讓 run 標紅，提醒重 dispatch 補跑
