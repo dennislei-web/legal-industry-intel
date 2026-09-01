@@ -2371,15 +2371,16 @@
           <option value="365">近一年</option>
           <option value="0">全部</option>
         </select>
-        <select id="chgType" onchange="filterChanges()">
-          <option value="">所有類型</option>
-          <option value="firm_change">事務所異動</option>
-          <option value="new_lawyer">新進律師</option>
-          <option value="state_change">執業狀態變更</option>
-        </select>
       </div>
       <div id="chgUnknownNote" style="font-size:0.75rem;color:var(--text-muted);line-height:1.65;margin:-6px 0 16px;display:none;"></div>
 
+      <!-- 頁內 sub-tab（2026-09 IA P2-1）：KPI/時間窗/搜尋共用置頂，下方分「異動明細」「人才流動與版圖變遷」 -->
+      <div id="chgSubTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="sub-tab-btn active" data-chg="detail" onclick="switchChgTab('detail')">異動明細</button>
+        <button class="sub-tab-btn" data-chg="flow" onclick="switchChgTab('flow')">人才流動與版圖變遷</button>
+      </div>
+
+      <div id="tab-chg-flow" class="chg-subpanel" style="display:none;">
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title" style="color:var(--gold);">&#128200; 事務所異動總表 — 進出・新血・開關一次看<span id="ffOvCount" style="color:var(--text-muted);font-weight:400;"></span></div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin:6px 0;">
@@ -2427,22 +2428,30 @@
           </div>
         </div>
       </div>
+      </div><!-- /tab-chg-flow -->
+
+      <div id="tab-chg-detail" class="chg-subpanel">
       <div class="card" id="chgDetailCard">
-        <div class="card-title ff-toggle" onclick="toggleFf(this)" style="cursor:pointer;user-select:none;">
-          <span class="ff-caret" style="display:inline-block;width:1.1em;color:var(--text-muted);">&#9654;</span>&#128260; 異動明細
+        <div class="card-title">&#128260; 異動明細</div>
+        <div style="margin:8px 0;">
+          <select id="chgType" onchange="filterChanges()" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 10px;font-size:0.82rem;">
+            <option value="">所有類型</option>
+            <option value="firm_change">事務所異動</option>
+            <option value="new_lawyer">新進律師</option>
+            <option value="state_change">執業狀態變更</option>
+          </select>
         </div>
-        <div class="ff-body" style="display:none;">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>日期</th><th>律師</th><th>類型</th><th>異動內容</th></tr>
-              </thead>
-              <tbody id="chgTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
-            </table>
-          </div>
-          <div class="pagination" id="chgPagination"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>日期</th><th>律師</th><th>類型</th><th>異動內容</th></tr>
+            </thead>
+            <tbody id="chgTableBody"><tr><td colspan="4" class="loading">載入中</td></tr></tbody>
+          </table>
         </div>
+        <div class="pagination" id="chgPagination"></div>
       </div>
+      </div><!-- /tab-chg-detail -->
 
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.6;">
@@ -4117,8 +4126,8 @@ function showTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
-  // 圖表分頁頁頂章節索引（domain/topics 走子分頁、由各自 switcher 產生）
-  if (content && tab !== 'domain' && tab !== 'jstat-topics') buildSectionIndex(content);
+  // 圖表分頁頁頂章節索引（domain/topics/changes 走子分頁、由各自 switcher 產生）
+  if (content && tab !== 'domain' && tab !== 'jstat-topics' && tab !== 'changes') buildSectionIndex(content);
   document.querySelectorAll('#subTabsBar .tab-btn').forEach(btn =>
     btn.classList.toggle('active', btn.id === 'tabBtn_' + tab));
 
@@ -4143,7 +4152,7 @@ function showTab(tab) {
   if (tab === 'firm-overview') loadFirmOverviewOnce();
   if (tab === 'deepreport') loadDeepReportOnce();
   if (tab === 'offices') loadOffices();
-  if (tab === 'changes') { loadChanges(); loadFirmFlow(); }
+  if (tab === 'changes') { initChgTab(); loadChanges(); loadFirmFlow(); }
   if (tab === 'inhouse') loadInhouseOnce();
   if (tab === 'corpmap') loadCorpmapOnce();
   if (tab === 'alumni' && isAdmin) loadAlumni();
@@ -9775,18 +9784,11 @@ async function loadChanges(force) {
 }
 
 function filterChanges() {
-  chgPage = 0; chgExpandDetail(); renderChanges();
+  chgPage = 0; renderChanges();
   // 頂部搜尋同步過濾異動總表（總表內建搜尋框仍可獨立覆寫）
   const kw = (document.getElementById('chgSearch').value || '').trim();
   const ovInput = document.getElementById('ffOvSearch');
   if (ovInput) { ovInput.value = kw; setOvQuery(kw); }
-}
-
-// 異動明細預設收合；使用者搜尋或選類型時自動展開（否則篩了看不到結果）
-function chgExpandDetail() {
-  const card = document.getElementById('chgDetailCard');
-  const body = card && card.querySelector(':scope > .ff-body');
-  if (body && body.style.display === 'none') toggleFf(card.querySelector('.ff-toggle'));
 }
 
 const CHG_TYPE_META = {
@@ -12135,11 +12137,12 @@ async function ovLawyers(el, fk) {
       || '<span style="color:var(--text-muted);">此期間無人員進出</span>'}</div></td>`;
 }
 
-// 下鑽：把所名塞進明細搜尋（firm_key 是原始所名前綴，substring 可命中含分所）
+// 下鑽：把所名塞進明細搜尋（firm_key 是原始所名前綴，substring 可命中含分所），並切到明細 sub-tab
 function ovDrill(fk) {
   document.getElementById('chgSearch').value = fk;
   document.getElementById('chgType').value = '';
   filterChanges();
+  switchChgTab('detail');
   document.getElementById('chgDetailCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function setOvFilter(k) { _ovFilter = k; renderOv(); }
@@ -12209,6 +12212,23 @@ function renderOv() {
 }
 
 // 2026-07-15 起併入「律師區＞異動追蹤」頁（原產業分析獨立 tab 已移除），由 showTab('changes') lazy load =====
+// 頁內 sub-tab（2026-09 IA P2-1）：detail=異動明細 / flow=人才流動與版圖變遷（KPI/時間窗/搜尋共用置頂）
+let _chgTabInit = false;
+const CHG_SUBTABS = ['detail', 'flow'];
+function initChgTab() {
+  if (_chgTabInit) return; _chgTabInit = true;
+  switchChgTab(CHG_SUBTABS.includes(navState.chg) ? navState.chg : 'detail');
+}
+window.switchChgTab = function(k) {
+  navState.chg = k;
+  saveNavState();
+  document.querySelectorAll('#chgSubTabs .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.chg === k));
+  CHG_SUBTABS.forEach(t => {
+    const el = document.getElementById('tab-chg-' + t);
+    if (el) el.style.display = (t === k) ? 'block' : 'none';
+  });
+  buildSectionIndex(document.getElementById('tab-chg-' + k));
+};
 let _ffWin = null;   // 目前載入的時間窗（天數；null=未載）
 // 區塊收合：標題可點，預設收起（讓使用者一眼看到本頁有哪些區塊）
 function toggleFf(el) {
