@@ -122,10 +122,15 @@
   `python judgment_stats.py reclassify <起> <迄>` 強制重跑（會刪 agg 快取、覆蓋上傳）
 - 家事分析 RPC：`family_judge_stats()`、`family_cases_by_year()`（含 ok_months 回填偵測，
   月家事 >= 300 視為新分類已回填），法官年度趨勢：`judge_days_by_year()`
-- **家事律師版圖走 cache 表**（migration 049）：前端讀 `family_lawyer_stats_cache` /
-  `family_lawyer_by_court_cache`，勿再直呼 `family_lawyer_stats()`/`family_lawyer_by_court()`
-  RPC 分頁（PostgREST 對 RPC 的 `.range()` 是每頁重跑整個函數，曾造成 tab 載入 30s+）；
-  `refresh_family_lawyer_stats()` 由 `refresh_stats()` 月更一併呼叫
+- **家事律師版圖已泛化為「領域律師版圖」（2026-09-01 IA P3-3，mig 182）**：
+  訴訟市場第 4 subpanel `tab-domain-lawyers`，任選案由種類看法院常勝軍＋TOP250 名單。
+  法院維度資料源 `lawyer_cause_court_stats`（律師×法院×種類，近 60 月滾動 47.6 萬列，
+  firm 唯一名歸戶；`refresh_lawyer_cause_stats()` 尾端月更）＋RPC `cause_court_list` /
+  `cause_court_top_lawyers`；名單走 `cause_top_lawyers(p_year)` 單發。
+  **前端一律 server-side 篩選、嚴禁拉全量**（PostgREST 對 RPC 的 `.range()` 是每頁重跑
+  整個函數，049 時代曾造成 tab 載入 30s+）。專業法庭 famLawyersBlock 僅剩導向卡
+  （`_dlPresetCat` 預選家事）。**family_lawyer_* 4 張 cache 表（mig 049/055）前端已下線**、
+  暫留 DB 觀察一輪後另開 migration 清理（`refresh_family_lawyer_stats()` 仍在 refresh_stats 鏈）
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
 - 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
 - **Phase B 案由層（migration 069/070）**：parse 帶 JTITLE → `lawyer_month_stats.causes` /
@@ -287,6 +292,19 @@
     （Lawsnote expertise_top10，官方案由的「訴訟領域律師 TOP 10」上移補位）
   - 案由供需表：聚合剩餘桶（「其他*」「特別法」）沉到表尾＋降灰標「剩餘桶」
   - localStorage navState 舊值（prosecutor/clerk section、已刪 tab 名）都有 fallback，不需遷移
+- **2026-09-01 IA 重整 P2/P3（commits e5c8356→7b7f60e）**：
+  - P2-1 異動追蹤頁內 sub-tab：`tab-changes` 拆 detail（異動明細）/flow（人才流動與版圖變遷）
+    兩個 `chg-subpanel`（`switchChgTab`、navState.chg；KPI/時間窗/搜尋共用置頂；
+    總表「明細」鈕 ovDrill 自動切分頁；明細卡不再收合、chgType 移入明細分頁）
+  - P2-2 司法統計總覽動態化：mig 181 `jstat_overview_stats()`（court_case_stats 年×分類，
+    民國 90 年起；月報 vs 開放資料口徑差異見 migration 註解）。**靜態月報三圖仍並列，
+    待使用者核可差異表後才刪**（核可後總數趨勢與訴訟市場重複部分改連結卡）
+  - P3-1 header 全站搜尋：`gsSearch` debounce 300ms 並行查 lawyers_with_stats/judges_combined/
+    prosecutor_stats/moj_firm_stats_cache，點擊開對應 modal（檢察官無 modal→跳名錄帶搜尋）；
+    未登入時 table 類（檢察官/事務所）RLS 回空、view 類可查，屬預期
+  - P3-2 總覽深度文章卡 4 張三層直達；順修 topics builder 首建硬蓋 civil 的 race
+    （改讀當前 active 按鈕）
+  - P3-3 領域律師版圖（見上方裁判書管線節）
 - **2026-07 Phase 1 產業分析整併**：家事法官（`family`）從產業分析移到**法官區**（純 SECTIONS 改）；
   「家事律師/事務所版圖/案由供需」收攏成「**領域版圖**」（`tab-domain`，內部 3 個 `domain-subpanel`：
   `tab-fam-lawyers/firm-map/cause-supply`，class 由 `tab-content` 改 `domain-subpanel`，
