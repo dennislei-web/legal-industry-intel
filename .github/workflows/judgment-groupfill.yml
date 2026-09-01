@@ -1,0 +1,102 @@
+name: 所級去重素材回填（groupfill）
+
+# mig 186：同一裁判書共同署名律師集合 → lawyer_group_month_stats（所級案量去重用）。
+# 模式同 judgment-doctypefill.yml：groupfill 冪等（已上傳月自動跳過、失敗月重 dispatch 補），
+# 只傳一張新表（其餘月表內容不變；pair 三表滾動視窗不重灌）。
+# 全量 = 202101-202504（去重口徑起點，與 mig 170 pair 表同窗）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      ranges_json:
+        description: '月份區間 shards（JSON array，格式 "起-迄"）'
+        required: false
+        default: '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202504"]'
+
+concurrency:
+  group: judgment-groupfill
+  cancel-in-progress: false
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        range: ${{ fromJSON(github.event.inputs.ranges_json || '["202101-202112","202201-202212","202301-202312","202401-202412","202501-202504"]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r scripts/requirements.txt
+          # 官方 7zz：ubuntu 的 p7zip 16.02（2016）解不開部分「Update」重打包月包
+          curl -sL https://github.com/ip7z/7zip/releases/download/24.09/7z2409-linux-x64.tar.xz -o /tmp/7z.tar.xz
+          sudo tar -xf /tmp/7z.tar.xz -C /usr/local/bin 7zz
+          7zz | head -2
+
+      - name: Resolve opendata.judicial.gov.tw via DoH（gov.tw DNS 拒答 Azure resolver）
+        run: |
+          IP=$(curl -s "https://dns.google/resolve?name=opendata.judicial.gov.tw&type=A" | jq -r '[.Answer[]? | select(.type==1)][0].data // empty')
+          if [ -z "$IP" ]; then IP=210.69.124.89; fi
+          echo "resolved: $IP"
+          echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
+
+      - name: Groupfill ${{ matrix.range }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
+          JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
+          SEVENZ_PATH: 7zz
+        working-directory: scripts
+        run: |
+          RANGE="${{ matrix.range }}"
+          python judgment_stats.py groupfill "${RANGE%-*}" "${RANGE#*-}"
+
+  refresh:
+    runs-on: ubuntu-latest
+    needs: shard
+    if: always()   # 部分 shard 失敗也先 refresh（缺月重 dispatch 補跑即可）
+    timeout-minutes: 30
+    steps:
+      - name: Refresh 所×月去重 cache + 檢查缺月
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          pip install -q requests
+          python - <<'EOF'
+          import os, requests, sys
+          url = os.environ['SUPABASE_URL'].strip()
+          key = os.environ['SUPABASE_SERVICE_KEY'].strip()
+          H = {'apikey': key, 'Authorization': f'Bearer {key}'}
+          # 逐月打單月增量版（全量 p_ym=NULL ~10s 會撞 PostgREST 8s statement_timeout）
+          missing, bad = [], []
+          y, m = 2021, 1
+          while (y, m) <= (2025, 4):
+              ym = f'{y}{m:02d}'
+              r = requests.get(f'{url}/rest/v1/lawyer_group_month_stats',
+                               params={'ym': f'eq.{ym}', 'select': 'ym', 'limit': 1},
+                               headers=H, timeout=30)
+              if not r.json():
+                  missing.append(ym)
+              else:
+                  r = requests.post(f'{url}/rest/v1/rpc/refresh_firm_dedup_stats',
+                                    json={'p_ym': ym},
+                                    headers={**H, 'Content-Type': 'application/json'}, timeout=60)
+                  if not r.ok:
+                      bad.append(ym)
+                      print(f'refresh {ym}: HTTP {r.status_code} {r.text[:120]}')
+              m += 1
+              if m > 12: y, m = y + 1, 1
+          print('缺 lawyer_group 的月份:', missing or '無 ✅')
+          print('refresh 失敗的月份:', bad or '無 ✅')
+          if missing or bad:
+              sys.exit(1)  # 讓 run 標紅，提醒重 dispatch 補跑
+          EOF

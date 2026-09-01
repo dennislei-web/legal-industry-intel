@@ -17,6 +17,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py pairfill 202005 202504   # Phase 2 配對回填（強制重解、跳過已上傳 pair 的月）
   python judgment_stats.py causefill 202105 202604  # Phase B 案由回填（強制重解、跳過已帶 causes 的月）
   python judgment_stats.py pairamtfill 202101 202606 # 逐案層回填（mig 170：同方共同列名 pair＋民事標的金額；只傳兩張新表）
+  python judgment_stats.py groupfill 202101 202504  # 所級去重素材回填（mig 186：同判決律師集合；只傳 lawyer_group_month_stats）
   python judgment_stats.py doctypefill 199601 202605 # 判決/裁定回填（強制重解、只傳 judge/lawyer 月表）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full p7zip-rar）。
@@ -629,6 +630,9 @@ def parse(yyyymm):
     # 逐案層（mig 170）：同 block 共同列名 pair（無法院維度、永久保存）＋ 民事金額桶
     pmagg = defaultdict(int)   # (律師A,律師B) canonical A<B → 案件數（同案去重）
     amagg = defaultdict(int)   # (律師,金額桶) → 案件數
+    # 所級去重素材（mig 186）：同一裁判書的律師全集合（>=2 人；跨當事人方合併，
+    # 全案類＋判決裁定都收——同所律師代理不同共同被告仍屬同一判決）
+    ggagg = defaultdict(int)   # tuple(sorted 律師名) → 判決數
     n_civil = 0                # 民事裁判總數（金額覆蓋率分母）
     n_civil_amt = 0            # 其中抽得到訴訟標的金額者
     # 細分專庭字別（mig 131）：法官人次與案件數兩口徑；backfill 端在 jcasefill.py，
@@ -689,6 +693,7 @@ def parse(yyyymm):
                             opagg[key] += 1
             # ── 逐案層（mig 170）：同 block 共同列名 pair ＋ 民事標的金額 ──
             if len(lawyers) >= 2:
+                ggagg[tuple(sorted(lawyers))] += 1  # 所級去重素材（mig 186）
                 pset = set()
                 for blk in extract_lawyer_blocks(jfull):
                     if len(blk) > PAIR_MAX_PER_SIDE:
@@ -773,6 +778,8 @@ def parse(yyyymm):
               for k, v in pmagg.items()]
     amrows = [{'ym': yyyymm, 'name': k[0], 'bucket': k[1], 'cases': v}
               for k, v in amagg.items()]
+    ggrows = [{'ym': yyyymm, 'lawyers': list(k), 'cases': v}
+              for k, v in ggagg.items()]
     jcrows = [{'name': k[0], 'court_name': k[1], 'yyyymm': yyyymm, 'jcase': k[2], 'n': v}
               for k, v in jcagg.items()]
     ccrows = [{'court_name': k[0], 'yyyymm': yyyymm, 'jcase': k[1], 'n': v}
@@ -782,6 +789,7 @@ def parse(yyyymm):
                    'lawyer_judge': ljrows, 'cocounsel': corows, 'opposing': oprows,
                    'judge_jcase': jcrows, 'court_jcase': ccrows,
                    'pair_month': pmrows, 'amount_month': amrows,
+                   'lawyer_group': ggrows,
                    'amount_meta': {'civil_total': n_civil,
                                    'civil_with_amount': n_civil_amt},
                    'cause_keys': sorted(cause_keys)},
@@ -789,7 +797,8 @@ def parse(yyyymm):
     print(f'  解析完成：{n_files} 份裁判書，{len(rows)} 個 (法官,法院) 組合，'
           f'{len(lrows)} 個 (律師,法院) 組合，{len(prows)} 個 (檢察官,檢察署) 組合，'
           f'{len(ljrows)} 律師×法官／{len(corows)} 協同／{len(oprows)} 對造 pair，'
-          f'{len(pmrows)} 同方共列 pair，民事金額覆蓋 {n_civil_amt}/{n_civil}，'
+          f'{len(pmrows)} 同方共列 pair，{len(ggrows)} 同案律師組合，'
+          f'民事金額覆蓋 {n_civil_amt}/{n_civil}，'
           f'{n_no_judge} 份未抽到法官，{(time.time()-t0)/60:.1f} 分鐘')
     return out_path
 
@@ -888,6 +897,9 @@ def upload(yyyymm, tables=None):
         _upload_rows('lawyer_pair_month_stats', yyyymm, data['pair_month'], ym_col='ym')
     if data.get('amount_month') and want('lawyer_amount_month_stats'):
         _upload_rows('lawyer_amount_month_stats', yyyymm, data['amount_month'], ym_col='ym')
+    # 所級去重素材（mig 186；舊 agg.json 無此 key 時略過，該月由 groupfill 覆蓋）
+    if data.get('lawyer_group') and want('lawyer_group_month_stats'):
+        _upload_rows('lawyer_group_month_stats', yyyymm, data['lawyer_group'], ym_col='ym')
     print('  上傳完成')
 
 
@@ -902,6 +914,14 @@ def pairs_uploaded(yyyymm):
 def pairamt_uploaded(yyyymm):
     """該月同方共同列名 pair 是否已上傳（pairamtfill 冪等跳過用）"""
     r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_pair_month_stats',
+                     params={'ym': f'eq.{yyyymm}', 'select': 'ym', 'limit': 1},
+                     headers=HEADERS_SB, timeout=30, verify=False)
+    return r.status_code == 200 and len(r.json()) > 0
+
+
+def group_uploaded(yyyymm):
+    """該月同案律師組合是否已上傳（groupfill 冪等跳過用）"""
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_group_month_stats',
                      params={'ym': f'eq.{yyyymm}', 'select': 'ym', 'limit': 1},
                      headers=HEADERS_SB, timeout=30, verify=False)
     return r.status_code == 200 and len(r.json()) > 0
@@ -967,6 +987,36 @@ def refresh_stats():
                           json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
                           timeout=600, verify=False)
         print(f'  HTTP {r.status_code}')
+    refresh_firm_dedup()
+
+
+def refresh_firm_dedup():
+    """所×月去重 cache（mig 186）逐月重刷。全量版（p_ym=NULL）~10s 會撞
+    PostgREST authenticator 的 8s statement_timeout（函數層 SET 蓋不掉已武裝
+    的頂層計時器），只能逐月打單月增量版（每月 ~5s）；逐月全刷也順便吸收
+    名冊歸戶漂移（現任名冊回溯口徑）。範圍 = lawyer_group_month_stats 的 min~max ym。"""
+    def _edge(order):
+        r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_group_month_stats',
+                         params={'select': 'ym', 'order': f'ym.{order}', 'limit': 1},
+                         headers=HEADERS_SB, timeout=30, verify=False)
+        rows = r.json() if r.status_code == 200 else []
+        return rows[0]['ym'] if rows else None
+    lo, hi = _edge('asc'), _edge('desc')
+    if not lo:
+        print('  refresh_firm_dedup_stats: 無 lawyer_group 素材，跳過')
+        return
+    print(f'  逐月 refresh_firm_dedup_stats {lo}~{hi} ...')
+    bad = 0
+    for ym in month_range(lo, hi):
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/refresh_firm_dedup_stats',
+                          json={'p_ym': ym},
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          timeout=60, verify=False)
+        if r.status_code not in (200, 204):
+            bad += 1
+            print(f'    {ym}: HTTP {r.status_code} {r.text[:120]}')
+    print(f'  refresh_firm_dedup_stats 完成（{bad} 月失敗）' if bad
+          else '  refresh_firm_dedup_stats 完成')
 
 
 def cleanup(yyyymm, purge_rar=False):
@@ -1126,6 +1176,39 @@ if __name__ == '__main__':
                 time.sleep(90)
                 try:
                     upload(ym, tables=PA_TABLES)
+                    cleanup(ym, purge_rar=True)
+                    print(f'{ym}: 重試成功')
+                except Exception as e2:
+                    print(f'{ym}: 重試仍失敗 — {e2}（重跑可補）')
+                    failed.append(ym)
+        if failed:
+            print(f'最終失敗月份: {failed}')
+            sys.exit(1)
+    elif cmd == 'groupfill':
+        # 所級去重素材回填（mig 186）：同一裁判書律師集合 → lawyer_group_month_stats。
+        # 強制重解（舊 agg 快取沒存 lawyer_group key），冪等跳過已上傳的月份。
+        # 只傳一張新表（其餘月表內容不變、pair 三表滾動視窗不重灌，同 pairamtfill 理由）。
+        # 失敗處理同 causefill：等 90 秒重傳一次，最終失敗 exit 1。
+        GF_TABLES = ('lawyer_group_month_stats',)
+        failed = []
+        for ym in month_range(sys.argv[2], sys.argv[3]):
+            try:
+                if group_uploaded(ym):
+                    print(f'{ym}: lawyer_group 已上傳，跳過')
+                    continue
+                old_agg = os.path.join(WORK_DIR, f'{ym}_agg.json')
+                if os.path.exists(old_agg):
+                    os.remove(old_agg)
+                print(f'=== {ym} ===')
+                download(ym)
+                parse(ym)
+                upload(ym, tables=GF_TABLES)
+                cleanup(ym, purge_rar=True)
+            except Exception as e:
+                print(f'{ym}: 失敗 — {e}，90 秒後重試上傳一次')
+                time.sleep(90)
+                try:
+                    upload(ym, tables=GF_TABLES)
                     cleanup(ym, purge_rar=True)
                     print(f'{ym}: 重試成功')
                 except Exception as e2:
