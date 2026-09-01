@@ -153,6 +153,20 @@
     .header-brand .name { font-size: 1.1rem; font-weight: 700; color: var(--gold-light); letter-spacing: 1px; }
     .header-actions { display: flex; align-items: center; gap: 12px; }
 
+    /* 全站搜尋（IA 重整 P3-1；header 一框搜 律師/法官/檢察官/事務所） */
+    #gsWrap { position: relative; }
+    #gsInput { width: 170px; padding: 7px 12px; background: var(--bg-main); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: inherit; font-size: 0.8rem; transition: width .15s; }
+    #gsInput:focus { width: 235px; outline: none; border-color: var(--gold); }
+    #gsResults { display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 330px; max-height: 65vh;
+      overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.35); z-index: 1200; text-align: left; }
+    .gs-head { padding: 9px 14px 3px; font-size: 0.7rem; color: var(--text-muted); font-weight: 700; letter-spacing: .05em; }
+    .gs-item { padding: 7px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 1px; font-size: 0.85rem; color: var(--text); }
+    .gs-item:hover { background: var(--bg-row); }
+    .gs-item .gs-sub { font-size: 0.72rem; color: var(--text-muted); }
+    .gs-note { padding: 10px 14px; color: var(--text-muted); font-size: 0.82rem; }
+
     .theme-toggle {
       background: var(--ghost-bg); border: 1px solid var(--border); color: var(--text-muted);
       width: 36px; height: 36px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -328,6 +342,7 @@
       .header-inner { height: 52px; }
       .header-brand .name { font-size: 0.95rem; letter-spacing: 0.5px; }
       .header-actions { gap: 8px; }
+      #gsInput { width: 110px; } #gsInput:focus { width: 160px; } #gsResults { width: 280px; }
       .user-badge { display: none; }
       .btn-logout { padding: 6px 10px; font-size: 0.75rem; }
       .theme-toggle { width: 32px; height: 32px; font-size: 1rem; }
@@ -612,6 +627,10 @@
       </div>
       <div class="header-actions">
         <span class="user-badge" id="userBadge"></span>
+        <div id="gsWrap">
+          <input id="gsInput" type="text" placeholder="&#128269; 搜律師/法官/事務所…" autocomplete="off" oninput="gsOnInput()" onfocus="gsOnFocus()">
+          <div id="gsResults"></div>
+        </div>
         <button class="btn-logout" onclick="showChangePassword()" title="修改密碼" style="font-size:0.75rem;">&#128273; 改密碼</button>
         <button class="theme-toggle" onclick="toggleTheme()" title="切換主題">&#9790;</button>
         <button class="btn-logout" onclick="handleLogout()">登出</button>
@@ -4606,6 +4625,89 @@ window.gotoTab = function(sec, tab, sub) {
   if (sub && tab === 'domain' && typeof switchDomainTab === 'function') switchDomainTab(sub);
   if (sub && tab === 'jstat-topics' && typeof switchJstatTopic === 'function') switchJstatTopic(sub);
 };
+
+// ===== 全站搜尋（IA 重整 P3-1）：header 一框搜 律師/法官/檢察官/事務所，點擊開對應 modal =====
+let _gsTimer = null, _gsSeq = 0, _gsItems = [];
+function gsOnInput() {
+  clearTimeout(_gsTimer);
+  const kw = document.getElementById('gsInput').value.trim();
+  if (kw.length < 2) { gsHide(); return; }
+  _gsTimer = setTimeout(() => gsSearch(kw), 300);  // debounce 300ms：PostgREST ilike 節流
+}
+function gsOnFocus() {
+  if (_gsItems.length && document.getElementById('gsInput').value.trim().length >= 2)
+    document.getElementById('gsResults').style.display = 'block';
+}
+function gsHide() { const el = document.getElementById('gsResults'); if (el) el.style.display = 'none'; }
+async function gsSearch(kw) {
+  const seq = ++_gsSeq;
+  const pat = '%' + kw.replace(/[%_]/g, '') + '%';
+  const box = document.getElementById('gsResults');
+  box.style.display = 'block';
+  box.innerHTML = '<div class="gs-note">搜尋中…</div>';
+  const [lw, jg, pr, fm] = await Promise.all([
+    db.from('lawyers_with_stats').select('name,firm_name,moj_lic_no,official_cases_5yr')
+      .ilike('name', pat).order('official_cases_5yr', { ascending: false, nullsFirst: false }).limit(6),
+    db.from('judges_combined').select('name,court_name,case_count_total')
+      .ilike('name', pat).order('case_count_total', { ascending: false, nullsFirst: false }).limit(6),
+    db.from('prosecutor_stats').select('name,office_name,case_count_total')
+      .ilike('name', pat).order('case_count_total', { ascending: false, nullsFirst: false }).limit(12),
+    db.from('moj_firm_stats_cache').select('firm_name,lawyer_count,main_region')
+      .ilike('firm_name', pat).order('lawyer_count', { ascending: false }).limit(6),
+  ]);
+  if (seq !== _gsSeq) return;  // 過時回應丟棄（已有更新的輸入）
+  _gsItems = [];
+  let html = '';
+  const section = (title, rows, kind, main, sub) => {
+    if (!rows || !rows.length) return;
+    html += `<div class="gs-head">${title}</div>`;
+    rows.forEach(r => {
+      const i = _gsItems.length;
+      _gsItems.push({ kind, r });
+      const s = sub(r);
+      html += `<div class="gs-item" data-i="${i}"><span>${escHtml(main(r))}</span>${s ? `<span class="gs-sub">${escHtml(s)}</span>` : ''}</div>`;
+    });
+  };
+  // 檢察官同名跨署去重（prosecutor_stats 為 人×署 五年累計組合）
+  const prSeen = new Set(), prRows = [];
+  (pr.data || []).forEach(p => {
+    if (prSeen.has(p.name) || prRows.length >= 6) return;
+    prSeen.add(p.name); prRows.push(p);
+  });
+  section('律師', lw.data, 'lawyer', r => r.name,
+    r => (r.firm_name || '') + (r.official_cases_5yr ? `・近5年 ${Number(r.official_cases_5yr).toLocaleString()} 件` : ''));
+  section('法官', jg.data, 'judge', r => r.name,
+    r => (r.court_name || '') + (r.case_count_total ? `・${Number(r.case_count_total).toLocaleString()} 件` : ''));
+  section('檢察官', prRows, 'pros', r => r.name,
+    r => (r.office_name || '') + (r.case_count_total ? `・${Number(r.case_count_total).toLocaleString()} 件` : ''));
+  section('事務所', fm.data, 'firm', r => r.firm_name,
+    r => `${r.lawyer_count || 0} 位律師` + (r.main_region ? `・${r.main_region}` : ''));
+  box.innerHTML = html || '<div class="gs-note">查無結果</div>';
+}
+function gsPick(i) {
+  const it = _gsItems[i];
+  if (!it) return;
+  gsHide();
+  if (it.kind === 'lawyer') showLawyerDetail(it.r.name, it.r.moj_lic_no || '');
+  else if (it.kind === 'judge') showJudgeDetail(it.r.name, it.r.court_name || '');
+  else if (it.kind === 'firm') showFirmDetail(it.r.firm_name);
+  else if (it.kind === 'pros') {
+    // 檢察官無個人 modal：跳名錄帶入搜尋（showTab('prosecutors') 會 loadProsecutors 吃新關鍵字）
+    const inp = document.getElementById('prosSearch');
+    if (inp) inp.value = it.r.name;
+    const of = document.getElementById('prosOfficeFilter');
+    if (of) of.value = '';
+    prosPage = 0;
+    gotoTab('judge', 'prosecutors');
+  }
+}
+document.addEventListener('click', e => {
+  const item = e.target.closest('.gs-item');
+  if (item) { gsPick(parseInt(item.dataset.i, 10)); return; }
+  const wrap = document.getElementById('gsWrap');
+  if (wrap && !wrap.contains(e.target)) gsHide();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') gsHide(); });
 
 const lwNameLink = n => `<a href="#" onclick="showLawyerDetail('${escHtml(n).replace(/'/g, "\\'")}','');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(n)}</a>`;
 const rankFailMsg = e => `<div style="color:var(--red);font-size:0.8rem;">載入失敗：${escHtml(e.message || '')}</div>`;
