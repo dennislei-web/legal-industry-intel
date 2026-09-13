@@ -4,8 +4,8 @@
 -- 來源：Excel「2023」分頁 27 位有內容（另 7 位只有姓名、無內容，未入庫：余信達／蕭逸泓／雷丘／余宗鳴／
 --       鄧湘全／李易撰／林仲豪）＋「2024」分頁 1 位（周宇修二訪）。
 -- 日期：原表僅知年份 → interviewed_on 記該年 01-01，date_precision='year'（前端顯示「2023 年」）。
--- 「營收/個人收入」欄原表未區分口徑：受僱／獨立小所視為個人收入（fin.personal_income），
---   主持／合夥所大額視為所（或單位）營收（fin.revenue）；區間取中位、value_qual='~'，原區間寫在 value_text。
+-- 「營收/個人收入」欄＝受訪者個人（或其單位）收入，一律 fin.personal_income，不得當全所營收（雷 2026-09-13 糾正，mig 199 修）；
+--   區間取中位、value_qual='~'，原區間寫在 value_text。
 -- 事務所名對齊 moj_firm_statistics()：宇恆→宇恒、六合國際→六合、大恆→大恆國際、天晴和永→天晴和永國際商務、
 --   法鳴國際→法鳴、永信→永信法律、成鼎→成鼎律師、立勤→立勤國際、KPMG→安侯、眾勤（北所）→眾勤。
 -- 律師別字：謝佳頴→謝佳穎、周逸賓→周逸濱、許肇慶→許兆慶（皆以 MOJ 名冊為準）。
@@ -283,11 +283,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 19. 陳全正｜眾勤法律事務所（北所） ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('眾勤法律事務所', DATE '2023-01-01', 'year', '主持律師', '陳全正，執業 13 年（眾勤 2→普華 5→眾勤 6），北所主持律師', '拜訪',
-   '北所營收約 2,000 萬，1 老闆＋5 受僱＋2–4 合署；做智財、股權結構、勞資，案源中小企業處、資策會、客戶介紹。擔心案源與「業績差→付不出薪→受僱流動→更差」負向循環，想往外找合夥（內部升上來的天花板就是自己）。透露普華制度：兩個 BU 各 4–5 小組，BU 年目標 1 億、小組 1,000–3,000 萬，改小組目標後達成與否嚴重影響獎金。',
+   '個人收入約 2,000 萬，1 老闆＋5 受僱＋2–4 合署；做智財、股權結構、勞資，案源中小企業處、資策會、客戶介紹。擔心案源與「業績差→付不出薪→受僱流動→更差」負向循環，想往外找合夥（內部升上來的天花板就是自己）。透露普華制度：兩個 BU 各 4–5 小組，BU 年目標 1 億、小組 1,000–3,000 萬，改小組目標後達成與否嚴重影響獎金。',
    '執業13年，眾勤2、普華5、眾勤6｜主持律師｜2000｜1老闆、5受僱、2~4合屬｜普華制度同會計師事務所、主要兩個ＢＵ，每個ＢＵ下4~5個小組，每個ＢＵ年度營業目標1E，每個小組目標1000~3000不等，之前是個人營業目標、現在改小組營業目標，達成與否嚴重影響獎金收入／目前事務所主要做智財、股權結構、勞資，案件多半從中小企業處、資策會及客戶介紹／擔心案源，希望往外找合夥（覺得內部升遷受雇是自己教的，天花板就是自己）／擔心負向循環，業績差>給不了受僱薪水>受僱流動>業績更差／與楊律師分配方式，引案後共同支出成本，獲利依引案比例分配') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '眾勤法律事務所', 'fin.revenue', 2000::numeric, '='::text, '北所營收約 2,000 萬（原表「營收/個人收入」欄）', 'medium', false, NULL::text, NULL::text, 1),
+  ('firm', '眾勤法律事務所', 'fin.personal_income', 2000::numeric, '='::text, '受訪者（北所主持律師）個人收入約 2,000 萬（原表「營收/個人收入」欄；非全所營收）', 'medium', false, NULL::text, NULL::text, 1),
   ('firm', '眾勤法律事務所', 'org.headcount', 9, '~', '北所：1 位老闆＋5 位受僱＋2–4 位合署', 'high', false, 'moj_firm_statistics 2026-09：眾勤全所 23 人（含各地分所）；陳全正現仍登錄眾勤', NULL, 2),
   ('peer', '普華商務法律事務所', 'comp.bonus_components', NULL, NULL, '制度同會計師事務所：兩個 BU、各 4–5 個小組；BU 年度營業目標 1 億、小組 1,000–3,000 萬；原為個人營業目標、改為小組目標，達成與否嚴重影響獎金', 'high', false, 'moj_firm_statistics 2026-09：普華 75 人', '每個ＢＵ年度營業目標1E，每個小組目標1000~3000不等', 3),
   ('firm', '眾勤法律事務所', 'biz.niche', NULL, NULL, '智財、股權結構、勞資；案源多來自中小企業處、資策會及客戶介紹', 'high', false, NULL, NULL, 4),
@@ -298,11 +298,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 20. 周逸濱｜威律法律事務所（主持） ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('威律法律事務所', DATE '2023-01-01', 'year', '主持律師', '周逸濱（原表作「周逸賓」），主持律師，工程背景（前雙榜）', '拜訪',
-   '所營收約 1,500 萬，1 老闆＋4 受僱＋2–4 合署；從青創轉做內容產業智財（影視），因青創市場被簡榮宗、黃沛聲佔走過半；擔憂同領域強碰、不知如何成為特定領域最專業；用全律娛樂法委員會主委角色接觸產業辦內訓，讓年輕律師做低價案、自己往中價移。',
+   '個人收入約 1,500 萬，1 老闆＋4 受僱＋2–4 合署；從青創轉做內容產業智財（影視），因青創市場被簡榮宗、黃沛聲佔走過半；擔憂同領域強碰、不知如何成為特定領域最專業；用全律娛樂法委員會主委角色接觸產業辦內訓，讓年輕律師做低價案、自己往中價移。',
    '主持律師｜1500｜1老闆、4受僱、2~4合屬｜之前在雙榜主要做工程，有工程背景／出來後先做青創，後覺得青創被簡榮宗、黃沛聲佔走市場一半以上，黃俐穎又佔了ＡＰＰWORKS的缺，所以轉向做內容產業智慧財產權（目前以影視產業為主）／擔憂與同領域律師強碰，不知道如何成為特定領域最好最專業的律師／透過全律娛樂法委員會主委的角色接觸產業界辦所內內訓並讓年輕律師可以做同領域低價案件，自己往中價案件移動／對剛好及格的律師不知道怎麼處理？') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '威律法律事務所', 'fin.revenue', 1500::numeric, '='::text, '所營收約 1,500 萬', 'medium', false, NULL::text, NULL::text, 1),
+  ('firm', '威律法律事務所', 'fin.personal_income', 1500::numeric, '='::text, '受訪者（主持律師）個人收入約 1,500 萬（非全所營收）', 'medium', false, NULL::text, NULL::text, 1),
   ('firm', '威律法律事務所', 'org.headcount', 8, '~', '1 位老闆＋4 位受僱＋2–4 位合署', 'high', false, 'moj_firm_statistics 2026-09：15 人；周逸濱現仍登錄威律', NULL, 2),
   ('firm', '威律法律事務所', 'biz.niche', NULL, NULL, '工程背景出身→青創→轉內容產業智財（影視為主）', 'high', false, NULL, NULL, 3),
   ('firm', '威律法律事務所', 'strat.market_view', NULL, NULL, '青創法律市場被簡榮宗、黃沛聲佔走一半以上，黃俐穎佔了 AppWorks 的缺；擔憂同領域強碰、不知如何成為特定領域最專業的律師', 'high', false, NULL, '青創被簡榮宗、黃沛聲佔走市場一半以上', 4),
@@ -328,11 +328,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 22. 沈以軒｜宇恒法律事務所 ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('宇恒法律事務所', DATE '2023-01-01', 'year', '主持律師', '沈以軒，主持律師（原表作「宇恆」，MOJ 登錄名為宇恒）', '拜訪',
-   '自稱台灣勞資第一大所：勞方案件起家→主動演講接觸人資→現以資方案件為主；1 老闆＋12 受僱；營收「接近 1 億？」（存疑）；前同仁出走開同型所（勝綸）。',
+   '自稱台灣勞資第一大所：勞方案件起家→主動演講接觸人資→現以資方案件為主；1 老闆＋12 受僱；自述收入「接近 1 億？」（個人口徑、存疑）；前同仁出走開同型所（勝綸）。',
    '主持律師｜接近1Ｅ？｜1老闆、12受僱｜以勞資為主的事務所，先以勞方案件起家，後主動演講接觸人資，現主要處理資方案件，台灣勞資第一大所／之前同仁出來開類似事務所（勝綸法律事務所）') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '宇恒法律事務所', 'fin.revenue', 10000::numeric, '~'::text, '營收「接近 1 億？」——原表帶問號，僅供參考', 'low', false, 'firm_analysis_facts.rev_low/high 可對照 AI 推估'::text, NULL::text, 1),
+  ('firm', '宇恒法律事務所', 'fin.personal_income', 10000::numeric, '~'::text, '受訪者（主持律師）自述收入「接近 1 億？」——原表帶問號，個人口徑、僅供參考', 'low', false, NULL::text, NULL::text, 1),
   ('firm', '宇恒法律事務所', 'org.headcount', 13, '=', '1 位老闆＋12 位受僱', 'high', false, 'moj_firm_statistics 2026-09：18 人；沈以軒現仍登錄宇恒', NULL, 2),
   ('firm', '宇恒法律事務所', 'biz.niche', NULL, NULL, '勞資專門所：勞方案件起家→主動辦演講接觸人資→現以資方案件為主；自稱台灣勞資第一大所', 'high', false, 'lawyer_cause_stats 可核對宇恒勞資案由占比', '先以勞方案件起家，後主動演講接觸人資', 3),
   ('firm', '宇恒法律事務所', 'mkt.channel_mix', NULL, NULL, '以演講接觸企業人資取得資方案源', 'high', false, NULL, NULL, 4),
@@ -373,11 +373,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 25. 劉韋廷｜立勤國際法律事務所 ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('立勤國際法律事務所', DATE '2023-01-01', 'year', '主持律師', '劉韋廷，主持律師（有電視節目「律由經」）', '拜訪',
-   '全所約 29 律師＋14 合署、均採合署制，劉的單位 20–30 人，營收據稱 6,000 萬。靠媒體聲量吸案但價格不易高（10–15 萬）、媒體是雙面刃；堅持合署不合夥（不讓人搭便車，認為合夥是不好的制度）；外國合作所與社團案件都不獲利；EMBA 對管理思維有幫助。',
+   '全所約 29 律師＋14 合署、均採合署制，劉的單位 20–30 人，劉本人單位收入據稱 6,000 萬。靠媒體聲量吸案但價格不易高（10–15 萬）、媒體是雙面刃；堅持合署不合夥（不讓人搭便車，認為合夥是不好的制度）；外國合作所與社團案件都不獲利；EMBA 對管理思維有幫助。',
    '主持律師｜據稱6000｜全所約29位律師、14位合署律師／均採合署制，劉的單位可能20~30人｜手上有一個電視節目（律由經）／有媒體聲量，透過媒體聲量吸引案，但價格不容易爆高（10~15），媒體是兩面刃／堅持合署，不想讓人搭便車，認為合夥是不好的制度／外國合作所純粹有趣，零星案件不獲利／社團案件零星，投入產出不划算／ＥＭＢＡ對管理思維有幫助') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '立勤國際法律事務所', 'fin.revenue', 6000::numeric, '~'::text, '營收「據稱 6,000 萬」（劉的單位或全所不明）', 'low', false, 'firm_analysis_facts.rev_low/high 可對照'::text, NULL::text, 1),
+  ('firm', '立勤國際法律事務所', 'fin.personal_income', 6000::numeric, '~'::text, '受訪者（劉韋廷，合署制下自己的單位 20–30 人）自述收入「據稱 6,000 萬」（非全所營收）', 'low', false, NULL::text, NULL::text, 1),
   ('firm', '立勤國際法律事務所', 'org.headcount', 43, '~', '全所約 29 位律師＋14 位合署，均採合署制；劉的單位 20–30 人', 'high', false, 'moj_firm_statistics 2026-09：42 人（吻合）；劉韋廷、黃沛聲現仍登錄立勤', NULL, 2),
   ('firm', '立勤國際法律事務所', 'mkt.channel_mix', NULL, NULL, '電視節目「律由經」＋媒體聲量吸引案件；媒體是雙面刃', 'high', false, NULL, '媒體是兩面刃', 3),
   ('firm', '立勤國際法律事務所', 'client.pricing', 12.5, '~', '媒體帶來的案件價格不易衝高，約 10–15 萬', 'high', false, NULL, '價格不容易爆高（10~15）', 4),
@@ -389,11 +389,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 26. 梁維珊｜成鼎律師事務所 ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('成鼎律師事務所', DATE '2023-01-01', 'year', '主持律師', '梁維珊，執業 13 年，與先生共同開所', '拜訪',
-   '營收約 1,000 萬；梁下 1 受僱＋2 實習；高價家事定價（一審離婚 25 萬＋定暫時狀態 15 萬，涉外／外縣市另加），能收高價因隨時聯絡得上、英文好、懂家事法、能處理情緒，手上有夏克立、福原愛等知名國際案；認為管理是難題；轉述蘇奕銓經營法（工讀生潛入群組接案、重輪轉率、自己處理客訴、能不寫狀就不寫）；提到希望與喆律合作。',
+   '個人收入約 1,000 萬；梁下 1 受僱＋2 實習；高價家事定價（一審離婚 25 萬＋定暫時狀態 15 萬，涉外／外縣市另加），能收高價因隨時聯絡得上、英文好、懂家事法、能處理情緒，手上有夏克立、福原愛等知名國際案；認為管理是難題；轉述蘇奕銓經營法（工讀生潛入群組接案、重輪轉率、自己處理客訴、能不寫狀就不寫）；提到希望與喆律合作。',
    '執業13年｜主持律師｜1000｜與先生共同開鎖，目前梁下面一位受僱兩位實習｜收費較高，一審離親收25萬＋定暫15萬，涉外另加、外縣市另加／認為可收高價的原因（讓當事人隨時聯絡得上、英文好、懂家事法、能處理當事人情緒），手上有知名國際案件 ＥＸ夏克立、福原愛／覺得管理是難題／有聊到蘇奕銓的經營方式（找工讀生加入可能發生問題的群組接案、案件重視輪轉率（反正案件本質也決定了勝敗）、自己處理客訴、能不寫狀就不寫狀）／希望跟喆律合作？') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '成鼎律師事務所', 'fin.revenue', 1000::numeric, '='::text, '營收約 1,000 萬', 'medium', false, NULL::text, NULL::text, 1),
+  ('firm', '成鼎律師事務所', 'fin.personal_income', 1000::numeric, '='::text, '受訪者（主持律師）個人收入約 1,000 萬（非全所營收）', 'medium', false, NULL::text, NULL::text, 1),
   ('firm', '成鼎律師事務所', 'org.headcount', 5, '~', '夫妻共同開所；梁下 1 位受僱＋2 位實習', 'high', false, 'moj_firm_statistics 2026-09：6 人；梁維珊現仍登錄成鼎', NULL, 2),
   ('firm', '成鼎律師事務所', 'client.pricing', 25, '=', '高價家事：一審離婚收 25 萬＋定暫時狀態處分 15 萬；涉外、外縣市另加', 'high', false, NULL, '一審離親收25萬＋定暫15萬', 3),
   ('firm', '成鼎律師事務所', 'biz.niche', NULL, NULL, '高價家事定位——能收高價的理由：當事人隨時聯絡得上、英文好、懂家事法、能處理當事人情緒；手上有知名國際案（夏克立、福原愛）', 'high', false, NULL, NULL, 4),
@@ -405,11 +405,11 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 27. 黃沛聲｜立勤國際法律事務所（黃的單位） ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('立勤國際法律事務所', DATE '2023-01-01', 'year', '主持律師', '黃沛聲，主持律師（立勤合署制下自己的單位，10 位律師以下）', '拜訪',
-   '單位營收 2,000–3,000 萬、10 位律師以下；一半時間做創投（主投美國市場）；法律業務在青創圈（同圈競爭者：簡榮宗、王俐瑩、蔡坤洲）；提及台灣沒有信託牌的信託業務機會；自稱與政界學界關係好，與政大合辦法律簡報大賽。',
+   '黃本人單位收入 2,000–3,000 萬、10 位律師以下；一半時間做創投（主投美國市場）；法律業務在青創圈（同圈競爭者：簡榮宗、王俐瑩、蔡坤洲）；提及台灣沒有信託牌的信託業務機會；自稱與政界學界關係好，與政大合辦法律簡報大賽。',
    '主持律師｜2000~3000｜黃的單位10位律師以下｜一半時間在做創投（主投針對美國市場服務）／法律業務主要在青創圈（主要競爭者有黃沛聲、簡榮宗、王俐瑩、蔡坤洲、）／提及信託業務（台灣目前沒有信託牌）／稱與政界學界關係良好，與政大合辦法律簡報大賽') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
-  ('firm', '立勤國際法律事務所', 'fin.revenue', 2500::numeric, '~'::text, '黃沛聲單位營收 2,000–3,000 萬（立勤合署制，非全所）', 'medium', false, NULL::text, NULL::text, 1),
+  ('firm', '立勤國際法律事務所', 'fin.personal_income', 2500::numeric, '~'::text, '受訪者（黃沛聲，自己的單位 10 人以下）自述收入 2,000–3,000 萬（非全所營收）', 'medium', false, NULL::text, NULL::text, 1),
   ('firm', '立勤國際法律事務所', 'org.headcount', 10, '<', '黃的單位 10 位律師以下', 'high', false, NULL, NULL, 2),
   ('firm', '立勤國際法律事務所', 'career.side_business', NULL, NULL, '一半時間做創投，主投針對美國市場的服務', 'high', false, NULL, NULL, 3),
   ('firm', '立勤國際法律事務所', 'biz.niche', NULL, NULL, '法律業務主要在青創圈；同圈主要競爭者：簡榮宗、王俐瑩、蔡坤洲', 'high', false, '與威律周逸濱訪談互證：青創市場由黃沛聲、簡榮宗佔過半', NULL, 4),

@@ -8,7 +8,7 @@
 - 前端：喆律戰情＞合夥人訪談筆記（KPI＋維度×事務所 pivot＋逐次訪談）；事務所 modal「🔒 田野筆記」tab（admin 才顯示）
 - 首筆：眾博法律事務所合夥人，2026-09-12（migration 196 內含 seed，可當範本）
 - 回填：2023／2024「拜訪律師名單.xlsx」28 筆（migration 197）——日期僅知年份時 `interviewed_on` 記該年 01-01 並設 `date_precision='year'`；
-  原表「營收/個人收入」欄未區分口徑，受僱／獨立小所歸 `fin.personal_income`、主持／合夥所大額歸 `fin.revenue`，區間取中位＋`'~'`
+  原表「營收/個人收入」欄＝**受訪者個人（或其單位）收入，一律歸 `fin.personal_income`**，不得當全所營收（受訪者多為合署靠行律師；mig 199 修正）；區間取中位＋`'~'`
 
 ## 流程（每次面談後）
 
@@ -37,6 +37,7 @@
 | `secondhand` | 受訪者轉述別人／別所＝true（`industry` 通常 true） |
 | `db_crosscheck` | 本站佐證或矛盾：寫「表名：數字」，例 `gov_tenders：114 年度 1,350 萬` |
 | `quote` | 原話片段（可省），供日後回看語氣 |
+| `fin.revenue` vs `fin.personal_income` | 受訪者說的錢預設是**個人或其單位**收入（合署所的主持律師尤其如此）→ `fin.personal_income`；只有明講「全所」才進 `fin.revenue`。**不要拿個人收入去校正本站營收推估** |
 | `strat.zhelu_implication` | **雷自己的判讀**用這個維度獨立記一條，不要混進受訪者說法 |
 
 ## 現有維度（key）
