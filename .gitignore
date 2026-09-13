@@ -29,3 +29,5 @@ scripts/_gov_tenders_*.json
 scripts/gov_tenders_run.log
 scripts/_preview_analysis.txt
 scripts/.chambers_cache/
+
+scripts/.interview_work/
