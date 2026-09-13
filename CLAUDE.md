@@ -38,6 +38,8 @@
 - `lawyer_members` — 律師公會會員（按地區公會）
 - `user_profiles` — 使用者角色 (admin/user)
 
+- `firm_headcount_snapshots` — 事務所規模月快照（migration 195，2026-09-13）：snapshot_month('YYYY-MM'＝該月月底) × firm_key（口徑同 `moj_firm_statistics()`：現職、排除名/「律師未顯示」、分所歸戶；含公司法人，`is_firm`=名稱含「事務所」）。`take_firm_size_snapshot(p_month, p_asof, p_note)` 冪等整月覆寫，`firm-size-snapshot-monthly.yml` 每月 1 日台北 00:30 拍上月；`firm_headcount_as_of(p_asof)` 用 moj_lawyer_changes 倒推歷史（只能回到追蹤起點 2026-07-03，2026-06~08 為倒推回填、note 有標）；前端「事務所總覽＞事務所規模分布」卡下方 `loadFirmSizeTrend()` 讀 `firm_size_trend()`。
+
 ## 律師異動追蹤（工作流動）
 
 - `scripts/moj_office_refresh.py` — 逐位比對 MOJ API 的事務所/執業狀態，只 PATCH 有變動的律師，trigger 自動記到 `moj_lawyer_changes`

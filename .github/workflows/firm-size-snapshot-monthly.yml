@@ -1,0 +1,55 @@
+name: 事務所規模月快照（每月 1 日）
+
+on:
+  schedule:
+    - cron: '30 16 1 * *'  # 每月 1 日 UTC 16:30 = 台灣 2 日凌晨 0:30，拍「上個月月底」快照（mig 195）
+  workflow_dispatch:
+    inputs:
+      month:
+        description: '要拍的月份 YYYY-MM（留空=上個月；同月重跑會整月覆寫）'
+        required: false
+        default: ''
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Take snapshot via RPC (with retry)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MONTH_IN: ${{ github.event.inputs.month }}
+        run: |
+          # secrets 可能帶尾端空白/換行，會讓 PostgREST 回 400 PGRST102（curl 不像 Python 會 strip）
+          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
+          if [ -n "$MONTH_IN" ]; then
+            BODY="{\"p_month\":\"$MONTH_IN\"}"
+          else
+            BODY='{}'   # RPC 內預設＝台北時間上個月
+          fi
+          echo "payload: $BODY"
+          success=0
+          for attempt in 1 2 3; do
+            http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" --max-time 180 \
+              -X POST "$SUPABASE_URL/rest/v1/rpc/take_firm_size_snapshot" \
+              -H "apikey: $SUPABASE_SERVICE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" -d "$BODY" 2>&1 || echo "ERR")
+            echo "attempt ${attempt}: HTTP $http_code"; cat /tmp/resp.txt; echo
+            case "$http_code" in
+              200|204) success=1; break ;;
+              5*|ERR) echo "retrying in 60s..."; sleep 60 ;;
+              *) break ;;
+            esac
+          done
+          [ $success -eq 1 ] || { echo "::error::take_firm_size_snapshot failed"; exit 1; }
+
+          # 回寫 data_sources.last_scraped_at（資料來源頁「上次執行」）
+          curl -sk --max-time 60 -X PATCH \
+            "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.firm_size_snapshot" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -H "Prefer: return=minimal" \
+            -d "{\"last_scraped_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" || echo "::warning::data_sources PATCH failed (non-fatal)"

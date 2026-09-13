@@ -859,6 +859,9 @@
         <div class="card">
           <div class="card-title">&#127970; 事務所規模分布</div>
           <div class="chart-container"><canvas id="chartFirmSize"></canvas></div>
+          <div class="card-title" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">&#128197; 事務所家數月趨勢</div>
+          <div class="chart-container" style="height:180px;"><canvas id="chartFirmSizeTrend"></canvas></div>
+          <div id="firmSizeTrendTable" style="margin-top:8px;overflow-x:auto;"><div class="loading">載入中</div></div>
           <div class="card-title" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">&#127942; 律師人數 TOP 10 事務所</div>
           <div id="topFirmsList"><div class="loading">載入中</div></div>
         </div>
@@ -4632,6 +4635,71 @@ async function loadFirmSizeChart() {
   </div>`;
 }
 
+// 事務所家數月快照趨勢（mig 195：firm_headcount_snapshots，每月 1 日排程拍上月月底）
+async function loadFirmSizeTrend() {
+  const tblEl = document.getElementById('firmSizeTrendTable');
+  const ctxEl = document.getElementById('chartFirmSizeTrend');
+  if (!tblEl || !ctxEl) return;
+  const { data, error } = await db.rpc('firm_size_trend');
+  if (error || !data || !data.length) {
+    console.error('firm_size_trend error:', error);
+    tblEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px;">尚無月快照資料</div>';
+    return;
+  }
+  const rows = data;
+  const muted = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+  const labels = rows.map(r => r.snapshot_month);
+  if (chartInstances.firmSizeTrend) chartInstances.firmSizeTrend.destroy();
+  chartInstances.firmSizeTrend = new Chart(ctxEl.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '事務所家數', data: rows.map(r => r.firms), yAxisID: 'y',
+          borderColor: 'rgba(155,126,216,1)', backgroundColor: 'rgba(155,126,216,0.25)',
+          borderWidth: 2, pointRadius: 3, tension: 0.25, fill: false },
+        { label: '在所律師數', data: rows.map(r => r.firm_lawyers), yAxisID: 'y1',
+          borderColor: 'rgba(79,142,247,1)', backgroundColor: 'rgba(79,142,247,0.25)',
+          borderWidth: 2, pointRadius: 3, tension: 0.25, fill: false, borderDash: [4, 3] },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: muted }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { position: 'left', ticks: { color: muted, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y1: { position: 'right', ticks: { color: muted, font: { size: 10 } }, grid: { drawOnChartArea: false } },
+      },
+    },
+  });
+
+  // 月×規模分布表（含相鄰月增減）
+  const cols = [['b1', '1人'], ['b2_3', '2-3'], ['b4_5', '4-5'], ['b6_10', '6-10'], ['b11_20', '11-20'], ['b21_50', '21-50'], ['b50p', '50+']];
+  const delta = (cur, prev) => {
+    if (prev == null) return '';
+    const d = cur - prev;
+    if (!d) return '<span style="color:var(--text-muted);font-size:0.65rem;"> ±0</span>';
+    return `<span style="color:${d > 0 ? 'var(--green)' : 'var(--red)'};font-size:0.65rem;"> ${d > 0 ? '+' : ''}${d}</span>`;
+  };
+  const th = 'padding:4px 6px;font-size:0.7rem;color:var(--text-muted);font-weight:600;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border);';
+  const td = 'padding:4px 6px;font-size:0.75rem;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border);';
+  const notes = rows.filter(r => r.note).map(r => `${r.snapshot_month}：${r.note}`);
+  tblEl.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr><th style="${th}text-align:left;">月底</th><th style="${th}">家數</th><th style="${th}">律師數</th>${cols.map(c => `<th style="${th}">${c[1]}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => {
+      const p = i ? rows[i - 1] : null;
+      return `<tr>
+        <td style="${td}text-align:left;color:var(--text);">${r.snapshot_month}${r.note ? '<span title="' + r.note.replace(/"/g, '&quot;') + '" style="color:var(--text-muted);cursor:help;"> *</span>' : ''}</td>
+        <td style="${td}font-weight:600;">${Number(r.firms).toLocaleString()}${delta(r.firms, p?.firms)}</td>
+        <td style="${td}">${Number(r.firm_lawyers).toLocaleString()}${delta(r.firm_lawyers, p?.firm_lawyers)}</td>
+        ${cols.map(c => `<td style="${td}">${Number(r[c[0]]).toLocaleString()}${delta(r[c[0]], p?.[c[0]])}</td>`).join('')}
+      </tr>`;
+    }).join('')}</tbody>
+  </table>
+  <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;line-height:1.5;">口徑＝法務部名冊現職登錄且名稱含「事務所」的單位（分所歸戶、排除已除名與「律師未顯示」），每月 1 日自動拍上月月底；數字後的綠／紅小字為相鄰月增減。${notes.length ? '<br>* ' + notes.join('；') : ''}</div>`;
+}
+
 // ============================================================
 // 律師總覽排行卡 ＋ 事務所總覽（2026-07-15 總覽拆分）
 // ============================================================
@@ -4960,6 +5028,7 @@ function loadFirmOverviewOnce() {
   _foLoaded = true;
   loadOffices().then(loadExJudFirmChart);  // KPI 群元素已移到本頁；聯集 merge 完成後畫法檢轉任圖
   loadFirmSizeChart();    // 規模分布圖＋律師人數 TOP 10（自舊總覽移入）
+  loadFirmSizeTrend();    // 事務所家數月快照趨勢（mig 195 firm_size_trend）
   loadIndustryStructure(); // 產業結構分析（AI 分析 398 家，firm_analysis_facts）
   loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
   loadFoFlowSnapshot();
