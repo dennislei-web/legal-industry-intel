@@ -56,7 +56,7 @@ comp.base_model／comp.bonus_ratio_to_base／comp.bonus_components／comp.origin
 - 薪酬結構橫向表：底薪模式 × 年終倍數 × 引案抽成，按所規模分層 → 對照喆律薪制
 - 公關支出／營收比：`mkt.*` 對 `firm_analysis_facts.rev_*`
 - 「駐點型標案」清單：`gov_tenders.title` 篩 駐點／進駐／派駐，配 `gov.tender_staffing` 口述門檻，評估喆律可競標池
-- 訪談口述 vs `ai_analysis` 推估的營收落差 → 校正 REVENUE_RULES 係數
+- 訪談口述 vs `ai_analysis` 推估的營收落差 → 校正 REVENUE_RULES 係數（**只能用明講「全所」口徑的 `fin.revenue`**；目前 0 筆，個人收入不可用）
 
 ## 邊界
 
