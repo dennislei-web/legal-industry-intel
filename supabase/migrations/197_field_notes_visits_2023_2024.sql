@@ -132,7 +132,7 @@ SELECT n.id, f.* FROM n, (VALUES
 -- ---------- 8. 沈元楷｜新凱國際法律事務所（現已自設所） ----------
 WITH n AS (INSERT INTO firm_field_notes (firm, interviewed_on, date_precision, source_role, source_desc, channel, summary, raw_notes) VALUES
   ('新凱國際法律事務所', DATE '2023-01-01', 'year', '合署律師', '沈元楷，受僱 8 年（建業 8 年半）＋開業 1 年', '拜訪',
-   '離開建業第一年即年收 450–500 萬；透露建業合夥階梯：業績 250 萬→資深合夥人目標 400 萬→主持律師目標 800 萬，自案拆分 9:1。與退下來的檢察官學長合署；思考是否找受僱、想放大。',
+   '離開建業第一年即年收 450–500 萬；透露建業合夥階梯：業績 250 萬→資深合夥人目標 400 萬→主持律師目標 800 萬，自案拆分所 9：律師 1。與退下來的檢察官學長合署；思考是否找受僱、想放大。',
    '年資：受僱8年、開業1年｜合署｜450-500｜5位合署律師｜在建業法律事務所待8年半／（在建業業績約250萬、成為資深合夥人目標業績為400萬、主持律師目標業績為800萬，自案拆分9:1）／目前與檢察官退下來的學長合署，出來開第一年／目標還在思考是否找受僱、想放大') RETURNING id)
 INSERT INTO firm_field_facts (note_id, subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort)
 SELECT n.id, f.* FROM n, (VALUES
@@ -140,7 +140,7 @@ SELECT n.id, f.* FROM n, (VALUES
   ('firm', '新凱國際法律事務所', 'org.headcount', 5, '=', '5 位合署律師', 'high', false, 'moj_firm_statistics 2026-09：5 人；沈元楷現已登錄「沈元楷律師事務所」（離開新凱自設）', NULL, 2),
   ('firm', '新凱國際法律事務所', 'org.model_lineage', NULL, NULL, '與檢察官退下來的學長合署', 'high', false, NULL, NULL, 3),
   ('peer', '建業法律事務所', 'org.partner_track', NULL, NULL, '合夥階梯以業績定義：受訪者在建業業績約 250 萬；資深合夥人目標業績 400 萬；主持律師目標 800 萬', 'high', false, 'moj_firm_statistics 2026-09：建業 28 人＋建業高所 6 人', '成為資深合夥人目標業績為400萬、主持律師目標業績為800萬', 4),
-  ('peer', '建業法律事務所', 'comp.self_case_split', NULL, NULL, '自案拆分 9:1（律師 9）', 'high', false, NULL, '自案拆分9:1', 5),
+  ('peer', '建業法律事務所', 'comp.self_case_split', NULL, NULL, '自案拆分 9:1＝建業拿 9 成、律師拿 1 成（與寰瀛同型）', 'high', false, NULL, '自案拆分9:1', 5),
   ('firm', '新凱國際法律事務所', 'career.goal', NULL, NULL, '思考是否找受僱、想放大', 'high', false, NULL, NULL, 6)
 ) AS f(subject_scope, subject_firm, dimension_key, value_num, value_qual, value_text, confidence, secondhand, db_crosscheck, quote, sort);
 
