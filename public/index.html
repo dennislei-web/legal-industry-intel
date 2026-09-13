@@ -2080,6 +2080,18 @@
       </div>
     </div>
 
+    <!-- ==================== TAB: FIELDNOTES（合夥人訪談田野筆記；admin 限定，mig 196） ==================== -->
+    <div id="tab-fieldnotes" class="tab-content">
+      <div class="card" style="margin-top:16px;border:1px solid var(--gold);">
+        <div class="card-title">&#128274; 合夥人訪談田野筆記 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px;line-height:1.7;">
+          雷皓明與各所合夥律師面談取得的非公開觀察（薪酬結構、引案抽成、公關預算、標案人力門檻…），依固定維度拆成原子條目，跨所可比。
+          記錄流程：面談後把口述丟給 Claude → 依 <code>docs/field-notes/README.md</code> 拆維度、標信心、附本站資料佐證 → 寫入 DB。事務所視窗「田野筆記」tab 可看單一所。
+        </div>
+        <div id="fieldNotesBody"><div class="loading">載入中…</div></div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: 案由供需（Phase B × Phase A 交叉） ==================== -->
     <div id="tab-family" class="tab-content">
       <div id="famCatTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;"></div>
@@ -4141,6 +4153,7 @@ const SECTIONS = {
     { tab: 'law010', label: '010 合作律師', adminOnly: true },
     { tab: 'deepreport', label: '產業深度報告', adminOnly: true },
     { tab: 'nlwatch', label: '併購觀察名單', adminOnly: true },
+    { tab: 'fieldnotes', label: '合夥人訪談筆記', adminOnly: true },
   ],
   system: [
     { tab: 'sources', label: '資料來源' },
@@ -4213,6 +4226,7 @@ function showTab(tab) {
   if (tab === 'landagent') loadLandagentOnce();
   if (tab === 'nonlit') loadNonlitOnce();
   if (tab === 'nlwatch' && isAdmin) loadNlWatchlist();
+  if (tab === 'fieldnotes' && isAdmin) loadFieldNotes();
   if (tab === 'domain') initDomainTab();
   if (tab === 'overview') loadLawyerRankCardsOnce();
   if (tab === 'lawyers') loadLawyers();
@@ -6911,6 +6925,8 @@ async function showFirmDetail(firmName) {
   modal.style.display = 'flex';
   titleEl.textContent = firmName;
   _currentFirmName = firmName;
+  const fieldTabBtn = document.getElementById('firmTab_field');
+  if (fieldTabBtn) fieldTabBtn.style.display = isAdmin ? '' : 'none';  // 田野筆記 tab 僅 admin（資料本身另有 RLS）
   // Reset tabs to overview
   document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('firmTab_overview')?.classList.add('active');
@@ -7758,6 +7774,8 @@ function switchFirmTab(tab) {
     loadFirmResearch(_currentFirmName);
   } else if (tab === 'analysis') {
     loadFirmAnalysis(_currentFirmName);
+  } else if (tab === 'field') {
+    loadFirmFieldNotes(_currentFirmName);
   }
 }
 
@@ -9944,6 +9962,7 @@ const STATIC_PAGE_SOURCES = {
   'zhelu/alumni': ['喆律校友 MOJ 刷新（每週一凌晨自動）'],
   'zhelu/law010': ['010 總表每日同步（lawyer-dashboard 管線）'],
   'zhelu/nlwatch': ['ip_watchlist 人工維護＋TIPO 年更自動重算'],
+  'zhelu/fieldnotes': ['合夥律師面談口述（雷皓明）→ Claude 依 docs/field-notes 規格結構化寫入 firm_field_notes/facts（mig 196）'],
   'judge/judge-changes': ['FJUD 職務法庭裁判（手動・月增量極低）', '監察院彈劾案文 CyBsBox（手動）', '司法院法官評鑑決議書（手動・judge_evaluations.py）'],
   'judge/clerk-overview': ['司法院年報 ODS（手動・建議每年6月）', '考選部四等特考（手動・建議每年11月放榜後）'],
   'jstat/jstat-topics': ['官方統計年度序列 judicial_stats.json（手動・建議每年2月；總覽已改 court_case_stats 動態，本檔僅供 各法院比較/案件專題）'],
@@ -14775,6 +14794,120 @@ async function nlRankSearch() {
   }
 }
 
+// --- 合夥人訪談田野筆記（field_note_dimensions / firm_field_notes / firm_field_facts，admin-only，migration 196）---
+const FN_CONF = { high: ['高', 'var(--green)'], medium: ['中', 'var(--gold)'], low: ['低', 'var(--text-muted)'] };
+function fnFmtVal(f, dim) {
+  if (f.value_num == null) return '';
+  const q = (f.value_qual && f.value_qual !== '=') ? f.value_qual : '';
+  return `<span style="color:var(--gold);font-weight:600;">${escHtml(q)}${Number(f.value_num).toLocaleString()}${dim?.unit ? ' ' + escHtml(dim.unit) : ''}</span> `;
+}
+async function fnFetchAll() {
+  const [d, n, f] = await Promise.all([
+    db.from('field_note_dimensions').select('*').order('sort'),
+    db.from('firm_field_notes').select('*').order('interviewed_on', { ascending: false }),
+    db.from('firm_field_facts').select('*').order('sort'),
+  ]);
+  const err = [d, n, f].find(r => r.error); if (err) throw err.error;
+  return { dims: d.data || [], notes: n.data || [], facts: f.data || [] };
+}
+function fnFactRow(f, dimMap, showSubject) {
+  const dim = dimMap[f.dimension_key] || {};
+  const [cl, cc] = FN_CONF[f.confidence] || FN_CONF.medium;
+  const subj = f.subject_scope === 'industry'
+    ? '<span style="color:var(--blue);">產業通則</span>'
+    : escHtml(f.subject_firm || '') + (f.subject_scope === 'peer' ? ' <span style="font-size:0.7rem;color:var(--text-muted);">(他所)</span>' : '');
+  return `<tr>
+    ${showSubject ? `<td style="white-space:nowrap;font-size:0.76rem;">${subj}</td>` : ''}
+    <td style="white-space:nowrap;font-size:0.74rem;color:var(--text-muted);">${escHtml(dim.grp_label || '')}</td>
+    <td style="white-space:nowrap;">${escHtml(dim.label || f.dimension_key)}</td>
+    <td style="line-height:1.6;">${fnFmtVal(f, dim)}${escHtml(f.value_text)}${f.secondhand ? ' <span title="受訪者轉述" style="font-size:0.7rem;color:var(--text-muted);">（轉述）</span>' : ''}
+      ${f.quote ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;">「${escHtml(f.quote)}」</div>` : ''}
+      ${f.db_crosscheck ? `<div style="font-size:0.72rem;color:var(--green);margin-top:2px;">✔ 本站佐證：${escHtml(f.db_crosscheck)}</div>` : ''}</td>
+    <td style="text-align:center;color:${cc};font-size:0.76rem;white-space:nowrap;">${cl}</td>
+  </tr>`;
+}
+function fnNoteHeader(n) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">
+      <span><strong style="color:var(--text);font-size:0.9rem;">${escHtml(n.firm)}</strong></span>
+      <span>📅 ${escHtml(n.interviewed_on)}</span>
+      <span>👤 ${escHtml(n.source_role)}${n.source_desc ? '・' + escHtml(n.source_desc) : ''}</span>
+      <span>${escHtml(n.channel)}／${escHtml(n.interviewer)}</span>
+    </div>
+    <div style="font-size:0.82rem;line-height:1.7;margin-bottom:10px;">${escHtml(n.summary)}</div>`;
+}
+function fnFactsTable(rows, dimMap, showSubject) {
+  return `<div class="table-wrap"><table style="font-size:0.8rem;"><thead><tr>${showSubject ? '<th>對象</th>' : ''}<th>群組</th><th>維度</th><th>觀察</th><th>信心</th></tr></thead>
+    <tbody>${rows.map(f => fnFactRow(f, dimMap, showSubject)).join('')}</tbody></table></div>`;
+}
+let _fnLoaded = false;
+async function loadFieldNotes() {
+  if (_fnLoaded) return;
+  _fnLoaded = true;
+  const body = document.getElementById('fieldNotesBody');
+  try {
+    const { dims, notes, facts } = await fnFetchAll();
+    if (!notes.length) { body.innerHTML = '<div style="color:var(--text-muted);">尚無訪談紀錄（或無權限）。</div>'; return; }
+    const dimMap = {}; dims.forEach(d => dimMap[d.key] = d);
+    const firms = [...new Set(facts.filter(f => f.subject_firm).map(f => f.subject_firm))].sort();
+    const dimsUsed = new Set(facts.map(f => f.dimension_key));
+    const hasInd = facts.some(f => f.subject_scope === 'industry');
+    let html = `<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:14px;">
+      <div class="kpi-card"><div class="kpi-label">訪談次數</div><div class="kpi-value">${notes.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">涉及事務所</div><div class="kpi-value">${firms.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">觀察條目</div><div class="kpi-value">${facts.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">已覆蓋維度</div><div class="kpi-value">${dimsUsed.size}<span style="font-size:0.8rem;color:var(--text-muted);">/${dims.length}</span></div></div>
+    </div>`;
+    // 跨所 pivot：維度 × 事務所（＋產業通則欄）；只列已有紀錄的維度
+    html += `<div class="card" style="margin-bottom:16px;"><div class="card-title">🧭 跨所比較（維度 × 事務所）</div>
+      <div class="table-wrap"><table style="font-size:0.78rem;"><thead><tr><th>維度</th>${firms.map(c => `<th>${escHtml(c)}</th>`).join('')}${hasInd ? '<th>產業通則</th>' : ''}</tr></thead><tbody>`;
+    const cell = (list, d) => list.map(f => `<div style="margin-bottom:3px;">${fnFmtVal(f, d)}${escHtml(f.value_text)}</div>`).join('');
+    dims.forEach(d => {
+      const rowF = facts.filter(f => f.dimension_key === d.key);
+      if (!rowF.length) return;
+      html += `<tr><td style="white-space:nowrap;"><span style="color:var(--text-muted);font-size:0.72rem;">${escHtml(d.grp_label)}</span><br>${escHtml(d.label)}</td>`;
+      firms.forEach(c => html += `<td style="vertical-align:top;line-height:1.55;">${cell(rowF.filter(f => f.subject_firm === c), d)}</td>`);
+      if (hasInd) html += `<td style="vertical-align:top;line-height:1.55;">${cell(rowF.filter(f => f.subject_scope === 'industry'), d)}</td>`;
+      html += '</tr>';
+    });
+    html += `</tbody></table></div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">尚無紀錄的維度不顯示；同一維度多筆（如多場活動）逐列並陳。數值前的 &lt;／~ 表示「上限」／「約」。</div></div>`;
+    // 逐次訪談
+    notes.forEach(n => {
+      const fs = facts.filter(f => f.note_id === n.id);
+      html += `<div class="card" style="margin-bottom:16px;">${fnNoteHeader(n)}${fnFactsTable(fs, dimMap, true)}
+        ${n.raw_notes ? `<details style="margin-top:8px;font-size:0.76rem;color:var(--text-muted);"><summary style="cursor:pointer;">原始口述</summary><div style="white-space:pre-wrap;line-height:1.7;margin-top:6px;">${escHtml(n.raw_notes)}</div></details>` : ''}
+      </div>`;
+    });
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</div>`;
+  }
+}
+// 事務所 modal「田野筆記」tab：本所受訪紀錄＋他所受訪者談到本所的條目
+async function loadFirmFieldNotes(firmName) {
+  const body = document.getElementById('firmModalBody');
+  body.innerHTML = '<div class="loading">載入田野筆記...</div>';
+  try {
+    const { dims, notes, facts } = await fnFetchAll();
+    const dimMap = {}; dims.forEach(d => dimMap[d.key] = d);
+    const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
+    const isMine = s => s && (s === firmName || s.startsWith(fk));
+    const mine = notes.filter(n => isMine(n.firm));
+    const mineIds = new Set(mine.map(n => n.id));
+    const others = facts.filter(f => isMine(f.subject_firm) && !mineIds.has(f.note_id));
+    if (!mine.length && !others.length) { body.innerHTML = '<div style="color:var(--text-muted);padding:12px;">本所尚無訪談紀錄。</div>'; return; }
+    let html = '';
+    mine.forEach(n => {
+      html += `<div class="card" style="margin-bottom:14px;">${fnNoteHeader(n)}${fnFactsTable(facts.filter(f => f.note_id === n.id), dimMap, true)}</div>`;
+    });
+    if (others.length) {
+      html += `<div class="card"><div class="card-title">他所受訪者談本所</div>${fnFactsTable(others, dimMap, false)}</div>`;
+    }
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);padding:12px;">載入失敗：${escHtml(e.message || String(e))}</div>`;
+  }
+}
+
 // --- 併購觀察名單（ip_watchlist admin-only 表＋tipo_* 即時指標，migration 117）---
 let _nlWatchLoaded = false;
 async function loadNlWatchlist() {
@@ -17781,6 +17914,7 @@ async function showCourtDetail(name) {
       <button class="tab-btn active" onclick="switchFirmTab('overview')" id="firmTab_overview">概覽</button>
       <button class="tab-btn" onclick="switchFirmTab('research')" id="firmTab_research">研究</button>
       <button class="tab-btn" onclick="switchFirmTab('analysis')" id="firmTab_analysis">AI 分析</button>
+      <button class="tab-btn" onclick="switchFirmTab('field')" id="firmTab_field" style="display:none;" title="合夥人訪談田野筆記（admin）">&#128274; 田野筆記</button>
     </div>
     <div class="modal-body" id="firmModalBody">
       <div class="loading">載入中</div>
