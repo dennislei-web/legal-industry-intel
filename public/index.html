@@ -14829,7 +14829,7 @@ function fnFactRow(f, dimMap, showSubject) {
 function fnNoteHeader(n) {
   return `<div style="display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">
       <span><strong style="color:var(--text);font-size:0.9rem;">${escHtml(n.firm)}</strong></span>
-      <span>📅 ${escHtml(n.interviewed_on)}</span>
+      <span>📅 ${n.date_precision === 'year' ? escHtml(String(n.interviewed_on).slice(0, 4)) + ' 年（日期僅知年份）' : n.date_precision === 'month' ? escHtml(String(n.interviewed_on).slice(0, 7)) : escHtml(n.interviewed_on)}</span>
       <span>👤 ${escHtml(n.source_role)}${n.source_desc ? '・' + escHtml(n.source_desc) : ''}</span>
       <span>${escHtml(n.channel)}／${escHtml(n.interviewer)}</span>
     </div>
@@ -14857,19 +14857,13 @@ async function loadFieldNotes() {
       <div class="kpi-card"><div class="kpi-label">觀察條目</div><div class="kpi-value">${facts.length}</div></div>
       <div class="kpi-card"><div class="kpi-label">已覆蓋維度</div><div class="kpi-value">${dimsUsed.size}<span style="font-size:0.8rem;color:var(--text-muted);">/${dims.length}</span></div></div>
     </div>`;
-    // 跨所 pivot：維度 × 事務所（＋產業通則欄）；只列已有紀錄的維度
-    html += `<div class="card" style="margin-bottom:16px;"><div class="card-title">🧭 跨所比較（維度 × 事務所）</div>
-      <div class="table-wrap"><table style="font-size:0.78rem;"><thead><tr><th>維度</th>${firms.map(c => `<th>${escHtml(c)}</th>`).join('')}${hasInd ? '<th>產業通則</th>' : ''}</tr></thead><tbody>`;
-    const cell = (list, d) => list.map(f => `<div style="margin-bottom:3px;">${fnFmtVal(f, d)}${escHtml(f.value_text)}</div>`).join('');
-    dims.forEach(d => {
-      const rowF = facts.filter(f => f.dimension_key === d.key);
-      if (!rowF.length) return;
-      html += `<tr><td style="white-space:nowrap;"><span style="color:var(--text-muted);font-size:0.72rem;">${escHtml(d.grp_label)}</span><br>${escHtml(d.label)}</td>`;
-      firms.forEach(c => html += `<td style="vertical-align:top;line-height:1.55;">${cell(rowF.filter(f => f.subject_firm === c), d)}</td>`);
-      if (hasInd) html += `<td style="vertical-align:top;line-height:1.55;">${cell(rowF.filter(f => f.subject_scope === 'industry'), d)}</td>`;
-      html += '</tr>';
-    });
-    html += `</tbody></table></div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">尚無紀錄的維度不顯示；同一維度多筆（如多場活動）逐列並陳。數值前的 &lt;／~ 表示「上限」／「約」。</div></div>`;
+    // 跨所 pivot：事務所為列、維度為欄，維度群組用 chips 切換（27+ 家時橫向才放得下）
+    _fnPivotData = { dims, facts, firms, hasInd };
+    const grps = []; dims.forEach(d => { if (!grps.some(g => g.grp === d.grp)) grps.push({ grp: d.grp, label: d.grp_label }); });
+    html += `<div class="card" style="margin-bottom:16px;"><div class="card-title">🧭 跨所比較（事務所 × 維度）</div>
+      <div id="fnPivotChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${grps.map((g, i) => `<button class="tab-btn${i === 0 ? ' active' : ''}" data-grp="${escHtml(g.grp)}" onclick="fnRenderPivot('${escHtml(g.grp)}')" style="font-size:0.76rem;padding:4px 10px;">${escHtml(g.label)}</button>`).join('')}</div>
+      <div id="fnPivotBody"></div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">只列該群組有紀錄的維度與事務所；同一維度多筆逐列並陳；數值前的 &lt;／~ 表示「上限」／「約」；（轉述）＝受訪者談他所或通則。</div></div>`;
     // 逐次訪談
     notes.forEach(n => {
       const fs = facts.filter(f => f.note_id === n.id);
@@ -14878,9 +14872,33 @@ async function loadFieldNotes() {
       </div>`;
     });
     body.innerHTML = html;
+    fnRenderPivot(grps[0]?.grp);
   } catch (e) {
     body.innerHTML = `<div style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</div>`;
   }
+}
+let _fnPivotData = null;
+function fnRenderPivot(grp) {
+  const el = document.getElementById('fnPivotBody');
+  if (!el || !_fnPivotData) return;
+  document.querySelectorAll('#fnPivotChips .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.grp === grp));
+  const { dims, facts } = _fnPivotData;
+  const cols = dims.filter(d => d.grp === grp && facts.some(f => f.dimension_key === d.key));
+  if (!cols.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;">此群組尚無紀錄。</div>'; return; }
+  const keys = new Set(cols.map(d => d.key));
+  const gf = facts.filter(f => keys.has(f.dimension_key));
+  const rows = [...new Set(gf.filter(f => f.subject_firm).map(f => f.subject_firm))].sort();
+  if (gf.some(f => f.subject_scope === 'industry')) rows.push('__industry__');
+  const cell = (list, d) => list.map(f => `<div style="margin-bottom:3px;">${fnFmtVal(f, d)}${escHtml(f.value_text)}${(f.secondhand || f.subject_scope !== 'firm') ? ' <span style="font-size:0.68rem;color:var(--text-muted);">（轉述）</span>' : ''}</div>`).join('');
+  let h = `<div class="table-wrap"><table style="font-size:0.78rem;"><thead><tr><th style="white-space:nowrap;">事務所</th>${cols.map(d => `<th>${escHtml(d.label)}${d.unit ? `<span style="font-weight:400;color:var(--text-muted);">（${escHtml(d.unit)}）</span>` : ''}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r => {
+    const isInd = r === '__industry__';
+    const rf = isInd ? gf.filter(f => f.subject_scope === 'industry') : gf.filter(f => f.subject_firm === r);
+    h += `<tr><td style="white-space:nowrap;vertical-align:top;">${isInd ? '<span style="color:var(--blue);">產業通則</span>' : escHtml(r)}</td>`;
+    cols.forEach(d => h += `<td style="vertical-align:top;line-height:1.55;min-width:160px;">${cell(rf.filter(f => f.dimension_key === d.key), d)}</td>`);
+    h += '</tr>';
+  });
+  el.innerHTML = h + '</tbody></table></div>';
 }
 // 事務所 modal「田野筆記」tab：本所受訪紀錄＋他所受訪者談到本所的條目
 async function loadFirmFieldNotes(firmName) {

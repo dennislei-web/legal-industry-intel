@@ -7,6 +7,8 @@
 - DB：`field_note_dimensions`（維度目錄）／`firm_field_notes`（一次訪談一列）／`firm_field_facts`（原子觀察）— migration 196，三表 **admin-only RLS**
 - 前端：喆律戰情＞合夥人訪談筆記（KPI＋維度×事務所 pivot＋逐次訪談）；事務所 modal「🔒 田野筆記」tab（admin 才顯示）
 - 首筆：眾博法律事務所合夥人，2026-09-12（migration 196 內含 seed，可當範本）
+- 回填：2023／2024「拜訪律師名單.xlsx」28 筆（migration 197）——日期僅知年份時 `interviewed_on` 記該年 01-01 並設 `date_precision='year'`；
+  原表「營收/個人收入」欄未區分口徑，受僱／獨立小所歸 `fin.personal_income`、主持／合夥所大額歸 `fin.revenue`，區間取中位＋`'~'`
 
 ## 流程（每次面談後）
 
@@ -22,7 +24,8 @@
 
 | 欄位 | 規則 |
 |---|---|
-| `firm`（notes） | 受訪者所屬所，用 `moj_firm_statistics().firm_name` 的全名（例「眾博法律事務所」），前端靠這個名字對到事務所 modal |
+| `firm`（notes） | 受訪者所屬所，用 `moj_firm_statistics().firm_name` 的全名（例「眾博法律事務所」），前端靠這個名字對到事務所 modal；**先查 DB 對齊異體字**（宇恆→宇恒、六合國際→六合、KPMG→安侯…），所名未載時寫「（未載）○○所屬事務所」 |
+| `interviewed_on` / `date_precision` | 確切日填 `day`；只知年份填該年 01-01＋`year`；只知月份填該月 01＋`month` |
 | `source_role` | 合夥人／所長／受僱律師／法務／其他。`source_desc` 可不具名；**不放個資**（電話、私人關係） |
 | `summary` | 三行以內，寫「這次最有價值的 2–3 個發現」，不是逐條複述 |
 | `raw_notes` | 原話全文照貼（保留口語），日後維度改版可重拆 |
