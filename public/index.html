@@ -14911,7 +14911,7 @@ function fnRenderPivot(grp) {
   el.innerHTML = h + '</tbody></table></div>';
 }
 // --- 面試筆記市場帶（interview_market_bands，admin-only，migration 200；由 scripts/.interview_work/bands.ps1 產出）---
-const IMB_POS = { lawyer: '受僱律師', 'trainee-lawyer': '實習律師（含轉受僱）', 'legal-staff-admin': '法務／助理／行政', 'part-time': '工讀／實習生', other: '其他', all: '全部職位' };
+const IMB_POS = { lawyer: '受僱律師（含實習轉正）', 'trainee-lawyer': '實習律師（實習期間）', 'legal-staff-admin': '法務／助理／行政', 'part-time': '工讀／實習生', other: '其他', all: '全部職位' };
 const IMB_BAND = { '1-3': '1–3 位', '4-10': '4–10 位', '11-30': '11–30 位', '31+': '31 位以上', unknown: '未對到名冊', all: '全部級距', zhelu: '應徵喆律者' };
 const IMB_BAND_ORDER = ['1-3', '4-10', '11-30', '31+', 'unknown', 'all', 'zhelu'];
 const IMB_POS_ORDER = ['lawyer', 'trainee-lawyer', 'legal-staff-admin', 'part-time', 'other', 'all'];
