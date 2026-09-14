@@ -58,6 +58,15 @@ comp.base_model／comp.bonus_ratio_to_base／comp.bonus_components／comp.origin
 - 「駐點型標案」清單：`gov_tenders.title` 篩 駐點／進駐／派駐，配 `gov.tender_staffing` 口述門檻，評估喆律可競標池
 - 訪談口述 vs `ai_analysis` 推估的營收落差 → 校正 REVENUE_RULES 係數（**只能用明講「全所」口徑的 `fin.revenue`**；目前 0 筆，個人收入不可用）
 
+## 面試筆記彙整（channel='面試筆記彙整'，migration 200，2026-09-14）
+
+北所面試筆記（人事機密，原文只在本機 `scripts/.interview_work/`）彙整後以同一套表承接，規則比面談嚴：
+
+- 錨點：一版一列 `firm_field_notes`（firm＝喆律、`channel='面試筆記彙整'`、`raw_notes` 一律 NULL）。
+- 事務所層：`firm_field_facts` `subject_scope='peer'`、`secondhand=true`；門檻＝≥3 位不同候選人提到該所，且仍在職者（MOJ 現登錄所＝口述前東家）的條目排除；文字改寫不引述；未查證的違法／倫理／性別指控與健康婚育不入；主持律師姓名改職稱；未逐字查核的塊一律 `confidence='low'`。
+- 數字帶：新表 `interview_market_bands`（名冊級距×職位×年度×維度；`n_candidates` ≥3 才入、≥5 才有四分位；`size_band='zhelu'` 放應徵喆律者期待薪資），由 `scripts/.interview_work/bands.ps1` 零 token 重算，改抽取後重跑再出新 migration（`source_version` 換版）。
+- 不存候選人姓名／參照碼／面試日期／狀態；喆律自身作為前東家的紀錄不入。
+
 ## 邊界
 
 - 面談內容屬商業敏感：**只進 admin-only 表，不進 `ai_analysis` 公開文、不進 `industry_review`**；要引用時只寫「業界訪談」不點名受訪者。
