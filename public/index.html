@@ -14845,7 +14845,10 @@ async function loadFieldNotes() {
   _fnLoaded = true;
   const body = document.getElementById('fieldNotesBody');
   try {
-    const { dims, notes, facts } = await fnFetchAll();
+    const [{ dims, notes, facts }, imbRows] = await Promise.all([
+      fnFetchAll(),
+      imbFetch().catch(e => { console.warn('interview_market_bands 讀取失敗（未建表或無權限）', e); return []; }),
+    ]);
     if (!notes.length) { body.innerHTML = '<div style="color:var(--text-muted);">尚無訪談紀錄（或無權限）。</div>'; return; }
     const dimMap = {}; dims.forEach(d => dimMap[d.key] = d);
     const firms = [...new Set(facts.filter(f => f.subject_firm).map(f => f.subject_firm))].sort();
@@ -14864,15 +14867,22 @@ async function loadFieldNotes() {
       <div id="fnPivotChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${grps.map((g, i) => `<button class="tab-btn${i === 0 ? ' active' : ''}" data-grp="${escHtml(g.grp)}" onclick="fnRenderPivot('${escHtml(g.grp)}')" style="font-size:0.76rem;padding:4px 10px;">${escHtml(g.label)}</button>`).join('')}</div>
       <div id="fnPivotBody"></div>
       <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">只列該群組有紀錄的維度與事務所；同一維度多筆逐列並陳；數值前的 &lt;／~ 表示「上限」／「約」；（轉述）＝受訪者談他所或通則。</div></div>`;
-    // 逐次訪談
+    // 面試筆記市場帶（interview_market_bands，mig 200；無資料或無權限就不顯示）
+    html += imbCardHtml(imbRows, dimMap);
+    // 逐次訪談（「面試筆記彙整」一列有數十條 peer 觀察，預設收合）
     notes.forEach(n => {
       const fs = facts.filter(f => f.note_id === n.id);
-      html += `<div class="card" style="margin-bottom:16px;">${fnNoteHeader(n)}${fnFactsTable(fs, dimMap, true)}
+      const big = n.channel === '面試筆記彙整' || fs.length > 30;
+      const tbl = big
+        ? `<details style="margin-top:4px;"><summary style="cursor:pointer;font-size:0.8rem;color:var(--gold);">展開 ${fs.length} 條觀察（他所 ${fs.filter(f => f.subject_scope === 'peer').length} 條、本所／通則 ${fs.filter(f => f.subject_scope !== 'peer').length} 條）</summary>${fnFactsTable(fs, dimMap, true)}</details>`
+        : fnFactsTable(fs, dimMap, true);
+      html += `<div class="card" style="margin-bottom:16px;">${fnNoteHeader(n)}${tbl}
         ${n.raw_notes ? `<details style="margin-top:8px;font-size:0.76rem;color:var(--text-muted);"><summary style="cursor:pointer;">原始口述</summary><div style="white-space:pre-wrap;line-height:1.7;margin-top:6px;">${escHtml(n.raw_notes)}</div></details>` : ''}
       </div>`;
     });
     body.innerHTML = html;
     fnRenderPivot(grps[0]?.grp);
+    if (_imbData) imbRender(_imbData.keys[0]);
   } catch (e) {
     body.innerHTML = `<div style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</div>`;
   }
@@ -14900,6 +14910,70 @@ function fnRenderPivot(grp) {
   });
   el.innerHTML = h + '</tbody></table></div>';
 }
+// --- 面試筆記市場帶（interview_market_bands，admin-only，migration 200；由 scripts/.interview_work/bands.ps1 產出）---
+const IMB_POS = { lawyer: '受僱律師', 'trainee-lawyer': '實習律師（含轉受僱）', 'legal-staff-admin': '法務／助理／行政', 'part-time': '工讀／實習生', other: '其他', all: '全部職位' };
+const IMB_BAND = { '1-3': '1–3 位', '4-10': '4–10 位', '11-30': '11–30 位', '31+': '31 位以上', unknown: '未對到名冊', all: '全部級距', zhelu: '應徵喆律者' };
+const IMB_BAND_ORDER = ['1-3', '4-10', '11-30', '31+', 'unknown', 'all', 'zhelu'];
+const IMB_POS_ORDER = ['lawyer', 'trainee-lawyer', 'legal-staff-admin', 'part-time', 'other', 'all'];
+const IMB_DIM_ORDER = ['comp.associate_pay_band', 'comp.trainee_pay', 'comp.staff_pay_band', 'comp.bonus_months', 'comp.overtime_pay', 'talent.tenure', 'talent.applicant_expected_pay'];
+let _imbData = null;
+async function imbFetch() {
+  const r = await db.from('interview_market_bands').select('*').order('id');
+  if (r.error) throw r.error;
+  return r.data || [];
+}
+function imbCardHtml(rows, dimMap) {
+  _imbData = null;
+  if (!rows || !rows.length) return '';
+  const rank = k => { const i = IMB_DIM_ORDER.indexOf(k); return i < 0 ? 99 : i; };
+  const keys = [...new Set(rows.map(r => r.dimension_key))].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  _imbData = { rows, dimMap, keys };
+  const ver = [...new Set(rows.map(r => r.source_version))].join('、');
+  const cAt = rows.map(r => r.computed_at).filter(Boolean).sort().pop();
+  return `<div class="card" style="margin-bottom:16px;"><div class="card-title">📊 面試筆記市場帶 <span style="font-size:0.72rem;font-weight:400;color:var(--text-muted);">北所面試筆記彙整・名冊級距 × 職位 × 年度・${rows.length} 格・版本 ${escHtml(ver)}${cAt ? '・' + escHtml(String(cAt).slice(0, 10)) : ''}</span></div>
+    <div id="imbChips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">${keys.map((k, i) => `<button class="tab-btn${i === 0 ? ' active' : ''}" data-dim="${escHtml(k)}" onclick="imbRender('${escHtml(k)}')" style="font-size:0.76rem;padding:4px 10px;">${escHtml(dimMap[k]?.label || k)}</button>`).join('')}</div>
+    <div id="imbBody"></div>
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">級距＝候選人前東家在律師名冊（moj_firm_statistics）的登錄律師數；職位＝候選人在該前東家的職位；年度＝面試民國年。每格 n＝不同候選人數（≥3 才入庫），≥5 才給 P25–P75；「查核」＝來自逐字查核分塊的條目占比。應徵喆律者期待薪資為候選人面試時自述。資料在本機由 scripts/.interview_work/bands.ps1 重算，第二版抽完後換版。</div></div>`;
+}
+function imbRender(key) {
+  const el = document.getElementById('imbBody');
+  if (!el || !_imbData) return;
+  document.querySelectorAll('#imbChips .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.dim === key));
+  const { rows, dimMap } = _imbData;
+  const rs = rows.filter(r => r.dimension_key === key);
+  if (!rs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:0.78rem;">此維度尚無資料。</div>'; return; }
+  const dim = dimMap[key] || {};
+  const isCat = rs.some(r => r.cat_counts);
+  const years = [...new Set(rs.map(r => r.year).filter(y => y != null))].sort((a, b) => a - b);
+  const cols = years.map(y => ({ y, label: `${y} 年` })).concat([{ y: null, label: '全部年度' }]);
+  const isZhelu = rs.every(r => r.size_band === 'zhelu');
+  const bi = b => { const i = IMB_BAND_ORDER.indexOf(b); return i < 0 ? 99 : i; };
+  const pi = p => { const i = IMB_POS_ORDER.indexOf(p); return i < 0 ? 99 : i; };
+  const rowKeys = [...new Set(rs.map(r => `${r.size_band}|${r.position_kind}`))].sort((a, b) => {
+    const [ba, pa] = a.split('|'), [bb, pb] = b.split('|');
+    return (bi(ba) - bi(bb)) || (pi(pa) - pi(pb)) || pa.localeCompare(pb, 'zh-Hant');
+  });
+  const unit = rs[0]?.unit || dim.unit || '';
+  const cell = r => {
+    if (!r) return '<td style="text-align:center;color:var(--text-muted);">—</td>';
+    if (r.cat_counts) {
+      const c = r.cat_counts || {};
+      return `<td style="text-align:center;white-space:nowrap;line-height:1.5;"><span style="color:var(--green);font-weight:600;">有 ${c['有'] ?? 0}</span>／<span style="color:var(--red);font-weight:600;">無 ${c['無'] ?? 0}</span>${c['補休'] ? `／補休 ${c['補休']}` : ''}<div style="font-size:0.68rem;color:var(--text-muted);">n=${r.n_candidates}</div></td>`;
+    }
+    const iqr = (r.p25 != null && r.p75 != null) ? `<div style="font-size:0.7rem;color:var(--text-muted);">${Number(r.p25)}–${Number(r.p75)}</div>` : '';
+    const ver = r.verified_share != null ? `<div title="逐字查核條目占比" style="font-size:0.66rem;color:${r.verified_share >= 50 ? 'var(--green)' : 'var(--text-muted)'};">查核 ${r.verified_share}%</div>` : '';
+    return `<td style="text-align:center;white-space:nowrap;line-height:1.45;"><span style="color:var(--gold);font-weight:700;font-size:0.92rem;">${Number(r.median).toLocaleString()}</span> <span style="font-size:0.7rem;color:var(--text-muted);">(n=${r.n_candidates})</span>${iqr}${ver}</td>`;
+  };
+  let h = `<div class="table-wrap"><table style="font-size:0.8rem;"><thead><tr>${isZhelu ? '<th>職缺</th>' : '<th>名冊級距</th><th>職位</th>'}${cols.map(c => `<th style="text-align:center;">${escHtml(c.label)}</th>`).join('')}</tr></thead><tbody>`;
+  rowKeys.forEach(k => {
+    const [band, pos] = k.split('|');
+    h += `<tr>${isZhelu ? `<td style="white-space:nowrap;">${escHtml(pos)}</td>` : `<td style="white-space:nowrap;">${escHtml(IMB_BAND[band] || band)}</td><td style="white-space:nowrap;">${escHtml(IMB_POS[pos] || pos)}</td>`}`;
+    cols.forEach(c => { const r = rs.find(x => x.size_band === band && x.position_kind === pos && (c.y == null ? x.year == null : x.year === c.y)); h += cell(r); });
+    h += '</tr>';
+  });
+  h += `</tbody></table></div><div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">${isCat ? '格內＝有提及加班費的條目數（有／無／補休）；' : `數字＝中位數（${escHtml(unit)}），括號 n＝不同候選人數，第二行＝P25–P75（n≥5 才顯示）；`}「全部年度」與「全部級距」為合併計算，不是各格加總。</div>`;
+  el.innerHTML = h;
+}
 // 事務所 modal「田野筆記」tab：本所受訪紀錄＋他所受訪者談到本所的條目
 async function loadFirmFieldNotes(firmName) {
   const body = document.getElementById('firmModalBody');
@@ -14915,7 +14989,9 @@ async function loadFirmFieldNotes(firmName) {
     if (!mine.length && !others.length) { body.innerHTML = '<div style="color:var(--text-muted);padding:12px;">本所尚無訪談紀錄。</div>'; return; }
     let html = '';
     mine.forEach(n => {
-      html += `<div class="card" style="margin-bottom:14px;">${fnNoteHeader(n)}${fnFactsTable(facts.filter(f => f.note_id === n.id), dimMap, true)}</div>`;
+      // 本所的 note 裡談「別所」的 peer 條目（面試筆記彙整）不在本所視窗重複列出
+      const fs = facts.filter(f => f.note_id === n.id && (f.subject_scope !== 'peer' || isMine(f.subject_firm)));
+      html += `<div class="card" style="margin-bottom:14px;">${fnNoteHeader(n)}${fnFactsTable(fs, dimMap, true)}</div>`;
     });
     if (others.length) {
       html += `<div class="card"><div class="card-title">他所受訪者談本所</div>${fnFactsTable(others, dimMap, false)}</div>`;
