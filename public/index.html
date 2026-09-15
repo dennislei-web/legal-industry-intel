@@ -597,7 +597,15 @@
     .chip:hover .chip-n { color: var(--text); }
 
     /* ===================== 合夥人訪談筆記：面向 → 概述 → 各所陳述（mig 202–206） ===================== */
-    #fieldNotesBody, .fn-modal { --fn-v: var(--blue); --fn-i: var(--purple); }
+    /* 配色：模組內把對比不足的色票調到 WCAG AA（一般文字至少 4.5:1），只作用在本模組、不動全站 */
+    #fieldNotesBody, .fn-modal { --text-muted: #97a6b8; --fn-v: var(--blue); --fn-i: var(--purple); --fn-v-text: #7aa9fa; --fn-i-text: #b39ce6; }
+    [data-theme="light"] #fieldNotesBody, [data-theme="light"] .fn-modal { --text-muted: #5b6270; --gold: #806418; --gold-light: #6f5512; --orange: #a3500b; --green: #116c33; --blue: #1d4ed8; --purple: #6d28d9; --red: #b91c1c; --tab-active-color: #1d4ed8; --fn-v-text: #1d4ed8; --fn-i-text: #6d28d9; }
+    /* 連結：全站沒有 a 的預設樣式（各頁用行內 style），本模組統一補上，否則落回瀏覽器預設深藍，深色底上看不見 */
+    :where(#fieldNotesBody, .fn-modal) a { color: var(--blue); text-decoration: none; }
+    :where(#fieldNotesBody, .fn-modal) a:hover { text-decoration: underline; text-underline-offset: 2px; }
+    :where(#fieldNotesBody, .fn-modal) a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+    #fieldNotesBody .chip .chip-n { font-size: 0.72rem; }
+    [data-theme="light"] #fieldNotesBody .chip .chip-n { background: rgba(0,0,0,0.06); }
     .fn-muted { color: var(--text-muted); }
     .fn-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .fn-nowrap { white-space: nowrap; }
@@ -610,11 +618,11 @@
     .fn-chips .chip.fn-chip-mirror.active { border-color: var(--green); background: var(--green-dim); }
     .fn-sd { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin: 0 4px 0 2px; vertical-align: 0; }
     .fn-sd-v { background: var(--fn-v); } .fn-sd-i { background: var(--fn-i); }
-    .fn-src { display: inline-block; font-size: 0.68rem; font-weight: 600; line-height: 1.5; padding: 0 6px; border-radius: 5px; margin-right: 4px; white-space: nowrap; }
-    .fn-src-v { color: var(--fn-v); background: var(--blue-dim); }
-    .fn-src-i { color: var(--fn-i); background: var(--purple-dim); }
-    .fn-draft { display: inline-block; font-size: 0.66rem; line-height: 1.5; color: var(--text-muted); border: 1px dashed var(--border-light); border-radius: 6px; padding: 0 6px; margin-left: 6px; white-space: nowrap; vertical-align: 1px; }
-    .fn-stale { display: inline-block; font-size: 0.7rem; line-height: 1.5; color: var(--orange); background: var(--orange-dim); border: 1px solid transparent; border-radius: 6px; padding: 0 7px; margin-left: 6px; white-space: nowrap; font-family: inherit; }
+    .fn-src { display: inline-block; font-size: 0.72rem; font-weight: 600; line-height: 1.5; padding: 0 6px; border-radius: 5px; margin-right: 4px; white-space: nowrap; }
+    .fn-src-v { color: var(--fn-v-text); background: var(--blue-dim); }
+    .fn-src-i { color: var(--fn-i-text); background: var(--purple-dim); }
+    .fn-draft { display: inline-block; font-size: 0.72rem; line-height: 1.5; color: var(--text-muted); border: 1px dashed var(--border-light); border-radius: 6px; padding: 0 6px; margin-left: 6px; white-space: nowrap; vertical-align: 1px; }
+    .fn-stale { display: inline-block; font-size: 0.72rem; line-height: 1.5; color: var(--orange); background: var(--orange-dim); border: 1px solid transparent; border-radius: 6px; padding: 0 7px; margin-left: 6px; white-space: nowrap; font-family: inherit; }
     button.fn-stale { cursor: pointer; } button.fn-stale:hover { border-color: var(--orange); }
     /* L1 資料來源 */
     .fn-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -641,7 +649,7 @@
     .fn-dots { letter-spacing: 1px; color: var(--green); }
     .fn-tile-kn { margin-top: 9px; font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap; padding-right: 70px; }
     .fn-tile-kn b { color: var(--gold-light); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
-    .fn-tile-kn small { color: var(--gold); }
+    .fn-tile-kn small { color: var(--gold); font-size: 0.74rem; }
     .fn-tile > .fn-draft { position: absolute; right: 12px; bottom: 11px; }
     .fn-rows { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
     .fn-rows-title { font-size: 0.72rem; color: var(--text-muted); padding: 7px 14px; background: var(--bg-row); letter-spacing: .06em; }
@@ -650,13 +658,13 @@
     .fn-row-name { font-weight: 600; color: var(--text); }
     .fn-row-n { font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .fn-row-one { font-size: 0.86rem; line-height: 1.55; }
-    .fn-row-tag { display: inline-block; font-size: 0.68rem; line-height: 1.5; color: var(--orange); border: 1px solid var(--orange); border-radius: 6px; padding: 0 5px; margin-right: 6px; white-space: nowrap; vertical-align: 1px; }
+    .fn-row-tag { display: inline-block; font-size: 0.72rem; line-height: 1.5; color: var(--orange); border: 1px solid var(--orange); border-radius: 6px; padding: 0 5px; margin-right: 6px; white-space: nowrap; vertical-align: 1px; }
     .fn-row-tag-ok { color: var(--green); border-color: var(--green); }
     .fn-row-go { color: var(--text-muted); text-align: right; }
     .fn-row-mirror .fn-row-name { color: var(--green); }
     .fn-index { display: grid; gap: 8px; margin: 4px 0 10px; }
-    .fn-foot { font-size: 0.7rem; color: var(--text-muted); margin-top: 8px; }
-    .fn-mini { font-family: inherit; font-size: 0.68rem; color: var(--text-muted); background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; margin: 1px 3px 1px 0; cursor: pointer; white-space: nowrap; }
+    .fn-foot { font-size: 0.74rem; color: var(--text-muted); margin-top: 8px; }
+    .fn-mini { font-family: inherit; font-size: 0.72rem; color: var(--text-muted); background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; margin: 1px 3px 1px 0; cursor: pointer; white-space: nowrap; }
     .fn-mini:hover { color: var(--gold-light); border-color: var(--gold); }
     .fn-mini-ok { color: var(--green); }
     .fn-table td, .fn-table th { padding: 6px 10px; }
@@ -698,19 +706,19 @@
     .fn-kn-detail .fn-conf { margin-left: 5px; }
     .fn-kn-broken .fn-kn-top b { color: var(--text-muted); text-decoration: line-through; }
     .fn-lei-box { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 6px; }
-    .fn-lei { display: inline-block; font-size: 0.68rem; color: var(--orange); border: 1px solid var(--orange); border-radius: 5px; padding: 0 5px; margin-right: 6px; white-space: nowrap; vertical-align: 1px; }
+    .fn-lei { display: inline-block; font-size: 0.72rem; color: var(--orange); border: 1px solid var(--orange); border-radius: 5px; padding: 0 5px; margin-right: 6px; white-space: nowrap; vertical-align: 1px; }
     .fn-mirror-link { font-size: 0.78rem; color: var(--text-muted); margin: 8px 2px; }
     .fn-mirror-link a { color: var(--green); text-decoration: none; }
     .fn-bands-ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
     .fn-bt td, .fn-bt th { text-align: center; white-space: nowrap; }
     .fn-bt td:first-child, .fn-bt th:first-child { text-align: left; }
     .fn-bt td b { color: var(--gold-light); font-variant-numeric: tabular-nums; }
-    .fn-bt td small { display: block; font-size: 0.68rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .fn-bt .fn-n { font-size: 0.68rem; color: var(--text-muted); margin-left: 2px; }
+    .fn-bt td small { display: block; font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .fn-bt .fn-n { font-size: 0.72rem; color: var(--text-muted); margin-left: 2px; }
     .fn-bt .fn-bt-all { background: var(--ghost-bg); }
     .fn-bt-title { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 4px; }
     .fn-ot-y { color: var(--green); font-weight: 600; } .fn-ot-n { color: var(--red); font-weight: 600; }
-    .fn-note { font-size: 0.7rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    .fn-note { font-size: 0.74rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
     .fn-auto { margin: 6px 0 0; padding-left: 1.2em; font-size: 0.84rem; }
     .fn-new { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
     .fn-new-title { font-size: 0.78rem; color: var(--orange); margin-bottom: 4px; }
@@ -734,14 +742,14 @@
     .fn-conf { font-size: 0.72rem; white-space: nowrap; }
     .fn-firm-one { font-size: 0.84rem; color: var(--text); line-height: 1.55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fn-firm.open .fn-firm-one { white-space: normal; color: var(--text-muted); }
-    .fn-plus { font-size: 0.7rem; color: var(--text-muted); margin-left: 5px; }
+    .fn-plus { font-size: 0.74rem; color: var(--text-muted); margin-left: 5px; }
     .fn-firm-detail { background: var(--bg-row); border-left: 2px solid var(--gold); margin: 0 0 0 14px; padding: 8px 14px 10px; }
     .fn-firm-detail-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; font-size: 0.76rem; margin-bottom: 4px; }
     .fn-firm-detail-head a { color: var(--blue); text-decoration: none; font-weight: 600; }
     .fn-dimgrp { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border); }
     .fn-firm-detail-head + .fn-dimgrp { border-top: none; }
     .fn-dimlabel { font-size: 0.76rem; color: var(--text-muted); line-height: 1.5; padding-top: 2px; }
-    .fn-dimlabel small { display: block; font-size: 0.66rem; }
+    .fn-dimlabel small { display: block; font-size: 0.72rem; }
     .fn-more { display: block; width: 100%; font-family: inherit; font-size: 0.8rem; color: var(--blue); background: none; border: none; border-top: 1px solid var(--border); padding: 8px; cursor: pointer; }
     .fn-industry { border-top: 1px solid var(--border); padding: 8px 14px; background: var(--bg-card); }
     .fn-industry-title { font-size: 0.76rem; color: var(--blue); margin-bottom: 2px; }
@@ -749,24 +757,24 @@
     .fn-bucket-title { font-size: 0.84rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
     .fn-bucket-row { display: grid; grid-template-columns: minmax(9em, 13em) 6.5em minmax(0, 1fr) auto auto; gap: 8px; align-items: baseline; padding: 4px 0; font-size: 0.84rem; border-top: 1px dashed var(--border); }
     .fn-bucket-title + .fn-bucket-row { border-top: none; }
-    .fn-bucket-firm small { display: block; font-size: 0.68rem; color: var(--text-muted); }
+    .fn-bucket-firm small { display: block; font-size: 0.72rem; color: var(--text-muted); }
     .fn-bucket-text { color: var(--text-muted); line-height: 1.5; }
     /* 單條觀察 */
     .fn-fact { padding: 5px 0; }
     .fn-fact + .fn-fact { border-top: 1px dotted var(--border); }
     .fn-fact-main { font-size: 0.87rem; line-height: 1.6; color: var(--text); }
-    .fn-fact-dim { display: inline-block; font-size: 0.7rem; color: var(--text-muted); background: var(--ghost-bg); border-radius: 5px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
+    .fn-fact-dim { display: inline-block; font-size: 0.72rem; color: var(--text-muted); background: var(--ghost-bg); border-radius: 5px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
     .fn-val { color: var(--gold-light); font-weight: 700; margin-right: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .fn-val small { font-size: 0.72rem; font-weight: 500; color: var(--gold); margin-left: 2px; }
     .fn-fact-meta { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 3px 4px; }
     .fn-fact-meta .fn-conf { margin-left: 6px; }
-    .fn-vs { display: inline-block; font-size: 0.66rem; line-height: 1.5; color: var(--text-muted); border: 1px solid var(--border-light); border-radius: 5px; padding: 0 5px; margin-left: 4px; white-space: nowrap; cursor: help; }
+    .fn-vs { display: inline-block; font-size: 0.72rem; line-height: 1.5; color: var(--text-muted); border: 1px solid var(--border-light); border-radius: 5px; padding: 0 5px; margin-left: 4px; white-space: nowrap; cursor: help; }
     .fn-vs-unverified, .fn-vs-first_pass { border-style: dashed; }
     .fn-who { margin-left: 6px; } .fn-who a { color: var(--blue); text-decoration: none; }
     .fn-fact-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 3px; }
     .fn-chk { font-size: 0.72rem; line-height: 1.5; border-radius: 5px; padding: 0 6px; }
     .fn-chk-ok { color: var(--green); background: var(--green-dim); }
-    .fn-chk-xr { color: var(--blue); background: var(--blue-dim); }
+    .fn-chk-xr { color: var(--fn-v-text); background: var(--blue-dim); }
     .fn-chk-ptr { color: var(--text-muted); background: var(--ghost-bg); }
     .fn-quote { margin-top: 2px; font-size: 0.76rem; color: var(--text-muted); }
     .fn-quote summary { cursor: pointer; width: max-content; }
@@ -774,7 +782,7 @@
     /* 喆律鏡像 */
     .fn-brand { margin: 12px 0; }
     .fn-hbar { display: grid; grid-template-columns: 2.6em minmax(8em, 13em) minmax(60px, 1fr) 3em minmax(0, 14em); gap: 8px; align-items: center; font-size: 0.82rem; padding: 3px 0; }
-    .fn-hbar-kind { font-size: 0.7rem; font-weight: 600; }
+    .fn-hbar-kind { font-size: 0.72rem; font-weight: 600; }
     .fn-hbar-track { height: 9px; background: var(--border); border-radius: 5px; overflow: hidden; }
     .fn-hbar-track i { display: block; height: 100%; background: var(--green); border-radius: 5px; }
     .fn-hbar-track i.neg { background: var(--red); }
