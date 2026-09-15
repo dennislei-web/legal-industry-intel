@@ -39,7 +39,7 @@
 - `user_profiles` — 使用者角色 (admin/user)
 
 - `firm_headcount_snapshots` — 事務所規模月快照（migration 195，2026-09-13）：snapshot_month('YYYY-MM'＝該月月底) × firm_key（口徑同 `moj_firm_statistics()`：現職、排除名/「律師未顯示」、分所歸戶；含公司法人，`is_firm`=名稱含「事務所」）。`take_firm_size_snapshot(p_month, p_asof, p_note)` 冪等整月覆寫，`firm-size-snapshot-monthly.yml` 每月 1 日台北 00:30 拍上月；`firm_headcount_as_of(p_asof)` 用 moj_lawyer_changes 倒推歷史（只能回到追蹤起點 2026-07-03，2026-06~08 為倒推回填、note 有標）；前端「事務所總覽＞事務所規模分布」卡下方 `loadFirmSizeTrend()` 讀 `firm_size_trend()`。
-- `field_note_dimensions` / `firm_field_notes` / `firm_field_facts` — 合夥律師訪談田野筆記（migration 196，2026-09-13，**admin-only**）：雷面談口述→依 `docs/field-notes/README.md` 拆成維度×對象所×數值×信心的原子觀察，跨所可比。前端：喆律戰情＞合夥人訪談筆記（pivot）＋事務所 modal「田野筆記」tab（admin 才顯示）。寫入走新 migration（一份訪談一檔），不做前端表單；內容不得進 `ai_analysis` 公開文。
+- `field_note_dimensions` / `firm_field_notes` / `firm_field_facts` / `field_note_overviews` / `interview_market_bands` — 合夥人訪談筆記（migration 196–207，**全部 admin-only**）：雷拜訪各所律師的口述（面談＝拜訪，`channel` 只允許 拜訪／面試筆記彙整）＋北所面試筆記彙整→依 `docs/field-notes/README.md` 拆成維度×對象所×數值×信心的原子觀察。`db_crosscheck` 只放本站佐證（`crosscheck_kind` evidence／pointer），跨訪談互證放 `corroboration`，面試筆記查核狀態放 `verification_status`（mig 202）；受訪者姓名只在 `firm_field_notes.interviewee`，顯示欄位不放人名（mig 204 遮名 lint）。前端：喆律戰情＞合夥人訪談筆記三層（總覽面向磚→面向頁概述／關鍵數字／市場帶／各所陳述→行內展開），事務所 modal「田野筆記」tab（本所自述／他人談本所）；概述存 `field_note_overviews`（Claude 撰寫、雷核定、只走 migration，`field_note_overview_status` view 查落後）。寫入走新 migration，不做前端表單；內容不得進 `ai_analysis` 公開文。
 
 ## 律師異動追蹤（工作流動）
 
