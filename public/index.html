@@ -714,11 +714,21 @@
     .fn-bt td:first-child, .fn-bt th:first-child { text-align: left; }
     .fn-bt td b { color: var(--gold-light); font-variant-numeric: tabular-nums; }
     .fn-bt td small { display: block; font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-    .fn-bt .fn-n { font-size: 0.72rem; color: var(--text-muted); margin-left: 2px; }
+    .fn-bt .fn-n { font-size: 0.72rem; color: var(--text-muted); margin-left: 6px; }
     .fn-bt .fn-bt-all { background: var(--ghost-bg); }
     .fn-bt-title { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 4px; }
     .fn-ot-y { color: var(--green); font-weight: 600; } .fn-ot-n { color: var(--red); font-weight: 600; }
     .fn-note { font-size: 0.74rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
+    .fn-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0; padding: 7px 10px; border: 1px dashed var(--border); border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.7; }
+    .fn-legend .fn-lg-hd { font-weight: 600; color: var(--text); font-size: 0.8rem; }
+    .fn-legend .fn-lg-cell { text-align: center; padding: 3px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--ghost-bg); white-space: nowrap; }
+    .fn-legend .fn-lg-cell b { color: var(--gold-light); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .fn-legend .fn-lg-cell em, .fn-legend .fn-lg-cell i { font-style: normal; font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .fn-legend .fn-lg-cell em { margin-left: 3px; }
+    .fn-legend .fn-lg-cell i { display: block; }
+    .fn-legend .fn-lg-txt b { color: var(--gold-light); font-weight: 700; }
+    .fn-legend .fn-lg-txt em, .fn-legend .fn-lg-txt i { font-style: normal; color: var(--text-muted); }
+    .fn-legend .fn-lg-txt .fn-sep { margin: 0 6px; opacity: 0.6; }
     .fn-auto { margin: 6px 0 0; padding-left: 1.2em; font-size: 0.84rem; }
     .fn-new { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
     .fn-new-title { font-size: 0.78rem; color: var(--orange); margin-bottom: 4px; }
@@ -15473,6 +15483,25 @@ function fnHighlightFirms(grp, i) {
 }
 
 // ---------- 市場帶（併入薪酬、人才、喆律鏡像）----------
+// 市場帶表格的「每格讀法」圖例：用該指標實際的「全部」格當範例，讀者可直接對照表格
+function fnBandLegend(mt, rows) {
+  const all = (rows || []).filter(b => b.level === 'pos' && b.size_band === 'all');
+  if (mt.cat) {
+    const s = all.find(b => b.cat_counts) || (rows || []).find(b => b.cat_counts);
+    const c = (s && s.cat_counts) || {};
+    const y = c['有'] != null ? c['有'] : 0, n = c['無'] != null ? c['無'] : 0, nc = s ? s.n_candidates : 0;
+    return `<div class="fn-legend"><span class="fn-lg-hd">每格讀法</span>
+      <span class="fn-lg-cell"><span class="fn-ot-y">有 ${y}</span>／<span class="fn-ot-n">無 ${n}</span><i>n=${nc}</i></span>
+      <span class="fn-lg-txt"><span class="fn-ot-y">有</span>／<span class="fn-ot-n">無</span>＝有講到加班費的候選人裡，各有幾位說有、幾位說沒有<span class="fn-sep">｜</span><i>n</i>＝這格總共幾位不同候選人</span></div>`;
+  }
+  const f = x => fnNum(mt.scale ? Number(x) * mt.scale : x);
+  const s = all.find(b => b.median != null && b.p25 != null) || (rows || []).find(b => b.median != null && b.p25 != null);
+  if (!s) return '';
+  const u = mt.unit ? '（' + escHtml(mt.unit) + '）' : '';
+  return `<div class="fn-legend"><span class="fn-lg-hd">每格讀法</span>
+    <span class="fn-lg-cell"><b>${f(s.median)}</b><em>${s.n_candidates} 人</em><i>${f(s.p25)}–${f(s.p75)}</i></span>
+    <span class="fn-lg-txt"><b>${f(s.median)}</b>＝中位數${u}<span class="fn-sep">｜</span><em>${s.n_candidates} 人</em>＝不同候選人數<span class="fn-sep">｜</span><i>${f(s.p25)}–${f(s.p75)}</i>＝中間半數落在此區間</span></div>`;
+}
 function fnBandsHtml(C, grp) {
   const metrics = (FN_BAND_METRICS[grp] || []).filter(mt => C.bands.some(b => mt.dims.includes(b.dimension_key)));
   if (!metrics.length) return '';
@@ -15496,8 +15525,9 @@ function fnBandsHtml(C, grp) {
   return `<details class="fn-sub fn-bands" open><summary>市場帶・${escHtml(mt.label)}<span class="fn-muted">（面試筆記・前東家名冊規模 × 職位・中位數${mt.unit ? '（' + escHtml(mt.unit) + '）' : ''}・版本 ${escHtml(ver)}${at ? '・' + escHtml(at) : ''}）</span></summary>
     <div class="fn-bands-ctl">${metrics.map(m => `<button class="sub-tab-btn${m.key === mk ? ' active' : ''}" onclick="fnSetBandMetric('${escHtml(grp)}','${m.key}')">${escHtml(m.label)}</button>`).join('')}
       <span class="fn-sep"></span><button class="sub-tab-btn${yearMode ? '' : ' active'}" onclick="fnSetBandYear('${escHtml(grp)}',false)">全部年度</button><button class="sub-tab-btn${yearMode ? ' active' : ''}" onclick="fnSetBandYear('${escHtml(grp)}',true)">分年度</button></div>
+    ${fnBandLegend(mt, rows)}
     ${body}
-    <div class="fn-note">格內＝中位數（n＝不同候選人數），第二行 P25–P75（n≥5 才有）；游標停在格上看條目數與已查核占比。每格至少 3 位候選人才入庫；「全部」為合併計算，不是各格加總。加班費格只計有提及的條目。</div>
+    <div class="fn-note">每格至少 3 位不同候選人才入庫，滿 5 位才顯示區間；「全部」欄與「全部」列是合併重算，不是各格加總。「未對到名冊」＝該筆前東家的所名沒有比對到律師名冊，所以不知道規模。游標停在格子上，可看該格的條目數、所數與已逐條查核的占比。</div>
   </details>`;
 }
 function fnBandCell(b, mt, isAll) {
@@ -15509,7 +15539,7 @@ function fnBandCell(b, mt, isAll) {
     return `<td${cls} title="${escHtml(tip)}"><span class="fn-ot-y">有 ${c['有'] != null ? c['有'] : 0}</span>／<span class="fn-ot-n">無 ${c['無'] != null ? c['無'] : 0}</span>${c['補休'] ? `／補休 ${c['補休']}` : ''}<small>n=${b.n_candidates}</small></td>`;
   }
   const f = x => fnNum(mt.scale ? Number(x) * mt.scale : x);
-  return `<td${cls} title="${escHtml(tip)}"><b>${f(b.median)}</b><span class="fn-n">（${b.n_candidates}）</span>${b.p25 != null && b.p75 != null ? `<small>${f(b.p25)}–${f(b.p75)}</small>` : ''}</td>`;
+  return `<td${cls} title="${escHtml(tip)}"><b>${f(b.median)}</b><span class="fn-n">${b.n_candidates} 人</span>${b.p25 != null && b.p75 != null ? `<small>${f(b.p25)}–${f(b.p75)}</small>` : ''}</td>`;
 }
 function fnBandYearTable(C, rows, mt, title) {
   const yrs = [...new Set(rows.map(b => b.year).filter(y => y != null))].sort((a, b) => a - b);
