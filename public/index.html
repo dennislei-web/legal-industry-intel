@@ -15500,7 +15500,7 @@ function fnBandLegend(mt, rows) {
   const u = mt.unit ? '（' + escHtml(mt.unit) + '）' : '';
   return `<div class="fn-legend"><span class="fn-lg-hd">每格讀法</span>
     <span class="fn-lg-cell"><b>${f(s.median)}</b><em>${s.n_candidates} 人</em><i>${f(s.p25)}–${f(s.p75)}</i></span>
-    <span class="fn-lg-txt"><b>${f(s.median)}</b>＝中位數${u}<span class="fn-sep">｜</span><em>${s.n_candidates} 人</em>＝不同候選人數<span class="fn-sep">｜</span><i>${f(s.p25)}–${f(s.p75)}</i>＝中間半數落在此區間</span></div>`;
+    <span class="fn-lg-txt"><b>${f(s.median)}</b>＝中位數${u}<span class="fn-sep">｜</span><em>${s.n_candidates} 人</em>＝不同候選人數<span class="fn-sep">｜</span><i>${f(s.p25)}–${f(s.p75)}</i>＝一半的人落在這區間，更少、更多的各約 1/4</span></div>`;
 }
 function fnBandsHtml(C, grp) {
   const metrics = (FN_BAND_METRICS[grp] || []).filter(mt => C.bands.some(b => mt.dims.includes(b.dimension_key)));
