@@ -718,6 +718,7 @@
     .fn-bt .fn-bt-all { background: var(--ghost-bg); }
     .fn-bt-title { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 4px; }
     .fn-ot-y { color: var(--green); font-weight: 600; } .fn-ot-n { color: var(--red); font-weight: 600; }
+    .fn-fb-mark { display: inline-block; float: right; font-size: 0.62rem; line-height: 1.2; padding: 0 3px; border-radius: 3px; background: var(--ghost-bg); color: var(--text-muted); border: 1px solid var(--border); margin-left: 4px; cursor: help; }
     .fn-note { font-size: 0.74rem; color: var(--text-muted); margin-top: 6px; line-height: 1.6; }
     .fn-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0; padding: 7px 10px; border: 1px dashed var(--border); border-radius: 6px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.7; }
     .fn-legend .fn-lg-hd { font-weight: 600; color: var(--text); font-size: 0.8rem; }
@@ -15061,7 +15062,7 @@ const FN_BAND_METRICS = {
 };
 
 let _fnCache = null, _fnCachePromise = null, _fnLoadPromise = null;
-const _fnState = { grp: 'overview', src: {}, sort: {}, open: new Set(), showAll: {}, bandMetric: {}, bandYear: {} };
+const _fnState = { grp: 'overview', src: {}, sort: {}, open: new Set(), showAll: {}, bandMetric: {}, bandYear: {}, bandOffice: {} };
 const _fnModal = { firm: '', grp: 'all', pendingGrp: null };
 
 // ---------- 資料 ----------
@@ -15508,41 +15509,51 @@ function fnBandsHtml(C, grp) {
   const mk = _fnState.bandMetric[grp] && metrics.some(m => m.key === _fnState.bandMetric[grp]) ? _fnState.bandMetric[grp] : metrics[0].key;
   const mt = metrics.find(m => m.key === mk);
   const yearMode = !!_fnState.bandYear[grp];
-  const rows = C.bands.filter(b => mt.dims.includes(b.dimension_key) && b.size_band !== 'zhelu');
+  // 分所口徑（mig 216）：office='all' 為綜合，其餘為單一分所。分所格不足 3 位候選人不入庫，改用綜合格並標註。
+  const pool = C.bands.filter(b => mt.dims.includes(b.dimension_key) && b.size_band !== 'zhelu');
+  const offices = ['all', ...[...new Set(pool.map(b => b.office || 'all'))].filter(o => o !== 'all').sort((a, b) => a.localeCompare(b, 'zh-Hant'))];
+  const office = offices.includes(_fnState.bandOffice[grp]) ? _fnState.bandOffice[grp] : 'all';
+  const allRows = pool.filter(b => (b.office || 'all') === 'all');
+  const rows = office === 'all' ? allRows : pool.filter(b => (b.office || 'all') === office);
   const ver = [...new Set(rows.map(b => b.source_version))].join('、');
   const at = rows.map(b => String(b.computed_at || '').slice(0, 10)).sort().pop() || '';
   let body;
   if (!yearMode) {
-    const cells = rows.filter(b => b.year == null && (b.level === 'band×pos' || b.level === 'pos'));
-    const poss = FN_POS_ORDER.filter(p => cells.some(b => b.position_kind === p));
-    const bands = FN_BAND_ORDER.filter(s => cells.some(b => b.size_band === s));
+    const pick = src => src.filter(b => b.year == null && (b.level === 'band×pos' || b.level === 'pos'));
+    const cells = pick(rows), fbCells = office === 'all' ? [] : pick(allRows);
+    const shown = cells.concat(fbCells);   // 聯集：分所缺的格子仍要出現，改顯示綜合數字並標註
+    const poss = FN_POS_ORDER.filter(p => shown.some(b => b.position_kind === p));
+    const bands = FN_BAND_ORDER.filter(s => shown.some(b => b.size_band === s));
     body = `<div class="table-wrap"><table class="fn-table fn-bt"><thead><tr><th>職位＼前東家名冊規模</th>${bands.map(s => `<th class="${s === 'all' ? 'fn-bt-all' : s === 'unknown' ? 'fn-muted' : ''}">${escHtml(FN_BAND_LABEL[s] || s)}</th>`).join('')}</tr></thead><tbody>
-      ${poss.map(p => `<tr><td class="fn-nowrap">${escHtml(FN_POS_LABEL[p] || p)}</td>${bands.map(s => fnBandCell(cells.find(b => b.position_kind === p && b.size_band === s), mt, s === 'all')).join('')}</tr>`).join('')}
+      ${poss.map(p => `<tr><td class="fn-nowrap">${escHtml(FN_POS_LABEL[p] || p)}</td>${bands.map(s => { const hit = cells.find(b => b.position_kind === p && b.size_band === s); return fnBandCell(hit || fbCells.find(b => b.position_kind === p && b.size_band === s), mt, s === 'all', !hit && office !== 'all'); }).join('')}</tr>`).join('')}
     </tbody></table></div>`;
   } else {
-    body = mt.dims.map(dk => fnBandYearTable(C, rows.filter(b => b.dimension_key === dk), mt, (C.dimMap[dk] || {}).label || dk)).join('');
+    body = mt.dims.map(dk => fnBandYearTable(C, rows.filter(b => b.dimension_key === dk), mt, (C.dimMap[dk] || {}).label || dk, office === 'all' ? [] : allRows.filter(b => b.dimension_key === dk), office)).join('');
   }
   return `<details class="fn-sub fn-bands" open><summary>市場帶・${escHtml(mt.label)}<span class="fn-muted">（面試筆記・前東家名冊規模 × 職位・中位數${mt.unit ? '（' + escHtml(mt.unit) + '）' : ''}・版本 ${escHtml(ver)}${at ? '・' + escHtml(at) : ''}）</span></summary>
     <div class="fn-bands-ctl">${metrics.map(m => `<button class="sub-tab-btn${m.key === mk ? ' active' : ''}" onclick="fnSetBandMetric('${escHtml(grp)}','${m.key}')">${escHtml(m.label)}</button>`).join('')}
-      <span class="fn-sep"></span><button class="sub-tab-btn${yearMode ? '' : ' active'}" onclick="fnSetBandYear('${escHtml(grp)}',false)">全部年度</button><button class="sub-tab-btn${yearMode ? ' active' : ''}" onclick="fnSetBandYear('${escHtml(grp)}',true)">分年度</button></div>
+      <span class="fn-sep"></span><button class="sub-tab-btn${yearMode ? '' : ' active'}" onclick="fnSetBandYear('${escHtml(grp)}',false)">全部年度</button><button class="sub-tab-btn${yearMode ? ' active' : ''}" onclick="fnSetBandYear('${escHtml(grp)}',true)">分年度</button>${offices.length > 1 ? '<span class="fn-sep"></span>' + offices.map(o => `<button class="sub-tab-btn${o === office ? ' active' : ''}" onclick="fnSetBandOffice('${escHtml(grp)}','${escHtml(o)}')">${o === 'all' ? '綜合' : escHtml(o)}</button>`).join('') : ''}</div>
     ${fnBandLegend(mt, rows)}
     ${body}
-    <div class="fn-note">每格至少 3 位不同候選人才入庫，滿 5 位才顯示區間；「全部」欄與「全部」列是合併重算，不是各格加總。「未對到名冊」＝該筆前東家的所名沒有比對到律師名冊，所以不知道規模。游標停在格子上，可看該格的條目數、所數與已逐條查核的占比。</div>
+    <div class="fn-note">每格至少 3 位不同候選人才入庫，滿 5 位才顯示區間；「全部」欄與「全部」列是合併重算，不是各格加總。「未對到名冊」＝該筆前東家的所名沒有比對到律師名冊，所以不知道規模。游標停在格子上，可看該格的條目數、所數與已逐條查核的占比。切到單一分所時，該分所不足 3 位候選人的格子會改用綜合數字（格內有「綜」記號），不是該分所自己的數字。</div>
   </details>`;
 }
-function fnBandCell(b, mt, isAll) {
+function fnBandCell(b, mt, isAll, isFallback) {
   const cls = isAll ? ' class="fn-bt-all"' : '';
   if (!b) return `<td${cls}><span class="fn-muted">—</span></td>`;
-  const tip = `條目 ${b.n_entries}・所 ${b.n_firms != null ? b.n_firms : '—'}・已查核 ${b.verified_share != null ? b.verified_share + '%' : '—'}`;
+  const fb = isFallback ? '<span class="fn-fb-mark" title="這個分所在這一格不足 3 位候選人，顯示的是綜合數字">綜</span>' : '';
+  const tip = `${isFallback ? '（綜合數字，該分所樣本不足）' : ''}條目 ${b.n_entries}・所 ${b.n_firms != null ? b.n_firms : '—'}・已查核 ${b.verified_share != null ? b.verified_share + '%' : '—'}`;
   if (mt.cat) {
     const c = b.cat_counts || {};
-    return `<td${cls} title="${escHtml(tip)}"><span class="fn-ot-y">有 ${c['有'] != null ? c['有'] : 0}</span>／<span class="fn-ot-n">無 ${c['無'] != null ? c['無'] : 0}</span>${c['補休'] ? `／補休 ${c['補休']}` : ''}<small>n=${b.n_candidates}</small></td>`;
+    return `<td${cls} title="${escHtml(tip)}">${fb}<span class="fn-ot-y">有 ${c['有'] != null ? c['有'] : 0}</span>／<span class="fn-ot-n">無 ${c['無'] != null ? c['無'] : 0}</span>${c['補休'] ? `／補休 ${c['補休']}` : ''}<small>n=${b.n_candidates}</small></td>`;
   }
   const f = x => fnNum(mt.scale ? Number(x) * mt.scale : x);
-  return `<td${cls} title="${escHtml(tip)}"><b>${f(b.median)}</b><span class="fn-n">${b.n_candidates} 人</span>${b.p25 != null && b.p75 != null ? `<small>${f(b.p25)}–${f(b.p75)}</small>` : ''}</td>`;
+  return `<td${cls} title="${escHtml(tip)}">${fb}<b>${f(b.median)}</b><span class="fn-n">${b.n_candidates} 人</span>${b.p25 != null && b.p75 != null ? `<small>${f(b.p25)}–${f(b.p75)}</small>` : ''}</td>`;
 }
-function fnBandYearTable(C, rows, mt, title) {
-  const yrs = [...new Set(rows.map(b => b.year).filter(y => y != null))].sort((a, b) => a - b);
+function fnBandYearTable(C, rows, mt, title, fbRows, office) {
+  fbRows = fbRows || [];
+  if (!rows.length) rows = fbRows;
+  const yrs = [...new Set(rows.concat(fbRows).map(b => b.year).filter(y => y != null))].sort((a, b) => a - b);
   const cols = yrs.map(y => ({ y, label: `${y} 年` })).concat([{ y: null, label: '全部年度' }]);
   const zhelu = rows.length && rows.every(b => b.size_band === 'zhelu');
   const keys = [...new Set(rows.map(b => `${b.size_band}|${b.position_kind}`))].sort((a, b) => {
@@ -15551,11 +15562,12 @@ function fnBandYearTable(C, rows, mt, title) {
   });
   if (!keys.length) return '';
   return `<div class="fn-bt-title">${escHtml(title)}</div><div class="table-wrap"><table class="fn-table fn-bt"><thead><tr>${zhelu ? '<th>職缺</th>' : '<th>名冊規模</th><th>職位</th>'}${cols.map(c => `<th class="${c.y == null ? 'fn-bt-all' : ''}">${escHtml(c.label)}</th>`).join('')}</tr></thead><tbody>
-    ${keys.map(k => { const [s, p] = k.split('|'); return `<tr>${zhelu ? `<td class="fn-nowrap">${escHtml(p)}</td>` : `<td class="fn-nowrap">${escHtml(FN_BAND_LABEL[s] || s)}</td><td class="fn-nowrap">${escHtml(FN_POS_LABEL[p] || p)}</td>`}${cols.map(c => fnBandCell(rows.find(b => b.size_band === s && b.position_kind === p && (c.y == null ? b.year == null : Number(b.year) === c.y)), mt, c.y == null)).join('')}</tr>`; }).join('')}
+    ${keys.map(k => { const [s, p] = k.split('|'); return `<tr>${zhelu ? `<td class="fn-nowrap">${escHtml(p)}</td>` : `<td class="fn-nowrap">${escHtml(FN_BAND_LABEL[s] || s)}</td><td class="fn-nowrap">${escHtml(FN_POS_LABEL[p] || p)}</td>`}${cols.map(c => { const m = x => x.find(b => b.size_band === s && b.position_kind === p && (c.y == null ? b.year == null : Number(b.year) === c.y)); const hit = m(rows); return fnBandCell(hit || m(fbRows), mt, c.y == null, !hit && office && office !== 'all'); }).join('')}</tr>`; }).join('')}
   </tbody></table></div>`;
 }
 function fnSetBandMetric(grp, key) { _fnState.bandMetric[grp] = key; fnRerenderBands(grp); }
 function fnSetBandYear(grp, on) { _fnState.bandYear[grp] = !!on; fnRerenderBands(grp); }
+function fnSetBandOffice(grp, o) { _fnState.bandOffice[grp] = o; fnRerenderBands(grp); }
 function fnRerenderBands(grp) { const el = document.getElementById('fnBands_' + grp); if (el && _fnCache) el.innerHTML = fnBandsHtml(_fnCache, grp); }
 
 // ---------- 組織治理：自述人數 vs 律師名冊 ----------
