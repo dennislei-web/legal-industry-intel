@@ -222,18 +222,15 @@ def join():
 def upload():
     d = json.load(open(os.path.join(WORK_DIR, 'appeal_agg.json'), encoding='utf-8'))
     rows = d['rows']
-    # 全量重建（DELETE + 分批 INSERT；表小、無外鍵）
-    r = requests.delete(f'{SB_URL}/rest/v1/judge_appeal_stats?id=gt.0', headers=HEAD, timeout=120)
-    print(f'DELETE {r.status_code}')
-    for i in range(0, len(rows), 3000):
-        r = requests.post(f'{SB_URL}/rest/v1/judge_appeal_stats',
-                          headers={**HEAD, 'Content-Type': 'application/json',
-                                   'Prefer': 'return=minimal'},
-                          json=rows[i:i + 3000], timeout=300)
-        if r.status_code not in (200, 201, 204):
-            print(f'batch {i} 失敗 {r.status_code}: {r.text[:300]}')
-            sys.exit(1)
-        print(f'  insert {i}~{i + len(rows[i:i + 3000])}', flush=True)
+    # 全量重建（DELETE + 分批 upsert；表小、無外鍵）
+    import sb_bulk
+    try:
+        sb_bulk.rebuild(SB_URL, HEAD, 'judge_appeal_stats', rows,
+                        on_conflict='name,court_name,side,cat',
+                        delete_filter='id=gt.0')
+    except RuntimeError as e:
+        print(f'上傳失敗：{e}')
+        sys.exit(1)
     print(f'完成：{len(rows)} 列（上訴審 {d["n_appeals"]}、可對回 {d["n_matched"]}）')
 
 
