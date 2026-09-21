@@ -15049,6 +15049,8 @@ const FN_QUAL = { '<': '<', '<=': '≤', '>': '>', '>=': '≥', '~': '約 ' };
 const FN_BAND_ORDER = ['1-3', '4-10', '11-30', '31+', 'unknown', 'all'];
 const FN_BAND_LABEL = { '1-3': '1–3 位', '4-10': '4–10 位', '11-30': '11–30 位', '31+': '31 位以上', unknown: '未對到名冊', all: '全部' };
 const FN_POS_ORDER = ['lawyer', 'trainee-lawyer', 'legal-staff-admin', 'part-time', 'other', 'all'];
+// 分所切換鈕依地理順序由北而南排列（mig 217 起共六所）；不在清單內的分所排在最後
+const FN_OFFICE_ORDER = ['北所', '桃所', '竹所', '中所', '南所', '雄所'];
 const FN_POS_LABEL = { lawyer: '受僱律師（含實習轉正）', 'trainee-lawyer': '實習律師（實習期間）', 'legal-staff-admin': '法務／助理／行政', 'part-time': '工讀／實習生', other: '其他', all: '全部職位' };
 const FN_BAND_METRICS = {
   comp: [
@@ -15509,9 +15511,10 @@ function fnBandsHtml(C, grp) {
   const mk = _fnState.bandMetric[grp] && metrics.some(m => m.key === _fnState.bandMetric[grp]) ? _fnState.bandMetric[grp] : metrics[0].key;
   const mt = metrics.find(m => m.key === mk);
   const yearMode = !!_fnState.bandYear[grp];
-  // 分所口徑（mig 216）：office='all' 為綜合，其餘為單一分所。分所格不足 3 位候選人不入庫，改用綜合格並標註。
+  // 分所口徑（mig 216 建軸、mig 217 擴為六所）：office='all' 為綜合，其餘為單一分所。
+  // 分所清單由資料推導，新分所會自動出現；分所格不足 3 位候選人不入庫，改用綜合格並標註。
   const pool = C.bands.filter(b => mt.dims.includes(b.dimension_key) && b.size_band !== 'zhelu');
-  const offices = ['all', ...[...new Set(pool.map(b => b.office || 'all'))].filter(o => o !== 'all').sort((a, b) => a.localeCompare(b, 'zh-Hant'))];
+  const offices = ['all', ...[...new Set(pool.map(b => b.office || 'all'))].filter(o => o !== 'all').sort((a, b) => (FN_OFFICE_ORDER.indexOf(a) + 1 || 99) - (FN_OFFICE_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b, 'zh-Hant'))];
   const office = offices.includes(_fnState.bandOffice[grp]) ? _fnState.bandOffice[grp] : 'all';
   const allRows = pool.filter(b => (b.office || 'all') === 'all');
   const rows = office === 'all' ? allRows : pool.filter(b => (b.office || 'all') === office);
