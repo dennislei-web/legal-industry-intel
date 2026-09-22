@@ -799,6 +799,45 @@
     .fn-hbar-track i.neg { background: var(--red); }
     .fn-hbar-v { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
     .fn-hbar-detail { font-size: 0.72rem; color: var(--text-muted); }
+    /* 關鍵數字磚、章節化概述、圖表（雷 2026-09-22 核定後改版：讀法順序 數字 → 圖 → 正文 → 表） */
+    .fn-kpiblock, .fn-charts, .fn-ovblock { margin-bottom: 10px; }
+    .fn-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+    .fn-kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px 8px; min-width: 0; }
+    .fn-kpi-click { cursor: pointer; }
+    .fn-kpi-click:hover, .fn-kpi-click:focus-visible { border-color: var(--gold); outline: none; }
+    .fn-kpi-v { color: var(--gold-light); font-size: 1.35rem; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .fn-kpi-v.fn-kpi-long { font-size: 0.98rem; line-height: 1.4; }
+    .fn-kpi-v small { color: var(--gold); font-size: 0.72rem; font-weight: 500; margin-left: 3px; }
+    .fn-kpi-t { font-size: 0.82rem; color: var(--text); margin-top: 3px; line-height: 1.4; }
+    .fn-kpi-d { font-size: 0.7rem; color: var(--text-muted); line-height: 1.5; margin-top: 4px; }
+    .fn-kpi-d .fn-conf { margin-left: 5px; }
+    .fn-kpi-broken .fn-kpi-v { color: var(--text-muted); text-decoration: line-through; }
+    .fn-block-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+    .fn-block-head .fn-block-title { margin-bottom: 0; }
+    .fn-mode { display: flex; gap: 4px; flex-wrap: wrap; }
+    .fn-toc { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 2px 0 10px; }
+    .fn-toc button { font-family: inherit; font-size: 0.72rem; color: var(--text-muted); background: var(--ghost-bg); border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fn-toc button:hover { color: var(--gold-light); border-color: var(--gold); }
+    .fn-sec { padding: 9px 0; border-top: 1px dashed var(--border); scroll-margin-top: calc(var(--fn-sticky-top, 57px) + 70px); transition: background .6s; }
+    .fn-secs > .fn-sec:first-child { border-top: none; padding-top: 2px; }
+    .fn-sec.fn-flash { background: var(--tab-active-bg); }
+    .fn-sec.fn-sec-plain { padding-left: calc(1.7em + 8px); }
+    .fn-sec-t { display: flex; gap: 8px; align-items: baseline; font-size: 0.95rem; font-weight: 700; color: var(--text); line-height: 1.5; text-wrap: pretty; }
+    .fn-secs.lead .fn-sec-t { cursor: pointer; }
+    .fn-sec-i { flex: none; font-size: 0.68rem; font-weight: 600; color: var(--gold); border: 1px solid var(--gold); border-radius: 999px; min-width: 1.7em; height: 1.7em; line-height: 1.6em; text-align: center; font-variant-numeric: tabular-nums; }
+    .fn-sec-c { display: none; flex: none; margin-left: auto; font-size: 0.8rem; color: var(--text-muted); transition: transform .15s; }
+    .fn-secs.lead .fn-sec-c { display: inline-block; }
+    .fn-secs.lead .fn-sec.open .fn-sec-c { transform: rotate(90deg); }
+    .fn-sec-b { margin-top: 5px; padding-left: calc(1.7em + 8px); }
+    .fn-secs.lead .fn-sec-b { display: none; }
+    .fn-secs.lead .fn-sec.open .fn-sec-b { display: block; }
+    .fn-sec-q { font-size: 0.8rem; color: var(--text-muted); border-left: 3px solid var(--gold); padding: 5px 10px; margin: 0 0 8px; background: var(--ghost-bg); border-radius: 0 6px 6px 0; line-height: 1.6; }
+    .fn-sec-q p { margin: 0; }
+    .fn-charts-ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .fn-chart-title { font-size: 0.88rem; font-weight: 600; color: var(--text); margin: 2px 0 6px; }
+    .fn-chart-title .fn-muted { font-weight: 400; font-size: 0.78rem; margin-left: 4px; }
+    .fn-chart-wrap { position: relative; height: 300px; }
+    .fn-heat td i { display: block; border-radius: 4px; padding: 3px 4px; font-style: normal; color: var(--text); font-variant-numeric: tabular-nums; }
     /* 事務所視窗 */
     .fn-modal { font-size: 0.88rem; }
     .fn-m-line { font-size: 0.8rem; color: var(--text); margin: 0 0 5px; line-height: 1.7; }
@@ -827,6 +866,8 @@
       .fn-hbar-detail { grid-column: 1 / -1; order: 5; }
       .fn-tile-kn { padding-right: 0; }
       .fn-tile > .fn-draft { position: static; margin: 8px 0 0; }
+      .fn-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .fn-chart-wrap { height: 250px; }
     }
     @media (prefers-reduced-motion: reduce) { .fn-firm, .fn-tile { transition: none; } }
 
@@ -15078,7 +15119,7 @@ const FN_BAND_METRICS = {
 };
 
 let _fnCache = null, _fnCachePromise = null, _fnLoadPromise = null;
-const _fnState = { grp: 'overview', src: {}, sort: {}, open: new Set(), showAll: {}, bandMetric: {}, bandYear: {}, bandOffice: {} };
+const _fnState = { grp: 'overview', src: {}, sort: {}, open: new Set(), showAll: {}, bandMetric: {}, bandYear: {}, bandOffice: {}, ovMode: {}, chart: {}, chartType: {}, chartSel: {} };
 const _fnModal = { firm: '', grp: 'all', pendingGrp: null };
 
 // ---------- 資料 ----------
@@ -15294,6 +15335,7 @@ function fnShowFacet(grp, opts) {
   else if (grp === FN_MIRROR) view = fnMirrorHtml(C, mirror);
   else view = fnFacetHtml(C, groups.find(g => g.grp === grp));
   body.innerHTML = fnChipsHtml(C, groups, mirror) + `<div id="fnView">${view}</div>`;
+  fnMountChart(C, grp);   // 圖表要等 canvas 進 DOM 才能畫；沒有圖表的面向會直接略過
   fnSetStickyTop();
   const tab = document.getElementById('tab-fieldnotes');
   if (tab && typeof buildSectionIndex === 'function') buildSectionIndex(tab);
@@ -15426,13 +15468,13 @@ function fnFacetHtml(C, g) {
   h += `<div class="fn-sample">${fnSampleHtml(st)}</div>`;
   const kn = ov && Array.isArray(ov.key_numbers) ? ov.key_numbers : [];
   const lei = g.facts.filter(fnIsLei);
-  h += `<div class="fn-ov${kn.length ? '' : ' fn-ov-one'}">
-    <div class="fn-block"><div class="fn-block-title">${v.singleFirm && v.nFirm <= 2 ? '案例概述' : '概述'}</div>
-      ${ov ? `<div class="ai-md fn-md">${renderMarkdown(ov.overview_md)}</div>` : '<div class="fn-muted">尚無撰寫的概述；以下樣本數、事務所列皆由條目即時整理。</div>'}
+  // 讀法順序：關鍵數字磚 → 圖表 → 章節化概述 → 市場帶表 → 缺口 → 各所陳述（雷 2026-09-22 核定後改版）
+  if (kn.length) h += fnKpiGridHtml(C, g, kn);
+  h += fnChartsHtml(C, g.grp);
+  h += `<div class="fn-block fn-ovblock">${fnOvHeadHtml(g.grp, ov, v.singleFirm && v.nFirm <= 2 ? '案例概述' : '概述')}
+      ${ov ? fnOvSectionsHtml(g.grp, ov.overview_md) : '<div class="fn-muted">尚無撰寫的概述；以下樣本數、事務所列皆由條目即時整理。</div>'}
       ${lei.length ? `<div class="fn-lei-box">${lei.map(f => fnFactLine(C, f, {})).join('')}</div>` : ''}
-    </div>
-    ${kn.length ? `<div class="fn-block"><div class="fn-block-title">關鍵數字</div>${kn.map((k, i) => fnKeyNumHtml(C, g, k, i)).join('')}</div>` : ''}
-  </div>`;
+    </div>`;
   if (FN_BAND_METRICS[g.grp] && C.bands.length) h += `<div id="fnBands_${escHtml(g.grp)}">${fnBandsHtml(C, g.grp)}</div>`;
   if (g.grp === 'talent' || g.grp === 'work' || g.grp === 'strat') {
     const mir = fnMirrorGroup(C);
@@ -15473,7 +15515,8 @@ function fnFindBand(C, ref) {
   return C.bands.find(b => b.dimension_key === ref.dimension_key && b.level === ref.level && b.size_band === ref.size_band
     && b.position_kind === ref.position_kind && (b.year == null ? ref.year == null : Number(b.year) === Number(ref.year)));
 }
-function fnKeyNumHtml(C, g, k, i) {
+// ---------- 關鍵數字磚（key_numbers → KPI 格；磚有所名時點一下展開對應事務所）----------
+function fnKpiHtml(C, g, k, i) {
   const ids = Array.isArray(k.fact_ids) ? k.fact_ids.map(Number) : [];
   const byId = {}; C.facts.forEach(f => { byId[f.id] = f; });
   const missing = ids.filter(id => !byId[id]).length + (Array.isArray(k.bands) ? k.bands.filter(b => !fnFindBand(C, b)).length : 0);
@@ -15482,9 +15525,15 @@ function fnKeyNumHtml(C, g, k, i) {
   const conf = k.confidence && FN_CONF[k.confidence] ? `<span class="fn-conf" style="color:${FN_CONF[k.confidence][1]};">●${FN_CONF[k.confidence][0]}</span>` : '';
   const click = firms.length && g.grp !== FN_MIRROR ? ` role="button" tabindex="0" onclick="fnHighlightFirms('${escHtml(g.grp)}',${i})" onkeydown="return fnKey(event,()=>fnHighlightFirms('${escHtml(g.grp)}',${i}))"` : '';
   const title = missing ? '引用的條目或市場帶已變更，概述需要重寫' : firms.length ? `點擊展開：${firms.join('、')}` : '';
-  return `<div class="fn-kn${missing ? ' fn-kn-broken' : ''}${click ? ' fn-kn-click' : ''}"${click}${title ? ` title="${escHtml(title)}"` : ''}>
-    <div class="fn-kn-top"><b>${escHtml(k.value)}</b>${k.unit ? `<small>${escHtml(k.unit)}</small>` : ''}<span>${escHtml(k.text)}</span></div>
-    <div class="fn-kn-detail">${dots}${escHtml(k.detail || '')}${conf}${missing ? '<span class="fn-stale">引用已變更</span>' : ''}</div></div>`;
+  const long = String(k.value || '').length > 7;   // 「北 60／中 60.5／桃 65.5」這類多值磚用小字，避免撐爆格子
+  return `<div class="fn-kpi${missing ? ' fn-kpi-broken' : ''}${click ? ' fn-kpi-click' : ''}"${click}${title ? ` title="${escHtml(title)}"` : ''}>
+    <div class="fn-kpi-v${long ? ' fn-kpi-long' : ''}">${escHtml(k.value)}${k.unit ? `<small>${escHtml(k.unit)}</small>` : ''}</div>
+    <div class="fn-kpi-t">${escHtml(k.text)}</div>
+    <div class="fn-kpi-d">${dots}${escHtml(k.detail || '')}${conf}${missing ? '<span class="fn-stale">引用已變更</span>' : ''}</div></div>`;
+}
+function fnKpiGridHtml(C, g, kn) {
+  const clickable = g.grp !== FN_MIRROR && kn.some(k => Array.isArray(k.fact_ids) && k.fact_ids.length);
+  return `<div class="fn-block fn-kpiblock"><div class="fn-block-title">關鍵數字<span class="fn-muted">（${kn.length} 項${clickable ? '・有所名的磚點一下會展開對應事務所' : ''}）</span></div><div class="fn-kpis">${kn.map((k, i) => fnKpiHtml(C, g, k, i)).join('')}</div></div>`;
 }
 function fnHighlightFirms(grp, i) {
   const C = _fnCache; if (!C) return;
@@ -15497,6 +15546,263 @@ function fnHighlightFirms(grp, i) {
   const el = document.getElementById(fnFirmRowId(grp, firms[0]));
   if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
   firms.forEach(f => { const r = document.getElementById(fnFirmRowId(grp, f)); if (r) { r.classList.add('fn-flash'); setTimeout(() => r.classList.remove('fn-flash'), 1600); } });
+}
+
+// ---------- 章節化概述：overview_md 的「**結論句。** 說明」段落 → 編號章節＋目錄＋「只看結論」----------
+// 概述正文只走 migration、雷核定後不動；這裡只改呈現，不改字。沒有結論句的補充段落併入前一節。
+function fnMdSections(md) {
+  const out = [];
+  String(md || '').replace(/\r/g, '').split(/\n\s*\n/).map(s => s.trim()).filter(Boolean).forEach(p => {
+    if (/^>/.test(p)) { out.push({ kind: 'quote', body: p.replace(/^>\s?/gm, '') }); return; }
+    const m = p.match(/^\*\*([^*\n]+?)\*\*\s*([\s\S]*)$/);
+    if (m) out.push({ kind: 'sec', title: m[1].replace(/[。：:]\s*$/, ''), body: m[2].trim() });
+    else if (out.length && out[out.length - 1].kind === 'sec') out[out.length - 1].body += '\n\n' + p;
+    else out.push({ kind: 'para', body: p });
+  });
+  return out;
+}
+function fnOvHeadHtml(grp, ov, title) {
+  const n = ov ? fnMdSections(ov.overview_md).filter(s => s.kind === 'sec').length : 0;
+  const mode = _fnState.ovMode[grp] || 'full';
+  const btn = (m, l) => `<button class="sub-tab-btn${mode === m ? ' active' : ''}" data-mode="${m}" onclick="fnSetOvMode('${escHtml(grp)}','${m}')">${l}</button>`;
+  return `<div class="fn-block-head"><div class="fn-block-title">${escHtml(title)}${n ? `<span class="fn-muted">（${n} 節）</span>` : ''}</div>${n >= 3 ? `<span class="fn-mode" data-fn-mode="${escHtml(grp)}">${btn('full', '全文')}${btn('lead', '只看結論')}</span>` : ''}</div>`;
+}
+function fnOvSectionsHtml(grp, md) {
+  const secs = fnMdSections(md), g = escHtml(grp);
+  const mode = _fnState.ovMode[grp] || 'full';
+  const titles = secs.filter(s => s.kind === 'sec').map(s => s.title);
+  let h = '', i = 0;
+  if (titles.length >= 4) h += `<div class="fn-toc">${titles.map((t, k) => `<button type="button" title="${escHtml(t)}" onclick="fnJumpSec('${g}',${k})">${k + 1}. ${escHtml(t.length > 24 ? t.slice(0, 23) + '…' : t)}</button>`).join('')}</div>`;
+  h += `<div class="fn-secs${mode === 'lead' ? ' lead' : ''}" id="fnSecs_${g}">`;
+  secs.forEach(s => {
+    if (s.kind === 'quote') h += `<div class="fn-sec-q ai-md">${renderMarkdown(s.body)}</div>`;
+    else if (s.kind === 'para') h += `<div class="fn-sec fn-sec-plain ai-md fn-md">${renderMarkdown(s.body)}</div>`;
+    else {
+      h += `<div class="fn-sec" id="fnSec_${g}_${i}"><div class="fn-sec-t" onclick="this.parentNode.classList.toggle('open')"><span class="fn-sec-i">${i + 1}</span><span>${escHtml(s.title)}</span><span class="fn-sec-c">▸</span></div><div class="fn-sec-b ai-md fn-md">${renderMarkdown(s.body)}</div></div>`;
+      i++;
+    }
+  });
+  return h + '</div>';
+}
+function fnSetOvMode(grp, mode) {
+  _fnState.ovMode[grp] = mode;
+  const el = document.getElementById('fnSecs_' + grp); if (el) el.classList.toggle('lead', mode === 'lead');
+  document.querySelectorAll(`.fn-mode[data-fn-mode="${grp}"] button`).forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+function fnJumpSec(grp, k) {
+  const el = document.getElementById(`fnSec_${grp}_${k}`); if (!el) return;
+  el.classList.add('open'); el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('fn-flash'); setTimeout(() => el.classList.remove('fn-flash'), 1600);
+}
+
+// ---------- 圖表：市場帶（interview_market_bands）與概述 basis 統計的圖形版 ----------
+// Chart.js 4。每組數據列出可用型式（直條／橫條／折線／區間／堆疊／環圈／熱圖表／表格），型式切換不重算資料。
+// 資料全部即時從 C.bands 與 overviews[grp].basis 取，不另存數字；市場帶換版後圖自動跟著換。
+const FN_CHART_TYPE_LABEL = { bar: '直條', hbar: '橫條', line: '折線', range: '區間', stack: '堆疊', doughnut: '環圈', heat: '熱圖表', table: '表格' };
+const FN_CHARTS = {
+  comp: [
+    { key: 'pay_year', label: '底薪六年走勢', types: ['line', 'bar', 'table'], build: C => fnChartByYear(C, [['comp.associate_pay_band', 'lawyer', '受僱律師'], ['comp.staff_pay_band', 'legal-staff-admin', '法務／助理'], ['comp.trainee_pay', 'trainee-lawyer', '實習律師']], { unit: '萬／月', scale: 0.1, note: '各年度的中位數（依候選人在該前東家的任職年度）；游標停在點上看人數與 P25–P75。實習律師多數年度不足 5 位、只有中位數，線上留空的是不足 3 位未入庫。' }) },
+    { key: 'pay_office', label: '底薪分所比較', types: ['bar', 'hbar', 'table'], build: C => fnChartByOffice(C, [['comp.associate_pay_band', 'lawyer', '受僱律師'], ['comp.staff_pay_band', 'legal-staff-admin', '法務／助理']], { unit: '萬／月', scale: 0.1, note: '分所＝候選人來面試的喆律分所（前東家多在同一地區）。不足 3 位候選人的分所格不入庫、圖上留空；游標停在柱上看人數。' }) },
+    { key: 'pay_size', label: '底薪依事務所規模', types: ['bar', 'hbar', 'table'], build: C => fnChartBySize(C, [['comp.associate_pay_band', 'lawyer', '受僱律師'], ['comp.staff_pay_band', 'legal-staff-admin', '法務／助理']], { unit: '萬／月', scale: 0.1, note: '規模＝前東家在律師名冊的登錄人數分級；沒對到名冊的前東家不在這張圖（在市場帶表的「未對到名冊」欄）。' }) },
+    { key: 'pay_range', label: '底薪區間 P25–P75', types: ['range', 'table'], build: C => fnChartRange(C, [['comp.associate_pay_band', 'lawyer', '受僱律師'], ['comp.trainee_pay', 'trainee-lawyer', '實習律師'], ['comp.staff_pay_band', 'legal-staff-admin', '法務／助理'], ['comp.staff_pay_band', 'part-time', '工讀／實習生']], { unit: '萬／月', scale: 0.1 }) },
+    { key: 'bonus_size', label: '年終＋三節依規模', types: ['bar', 'hbar', 'table'], build: C => fnChartBySize(C, [['comp.bonus_months', 'lawyer', '受僱律師'], ['comp.bonus_months', 'legal-staff-admin', '法務／助理']], { unit: '個月', note: '中小所市場帶的年終＋三節中位（個月本薪）。超大型所的受僱律師不足 3 位、不入庫；大所會所的 3–12 個月來自拜訪筆記的換算，見概述。' }) },
+    { key: 'ot', label: '加班費有無', types: ['stack', 'table'], build: C => fnChartCat(C, 'comp.overtime_pay', [['lawyer', '受僱律師'], ['trainee-lawyer', '實習律師'], ['legal-staff-admin', '法務／助理']], ['有', '無', '補休'], { note: '有講到加班費的候選人裡，各有幾位說有、幾位說沒有；補休制另計。' }) },
+  ],
+  talent: [
+    { key: 'tenure_range', label: '任職月數依職位 P25–P75', types: ['range', 'table'], build: C => fnChartRange(C, [['talent.tenure', 'lawyer', '受僱律師'], ['talent.tenure', 'trainee-lawyer', '實習律師'], ['talent.tenure', 'legal-staff-admin', '法務／助理'], ['talent.tenure', 'part-time', '工讀／實習生']], { unit: '個月', note: '在前東家的任職月數：橫條＝P25–P75（一半的人落在這區間），菱形＝中位數。實習律師的區間 5–6 個月等於實習期本身。' }) },
+    { key: 'tenure_office', label: '任職中位分所比較', types: ['bar', 'hbar', 'table'], build: C => fnChartByOffice(C, [['talent.tenure', 'lawyer', '受僱律師'], ['talent.tenure', 'legal-staff-admin', '法務／助理']], { unit: '個月', note: '分所＝候選人來面試的喆律分所。竹所受僱律師 24 個月看起來突出，但 n 僅 8，不足以下結論。' }) },
+    { key: 'tenure_size', label: '任職中位依規模', types: ['bar', 'hbar', 'table'], build: C => fnChartBySize(C, [['talent.tenure', 'lawyer', '受僱律師'], ['talent.tenure', 'legal-staff-admin', '法務／助理']], { unit: '個月', note: '規模＝前東家在律師名冊的登錄人數分級。' }) },
+    { key: 'verif', label: '各維度查核狀態', types: ['stack', 'table'], build: C => fnChartVerif(C, 'talent') },
+    { key: 'alleg', label: '職場指控型態', types: ['hbar', 'table'], build: C => fnChartAlleg(C) },
+    { key: 'hiring', label: '招募來源', types: ['doughnut', 'hbar', 'table'], build: C => fnChartHiring(C) },
+  ],
+  [FN_MIRROR]: [
+    { key: 'pull_role', label: '七個拉力 依職缺', types: ['bar', 'heat', 'hbar', 'table'], build: C => fnChartMirror(C, 'pulls', 'by_role') },
+    { key: 'concern_role', label: '六個疑慮 依職缺', types: ['bar', 'heat', 'hbar', 'table'], build: C => fnChartMirror(C, 'concerns', 'by_role') },
+    { key: 'pull_office', label: '七個拉力 依分所', types: ['heat', 'bar', 'table'], build: C => fnChartMirror(C, 'pulls', 'by_office') },
+    { key: 'expect', label: '期待薪資 vs 前東家底薪', types: ['bar', 'hbar', 'table'], build: C => fnChartExpect(C) },
+    { key: 'expect_year', label: '期待薪資逐年', types: ['line', 'bar', 'table'], build: C => fnChartExpectYear(C) },
+  ],
+};
+function fnCssColor(name, fallback) { return (getComputedStyle(document.body).getPropertyValue(name) || '').trim() || fallback; }
+function fnRgba(c, a) { const m = String(c).trim().replace('#', ''); if (!/^[0-9a-f]{6}$/i.test(m)) return c; const n = parseInt(m, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+function fnPalette() { const fb = ['#4f8ef7', '#9b7ed8', '#4caf82', '#c9a84c', '#e0954a', '#e05c5c', '#8899aa']; return ['--blue', '--purple', '--green', '--gold', '--orange', '--red', '--text-muted'].map((v, i) => fnCssColor(v, fb[i])); }
+function fnScaled(v, scale) { return v == null ? null : Math.round(Number(v) * (scale || 1) * 100) / 100; }
+function fnOfficeCmp(a, b) { return (FN_OFFICE_ORDER.indexOf(a) + 1 || 99) - (FN_OFFICE_ORDER.indexOf(b) + 1 || 99) || String(a).localeCompare(String(b), 'zh-Hant'); }
+// 市場帶單格：office／size／year 沒給就取綜合格（office=all、size_band=all、year 空）
+function fnBandFind(C, dim, pos, q) {
+  q = q || {};
+  return C.bands.find(b => b.dimension_key === dim && b.position_kind === pos && (b.office || 'all') === (q.office || 'all')
+    && b.size_band === (q.size || 'all') && (q.year == null ? b.year == null : Number(b.year) === Number(q.year)));
+}
+function fnChartByYear(C, series, o) {
+  const dims = series.map(s => s[0]);
+  const years = [...new Set(C.bands.filter(b => dims.includes(b.dimension_key) && b.year != null && (b.office || 'all') === 'all' && b.size_band === 'all').map(b => Number(b.year)))].sort((a, b) => a - b);
+  const datasets = series.map(([dim, pos, label]) => { const rows = years.map(y => fnBandFind(C, dim, pos, { year: y })); return { label, data: rows.map(b => b ? fnScaled(b.median, o.scale) : null), meta: rows }; }).filter(d => d.data.some(v => v != null));
+  return { labels: years.map(y => `${y} 年`), datasets, unit: o.unit, scale: o.scale, note: o.note };
+}
+function fnChartByOffice(C, series, o) {
+  const dims = series.map(s => s[0]);
+  const offs = [...new Set(C.bands.filter(b => dims.includes(b.dimension_key) && (b.office || 'all') !== 'all' && b.size_band === 'all' && b.year == null).map(b => b.office))].sort(fnOfficeCmp);
+  const keys = ['all'].concat(offs);
+  const datasets = series.map(([dim, pos, label]) => { const rows = keys.map(of => fnBandFind(C, dim, pos, { office: of })); return { label, data: rows.map(b => b ? fnScaled(b.median, o.scale) : null), meta: rows }; }).filter(d => d.data.some(v => v != null));
+  return { labels: keys.map(k => k === 'all' ? '綜合' : k), datasets, unit: o.unit, scale: o.scale, note: o.note };
+}
+function fnChartBySize(C, series, o) {
+  const sizes = FN_BAND_ORDER.filter(s => s !== 'unknown' && s !== 'all').concat(['all']);
+  const datasets = series.map(([dim, pos, label]) => { const rows = sizes.map(s => fnBandFind(C, dim, pos, { size: s })); return { label, data: rows.map(b => b ? fnScaled(b.median, o.scale) : null), meta: rows }; }).filter(d => d.data.some(v => v != null));
+  return { labels: sizes.map(s => s === 'all' ? '全部' : String(FN_BAND_LABEL[s] || s).replace('（', ' ').replace('）', '')), datasets, unit: o.unit, scale: o.scale, note: o.note };
+}
+function fnChartRange(C, series, o) {
+  const rows = series.map(([dim, pos]) => fnBandFind(C, dim, pos, {}));
+  const keep = series.map((s, i) => i).filter(i => rows[i] && rows[i].median != null);
+  return { labels: keep.map(i => `${series[i][2]}・中位 ${fnNum(fnScaled(rows[i].median, o.scale))}`), unit: o.unit, scale: o.scale, range: true,
+    note: o.note || '橫條＝P25–P75（一半的人落在這區間），菱形＝中位數；不足 5 位的職位沒有區間、只有中位數。',
+    datasets: [{ label: 'P25–P75', data: keep.map(i => rows[i].p25 != null && rows[i].p75 != null ? [fnScaled(rows[i].p25, o.scale), fnScaled(rows[i].p75, o.scale)] : null), meta: keep.map(i => rows[i]) },
+      { label: '中位數', data: keep.map(i => fnScaled(rows[i].median, o.scale)), meta: keep.map(i => rows[i]) }] };
+}
+function fnChartCat(C, dim, poss, cats, o) {
+  const rows = poss.map(([p]) => fnBandFind(C, dim, p, {}));
+  const keep = poss.map((p, i) => i).filter(i => rows[i] && rows[i].cat_counts);
+  const palIdx = { '有': 2, '無': 5, '補休': 3 };
+  return { labels: keep.map(i => `${poss[i][1]}（n=${rows[i].n_candidates}）`), unit: '位', stacked: true, note: o && o.note,
+    datasets: cats.map(c => ({ label: c, data: keep.map(i => Number((rows[i].cat_counts || {})[c] || 0)), meta: keep.map(i => rows[i]), pal: palIdx[c] })).filter(d => d.data.some(v => v)) };
+}
+// 面試筆記條目的查核狀態，依維度堆疊（verification_status 由 mig 229 規則重算）
+function fnChartVerif(C, grp) {
+  const order = ['verified', 'partial', 'unverified', 'first_pass'], palIdx = { verified: 2, partial: 3, unverified: 6, first_pass: 1 };
+  const m = {};
+  C.facts.forEach(f => {
+    const d = C.dimMap[f.dimension_key];
+    if (!d || d.grp !== grp || d.mirror_only || !fnIsInterview(C.noteMap[f.note_id])) return;
+    const vs = order.includes(f.verification_status) ? f.verification_status : 'unverified';
+    (m[f.dimension_key] = m[f.dimension_key] || { verified: 0, partial: 0, unverified: 0, first_pass: 0 })[vs]++;
+  });
+  const sum = k => order.reduce((a, s) => a + m[k][s], 0);
+  const keys = Object.keys(m).sort((a, b) => sum(b) - sum(a));
+  return { labels: keys.map(k => `${(C.dimMap[k] || {}).label || k}（${sum(k)}）`), unit: '條', stacked: true,
+    note: '只算面試筆記條目。已逐字查核＝來源分塊逐字對照過原文、事實文字也回對過；部分＝分塊查核過但事實文字沿用抽取版；未逐字查核＝分塊未查核或覆蓋不足；第一版分析＝主題編碼未逐條複核。',
+    datasets: order.map(s => ({ label: FN_VS[s], data: keys.map(k => m[k][s]), pal: palIdx[s] })).filter(d => d.data.some(v => v)) };
+}
+function fnChartAlleg(C) {
+  const ov = C.overviews.talent, a = ov && ov.basis && ov.basis.talent_stats && ov.basis.talent_stats.allegations;
+  if (!a) return null;
+  const law = Object.entries(a.law || {}).sort((x, y) => y[1] - x[1]), non = Object.entries(a.nonlaw || {}).sort((x, y) => y[1] - x[1]);
+  return { labels: law.map(([k]) => k).concat(non.map(([k]) => k)), unit: '筆', stacked: true,
+    note: `${a.note || ''}。律師事務所 ${a.n_law_firms} 筆／非律所雇主 ${a.n_nonlaw} 筆；一筆可對到多個型態，型態合計會大於筆數。所名只在門檻內兩家以 peer 條目記錄，其餘不入庫。`,
+    datasets: [{ label: `律師事務所（${a.n_law_firms} 筆）`, data: law.map(([, v]) => v).concat(non.map(() => null)), pal: 5 }, { label: `非律所雇主（${a.n_nonlaw} 筆）`, data: law.map(() => null).concat(non.map(([, v]) => v)), pal: 4 }] };
+}
+function fnChartHiring(C) {
+  const ov = C.overviews.talent, hs = ov && ov.basis && ov.basis.talent_stats && ov.basis.talent_stats.hiring;
+  if (!hs) return null;
+  const ch = Object.entries(hs.channels || {}).sort((x, y) => y[1] - x[1]);
+  return { labels: ch.map(([k]) => k), unit: '筆', note: hs.note || '', datasets: [{ label: `招募來源（${hs.n} 筆）`, data: ch.map(([, v]) => v) }] };
+}
+// 喆律鏡像：第二版主題編碼的分職缺／分所計數（basis.mirror_stats，mig 231）→ 占該群有實質內容候選人的比例
+function fnChartMirror(C, kind, by) {
+  const ov = C.overviews[FN_MIRROR], ms = ov && ov.basis && ov.basis.mirror_stats;
+  if (!ms || !ms.all || !ms[by]) return null;
+  const codes = Object.keys(ms.labels || {}).filter(c => (kind === 'pulls' ? /^P/ : /^C/).test(c));
+  const pct = (g, c) => g.n ? Math.round(Number((g[kind] || {})[c] || 0) * 1000 / g.n) / 10 : null;
+  let groups = Object.entries(ms[by]).filter(([, g]) => g.n >= 20);
+  groups = by === 'by_office' ? groups.sort((a, b) => fnOfficeCmp(a[0], b[0])) : groups.sort((a, b) => b[1].n - a[1].n);
+  const skipped = Object.entries(ms[by]).filter(([, g]) => g.n < 20).map(([k, g]) => `${k} ${g.n}`);
+  return { labels: codes.map(c => ms.labels[c]), unit: '%', pct: true,
+    note: `占該${by === 'by_role' ? '職缺' : '分所'}有實質內容候選人的比例（一位候選人可同時被編多個碼，所以不加總到 100%）；全體 n=${ms.all.n}${skipped.length ? `；n<20 不列：${skipped.join('、')}` : ''}。`,
+    datasets: [{ label: `全體（n=${ms.all.n}）`, data: codes.map(c => pct(ms.all, c)), pal: 6 }].concat(groups.map(([name, g]) => ({ label: `${name}（n=${g.n}）`, data: codes.map(c => pct(g, c)) }))) };
+}
+function fnChartExpect(C) {
+  const map = [['律師', 'comp.associate_pay_band', 'lawyer'], ['法顧律師', 'comp.associate_pay_band', 'lawyer'], ['法務', 'comp.staff_pay_band', 'legal-staff-admin'], ['行政', 'comp.staff_pay_band', 'legal-staff-admin'], ['工讀生', 'comp.staff_pay_band', 'part-time']];
+  const rows = map.map(([role, dim, pos]) => ({ role, e: C.bands.find(b => b.size_band === 'zhelu' && b.level === 'role' && b.position_kind === role && (b.office || 'all') === 'all' && b.year == null), m: fnBandFind(C, dim, pos, {}) })).filter(r => r.e);
+  if (!rows.length) return null;
+  return { labels: rows.map(r => `應徵${r.role}（n=${r.e.n_candidates}）`), unit: '萬／月', scale: 0.1,
+    note: '左＝應徵喆律者面試時自述的期待薪資中位；右＝市場帶裡同類職位在前東家的底薪中位（法顧律師對照受僱律師格、行政對照法務／助理格、工讀生對照工讀／實習生格）。',
+    datasets: [{ label: '期待薪資（應徵喆律）', data: rows.map(r => fnScaled(r.e.median, 0.1)), meta: rows.map(r => r.e), pal: 2 }, { label: '前東家底薪（市場帶）', data: rows.map(r => r.m ? fnScaled(r.m.median, 0.1) : null), meta: rows.map(r => r.m), pal: 0 }] };
+}
+function fnChartExpectYear(C) {
+  const roles = ['律師', '法務', '法顧律師', '行政'];
+  const rows = C.bands.filter(b => b.size_band === 'zhelu' && b.level === 'role×year' && (b.office || 'all') === 'all' && roles.includes(b.position_kind));
+  const years = [...new Set(rows.map(b => Number(b.year)))].sort((a, b) => a - b);
+  if (!years.length) return null;
+  return { labels: years.map(y => `${y} 年`), unit: '萬／月', scale: 0.1, note: '應徵喆律者自述的期待薪資中位，依面試年度；不足 3 位的年度不入庫、線上留空。',
+    datasets: roles.map(r => { const rs = years.map(y => rows.find(b => b.position_kind === r && Number(b.year) === y)); return { label: `應徵${r}`, data: rs.map(b => b ? fnScaled(b.median, 0.1) : null), meta: rs }; }).filter(d => d.data.some(v => v != null)) };
+}
+function fnChartSpecs(C, grp) {
+  return (FN_CHARTS[grp] || []).map(s => {
+    let d = null;
+    try { d = s.build(C); } catch (e) { console.warn('圖表資料建構失敗', s.key, e); }
+    return d && d.datasets.some(ds => ds.data.some(v => v != null)) ? { spec: s, d } : null;
+  }).filter(Boolean);
+}
+function fnChartsHtml(C, grp) {
+  const specs = fnChartSpecs(C, grp);
+  if (!specs.length) return '';
+  const cur = specs.find(x => x.spec.key === _fnState.chart[grp]) || specs[0];
+  const type = cur.spec.types.includes(_fnState.chartType[grp]) ? _fnState.chartType[grp] : cur.spec.types[0];
+  _fnState.chartSel[grp] = { key: cur.spec.key, type };
+  const d = cur.d, g = escHtml(grp);
+  return `<div class="fn-block fn-charts" id="fnCharts_${g}">
+    <div class="fn-block-head"><div class="fn-block-title">圖表<span class="fn-muted">（${specs.length} 組，同一組數據可換型式）</span></div><span class="fn-mode">${cur.spec.types.map(t => `<button class="sub-tab-btn${t === type ? ' active' : ''}" onclick="fnSetChartType('${g}','${t}')">${FN_CHART_TYPE_LABEL[t] || t}</button>`).join('')}</span></div>
+    <div class="fn-charts-ctl">${specs.map(x => `<button class="sub-tab-btn${x.spec.key === cur.spec.key ? ' active' : ''}" onclick="fnSetChart('${g}','${x.spec.key}')">${escHtml(x.spec.label)}</button>`).join('')}</div>
+    <div class="fn-chart-title">${escHtml(cur.spec.label)}${d.unit ? `<span class="fn-muted">（${escHtml(d.unit)}）</span>` : ''}</div>
+    ${type === 'table' ? fnChartTableHtml(d) : type === 'heat' ? fnChartHeatHtml(d) : `<div class="fn-chart-wrap"><canvas id="fnChart_${g}"></canvas></div>`}
+    ${d.note ? `<div class="fn-note">${escHtml(d.note)}</div>` : ''}
+  </div>`;
+}
+function fnSetChart(grp, key) { _fnState.chart[grp] = key; fnRerenderCharts(grp); }
+function fnSetChartType(grp, t) { _fnState.chartType[grp] = t; fnRerenderCharts(grp); }
+function fnRerenderCharts(grp) {
+  const el = document.getElementById('fnCharts_' + grp); if (!el || !_fnCache) return;
+  el.outerHTML = fnChartsHtml(_fnCache, grp);
+  fnMountChart(_fnCache, grp);
+}
+function fnMountChart(C, grp) {
+  const id = 'fn_' + grp;
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+  const cv = document.getElementById('fnChart_' + grp), sel = _fnState.chartSel[grp];
+  if (!cv || !sel || typeof Chart === 'undefined') return;
+  const hit = fnChartSpecs(C, grp).find(x => x.spec.key === sel.key); if (!hit) return;
+  const d = hit.d, type = sel.type;
+  const pal = fnPalette(), muted = fnCssColor('--text-muted', '#8899aa'), grid = fnRgba(fnCssColor('--border-light', '#243a5e'), 0.5);
+  const col = (ds, i) => ds.pal != null ? pal[ds.pal] : pal[i % pal.length];
+  const fmt = v => v == null ? '—' : fnNum(v);
+  const tip = { callbacks: { label: ctx => {
+    const ds = d.datasets[ctx.datasetIndex] || {}, b = ds.meta && ds.meta[ctx.dataIndex], v = ctx.raw;
+    let s = `${ds.label}：${Array.isArray(v) ? `${fmt(v[0])}–${fmt(v[1])}` : fmt(v)}${d.pct ? '%' : d.unit ? ' ' + d.unit : ''}`;
+    if (b) s += `（${b.n_candidates} 位${!Array.isArray(v) && b.p25 != null && b.p75 != null ? `・P25–P75 ${fmt(fnScaled(b.p25, d.scale))}–${fmt(fnScaled(b.p75, d.scale))}` : ''}${b.verified_share != null ? `・已查核 ${b.verified_share}%` : ''}）`;
+    return s;
+  } } };
+  const legend = { display: d.datasets.length > 1, labels: { color: muted, boxWidth: 12 } };
+  const valAxis = { stacked: !!d.stacked, beginAtZero: true, grid: { color: grid }, ticks: { color: muted, callback: v => d.pct ? v + '%' : v } };
+  const catAxis = { stacked: !!d.stacked, grid: { display: false }, ticks: { color: muted } };
+  let cfg;
+  if (type === 'doughnut') {
+    cfg = { type: 'doughnut', data: { labels: d.labels, datasets: [{ data: d.datasets[0].data, backgroundColor: d.labels.map((_, i) => fnRgba(pal[i % pal.length], 0.8)), borderColor: fnCssColor('--bg-row', '#111b2e'), borderWidth: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: muted, boxWidth: 12 } }, tooltip: tip } } };
+  } else if (type === 'range') {
+    // 浮動長條（[P25, P75]）＋菱形點（中位數）；indexAxis y 讓職位名稱在左
+    cfg = { type: 'bar', data: { labels: d.labels, datasets: [
+      { label: d.datasets[0].label, data: d.datasets[0].data, backgroundColor: fnRgba(pal[0], 0.4), borderColor: pal[0], borderWidth: 1, borderSkipped: false, borderRadius: 4 },
+      { type: 'line', label: d.datasets[1].label, data: d.datasets[1].data, showLine: false, pointStyle: 'rectRot', pointRadius: 7, pointHoverRadius: 9, pointBackgroundColor: pal[3], pointBorderColor: pal[3] }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: valAxis, y: catAxis }, plugins: { legend, tooltip: tip } } };
+  } else {
+    const horiz = type === 'hbar' || type === 'stack', line = type === 'line';
+    cfg = { type: line ? 'line' : 'bar', data: { labels: d.labels, datasets: d.datasets.map((ds, i) => ({ label: ds.label, data: ds.data, backgroundColor: line ? col(ds, i) : fnRgba(col(ds, i), 0.75), borderColor: col(ds, i), borderWidth: line ? 2 : 0, borderRadius: 3, tension: 0.25, spanGaps: true, pointRadius: 4, pointHoverRadius: 6 })) },
+      options: { indexAxis: horiz ? 'y' : 'x', responsive: true, maintainAspectRatio: false, scales: horiz ? { x: valAxis, y: catAxis } : { x: catAxis, y: valAxis }, plugins: { legend, tooltip: tip } } };
+  }
+  chartInstances[id] = new Chart(cv.getContext('2d'), cfg);
+}
+function fnChartTableHtml(d) {
+  return `<div class="table-wrap"><table class="fn-table fn-bt"><thead><tr><th></th>${d.labels.map(l => `<th>${escHtml(l)}</th>`).join('')}</tr></thead><tbody>
+    ${d.datasets.map(ds => `<tr><td class="fn-nowrap">${escHtml(ds.label)}</td>${ds.data.map((v, i) => { const b = ds.meta && ds.meta[i]; return `<td>${v == null ? '<span class="fn-muted">—</span>' : Array.isArray(v) ? `${fnNum(v[0])}–${fnNum(v[1])}` : `<b>${fnNum(v)}${d.pct ? '%' : ''}</b>`}${b && b.n_candidates != null ? `<span class="fn-n">${b.n_candidates} 人</span>` : ''}</td>`; }).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+}
+function fnChartHeatHtml(d) {
+  const vals = d.datasets.flatMap(ds => ds.data.filter(v => v != null && !Array.isArray(v)).map(Number));
+  const max = Math.max(1, ...vals), base = fnCssColor('--green', '#4caf82');
+  return `<div class="table-wrap"><table class="fn-table fn-bt fn-heat"><thead><tr><th></th>${d.labels.map(l => `<th>${escHtml(l)}</th>`).join('')}</tr></thead><tbody>
+    ${d.datasets.map(ds => `<tr><td class="fn-nowrap">${escHtml(ds.label)}</td>${ds.data.map(v => `<td><i style="background:${fnRgba(base, v == null ? 0 : 0.08 + 0.72 * Number(v) / max)}">${v == null ? '—' : fnNum(v) + (d.pct ? '%' : '')}</i></td>`).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
 }
 
 // ---------- 市場帶（併入薪酬、人才、喆律鏡像）----------
@@ -15764,9 +16070,13 @@ function fnMirrorHtml(C, mirror) {
   const ov = C.overviews[FN_MIRROR];
   const facts = mirror.facts;
   let h = `<div class="fn-facet-head"><h3 class="fn-zhelu">喆律鏡像</h3><div class="fn-facet-status">${fnOvStatusHtml(C, mirror, ov)}</div></div>`;
-  h += '<div class="fn-banner fn-banner-ok">候選人看喆律：面試筆記彙整、第一版主題編碼、未逐條複核；不參與任何跨所比較、所數與統計</div>';
+  // 橫幅讀 basis.mirror_stats（mig 231）：編碼版本與樣本數跟著資料走，不再寫死「第一版、未逐條複核」
+  const ms = ov && ov.basis && ov.basis.mirror_stats;
+  h += `<div class="fn-banner fn-banner-ok">候選人看喆律：面試筆記彙整${ms ? `・第 ${escHtml(String(ms.coding_version))} 版主題編碼（有印象紀錄 ${fnNum(ms.n_perception)} 位、有實質內容 ${fnNum(ms.n_substantive)} 位）` : '・主題編碼'}${ov && ov.reviewed_by ? `・${escHtml(ov.reviewed_by)}核定` : ''}；不參與任何跨所比較、所數與統計</div>`;
   const kn = ov && Array.isArray(ov.key_numbers) ? ov.key_numbers : [];
-  if (ov) h += `<div class="fn-ov${kn.length ? '' : ' fn-ov-one'}"><div class="fn-block"><div class="fn-block-title">概述</div><div class="ai-md fn-md">${renderMarkdown(ov.overview_md)}</div></div>${kn.length ? `<div class="fn-block"><div class="fn-block-title">關鍵數字</div>${kn.map((k, i) => fnKeyNumHtml(C, mirror, k, i)).join('')}</div>` : ''}</div>`;
+  if (kn.length) h += fnKpiGridHtml(C, mirror, kn);
+  h += fnChartsHtml(C, FN_MIRROR);
+  if (ov) h += `<div class="fn-block fn-ovblock">${fnOvHeadHtml(FN_MIRROR, ov, '概述')}${fnOvSectionsHtml(FN_MIRROR, ov.overview_md)}</div>`;
   const brand = facts.filter(f => f.dimension_key === 'strat.employer_brand');
   if (brand.length) {
     const max = Math.max(...brand.map(f => Number(f.value_num) || 0), 1);
@@ -15862,7 +16172,7 @@ function fnRenderModal(C, firmName) {
   grpKeys.filter(gk => curGrp === 'all' || gk === curGrp).forEach(gk => {
     const s = self.filter(f => grpOf(f) === gk).sort(order), o = others.filter(f => grpOf(f) === gk).sort(order);
     h += `<div class="fn-mgrp"><div class="fn-mgrp-head"><b>${escHtml(labelOf(gk))}</b><a href="#" onclick="fnGoFacet('${escHtml(gk)}','${_nameArg(firmName)}');return false;">看此面向跨所 →</a></div>`;
-    if (s.length) h += `<div class="fn-mseg">${gk === FN_MIRROR ? '候選人看本所（鏡像・第一版主題編碼）' : '本所自述'}</div>${s.map(f => fnFactLine(C, f, { showDim: true })).join('')}`;
+    if (s.length) h += `<div class="fn-mseg">${gk === FN_MIRROR ? '候選人看本所（鏡像・主題編碼）' : '本所自述'}</div>${s.map(f => fnFactLine(C, f, { showDim: true })).join('')}`;
     if (o.length) h += `<div class="fn-mseg">他人談本所</div>${o.map(f => fnFactLine(C, f, { showDim: true, showSource: true })).join('')}`;
     h += '</div>';
   });
