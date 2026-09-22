@@ -8110,12 +8110,17 @@ function renderMarkdown(text) {
   } else {
     html = escHtml(text).replace(/\n/g, '<br>');
   }
-  // AI 分析的文字量條（█░）→ CSS 漸層量條（DB 內容保持純文字可攜）
-  html = html.replace(/(█*)(░*)/g, (m, full, empty) => {
-    const total = full.length + empty.length;
+  // AI 分析的文字量條（█░＋部分方塊 ▏▎▍▌▋▊▉）→ CSS 漸層量條（DB 內容保持純文字可攜）
+  // 寬度依總格數（每格 12px，10 格＝120px）、填色依實填格數：沒有 ░ 補位的逐年趨勢條
+  // 也能呈現長短差（舊版按 █÷(█+░) 算百分比，缺 ░ 時每條都變 100%），部分方塊算 1/8～7/8 格
+  const AIBAR_FRAC = { '▏': 1, '▎': 2, '▍': 3, '▌': 4, '▋': 5, '▊': 6, '▉': 7 };
+  html = html.replace(/(█*)([▏▎▍▌▋▊▉]?)(░*)/g, (m, full, frac, empty) => {
+    const total = full.length + (frac ? 1 : 0) + empty.length;
     if (total < 3) return m;
-    const pct = Math.round(full.length / total * 100);
-    return `<span class="aibar" title="${pct}%"><i style="width:${pct}%"></i></span>`;
+    const filled = full.length + (frac ? AIBAR_FRAC[frac] / 8 : 0);
+    const pct = Math.round(filled / total * 1000) / 10;
+    const label = empty.length ? `${pct}%` : `${filled} 格`;
+    return `<span class="aibar" style="width:${total * 12}px" title="${label}"><i style="width:${pct}%"></i></span>`;
   });
   // ==重點== → 螢光標示
   html = html.replace(/==([^=<>]{1,120}?)==/g, '<mark class="ai-hl">$1</mark>');
