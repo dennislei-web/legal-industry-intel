@@ -9817,7 +9817,7 @@ function renderJudgeDisciplineCard(rows, impRows, evalRows) {
 let _jdisRows = null;
 async function loadJudgeDiscipline(force) {
   if (_jdisRows && !force) { renderJudgeDiscipline(); return; }
-  const [d1, d2, e1, e2] = await Promise.all([
+  const [d1, d2, e1, e2, pl] = await Promise.all([
     db.from('judge_disciplines')
       .select('case_no,kind,decided_date,name,role,org,sanction,source_url')
       .order('decided_date', { ascending: false }).limit(1000),
@@ -9831,6 +9831,9 @@ async function loadJudgeDiscipline(force) {
     db.from('judge_evaluations')
       .select('case_no,decided_date,result,summary,name,name_masked,org,doc_url,source_url,matched_kind,matched_case_no,matched_name,match_basis')
       .order('decided_date', { ascending: false }).range(1000, 1999),
+    // 檢察官最新資料月（下方在職比對用）與四張表互不相依 → 併進同一波，省一趟串行 round-trip
+    db.from('prosecutor_month_stats')
+      .select('yyyymm').order('yyyymm', { ascending: false }).limit(1),
   ]);
   const evalRows = [...(e1.data || []), ...(e2.data || [])].map(r => ({
     ...r, src: 'eval', role: '法官', name: r.name || r.name_masked || '（未載明）',
@@ -9849,8 +9852,7 @@ async function loadJudgeDiscipline(force) {
   const activeJudge = {}, activePros = new Set();
   const chunks = [];
   for (let i = 0; i < names.length; i += 80) chunks.push(names.slice(i, i + 80));
-  const { data: pLatest } = await db.from('prosecutor_month_stats')
-    .select('yyyymm').order('yyyymm', { ascending: false }).limit(1);
+  const pLatest = pl.data;
   const pCut = pLatest?.[0]?.yyyymm ? jchgMonthMinus(pLatest[0].yyyymm, 2) : null;
   await Promise.all(chunks.flatMap(c => [
     db.from('judges_combined').select('name,court_name').eq('has_jy', true).in('name', c)
@@ -10937,49 +10939,72 @@ let jchgRosterSortKey = 'month';
 // 退場法官 × 法務部律師名冊（ex_judicial_lawyers 高/中信心，name → {firm_name,lic_year,confidence}）
 let _jchgExjMap = null;
 
+// PostgREST 每個回應硬上限 1000 列（.limit(N>1000) 會被靜默截斷），大表只能逐頁 range 抓。
+// 舊寫法「抓一頁、等回來、再抓下一頁」：judge_changes 6,000+ 列要 7 趟串行 round-trip，
+// 實測整頁載入 3～8 秒。這裡改成兩波平行：第 1 波同時發出 prefetchPages 頁（第 0 頁帶
+// count=exact 取總列數），總數若超出第 1 波涵蓋範圍，第 2 波再把剩餘頁一次平行抓完，
+// 不論幾千列最多 2 個 round-trip。多抓的空頁回 []，成本可忽略。
+// buildQuery(from, to, withCount) 需回傳已套好 select/filter/order 的 builder（order 要帶唯一鍵
+// 當 tiebreaker，各頁排序才穩定、跨頁不會重複或漏列）。回傳 Promise<rows>，任一頁失敗即 throw。
+async function fetchAllPagesParallel(buildQuery, { pageSize = 1000, prefetchPages = 1 } = {}) {
+  const page = (i, withCount) => buildQuery(i * pageSize, (i + 1) * pageSize - 1, withCount);
+  const wave1 = await Promise.all(Array.from({ length: Math.max(1, prefetchPages) }, (_, i) => page(i, i === 0)));
+  for (const r of wave1) if (r.error) throw r.error;
+  let rows = wave1.flatMap(r => r.data || []);
+  const total = typeof wave1[0].count === 'number' ? wave1[0].count : null;
+  if (total == null) {
+    // 沒拿到總列數（理論上 PostgREST 必回 Content-Range）：退回逐頁串行，抓到某頁不滿為止
+    let last = wave1[wave1.length - 1].data || [], i = wave1.length;
+    while (last.length === pageSize) {
+      const r = await page(i++, false);
+      if (r.error) throw r.error;
+      last = r.data || [];
+      rows = rows.concat(last);
+    }
+    return rows;
+  }
+  const pagesNeeded = Math.ceil(total / pageSize);
+  if (pagesNeeded > wave1.length) {
+    const wave2 = await Promise.all(Array.from({ length: pagesNeeded - wave1.length }, (_, k) => page(wave1.length + k, false)));
+    for (const r of wave2) if (r.error) throw r.error;
+    rows = rows.concat(wave2.flatMap(r => r.data || []));
+  }
+  return rows;
+}
+
+const JCHG_COLS = 'name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url,inferred_to,inferred_from,cross_court_other_side';
+
 async function loadJudgeChanges(force) {
   if (_jchgRows && !force) { renderJudgeChanges(); return; }
   jchgPage = 0;
   ['jchgInflow', 'jchgMove', 'jchgOutflow'].forEach(id => { document.getElementById(id).className = 'loading'; });
-  // PostgREST 硬上限 1000 列／回應，.limit(20000) 會被靜默截斷 → 逐頁 range 抓齊全量，
-  // 否則 KPI/排行/明細只吃到最新 1000 列（退場曾因此低報近半）。
-  const PAGE = 1000;
-  let all = [], from = 0;
-  for (;;) {
-    const { data, error } = await db.from('judge_changes')
-      .select('name,court_name,change_type,event_month,case_count,active_months,in_current_roster,confidence,transfer_to,transfer_from,transfer_url,inferred_to,inferred_from,cross_court_other_side')
-      .order('event_month', { ascending: false }).range(from, from + PAGE - 1);
-    if (error) {
-      document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="8" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
-      return;
-    }
-    all = all.concat(data || []);
-    if (!data || data.length < PAGE) break;
-    from += PAGE;
-  }
-  _jchgRows = all;
-
+  // judge_changes 6,000+ 列（PostgREST 每回應上限 1000）→ fetchAllPagesParallel 兩波平行抓齊，
+  // 否則 KPI/排行/明細只吃到最新 1000 列（退場曾因此低報近半）。prefetchPages=8 涵蓋 8,000 列
+  // （現 6,194、每月約 +50，夠用數年；超過只是多一趟 round-trip，不會漏列）。
+  // order 加 id 當 tiebreaker：同月多列各頁排序才穩定。
+  const chgP = fetchAllPagesParallel((from, to, withCount) => db.from('judge_changes')
+    .select(JCHG_COLS, withCount ? { count: 'exact' } : {})
+    .order('event_month', { ascending: false }).order('id', { ascending: true })
+    .range(from, to), { prefetchPages: 8 });
   // 退場法官轉任律師比對：ex_judicial_lawyers（五訊號同名剔除後 high/medium）。
   // MOJ 名冊每週掃新證號、比對表隨排程刷新，新登錄會自動出現，無需另建管線。
-  if (!_jchgExjMap) {
-    try {
-      let exj = [], efrom = 0;
-      for (;;) {
-        const { data, error } = await db.from('ex_judicial_lawyers')
-          .select('name,firm_name,lic_year,confidence')
-          .eq('kind', 'judge').in('confidence', ['high', 'medium'])
-          .range(efrom, efrom + PAGE - 1);
-        if (error) throw error;
-        exj = exj.concat(data || []);
-        if (!data || data.length < PAGE) break;
-        efrom += PAGE;
-      }
-      _jchgExjMap = {};
-      exj.forEach(r => { _jchgExjMap[r.name] = r; });
-    } catch (e) {
-      console.warn('ex_judicial_lawyers 載入失敗（轉任律師欄顯示 —）', e);
-      _jchgExjMap = null;
-    }
+  // 與 judge_changes 互不相依 → 同時發出（舊版排在後面串行等，白白多一趟）。
+  const exjP = _jchgExjMap ? Promise.resolve(null)
+    : fetchAllPagesParallel((from, to, withCount) => db.from('ex_judicial_lawyers')
+        .select('name,firm_name,lic_year,confidence', withCount ? { count: 'exact' } : {})
+        .eq('kind', 'judge').in('confidence', ['high', 'medium'])
+        .order('name', { ascending: true }).range(from, to))
+      .catch(e => { console.warn('ex_judicial_lawyers 載入失敗（轉任律師欄顯示 —）', e); return null; });
+  let all;
+  try { all = await chgP; } catch (e) {
+    document.getElementById('jchgTableBody').innerHTML = `<tr><td colspan="8" class="loading">載入失敗: ${escHtml(e.message || String(e))}</td></tr>`;
+    return;
+  }
+  const exj = await exjP;
+  _jchgRows = all;
+  if (exj) {
+    _jchgExjMap = {};
+    exj.forEach(r => { _jchgExjMap[r.name] = r; });
   }
 
   // 明細篩選下拉：年度 + 法院（依資料動態生成；重載時保留現選值）
