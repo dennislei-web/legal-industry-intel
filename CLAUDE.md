@@ -405,7 +405,10 @@
   一律改用 index.html 的 `fetchAllPagesParallel(buildQuery, { pageSize, prefetchPages })`（定義在 JUDGE-CHANGES 區段）：
   第 1 波平行發 prefetchPages 頁、第 0 頁帶 `{ count: 'exact' }` 取總數、不夠再補第 2 波，不論幾千列最多 2 趟；
   `.order()` 必帶唯一鍵 tiebreaker（如 `.order('id')`），否則同值多列跨頁會重複/漏列。
-  其他分頁仍是串行迴圈的抓取點（`grep "\.range(from"`）待逐一換用。
+  2026-09-22 已把所有 >1000 列的抓取點換完（律師總覽人口圖、事務所總覽與規模圖、律師旗標三表、一人所對照、
+  律師異動頁、法官總覽、律師/法官 modal 月統計、法人客戶清單 RPC）；`grep "\.range(from"` 剩下的都是 <1000 列的
+  單頁查詢（前司法官圖 587、所長標註 19、每所律師 ≤532、田野筆記 ≤474 列），刻意不改。helper 另有 `maxPages`
+  選項給有載入上限的頁面用（律師異動頁 CHG_MAX_ROWS）；互不相依的查詢先建 Promise 再一起 await，別串行等。
 
 ## DB Schema 關鍵欄位（避免查詢時踩坑）
 
