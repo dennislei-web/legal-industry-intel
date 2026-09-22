@@ -8119,8 +8119,9 @@ function renderMarkdown(text) {
     if (total < 3) return m;
     const filled = full.length + (frac ? AIBAR_FRAC[frac] / 8 : 0);
     const pct = Math.round(filled / total * 1000) / 10;
-    const label = empty.length ? `${pct}%` : `${filled} 格`;
-    return `<span class="aibar" style="width:${total * 12}px" title="${label}"><i style="width:${pct}%"></i></span>`;
+    // 組成比例條（有 ░ 補位）保留百分比提示；趨勢條的實際數字就印在量條右側，「畫了幾格」對讀者無意義，不給提示
+    const title = empty.length ? ` title="${pct}%"` : '';
+    return `<span class="aibar" style="width:${total * 12}px"${title}><i style="width:${pct}%"></i></span>`;
   });
   // ==重點== → 螢光標示
   html = html.replace(/==([^=<>]{1,120}?)==/g, '<mark class="ai-hl">$1</mark>');
