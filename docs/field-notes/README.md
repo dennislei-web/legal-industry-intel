@@ -93,6 +93,7 @@
 
 - 錨點：一版一列 `firm_field_notes`（firm＝喆律、`channel='面試筆記彙整'`、`raw_notes` 一律 NULL、`source_version` 記抽取版本）。
 - 事務所層：`firm_field_facts` `subject_scope='peer'`、`secondhand=true`；門檻＝≥3 位不同候選人提到該所，且仍在職者（MOJ 現登錄所＝口述前東家）的條目排除；文字改寫不引述；未查證的違法／倫理／性別指控與健康婚育不入；主持律師姓名改職稱；`verification_status` 依來源分塊是否逐字查核判定，未逐字查核的一律 `confidence='low'`。
+  - 指控類（`talent.workplace_allegation`，2026-09-22 起）：只收逐字查核後仍在、且明確指向雇主的候選人自述，一律標「候選人自述、單一來源」、`confidence='low'`；此維度**不受 ≥3 位候選人門檻限制**（雷 2026-09-22 拍板），門檻外的所要在文字開頭標明「門檻外：僅此 1 位候選人提到本所」；候選人未具所名者用佔位名；非律所雇主只入型態彙總。
 - 同一位候選人在不同分塊重複面試只算一位，不可當「2 筆一致」。
 - **本 repo 是公開的**：含受訪者、候選人或各所觀察內容的 migration 檔不進 git（本機 `.git/info/exclude` 排除，只在本機保存並套用）；規格、前端程式可以進 git。
 - 數字帶：`interview_market_bands`（名冊級距×職位×年度×維度；`n_candidates` ≥3 才入、≥5 才有四分位；`size_band='zhelu'` 放應徵喆律者期待薪資），由 `scripts/.interview_work/bands.ps1` 零 token 重算，改抽取後重跑再出新 migration（`source_version` 換版）。

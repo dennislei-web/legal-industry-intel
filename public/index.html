@@ -15689,7 +15689,7 @@ function fnChartAlleg(C) {
   if (!a) return null;
   const law = Object.entries(a.law || {}).sort((x, y) => y[1] - x[1]), non = Object.entries(a.nonlaw || {}).sort((x, y) => y[1] - x[1]);
   return { labels: law.map(([k]) => k).concat(non.map(([k]) => k)), unit: '筆', stacked: true,
-    note: `${a.note || ''}。律師事務所 ${a.n_law_firms} 筆／非律所雇主 ${a.n_nonlaw} 筆；一筆可對到多個型態，型態合計會大於筆數。所名只在門檻內兩家以 peer 條目記錄，其餘不入庫。`,
+    note: `${a.note || ''}。律師事務所 ${a.n_law_firms} 筆／非律所雇主 ${a.n_nonlaw} 筆；一筆可對到多個型態，型態合計會大於筆數。律所 14 家已逐所入庫（12 家未達事務所層門檻、各僅 1 位候選人，條目內標明），見下方各所陳述。`,
     datasets: [{ label: `律師事務所（${a.n_law_firms} 筆）`, data: law.map(([, v]) => v).concat(non.map(() => null)), pal: 5 }, { label: `非律所雇主（${a.n_nonlaw} 筆）`, data: law.map(() => null).concat(non.map(([, v]) => v)), pal: 4 }] };
 }
 function fnChartHiring(C) {
