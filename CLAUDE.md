@@ -400,6 +400,12 @@
   - 上傳 batch size 50、每次上傳後 sleep 2s
 - `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會 fire-and-forget 呼叫 RPC，server 端非同步跑完）
 - 前端登入後若無資料可能是 RLS 設定問題（需 auth.uid() IS NOT NULL）
+- **PostgREST 每回應上限 1000 列**：大表要逐頁 `.range()`，但**別「抓一頁、等回來、再抓下一頁」串行**——
+  異動與懲戒頁 judge_changes 6,000+ 列曾因 7 趟串行 round-trip 載入 3～8 秒（2026-09-22 修，commit b3edaf4）。
+  一律改用 index.html 的 `fetchAllPagesParallel(buildQuery, { pageSize, prefetchPages })`（定義在 JUDGE-CHANGES 區段）：
+  第 1 波平行發 prefetchPages 頁、第 0 頁帶 `{ count: 'exact' }` 取總數、不夠再補第 2 波，不論幾千列最多 2 趟；
+  `.order()` 必帶唯一鍵 tiebreaker（如 `.order('id')`），否則同值多列跨頁會重複/漏列。
+  其他分頁仍是串行迴圈的抓取點（`grep "\.range(from"`）待逐一換用。
 
 ## DB Schema 關鍵欄位（避免查詢時踩坑）
 
