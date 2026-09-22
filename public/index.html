@@ -4729,17 +4729,13 @@ async function loadDemographicCharts() {
   const seniorityColor = 'rgba(201,168,76,0.65)';  // 金
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
-  // 批次抓 moj_lawyers 的 birth_year, sex, lic_no
-  let allRows = [];
-  let from = 0;
-  const batchSize = 1000;
-  while (true) {
-    const { data } = await db.from('moj_lawyers').select('birth_year, sex, lic_no').range(from, from + batchSize - 1);
-    if (!data || !data.length) break;
-    allRows = allRows.concat(data);
-    if (data.length < batchSize) break;
-    from += batchSize;
-  }
+  // moj_lawyers 13,500+ 列（PostgREST 每回應上限 1000）→ fetchAllPagesParallel 兩波平行抓齊
+  // （舊版逐頁串行 14 趟 round-trip，curl 實測 4～9 秒 → 平行 0.6～1.6 秒）。prefetchPages=16 涵蓋
+  // 16,000 列（現 13,585）。order 用主鍵 id：各頁排序穩定、跨頁不重複不漏列。失敗回空陣列（沿用舊版靜默語意）。
+  const allRows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_lawyers')
+    .select('birth_year, sex, lic_no', withCount ? { count: 'exact' } : {})
+    .order('id', { ascending: true }).range(from, to), { prefetchPages: 16 })
+    .catch(e => { console.warn('moj_lawyers 人口統計載入失敗:', e); return []; });
 
   const chartOpts = (indexAxis) => ({
     responsive: true, maintainAspectRatio: false, indexAxis,
@@ -4816,21 +4812,14 @@ async function loadFirmSizeChart() {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
   const firmColor = 'rgba(155,126,216,0.65)'; // 紫
 
-  // 用 cache 表（快 ~0.2s）而非 RPC（慢 ~8s）
-  let allFirms = [];
-  const PAGE = 1000;
-  let from = 0;
-  while (true) {
-    const { data, error } = await db.from('moj_firm_stats_cache')
-      .select('firm_name, lawyer_count, main_region')
-      .order('lawyer_count', { ascending: false })
-      .range(from, from + PAGE - 1);
-    if (error) { console.error('firm cache error:', error); break; }
-    if (!data || !data.length) break;
-    allFirms = allFirms.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
-  }
+  // 用 cache 表而非 RPC（慢 ~8s）；6,200+ 列 → fetchAllPagesParallel 兩波平行抓齊
+  // （舊版逐頁串行 7 趟 round-trip，curl 實測 1.8～3.9 秒 → 平行 0.6～0.9 秒）。prefetchPages=8 涵蓋 8,000 列（現 6,261）。
+  // order 加 firm_name（主鍵）當 tiebreaker：同人數多所各頁排序才穩定。失敗回空陣列 → 下方顯示無資料。
+  const allFirms = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_firm_stats_cache')
+    .select('firm_name, lawyer_count, main_region', withCount ? { count: 'exact' } : {})
+    .order('lawyer_count', { ascending: false }).order('firm_name', { ascending: true })
+    .range(from, to), { prefetchPages: 8 })
+    .catch(e => { console.error('firm cache error:', e); return []; });
   if (!allFirms.length) {
     document.getElementById('topFirmsList').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">無事務所資料</div>';
     return;
@@ -6554,28 +6543,33 @@ function ensureLawyerFlags() {
   if (!_lawyerFlagsLoading) {
     _lawyerFlagsLoading = (async () => {
       try {
-        const lic = new Map(), gov = new Map();
-        for (let from = 0; ; from += 1000) {
-          const { data } = await db.from('lawyer_indep_directorships').select('lic_no')
+        // 三張表互不相依 → 同時發出（舊版三段串行，gov_lawyer_tenders 再逐頁串行）。
+        // 各自失敗回空陣列（沿用舊版忽略 error 的語意）；order 帶唯一鍵，分頁才穩定。
+        const quiet = label => e => { console.log(`lawyer flags ${label} load error:`, e); return []; };
+        const [licRows, govRows, exjRows] = await Promise.all([
+          // lawyer_indep_directorships 覆核確認者 ~640 列（單頁即足；主鍵 id）
+          fetchAllPagesParallel((from, to, withCount) => db.from('lawyer_indep_directorships')
+            .select('lic_no', withCount ? { count: 'exact' } : {})
             .in('verify_status', ['office_matched', 'lawyer_confirmed', 'cross_confirmed'])
-            .not('lic_no', 'is', null).range(from, from + 999);
-          (data || []).forEach(r => lic.set(r.lic_no, (lic.get(r.lic_no) || 0) + 1));
-          if (!data || data.length < 1000) break;
-        }
-        for (let from = 0; ; from += 1000) {
-          const { data } = await db.from('gov_lawyer_tenders').select('lawyer_name')
-            .eq('is_winner', true).range(from, from + 999);
-          (data || []).forEach(r => gov.set(r.lawyer_name, (gov.get(r.lawyer_name) || 0) + 1));
-          if (!data || data.length < 1000) break;
-        }
-        const exj = new Map();
-        for (let from = 0; ; from += 1000) {
-          const { data } = await db.from('ex_judicial_lawyers')
-            .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,confidence,source')
-            .in('confidence', ['high', 'medium']).range(from, from + 999);
-          (data || []).forEach(r => { const a = exj.get(r.name) || []; a.push(r); exj.set(r.name, a); });
-          if (!data || data.length < 1000) break;
-        }
+            .not('lic_no', 'is', null).order('id', { ascending: true }).range(from, to))
+            .catch(quiet('indep')),
+          // gov_lawyer_tenders 得標列 1,500+（2 頁，prefetchPages=3 留成長空間）；view 無主鍵，
+          // 以 lawyer_name,tender_key,vendor_name,via 全序排（僅 2 組完全相同列，重複落頁不影響計數）
+          fetchAllPagesParallel((from, to, withCount) => db.from('gov_lawyer_tenders')
+            .select('lawyer_name', withCount ? { count: 'exact' } : {})
+            .eq('is_winner', true)
+            .order('lawyer_name').order('tender_key').order('vendor_name').order('via').range(from, to), { prefetchPages: 3 })
+            .catch(quiet('gov')),
+          // ex_judicial_lawyers high/medium ~590 列（單頁即足；主鍵 name,kind）
+          fetchAllPagesParallel((from, to, withCount) => db.from('ex_judicial_lawyers')
+            .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,confidence,source', withCount ? { count: 'exact' } : {})
+            .in('confidence', ['high', 'medium']).order('name').order('kind').range(from, to))
+            .catch(quiet('exj')),
+        ]);
+        const lic = new Map(), gov = new Map(), exj = new Map();
+        licRows.forEach(r => lic.set(r.lic_no, (lic.get(r.lic_no) || 0) + 1));
+        govRows.forEach(r => gov.set(r.lawyer_name, (gov.get(r.lawyer_name) || 0) + 1));
+        exjRows.forEach(r => { const a = exj.get(r.name) || []; a.push(r); exj.set(r.name, a); });
         INDEP_LIC_MAP = lic; GOV_LAWYER_MAP = gov; EX_JUDICIAL_MAP = exj;
       } catch (e) { console.log('lawyer flags load error:', e); _lawyerFlagsLoading = null; }
     })();
@@ -6589,13 +6583,12 @@ function ensureSoloFirms() {
     _soloFirmLoading = (async () => {
       const map = new Map();
       try {
-        for (let from = 0; ; from += 1000) {
-          const { data, error } = await db.from('moj_solo_firm_lawyers')
-            .select('firm_key,name').range(from, from + 999);
-          if (error) throw error;
-          (data || []).forEach(r => map.set(r.firm_key, r.name));
-          if (!data || data.length < 1000) break;
-        }
+        // moj_solo_firm_lawyers 3,800 列 → fetchAllPagesParallel 兩波平行（舊版 4 趟串行，curl 實測
+        // 1.4～2 秒 → 0.45～0.9 秒，偶有離群）；prefetchPages=5 涵蓋 5,000 列；view 以 firm_key GROUP BY，firm_key 即唯一鍵。
+        const rows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_solo_firm_lawyers')
+          .select('firm_key,name', withCount ? { count: 'exact' } : {})
+          .order('firm_key', { ascending: true }).range(from, to), { prefetchPages: 5 });
+        rows.forEach(r => map.set(r.firm_key, r.name));
         SOLO_FIRM_MAP = map;
       } catch (e) {
         console.log('solo firm map load error:', e);
@@ -6812,27 +6805,35 @@ async function loadOffices() {
   // cache 每天凌晨自動 refresh，或手動呼叫 refresh_firm_stats_cache()
   if (allOffices.length) { renderOffices(); return; }  // 本次開頁已載過：直接重繪，不重抓
   const mySeq = ++officeLoadSeq;
-  let rows = [];  // 先累加到區域變數；直接累加全域 allOffices 會被併發呼叫交錯出整份重複
-  const PAGE = 1000;
-  let from = 0;
-  while (true) {
-    const { data, error } = await db
+  // 徽章用的兩張小表與主表互不相依 → 先同時發出，主表載完再等結果併入（舊版排在主表後串行等，多 3 趟）：
+  //  - 政府標案 gov_firm_stats 得標所 1,500 列（2 頁，prefetchPages=2；view 以 firm_key GROUP BY，firm_key 即唯一鍵）
+  //  - 前司法官比對 ex_judicial_lawyers high/medium 且有掛所 ~570 列（單頁即足；主鍵 name,kind）
+  // 各自失敗回空陣列（沿用舊版忽略 error、只少徽章的語意）
+  const govBadgeP = fetchAllPagesParallel((from, to, withCount) => db.from('gov_firm_stats')
+    .select('firm_key, wins, total_amount, wins_5y', withCount ? { count: 'exact' } : {})
+    .gt('wins', 0).order('firm_key', { ascending: true }).range(from, to), { prefetchPages: 2 })
+    .catch(e => { console.warn('firm gov tender badge error:', e); return []; });
+  const exjBadgeP = fetchAllPagesParallel((from, to, withCount) => db.from('ex_judicial_lawyers')
+    .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,firm_name', withCount ? { count: 'exact' } : {})
+    .in('confidence', ['high', 'medium']).not('firm_name', 'is', null)
+    .order('name', { ascending: true }).order('kind', { ascending: true }).range(from, to))
+    .catch(e => { console.warn('firm ex-judicial badge load error:', e); return []; });
+  // 主表 6,200+ 列 → fetchAllPagesParallel 兩波平行抓齊（舊版 7 趟串行 round-trip，curl 實測 2.7～3.4 秒
+  // → 平行 0.7～1.2 秒）；prefetchPages=8 涵蓋 8,000 列（現 6,261）；order 帶 firm_name（主鍵）當 tiebreaker。
+  // 先存區域變數；直接寫全域 allOffices 會被併發呼叫交錯出整份重複
+  let rows = [];
+  try {
+    rows = await fetchAllPagesParallel((from, to, withCount) => db
       .from('moj_firm_stats_cache')
-      .select('*')
+      .select('*', withCount ? { count: 'exact' } : {})
       .order('lawyer_count', { ascending: false })
-      .order('firm_name', { ascending: true })  // 次序：避免同值分頁不穩造成重複
-      .range(from, from + PAGE - 1);
-    if (error) {
-      console.error('moj_firm_stats_cache error:', error);
-      // Fallback 到 RPC（慢但保底）
-      const { data: rpcData } = await db.rpc('moj_firm_statistics').range(0, 999);
-      if (rpcData) rows = rpcData;
-      break;
-    }
-    if (!data || data.length === 0) break;
-    rows = rows.concat(data);
-    if (data.length < PAGE) break;
-    from += PAGE;
+      .order('firm_name', { ascending: true })
+      .range(from, to), { prefetchPages: 8 });
+  } catch (error) {
+    console.error('moj_firm_stats_cache error:', error);
+    // Fallback 到 RPC（慢但保底）
+    const { data: rpcData } = await db.rpc('moj_firm_statistics').range(0, 999);
+    if (rpcData) rows = rpcData;
   }
   if (mySeq !== officeLoadSeq) return;  // 期間又觸發了新的載入：放棄本次結果
   allOffices = rows;
@@ -6912,31 +6913,20 @@ async function loadOffices() {
   } catch(e) { console.warn('firm indep badge error:', e); }
 
   // 政府標案徽章資料（gov_firm_stats view，mig 077：firm_key 已按截到第一個「事務所」合併分所）
+  // 查詢在 loadOffices 開頭已與主表同時發出（govBadgeP），這裡只等結果併入
   try {
     const byName = new Map(allOffices.map(o => [o.firm_name, o]));
-    for (let from = 0; ; from += 1000) {
-      const { data: gs } = await db.from('gov_firm_stats')
-        .select('firm_key, wins, total_amount, wins_5y')
-        .gt('wins', 0).range(from, from + 999);
-      (gs || []).forEach(r => {
-        const o = byName.get(r.firm_key);
-        if (o) { o.gov_wins = r.wins; o.gov_amount = r.total_amount; o.gov_wins_5y = r.wins_5y; }
-      });
-      if (!gs || gs.length < 1000) break;
-    }
+    (await govBadgeP).forEach(r => {
+      const o = byName.get(r.firm_key);
+      if (o) { o.gov_wins = r.wins; o.gov_amount = r.total_amount; o.gov_wins_5y = r.wins_5y; }
+    });
   } catch(e) { console.warn('firm gov tender badge error:', e); }
 
   // 前司法官徽章：併入裁判書自動比對（ex_judicial_lawyers, mig 107；僅 high/medium），
   // 與 modal「前司法官」卡同口徑 — 只靠 firm_profiles 策展清單會漏掉未收錄的所（如理律）
+  // 查詢同樣在開頭已發出（exjBadgeP）
   try {
-    const exjRows = [];
-    for (let from = 0; ; from += 1000) {
-      const { data } = await db.from('ex_judicial_lawyers')
-        .select('name,kind,first_yyyymm,last_yyyymm,case_count_total,main_org,firm_name')
-        .in('confidence', ['high', 'medium']).not('firm_name', 'is', null).range(from, from + 999);
-      exjRows.push(...(data || []));
-      if (!data || data.length < 1000) break;
-    }
+    const exjRows = await exjBadgeP;
     const exjByFirm = new Map();
     for (const r of exjRows) {
       const m = exjByFirm.get(r.firm_name) || new Map();
@@ -6970,15 +6960,12 @@ async function loadOffices() {
 }
 
 async function loadOfficeAgeSeniority() {
-  let rows = [];
-  let from = 0;
-  while (true) {
-    const { data } = await db.from('moj_lawyers').select('name, birth_year, lic_no, office_normalized').range(from, from + 999);
-    if (!data || !data.length) break;
-    rows = rows.concat(data);
-    if (data.length < 1000) break;
-    from += 1000;
-  }
+  // moj_lawyers 13,500+ 列 → fetchAllPagesParallel 兩波平行（舊版 14 趟串行 round-trip，curl 實測 4～9 秒
+  // → 平行 0.6～1.6 秒）；prefetchPages=16 涵蓋 16,000 列；order 用主鍵 id；失敗回空陣列（沿用舊版靜默語意）。
+  const rows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_lawyers')
+    .select('name, birth_year, lic_no, office_normalized', withCount ? { count: 'exact' } : {})
+    .order('id', { ascending: true }).range(from, to), { prefetchPages: 16 })
+    .catch(e => { console.warn('moj_lawyers 年齡年資載入失敗:', e); return []; });
   const currentYear = new Date().getFullYear();
   const currentRocYear = currentYear - 1911;
 
@@ -8320,14 +8307,13 @@ async function showLawyerDetail(name, certNumber) {
       .then(r => { pairs = r.data; }),
     db.rpc('lawyer_year_trend', { p_name: name })
       .then(r => { yearTrend = r.data; }),
-    (async () => {
-      for (let from = 0; ; from += 1000) {
-        const { data: cr } = await db.from('lawyer_month_stats')
-          .select('court_name,case_count').eq('name', name).range(from, from + 999);
-        if (cr?.length) courtRows.push(...cr);
-        if (!cr || cr.length < 1000) break;
-      }
-    })(),
+    // 逐法院月紀錄：多數律師 <1000 列一頁即足，157 位活躍律師逾 1000（最多 2,069）→ fetchAllPagesParallel
+    // 第 0 頁取總數、不足再一波平行補齊；order 用主鍵 id（舊版無 order，跨頁可能重複/漏列）；失敗照舊靜默
+    fetchAllPagesParallel((from, to, withCount) => db.from('lawyer_month_stats')
+      .select('court_name,case_count', withCount ? { count: 'exact' } : {}).eq('name', name)
+      .order('id', { ascending: true }).range(from, to))
+      .then(rows => { courtRows.push(...rows); })
+      .catch(e => console.log('lawyer_month_stats load error:', e)),
   ];
   if (l.moj_id) {
     tasks.push(db.from('moj_lawyers').select('*').eq('id', l.moj_id).maybeSingle()
@@ -9392,15 +9378,14 @@ async function showJudgeDetail(name, court) {
       .then(r => { changes = r.data || []; }),
     db.from('judge_transfers').select('from_org,to_org').eq('name', name)
       .then(r => { transfers = r.data || []; }).catch(() => {}),
-    (async () => { // 逐月署名全院（PostgREST 1000 列上限 → range 逐頁）
-      for (let from = 0; ; from += 1000) {
-        const { data: mr } = await db.from('judge_month_stats')
-          .select('court_name,yyyymm,case_count,cats').eq('name', name)
-          .order('yyyymm').range(from, from + 999);
-        if (mr?.length) monthRows.push(...mr);
-        if (!mr || mr.length < 1000) break;
-      }
-    })(),
+    // 逐月署名全院（PostgREST 1000 列上限）：一頁即足者只 1 趟；逾 1000 列（極少數，最多 2,361）由
+    // fetchAllPagesParallel 第 0 頁取總數後一波平行補齊。order 加 court_name 當 tiebreaker（同月多院；
+    // (name,court_name,yyyymm) 唯一）；yyyymm 仍為主序，下方 dataEnd 取末列不受影響；失敗照舊靜默
+    fetchAllPagesParallel((from, to, withCount) => db.from('judge_month_stats')
+      .select('court_name,yyyymm,case_count,cats', withCount ? { count: 'exact' } : {}).eq('name', name)
+      .order('yyyymm').order('court_name').range(from, to))
+      .then(rows => { monthRows.push(...rows); })
+      .catch(e => console.log('judge_month_stats load error:', e)),
   ]);
 
   // 雙重身分切換 pill（查無法官資料時也顯示，仍可切回律師頁）
@@ -10332,20 +10317,22 @@ async function loadChanges(force) {
   if (_chgRows && !force) { renderChanges(); return; }
   chgPage = 0;
   const days = parseInt(document.getElementById('chgWindow').value, 10);
-  // PostgREST 單次回應上限 1000 列（.limit(3000) 會被靜默截斷），故逐頁取滿
-  const rows = [];
-  for (let from = 0; from < CHG_MAX_ROWS; from += 1000) {
-    let q = db.from('moj_lawyer_changes')
-      .select('name,change_type,old_office,new_office,old_state,new_state,changed_at')
-      .order('changed_at', { ascending: false }).range(from, from + 999);
-    if (days > 0) q = q.gte('changed_at', new Date(Date.now() - days * 86400000).toISOString());
-    const { data, error } = await q;
-    if (error) {
-      document.getElementById('chgTableBody').innerHTML = `<tr><td colspan="4" class="loading">載入失敗: ${escHtml(error.message)}</td></tr>`;
-      return;
-    }
-    rows.push(...(data || []));
-    if (!data || data.length < 1000) break;
+  // PostgREST 單次回應上限 1000 列（.limit(3000) 會被靜默截斷）→ fetchAllPagesParallel 兩波平行取滿；
+  // maxPages 保留 CHG_MAX_ROWS 載入上限（renderChanges 會提示縮短期間）。「全部」現 2,100 列 3 頁、
+  // 每月約 +700，prefetchPages=3（近 30 天約 700 列，多發的空頁成本可忽略）。order 加主鍵 id 當 tiebreaker。
+  const since = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null;
+  let rows;
+  try {
+    rows = await fetchAllPagesParallel((from, to, withCount) => {
+      let q = db.from('moj_lawyer_changes')
+        .select('name,change_type,old_office,new_office,old_state,new_state,changed_at', withCount ? { count: 'exact' } : {})
+        .order('changed_at', { ascending: false }).order('id', { ascending: true }).range(from, to);
+      if (since) q = q.gte('changed_at', since);
+      return q;
+    }, { prefetchPages: 3, maxPages: CHG_MAX_ROWS / 1000 });
+  } catch (error) {
+    document.getElementById('chgTableBody').innerHTML = `<tr><td colspan="4" class="loading">載入失敗: ${escHtml(error.message || String(error))}</td></tr>`;
+    return;
   }
   _chgRows = rows;
   renderChanges();
@@ -10946,16 +10933,17 @@ let _jchgExjMap = null;
 // 不論幾千列最多 2 個 round-trip。多抓的空頁回 []，成本可忽略。
 // buildQuery(from, to, withCount) 需回傳已套好 select/filter/order 的 builder（order 要帶唯一鍵
 // 當 tiebreaker，各頁排序才穩定、跨頁不會重複或漏列）。回傳 Promise<rows>，任一頁失敗即 throw。
-async function fetchAllPagesParallel(buildQuery, { pageSize = 1000, prefetchPages = 1 } = {}) {
+// maxPages：最多抓幾頁（給有載入上限的頁面用，如律師異動頁的 CHG_MAX_ROWS），超過即截斷不補抓。
+async function fetchAllPagesParallel(buildQuery, { pageSize = 1000, prefetchPages = 1, maxPages = Infinity } = {}) {
   const page = (i, withCount) => buildQuery(i * pageSize, (i + 1) * pageSize - 1, withCount);
-  const wave1 = await Promise.all(Array.from({ length: Math.max(1, prefetchPages) }, (_, i) => page(i, i === 0)));
+  const wave1 = await Promise.all(Array.from({ length: Math.max(1, Math.min(prefetchPages, maxPages)) }, (_, i) => page(i, i === 0)));
   for (const r of wave1) if (r.error) throw r.error;
   let rows = wave1.flatMap(r => r.data || []);
   const total = typeof wave1[0].count === 'number' ? wave1[0].count : null;
   if (total == null) {
     // 沒拿到總列數（理論上 PostgREST 必回 Content-Range）：退回逐頁串行，抓到某頁不滿為止
     let last = wave1[wave1.length - 1].data || [], i = wave1.length;
-    while (last.length === pageSize) {
+    while (last.length === pageSize && i < maxPages) {
       const r = await page(i++, false);
       if (r.error) throw r.error;
       last = r.data || [];
@@ -10963,7 +10951,7 @@ async function fetchAllPagesParallel(buildQuery, { pageSize = 1000, prefetchPage
     }
     return rows;
   }
-  const pagesNeeded = Math.ceil(total / pageSize);
+  const pagesNeeded = Math.min(Math.ceil(total / pageSize), maxPages);
   if (pagesNeeded > wave1.length) {
     const wave2 = await Promise.all(Array.from({ length: pagesNeeded - wave1.length }, (_, k) => page(wave1.length + k, false)));
     for (const r of wave2) if (r.error) throw r.error;
@@ -11560,16 +11548,12 @@ async function loadJudgeOverview() {
     (courts || []).forEach(c => { typeByCourt[c.name] = c.court_type; });
     if (courts) el('ovCourtCount').textContent = courts.length;
 
-    // 分批抓全部法官（~2,100 列，Supabase 單次上限 1000）
-    let judges = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await db.from('judges_combined')
-        .select('name,court_name,division,seniority_years,case_count_total,avg_processing_days,data_source')
-        .range(from, from + 999);
-      if (error || !data?.length) break;
-      judges = judges.concat(data);
-      if (data.length < 1000) break;
-    }
+    // 全部法官 2,300 列（Supabase 單次上限 1000）→ fetchAllPagesParallel 兩波平行（舊版 3 趟串行，curl 實測
+    // 1.2～2.8 秒 → 0.6～1.1 秒）；prefetchPages=3 涵蓋 3,000 列；view 唯一鍵 (name, court_name) 當排序；失敗回空陣列
+    const judges = await fetchAllPagesParallel((from, to, withCount) => db.from('judges_combined')
+      .select('name,court_name,division,seniority_years,case_count_total,avg_processing_days,data_source', withCount ? { count: 'exact' } : {})
+      .order('name', { ascending: true }).order('court_name', { ascending: true }).range(from, to), { prefetchPages: 3 })
+      .catch(e => { console.warn('judges_combined 載入失敗:', e); return []; });
     if (!judges.length) return;
 
     // KPI
@@ -13180,14 +13164,12 @@ async function showCorpFirm(firm) {
       rows.push(...(data || []));
     }
     rows.sort((a, b) => b.n_companies - a.n_companies);
-    // 全所法人客戶清單（RPC，PostgREST 單頁 1000 列上限 → 逐頁）
-    const clients = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await db.rpc('corp_firm_clients', { p_firm: firm }).range(from, from + 999);
-      if (error) throw error;
-      clients.push(...(data || []));
-      if (!data || data.length < 1000) break;
-    }
+    // 全所法人客戶清單（RPC，PostgREST 單頁 1000 列上限）：多數所一頁即足，最大所 1,032 家 →
+    // fetchAllPagesParallel 第 0 頁取總數、不足再一波平行補齊。RPC 內 order by n desc 非唯一，外層改以
+    // n desc + company 全序排（company 為 GROUP BY 鍵）分頁才穩定；失敗即 throw（沿用舊版）
+    const clients = await fetchAllPagesParallel((from, to, withCount) => db
+      .rpc('corp_firm_clients', { p_firm: firm }, withCount ? { count: 'exact' } : {})
+      .order('n', { ascending: false }).order('company', { ascending: true }).range(from, to));
     body.innerHTML = `
       ${f ? `<div style="font-size:0.85rem;margin-bottom:10px;">全所不重複企業客戶 <strong>${f.n_companies.toLocaleString()}</strong> 家／代理案件 <strong>${f.n_cases.toLocaleString()}</strong> 件（現職律師 ${names.length} 位，其中 ${rows.length} 位有企業代理紀錄）</div>` : ''}
       <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px;">&#127970; 全所法人客戶清單（${clients.length.toLocaleString()} 家）</div>
