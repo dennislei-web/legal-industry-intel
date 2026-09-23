@@ -3513,6 +3513,12 @@
                 <div class="chart-card">
                     <div class="chart-title">家事案件調解成立率</div>
                     <div class="chart-container"><canvas id="jstat_chartFamilyMediation"></canvas></div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.7;">
+                        <div><strong>兩條線分子相同（調解成立件數），差在分母：</strong></div>
+                        <div>● <strong>調解成立率①</strong>＝成立 ÷（成立＋不成立）。只計實際調出結果的案件，衡量「雙方坐下來談」的成功率，反映調解本身的效能。</div>
+                        <div>● <strong>調解成立率②</strong>＝成立 ÷ 全部調解終結件數。分母另含撤回聲請、駁回等未調出結果者，衡量「進入調解程序的案件中，最後靠調解結案」的比率。</div>
+                        <div>● 兩線差距（約 25%）即未走完調解就終結的案件；其中撤回者部分可能是當事人私下和解，不應全數視為失敗。對外引用時請註明採哪一條口徑。</div>
+                    </div>
                 </div>
                 <div class="chart-card">
                     <div class="chart-title">家事案件上訴維持率</div>
@@ -18127,7 +18133,10 @@ async function showCourtDetail(name) {
             options: {
                 responsive: true, maintainAspectRatio: false,
                 scales: { y: { min: 20, max: 80, ticks: { callback: v => v + '%' } } },
-                plugins: { tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%' } } }
+                plugins: { tooltip: { callbacks: {
+                    label: ctx => ctx.dataset.label + ': ' + ctx.raw + '%',
+                    footer: () => ['①＝成立÷(成立＋不成立)', '②＝成立÷全部調解終結件數（含撤回、駁回）']
+                } } }
             }
         });
 
