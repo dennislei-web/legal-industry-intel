@@ -276,26 +276,54 @@ def aggregate(start, end):
     print('分級分布:', dict(sorted(dist.items())))
 
     # 全量重建（視窗滾動、涵蓋範圍變更都以最新一次為準）
-    r = requests.delete(f'{js.SUPABASE_URL}/rest/v1/lawyer_client_concentration',
-                        params={'name': 'not.is.null'}, headers=js.HEADERS_SB,
-                        timeout=300, verify=False)
-    if r.status_code not in (200, 204):
-        raise RuntimeError(f'清空舊資料失敗 {r.status_code}: {r.text[:200]}')
+    # 先 upsert 再刪舊列，表在任何時刻都不會是空的（原本 DELETE 全表再灌，
+    # 月更排程無人看守時斷線會留下殘缺表，見 sb_bulk.py 同一教訓）
+    hdr_post = {**js.HEADERS_SB, 'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates,return=minimal', 'Connection': 'close'}
+
+    def _retry(desc, fn):
+        for attempt in range(6):
+            try:
+                r = fn()
+                if r.status_code in (200, 201, 204, 206):
+                    return r
+                if r.status_code < 500 and r.status_code != 408:
+                    raise RuntimeError(f'{desc} HTTP {r.status_code}: {r.text[:200]}')
+                print(f'  {desc} HTTP {r.status_code}，重試 {attempt + 1}/6')
+            except requests.exceptions.RequestException as e:
+                print(f'  {desc} {type(e).__name__}，重試 {attempt + 1}/6')
+            time.sleep(10 * (attempt + 1))
+        raise RuntimeError(f'{desc} 重試 6 次仍失敗')
+
     for i in range(0, len(rows), 500):
         batch = rows[i:i + 500]
-        for attempt in range(3):
-            r = requests.post(
-                f'{js.SUPABASE_URL}/rest/v1/lawyer_client_concentration?on_conflict=name',
-                json=batch,
-                headers={**js.HEADERS_SB, 'Content-Type': 'application/json',
-                         'Prefer': 'resolution=merge-duplicates,return=minimal'},
-                timeout=180, verify=False)
-            if r.status_code in (200, 201, 204):
-                break
-            print(f'  batch {i} HTTP {r.status_code}，重試 {attempt + 1}/3')
-            time.sleep(15)
-        else:
-            raise RuntimeError(f'上傳失敗 batch {i}: {r.status_code} {r.text[:200]}')
+        _retry(f'upsert batch {i}', lambda b=batch: requests.post(
+            f'{js.SUPABASE_URL}/rest/v1/lawyer_client_concentration?on_conflict=name',
+            json=b, headers=hdr_post, timeout=180, verify=False))
+
+    def _all_names():
+        out, off = [], 0
+        while True:
+            page = _retry('讀回 name', lambda o=off: requests.get(
+                f'{js.SUPABASE_URL}/rest/v1/lawyer_client_concentration',
+                params={'select': 'name', 'order': 'name', 'offset': o, 'limit': 1000},
+                headers=js.HEADERS_SB, timeout=120, verify=False)).json()
+            out += [x['name'] for x in page]
+            if len(page) < 1000:
+                return out
+            off += 1000
+
+    new_names = {r['name'] for r in rows}
+    stale = [n for n in _all_names() if n not in new_names]
+    for i in range(0, len(stale), 100):
+        lst = ','.join(json.dumps(n, ensure_ascii=False) for n in stale[i:i + 100])
+        _retry('刪舊列', lambda l=lst: requests.delete(
+            f'{js.SUPABASE_URL}/rest/v1/lawyer_client_concentration',
+            params={'name': f'in.({l})'}, headers=js.HEADERS_SB, timeout=120, verify=False))
+    final = len(_all_names())
+    if final != len(new_names):
+        raise RuntimeError(f'筆數驗證失敗：DB {final} ≠ 預期 {len(new_names)}')
+    print(f'移除舊列 {len(stale)}；驗證通過 {final} 列')
     print(f'上傳完成: {len(rows)} 列')
 
 
