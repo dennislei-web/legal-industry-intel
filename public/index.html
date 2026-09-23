@@ -12962,7 +12962,12 @@ function renderOv() {
   // 對手欄：熄燈側優先顯示去向、新設側顯示來源，一般所依淨方向取最大配對
   const partner = r => {
     if (r.dest_firm) return `<span style="color:var(--text-muted);">→</span> ${firmCell(r.dest_firm)}<span style="color:var(--text-muted);">（${r.dest_moved} 位）</span>`;
-    if ((r.from_firms || []).length) return `<span style="color:var(--text-muted);">←</span> ${r.from_firms.map(f => firmCell(f)).join('、')}`;
+    // 新設側：from_firms 只收「歸零所」，未歸零的最大來源（如分家出走 4/5 人、原所仍留 1 人）會漏掉 → top_src 排第一
+    if ((r.from_firms || []).length) {
+      const rest = r.from_firms.filter(f => f !== r.top_src);
+      const head = r.top_src ? [`${firmCell(r.top_src)}<span style="color:var(--text-muted);">（${r.top_src_n}）</span>`] : [];
+      return `<span style="color:var(--text-muted);">←</span> ${head.concat(rest.map(f => firmCell(f))).join('、')}`;
+    }
     if (r.net >= 0 && r.top_src) return `<span style="color:var(--text-muted);">←</span> ${firmCell(r.top_src)}<span style="color:var(--text-muted);">（${r.top_src_n}）</span>`;
     if (r.top_dst) return `<span style="color:var(--text-muted);">→</span> ${firmCell(r.top_dst)}<span style="color:var(--text-muted);">（${r.top_dst_n}）</span>`;
     return '<span style="color:var(--text-muted);">—</span>';
