@@ -12852,9 +12852,10 @@ const OV_STATUS = {
   closed_unlisted: { label: '轉未登錄', color: 'var(--text-muted)', desc: '律師仍執業，名冊不再揭示所名' },
   closed_merge:    { label: '併入',    color: 'var(--blue)',       desc: '整批律師轉往既有事務所' },
   closed_rename:   { label: '改名',    color: 'var(--orange)',     desc: '整批律師轉往同時新設的所' },
-  opened_new:      { label: '新設',    color: 'var(--green)',      desc: '追蹤起始後首次出現，無歸零所整批轉入' },
+  opened_new:      { label: '新設',    color: 'var(--green)',      desc: '追蹤起始後首次出現，無歸零所整批轉入、也非分家' },
   opened_rename:   { label: '改名而來', color: 'var(--orange)',     desc: '單一歸零所整批轉入' },
   opened_merger:   { label: '整併而來', color: 'var(--blue)',       desc: '多個歸零所整批轉入' },
+  opened_spinoff:  { label: '分家而來', color: 'var(--purple)',     desc: '過半律師來自同一個仍在營運的所（原所留人）' },
 };
 const OV_FILTERS = [
   { k: 'all',    label: '全部',          test: () => true },
@@ -12862,7 +12863,8 @@ const OV_FILTERS = [
   { k: 'shrink', label: '收縮中',        test: r => r.net < 0 && !r.status.startsWith('closed_') },
   { k: 'opened', label: '真新設',        test: r => r.status === 'opened_new' },
   { k: 'closed', label: '真熄燈',        test: r => r.status === 'closed_shutdown' },
-  { k: 'sign',   label: '招牌/登錄異動', test: r => ['closed_rename', 'closed_merge', 'closed_unlisted', 'opened_rename', 'opened_merger'].includes(r.status) },
+  { k: 'spin',   label: '分家',          test: r => r.status === 'opened_spinoff' },
+  { k: 'sign',   label: '招牌/登錄異動', test: r => ['closed_rename', 'closed_merge', 'closed_unlisted', 'opened_rename', 'opened_merger', 'opened_spinoff'].includes(r.status) },
 ];
 // 幅度＝淨變動 ÷ 追蹤起始推估規模（現有 − 淨）；無基期的新設所回 Infinity
 function ovPct(r) {
