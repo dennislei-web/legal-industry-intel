@@ -939,7 +939,7 @@
         <div class="kpi-card">
           <div class="kpi-label">法務部 (MOJ)</div>
           <div class="kpi-value" id="kpiRegistryCount" style="color:var(--purple);">-</div>
-          <div class="kpi-sub">現役登錄律師</div>
+          <div class="kpi-sub" title="只計名冊狀態「正常」者；不含推定除名、喪失資格、未執業、停職中（2026-09-30 起改此口徑，原為名冊全部筆數）">現役登錄律師（狀態正常）</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">平均出庭數</div>
@@ -961,6 +961,13 @@
           <div class="kpi-value" id="kpiExJudicial" style="color:var(--blue);">-</div>
           <div class="kpi-sub" id="kpiExJudicialSub">載入中...</div>
         </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128101; 現役律師人數異動（每週）</div>
+        <div id="headcountFlowSummary" style="font-size:0.8rem;color:var(--text-muted);margin:4px 0 8px;">載入中...</div>
+        <div class="chart-container" style="height:280px;"><canvas id="chartHeadcountFlow"></canvas></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">來源＝法務部律師名冊每日掃描的異動紀錄（2026-07-03 起追蹤）。新增＝名冊新出現的證號；復歸＝由非正常狀態轉回「正常」；退出＝由「正常」轉為推定除名／停職／未執業／喪失資格。7 月為首次掃描補登期（淡色），含早已發生、當時才發現的差異，不代表當月實際變動；推定除名＝名冊查無，偶有之後復歸。</div>
       </div>
 
       <div class="grid-2">
@@ -4374,11 +4381,13 @@ async function showDashboard() {
 
 async function loadOverviewFast() {
   // 先平行載入最重要的 KPI（不含圖表）
-  const moj = await db.from('lawyers_combined').select('*', { count: 'exact', head: true }).eq('has_moj', true);
-  document.getElementById('kpiRegistryCount').textContent = moj.count?.toLocaleString() || '0';
+  // 現役＝名冊狀態「正常」（2026-09-30 起；原 lawyers_combined.has_moj 會連推定除名／喪失資格／未執業／停職一起算，多約 220 人）
+  const moj = await db.from('moj_lawyers').select('id', { count: 'exact', head: true }).eq('state_desc', '正常');
+  document.getElementById('kpiRegistryCount').textContent = moj.count != null ? moj.count.toLocaleString() : '-';
 
   // 然後背景載入其餘的（圖表、統計等）
   loadOverview();
+  loadHeadcountFlowChart();
   loadSources();
 }
 
@@ -4590,9 +4599,7 @@ async function loadOverview() {
   if (statsCache) statsCache.forEach(s => stats[s.key] = s.value);
 
   // 只在 loadOverviewFast 還沒設過時才用 cache 值（避免覆蓋即時查詢的結果）
-  if (document.getElementById('kpiRegistryCount').textContent === '-') {
-    document.getElementById('kpiRegistryCount').textContent = (stats.has_moj || 0).toLocaleString();
-  }
+  // 註：kpiRegistryCount 已改「狀態正常」口徑，不再用 stats.has_moj（名冊全部筆數）回填
 
   // Guild total from industry_stats
   const { data: guildStats } = await db.from('industry_stats').select('value')
@@ -4723,6 +4730,88 @@ function exJudLabelIndex(evt, chart) {
   const idx = Math.round(chart.scales.y.getValueForPixel(evt.y));
   const n = chart.data.labels.length;
   return (idx >= 0 && idx < n) ? idx : null;
+}
+
+// 現役律師人數異動（每週）：moj_lawyer_changes 的 new_lawyer＋state_change 聚合；firm_change 不影響人數故不抓
+async function loadHeadcountFlowChart() {
+  const sumEl = document.getElementById('headcountFlowSummary');
+  let rows;
+  try {
+    rows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_lawyer_changes')
+      .select('change_type, old_state, new_state, changed_at', withCount ? { count: 'exact' } : {})
+      .in('change_type', ['new_lawyer', 'state_change'])
+      .order('id', { ascending: true }).range(from, to), { prefetchPages: 2 });
+  } catch (e) {
+    console.warn('人數異動載入失敗:', e);
+    if (sumEl) sumEl.textContent = '載入失敗';
+    return;
+  }
+  // 以台北時間週一為週起點
+  const weekKey = iso => {
+    const d = new Date(new Date(iso).getTime() + 8 * 3600e3);
+    d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+    return d.toISOString().slice(0, 10);
+  };
+  const weeks = {};
+  const bump = (k, f) => { (weeks[k] = weeks[k] || { add: 0, back: 0, out: 0 })[f]++; };
+  rows.forEach(r => {
+    const k = weekKey(r.changed_at);
+    if (r.change_type === 'new_lawyer') bump(k, 'add');
+    else if (r.new_state === '正常' && r.old_state !== '正常') bump(k, 'back');
+    else if (r.old_state === '正常' && r.new_state !== '正常') bump(k, 'out');
+  });
+  const keys = Object.keys(weeks).sort();
+  if (!keys.length) { if (sumEl) sumEl.textContent = '尚無異動紀錄'; return; }
+  // 補齊中間沒有異動的週
+  const all = [];
+  for (let d = new Date(keys[0] + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= keys[keys.length - 1]; d.setUTCDate(d.getUTCDate() + 7)) {
+    all.push(d.toISOString().slice(0, 10));
+  }
+  const w = all.map(k => weeks[k] || { add: 0, back: 0, out: 0 });
+  let cum = 0;
+  const cumArr = w.map(x => (cum += x.add + x.back - x.out));
+  const isScan = k => k < '2026-07-27';  // 首次掃描補登期（7/3～7/26 大量補出既有差異）
+  const alpha = (rgb, k) => `rgba(${rgb},${isScan(k) ? 0.28 : 0.75})`;
+  const sign = n => (n >= 0 ? '+' : '') + n.toLocaleString();
+
+  // 摘要：排除補登期後的淨增速度
+  const post = all.map((k, i) => ({ k, x: w[i] })).filter(o => !isScan(o.k));
+  const pIn = post.reduce((a, o) => a + o.x.add + o.x.back, 0), pOut = post.reduce((a, o) => a + o.x.out, 0);
+  if (sumEl) {
+    sumEl.innerHTML = `追蹤以來累計淨增 <b style="color:var(--text);">${sign(cum)}</b> 人（含 7 月補登）`
+      + (post.length ? `；排除補登期後 ${post.length} 週：增 ${pIn}、減 ${pOut}，淨增 <b style="color:var(--text);">${sign(pIn - pOut)}</b>，約每月 ${sign(Math.round((pIn - pOut) / post.length * 52 / 12))} 人` : '');
+  }
+
+  const txt = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+  if (chartInstances.headcountFlow) chartInstances.headcountFlow.destroy();
+  chartInstances.headcountFlow = new Chart(document.getElementById('chartHeadcountFlow').getContext('2d'), {
+    data: {
+      labels: all.map(k => k.slice(5).replace('-', '/')),
+      datasets: [
+        { type: 'bar', label: '新增', data: w.map(x => x.add), backgroundColor: all.map(k => alpha('76,175,130', k)), stack: 's', yAxisID: 'y', order: 2 },
+        { type: 'bar', label: '復歸正常', data: w.map(x => x.back), backgroundColor: all.map(k => alpha('79,142,247', k)), stack: 's', yAxisID: 'y', order: 2 },
+        { type: 'bar', label: '退出', data: w.map(x => -x.out), backgroundColor: all.map(k => alpha('224,149,74', k)), stack: 's', yAxisID: 'y', order: 2 },
+        { type: 'line', label: '累計淨增', data: cumArr, borderColor: 'rgba(201,168,76,0.9)', backgroundColor: 'rgba(201,168,76,0.9)', pointRadius: 2, tension: 0.2, yAxisID: 'y1', order: 1 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { stacked: true, ticks: { color: txt, font: { size: 10 } }, grid: { color: 'transparent' } },
+        y: { stacked: true, title: { display: true, text: '每週人數', color: txt, font: { size: 10 } }, ticks: { color: txt, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y1: { position: 'right', title: { display: true, text: '累計淨增', color: txt, font: { size: 10 } }, ticks: { color: txt, font: { size: 10 } }, grid: { display: false } }
+      },
+      plugins: {
+        legend: { labels: { color: txt, font: { size: 11 } } },
+        tooltip: { callbacks: {
+          title: items => `${all[items[0].dataIndex]} 當週${isScan(all[items[0].dataIndex]) ? '（首次掃描補登期）' : ''}`,
+          label: c => `${c.dataset.label}：${Math.abs(c.raw).toLocaleString()}`,
+          footer: items => { const x = w[items[0].dataIndex]; return `當週淨增 ${sign(x.add + x.back - x.out)}`; }
+        } }
+      }
+    }
+  });
 }
 
 function renderRegionChart(data) {
