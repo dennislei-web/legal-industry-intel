@@ -62,8 +62,8 @@
 ## 裁判書開放資料管線（法官統計）
 
 - `scripts/judgment_stats.py`：opendata.judicial.gov.tw 每月裁判書 RAR → 解析全文抽承審法官 → `judge_month_stats`（月聚合）→ RPC `refresh_judge_judgment_stats()` → `judge_judgment_stats` → `judges_combined` view（官方統計優先、Lawsnote fallback）
-- **裁判書資料集是「會員限定」**：下載需先 POST `/api/MemberTokens` 登入（帳密在 `scripts/.env` 的 `JUDICIAL_OPENDATA_USER/PWD`，不需 Turnstile）；資料集查詢用 `/api/Datasets?Keyword=YYYYMM裁判書`，下載 `/api/FilesetLists/{fileSetId}/file` 帶 Bearer token
-- 月包晚兩個月發布（約每月 15 日）；`judgment-stats-monthly.yml` 每月 17 日自動增量
+- **裁判書資料集是「會員限定」**：下載需先 POST `/api/MemberTokens` 登入（帳密在 `scripts/.env` 的 `JUDICIAL_OPENDATA_USER/PWD`，不需 Turnstile）；資料集查詢用 `/api/Datasets?Keyword=YYYYMM裁判書`，下載 `/api/FilesetLists/{fileSetId}/file` 帶 Bearer token；**會員約每 3 個月要重新啟用**（見下方「裁判書管線」節）
+- 月包晚兩個月發布，但上架日不固定（平臺 publishedDate 標 9/16 的 202607 包，9/17 清晨排程仍查不到）；`judgment-stats-monthly.yml` 同月試 4 次，見下方「裁判書管線」節「每月增量」
 - 已回填 2020-01 ~ 2025-04；`avg_processing_days` 是估算值（裁判日 − 案號年 1/1），僅供法官間相對比較
 - **多 session 注意**：backfill 不要兩個 session 同時跑（會撞 `.judgment_work` 檔案鎖與 upload 重複鍵）
 
@@ -137,7 +137,18 @@
   refresh 鏈（judgment_stats.py refresh_stats、judgment-causefill.yml）同步拔除；
   `family_judge_stats()`/`family_cases_by_year()` 屬法官統計、保留
 - 前端「家事分析」頁的回填橫幅依 ok_months 自動顯示/消失
-- 每月增量：`judgment-stats-monthly.yml`（每月 17 日抓兩個月前月包）
+- 每月增量：`judgment-stats-monthly.yml` 抓兩個月前月包，**同月試 4 次**（台灣 17／20／23／27 日 04:00，
+  cron `0 20 16,19,22,26 * *`）——官方上架常比 17 日晚幾天，單一排程曾連三個月撲空（202605～07）。
+  - 已上傳就跳過：check 步驟看 `month_uploaded(ym, full=True)`（judge／lawyer／lawyer_group_court
+    三表都有該月；upload() 逐表依序刪後插，末表有列⇒前面都跑完）＋`jy_copanel.month_uploaded()`，
+    兩者都已上傳時整個 run 約 1 分鐘、不寫 DB。**抓不到的半殘**：剛好在最後一張表（或共署 pair
+    單表）插到一半失敗、force 重跑中途失敗——該次 run 會紅燈，要人工 force 補
+  - 尚未上架（`NotPublishedYet`→`run` exit 75）＝綠燈＋notice；只有最後一次排程（UTC 日 ≥
+    `env.LAST_ATTEMPT_DAY`，改 cron 要同步）或手動指定月份才紅燈
+  - 手動：`gh workflow run judgment-stats-monthly.yml -f yyyymm=<ym>` 預設也是已上傳就跳過，
+    **強制重跑（整月刪後重插）加 `-f force=true`**；本機 `python judgment_stats.py run <ym>` 仍無條件重跑
+- **開放平臺會員約每 3 個月要到註冊信箱點確認連結重新啟用**：未啟用時登入回 400「請您先啟動會員帳號
+  完成認證，謝謝。」（密碼錯是「帳號或密碼錯誤!」），`get_od_token()` 會把這句帶進例外訊息——月更紅燈先看 log
 - **Phase B 案由層（migration 069/070）**：parse 帶 JTITLE → `lawyer_month_stats.causes` /
   `judge_month_stats.causes` jsonb（鍵=「案類|正規化案由」複合鍵，存**原始案由**；
   mapping 改版只需重跑 `sync_cause_map` 相關 remap + `refresh_lawyer_cause_stats()`，

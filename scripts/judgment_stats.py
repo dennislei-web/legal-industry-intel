@@ -3,7 +3,7 @@
 
 資料來源：司法院資料開放平臺（opendata.judicial.gov.tw），每月一個 RAR 打包
 （每份裁判書一個 JSON，欄位：ID/JYEAR/JCASE/JNO/JDATE/JTITLE/JFULL/JPDF），
-發布晚兩個月（例：2026-06 發布 2025-04 的包）。不需帳號、不需爬網頁。
+發布晚兩個月（例：2026-06 發布 2025-04 的包）。下載需會員帳號（見 get_od_token）、不需爬網頁。
 
 產出：judge_month_stats 表（每法官×法院×月的聚合），再由 DB 端 RPC
 refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使用。
@@ -59,8 +59,25 @@ def get_od_token():
     r = requests.post(f'{OPENDATA}/api/MemberTokens', json={
         'memberAccount': OD_USER, 'pwd': OD_PWD,
     }, timeout=60, verify=False)
-    r.raise_for_status()
-    _od_token = r.json()['token']
+    # 登入失敗時平臺回 HTTP 400＋JSON {"succeeded":false,"message":"…"}，原因在 message
+    # （raise_for_status() 只會印「400 Client Error」）。會員約每 3 個月要到註冊信箱點確認
+    # 連結重新啟用，未啟用回「請您先啟動會員帳號完成認證，謝謝。」；密碼錯回「帳號或密碼錯誤!」。
+    # 只取 message 欄：帳號、密碼、token 一律不進例外訊息／log。
+    try:
+        body = r.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        body = {}
+    if r.status_code != 200 or not body.get('token'):
+        msg = str(body.get('message') or '（回應沒有 message）')[:200]
+        for secret in (OD_USER, OD_PWD):
+            if secret:
+                msg = msg.replace(secret, '***')
+        hint = ('（會員約每 3 個月要到註冊信箱點確認連結重新啟用，啟用後重跑即可）'
+                if '啟動會員帳號' in msg else '')
+        raise RuntimeError(f'司法院資料開放平臺登入失敗（HTTP {r.status_code}）：{msg}{hint}')
+    _od_token = body['token']
     return _od_token
 WORK_DIR = os.environ.get('JUDGMENT_WORK_DIR') or os.path.join(os.path.dirname(__file__), '.judgment_work')
 SEVENZ = os.environ.get('SEVENZ_PATH', '7z')
@@ -71,6 +88,15 @@ os.makedirs(WORK_DIR, exist_ok=True)
 # ============================================================
 # 下載
 # ============================================================
+
+class NotPublishedYet(RuntimeError):
+    """平臺上還查不到該月的裁判書資料集（官方尚未上架）。
+    與真正的失敗分開：`run` 模式以 EXIT_NOT_PUBLISHED 結束，月更 workflow 據此
+    決定「之後的排程再試」或「本月最後一次了，紅燈」。"""
+
+
+EXIT_NOT_PUBLISHED = 75  # sysexits.h 的 EX_TEMPFAIL（暫時性失敗，稍後再試）
+
 
 def find_fileset(yyyymm):
     """用關鍵字搜尋該月資料集，回傳 fileSetId"""
@@ -94,7 +120,7 @@ def download(yyyymm):
         return rar_path
     fileset_id, title = find_fileset(yyyymm)
     if not fileset_id:
-        raise RuntimeError(f'找不到 {yyyymm} 的裁判書資料集（可能尚未發布）')
+        raise NotPublishedYet(f'找不到 {yyyymm} 的裁判書資料集（可能尚未發布）')
     print(f'  下載 {title}（fileSetId={fileset_id}）...')
     t0 = time.time()
     # 檔案端點偶發 connect timeout（Actions 曾整包掛在第一次連線），連線層重試 3 次
@@ -815,11 +841,36 @@ def parse(yyyymm):
 # 上傳
 # ============================================================
 
-def month_uploaded(yyyymm):
-    r = requests.get(f'{SUPABASE_URL}/rest/v1/judge_month_stats',
-                     params={'yyyymm': f'eq.{yyyymm}', 'select': 'yyyymm', 'limit': 1},
+def _month_has_rows(table, ym_col, yyyymm):
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/{table}',
+                     params={ym_col: f'eq.{yyyymm}', 'select': ym_col, 'limit': 1},
                      headers=HEADERS_SB, timeout=30, verify=False)
-    return r.status_code == 200 and len(r.json()) > 0
+    # 查詢失敗要 raise、不能回 False：這個結果決定要不要整月刪後重插，
+    # 連線抖一下就被當成「沒上傳」會誤觸重傳
+    r.raise_for_status()
+    return len(r.json()) > 0
+
+
+def month_uploaded(yyyymm, full=False):
+    """該月是否已上傳。
+    full=False：只看 judge_month_stats（歷史 backfill 用——2021 前的老月份本來就沒有
+      後來才加的表，套完整判定會把老月份整批重傳、還會把已 prune 的 pair 列灌回去）。
+    full=True：月更排程「已上傳就跳過」用，三張都要有該月——judge_month_stats
+      （upload() 第一張）、lawyer_month_stats、lawyer_group_court_month_stats（upload()
+      最後一張）。upload() 逐表依序刪後插、任何一張失敗就中止，所以最後一張有列 ⇒ 前面
+      各表都跑完；只看第一張的話，中途失敗的半殘月會被當成已上傳。
+      抓不到的半殘：剛好在最後一張插到一半失敗、或強制重跑中途失敗（後面的表舊列還在）。
+      ⚠️ upload() 尾端再加表時，這裡的最後一張要跟著換。"""
+    if not _month_has_rows('judge_month_stats', 'yyyymm', yyyymm):
+        return False
+    if not full:
+        return True
+    missing = [t for t, col in (('lawyer_month_stats', 'yyyymm'),
+                                ('lawyer_group_court_month_stats', 'ym'))
+               if not _month_has_rows(t, col, yyyymm)]
+    if missing:
+        print(f'  {yyyymm}: judge_month_stats 有列但缺 {"、".join(missing)}（半殘月），視為未上傳')
+    return not missing
 
 
 def _upload_rows(table, yyyymm, rows, ym_col='yyyymm'):
@@ -909,6 +960,7 @@ def upload(yyyymm, tables=None):
     if data.get('lawyer_group') and want('lawyer_group_month_stats'):
         _upload_rows('lawyer_group_month_stats', yyyymm, data['lawyer_group'], ym_col='ym')
     # 法院×案類維度版（mig 189；舊 agg.json 無此 key 時略過，該月由 groupfill 覆蓋）
+    # ⚠️ 這是最後一張：month_uploaded(full=True) 拿它當「整月傳完」的標記，後面再加表要同步改
     if data.get('lawyer_group_court') and want('lawyer_group_court_month_stats'):
         _upload_rows('lawyer_group_court_month_stats', yyyymm, data['lawyer_group_court'], ym_col='ym')
     print('  上傳完成')
@@ -1078,7 +1130,13 @@ if __name__ == '__main__':
         upload(sys.argv[2])
         refresh_stats()
     elif cmd == 'run':
-        run_month(sys.argv[2])
+        # 無條件重跑（刪後重插）。「已上傳就跳過」由月更 workflow 的 check 步驟決定，不在這裡。
+        try:
+            run_month(sys.argv[2])
+        except NotPublishedYet as e:
+            # 月包還沒上架不是真正的失敗：用專屬 exit code 回報，其他例外照舊 traceback＋exit 1
+            print(f'{sys.argv[2]}: {e}')
+            sys.exit(EXIT_NOT_PUBLISHED)
         refresh_stats()
         prune_pairs()  # 月更後維護配對表滾動視窗
     elif cmd == 'pairfill':

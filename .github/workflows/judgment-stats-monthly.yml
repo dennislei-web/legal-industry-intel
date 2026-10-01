@@ -1,19 +1,40 @@
 name: 裁判書法官統計（每月增量）
+run-name: 裁判書月更 ${{ github.event.inputs.yyyymm || '自動(兩個月前)' }}${{ github.event.inputs.force == 'true' && ' force' || '' }}
 
 on:
   schedule:
-    - cron: '0 20 16 * *'  # 每月 16 日 UTC 20:00 = 台灣 17 日凌晨 4:00（官方約 15 日發布兩個月前的月包）
+    # 目標＝兩個月前的月包。官方約 15～16 日產包，但實際上架常再晚幾天（202606 到 8/20、
+    # 202607 到 9/17 之後才查得到），所以同月試 4 次：UTC 16／19／22／26 日 20:00
+    # ＝台灣 17／20／23／27 日凌晨 4:00。已上傳就跳過（約 1 分鐘、不寫 DB）；還沒上架不算失敗，
+    # 只有最後一次仍抓不到才紅燈。⚠️ 改日期時 env.LAST_ATTEMPT_DAY 要跟著改成最後一個日期。
+    - cron: '0 20 16,19,22,26 * *'
   workflow_dispatch:
     inputs:
       yyyymm:
         description: '要跑的月份（留空=自動抓兩個月前）'
         required: false
         default: ''
+      force:
+        description: '已上傳也強制重跑（整月刪後重插）；不勾＝已上傳就跳過'
+        type: boolean
+        required: false
+        default: false
+
+# 同月多次排程＋手動 dispatch 不要兩個同時跑（都是整月刪後重插，會撞唯一鍵）。
+# 後到的排隊，輪到時 check 步驟會發現已上傳而跳過。
+concurrency:
+  group: judgment-stats-monthly
+  cancel-in-progress: false
+
+env:
+  LAST_ATTEMPT_DAY: '26'  # UTC 日；＝上面 cron 的最後一個日期（本月最後一次排程）
 
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      PYTHONUNBUFFERED: '1'  # log 即時輸出（否則 stdout 整段緩衝到結束，traceback 會排在前文之前）
     steps:
       - uses: actions/checkout@v4
 
@@ -36,37 +57,101 @@ jobs:
           echo "resolved: $IP"
           echo "$IP opendata.judicial.gov.tw" | sudo tee -a /etc/hosts
 
+      - name: 決定目標月份
+        id: plan
+        env:
+          INPUT_YM: ${{ github.event.inputs.yyyymm }}
+          INPUT_FORCE: ${{ github.event.inputs.force }}
+        run: |
+          if [ -n "$INPUT_YM" ]; then
+            if ! [[ "$INPUT_YM" =~ ^[0-9]{6}$ ]]; then
+              echo "::error::yyyymm 要是 6 位數字（例 202607），收到：$INPUT_YM"
+              exit 1
+            fi
+            YM="$INPUT_YM"
+            # 手動指定月份：排程只會重試「兩個月前」那個月，不保證替這個月再試 → 抓不到就該紅燈
+            FINAL=true
+          else
+            YM=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y%m)
+            # 排程（或留空手動）：UTC 日期已到本月最後一次排程日 → 這是最後一次嘗試
+            if [ "$(date -u +%-d)" -ge "$LAST_ATTEMPT_DAY" ]; then FINAL=true; else FINAL=false; fi
+          fi
+          if [ "$INPUT_FORCE" = "true" ]; then FORCE=true; else FORCE=false; fi
+          echo "目標月份: $YM（force=$FORCE，final=$FINAL）"
+          { echo "ym=$YM"; echo "force=$FORCE"; echo "final=$FINAL"; } >> "$GITHUB_OUTPUT"
+
+      - name: 檢查該月是否已上傳（已上傳的部分後面直接跳過，不重工）
+        id: check
+        if: steps.plan.outputs.force != 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          YM: ${{ steps.plan.outputs.ym }}
+        working-directory: scripts
+        run: |
+          # 查詢本身失敗會讓這步紅燈（不會被當成「未上傳」而誤觸整月刪後重插）
+          python - <<'PY'
+          import os
+          import urllib3
+          urllib3.disable_warnings()
+          import judgment_stats as js
+          import jy_copanel
+
+          ym = os.environ['YM']
+          stats = js.month_uploaded(ym, full=True)  # 三表都有該月才算（防半殘月）
+          copanel = jy_copanel.month_uploaded(ym)
+          print(f'::notice::{ym}｜月表：{"已完整上傳→跳過" if stats else "未上傳→要跑"}'
+                f'｜共署 pair：{"已上傳→跳過" if copanel else "未上傳→要跑"}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'stats={str(stats).lower()}\ncopanel={str(copanel).lower()}\n')
+          PY
+
       - name: Run judgment stats pipeline
+        id: stats
+        if: steps.check.outputs.stats != 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
           JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
           SEVENZ_PATH: 7zz
+          YM: ${{ steps.plan.outputs.ym }}
+          FINAL: ${{ steps.plan.outputs.final }}
         working-directory: scripts
         run: |
-          YM="${{ github.event.inputs.yyyymm }}"
-          if [ -z "$YM" ]; then
-            YM=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y%m)
+          rc=0
+          python judgment_stats.py run "$YM" || rc=$?
+          if [ "$rc" -eq 75 ]; then
+            # 75 = judgment_stats.EXIT_NOT_PUBLISHED：平臺上還查不到該月資料集
+            echo "state=unpublished" >> "$GITHUB_OUTPUT"
+            if [ "$FINAL" = "true" ]; then
+              echo "::error::$YM 裁判書月包在平臺上還查不到（尚未上架），之後沒有排程會再替這個月重試。上架後請手動補跑：gh workflow run judgment-stats-monthly.yml -f yyyymm=$YM"
+              exit 1
+            fi
+            echo "::notice::$YM 裁判書月包尚未上架，本次不算失敗；本月後續排程（UTC 16／19／22／26 日 20:00）會再試"
+            exit 0
           fi
-          echo "目標月份: $YM"
-          python judgment_stats.py run "$YM"
+          if [ "$rc" -eq 0 ]; then echo "state=uploaded" >> "$GITHUB_OUTPUT"; fi
+          exit "$rc"
 
-      - name: 共署 pair（重用本次已下載的月包 RAR）
+      - name: 共署 pair（重用本次已下載的月包 RAR；月表步驟被跳過時自己下載）
+        id: copanel
+        if: steps.check.outputs.copanel != 'true' && steps.stats.outputs.state != 'unpublished'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # 月表步驟被跳過（已上傳）時這裡沒有現成 RAR，要自己登入下載
+          JUDICIAL_OPENDATA_USER: ${{ secrets.JUDICIAL_OPENDATA_USER }}
+          JUDICIAL_OPENDATA_PWD: ${{ secrets.JUDICIAL_OPENDATA_PWD }}
           SEVENZ_PATH: 7zz
+          YM: ${{ steps.plan.outputs.ym }}
         working-directory: scripts
-        run: |
-          YM="${{ github.event.inputs.yyyymm }}"
-          if [ -z "$YM" ]; then
-            YM=$(date -u -d "$(date -u +%Y-%m-01) -2 months" +%Y%m)
-          fi
-          python jy_copanel.py run "$YM"
+        run: python jy_copanel.py run "$YM"
 
       - name: Refresh 官方遷調邊（人審會決議 → judge_transfers → 異動歸因）
         # 全量重抓 65+ 頁約 3 分鐘；parse 有新句型警告會 exit 1 擋 upload（解析器要補樣態）
+        # 只在本次真的有新資料落地時跑（月表或共署 pair 有實際上傳）；整個 run 都是跳過時不重抓
+        if: steps.stats.outputs.state == 'uploaded' || steps.copanel.outcome == 'success'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -83,6 +168,9 @@ jobs:
             -H "Content-Type: application/json" -d '{}'
 
       - name: 回寫資料來源最後爬取時間
+        # 只在本次月表真的落地時回寫（跳過／尚未上架的 run 不動它）；後面的共署 pair／遷調邊
+        # 就算失敗也照寫——之後的重試 run 月表會被跳過，這裡不寫就永遠不會寫
+        if: ${{ !cancelled() && steps.stats.outputs.state == 'uploaded' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

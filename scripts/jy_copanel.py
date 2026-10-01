@@ -87,10 +87,15 @@ def parse_copanel(yyyymm):
 
 
 def month_uploaded(yyyymm):
+    """該月共署 pair 是否已上傳（backfill 與月更 workflow 的 check 步驟「已上傳就跳過」用）。
+    單表只能看有無列：upload() 插到一半失敗會留下部分列而被當成已上傳（該次 run 會是紅燈，
+    要手動 `python jy_copanel.py run <ym>` 或 workflow force 重跑）。"""
     r = requests.get(f'{js.SUPABASE_URL}/rest/v1/judge_copanel_pairs',
                      params={'yyyymm': f'eq.{yyyymm}', 'select': 'yyyymm', 'limit': 1},
                      headers=js.HEADERS_SB, timeout=60, verify=False)
-    return r.status_code == 200 and len(r.json()) > 0
+    # 查詢失敗要 raise、不能回 False（同 js.month_uploaded：否則連線抖一下就誤觸重傳）
+    r.raise_for_status()
+    return len(r.json()) > 0
 
 
 def upload(yyyymm):

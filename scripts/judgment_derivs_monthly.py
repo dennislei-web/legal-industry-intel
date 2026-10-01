@@ -3,7 +3,7 @@
 
 背景（2026-09-24）：下列管線上線時都是一次性手動回填，沒有排程，頁面數字停在回填當月
 （霸凌判決停 202605、企業當事人停 202604、金額/收費/大額停 202606、集中度停 7/31）。
-雲端 judgment-stats-monthly（每月 17 日）與本機 appeal/achievement（每月 20 日）不涵蓋它們。
+雲端 judgment-stats-monthly（每月 17～27 日試 4 次）與本機 appeal/achievement（每月 20 日）不涵蓋它們。
 這些都依賴本機 .judgment_work 月包快取，所以排本機，不搬 GH Actions。
 
 目標月＝雲端月更已落地的最新月（lawyer_month_stats 的 max(yyyymm)）——官方月包發布
