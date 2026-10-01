@@ -199,7 +199,10 @@
   分所合併、按現任名冊回溯）。⚠️ **p_ym=NULL 全量 ~10s 會撞 PostgREST authenticator 的
   8s statement_timeout（函數層 SET 蓋不掉已武裝的頂層計時器），只能走
   `supabase db query`**；單月增量 ~5s 可走 RPC——refresh_stats() 的
-  `refresh_firm_dedup()` 與 groupfill CI 都逐月打單月版
+  `refresh_firm_dedup()` 與 groupfill CI 都逐月打單月版。
+  **（2026-10-01 更正）「函數層 SET 蓋不掉」不成立**，當時被砍應是剛 `ALTER FUNCTION` 完
+  就測（schema cache 還是舊值），機制見「已知 Gotchas」的 statement_timeout 條；
+  本函數全量走 RPC 尚未重測，逐月版照常可用
 - 回填：`judgment-groupfill.yml`（202101–202504 分 5 shard＋202505–202605 補 2 shard，
   月更 run 自動增量）。`python judgment_stats.py groupfill <起> <迄>` 冪等（已上傳月跳過）。
   ⚠️ **名目端是從 lawyer_month_stats 全期灌的**：firm_dedup_month_stats 的 ym 涵蓋
@@ -222,7 +225,10 @@
   ＋`firm_court_dup_month_stats`（dup cache，⚠️ 歸戶用 047 排行口徑 lawyers_combined
   截「事務所」，**不是** mig 186 moj fk——排行名目/去重必須同套歸戶才能相減）。
   `firm_court_ranking` v3 加 dup/dedup 欄、rank 按 dedup；`firm_map_default_cache`
-  （mig 178 預設快取）同步補欄。前端 dup cache 有值才切去重呈現、案由種類路徑維持名目。
+  （mig 178 預設快取）同步補欄；快取由 `moj-office-refresh.yml` 每日以 PostgREST RPC
+  `refresh_firm_map_cache` 刷新——⚠️ 函數內的 `DELETE … WHERE true` 不可拿掉（pg-safeupdate，
+  見「已知 Gotchas」；原版無 WHERE，排程自 2026-08-31 起天天 400、快取停更一個月，mig 237 修）。
+  前端 dup cache 有值才切去重呈現、案由種類路徑維持名目。
   groupfill 冪等改看新表（重跑會重灌兩表）；workflow refresh 步驟改動態月份範圍
   （原寫死 (2025,4) 曾漏刷 202505+）＋雙 RPC 逐月刷
 
@@ -411,6 +417,19 @@
   - 上傳 batch size 50、每次上傳後 sleep 2s
 - `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會 fire-and-forget 呼叫 RPC，server 端非同步跑完）
 - 前端登入後若無資料可能是 RLS 設定問題（需 auth.uid() IS NOT NULL）
+- **PostgREST 路徑載入 pg-safeupdate**（`authenticator` role 帶 `session_preload_libraries=safeupdate`）：
+  函數內無 WHERE 的 `DELETE`／`UPDATE` 經 RPC 呼叫一律 HTTP 400 `21000 DELETE requires a WHERE clause`
+  （session 層 hook，`SECURITY DEFINER` 也擋；`TRUNCATE` 不擋）。`supabase db query --linked` 走 postgres role
+  不載 safeupdate，所以**直連跑過不代表 RPC 會過**——refresh 函數要用 `TRUNCATE` 或 `DELETE … WHERE true`，
+  新函數上線要實打一次 `/rest/v1/rpc/…` 驗證。實例：`refresh_firm_map_cache`（mig 178/190）無 WHERE，
+  日更 workflow 又把 4xx 當 non-fatal warning，`firm_map_default_cache` 停更一個月才被發現（mig 237 修；
+  2026-10-01 掃過線上 174 個 public 函數僅此一支，scripts 的 REST DELETE 也都帶 filter）
+- **PostgREST RPC 的 statement_timeout**：`authenticator`／`authenticated` 預設 8s、`anon` 3s。函數自帶
+  `SET statement_timeout`（proconfig）時，PostgREST（v14.4）會把它提升成交易層設定、以函數值為準——
+  2026-10-01 實測：有 SET 的函數跑 15s 回 200，沒 SET 的在 8s 被砍（57014）。所以各 refresh 函數的
+  `SET statement_timeout` **不是裝飾，重寫函數時要保留**（`refresh_firm_map_cache` 通常 6～7s、DB 忙時到 19s，靠它才不被砍）。
+  ⚠️ 設定讀自 schema cache：剛 `CREATE`／`ALTER FUNCTION` 完數十秒內仍沿用舊值（實測 ALTER 後立刻打
+  仍 8s 被砍、30 秒後正常），要立刻生效就 `NOTIFY pgrst, 'reload schema'`
 - **PostgREST 每回應上限 1000 列**：大表要逐頁 `.range()`，但**別「抓一頁、等回來、再抓下一頁」串行**——
   異動與懲戒頁 judge_changes 6,000+ 列曾因 7 趟串行 round-trip 載入 3～8 秒（2026-09-22 修，commit b3edaf4）。
   一律改用 index.html 的 `fetchAllPagesParallel(buildQuery, { pageSize, prefetchPages })`（定義在 JUDGE-CHANGES 區段）：
