@@ -7289,23 +7289,91 @@ async function showFirmDetail(firmName) {
   document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('firmTab_overview')?.classList.add('active');
   bodyEl.innerHTML = '<div class="loading">載入律師資料中...</div>';
-  await ensureLeaderOverrides(); // 律師清單所長判定需要前台標註對照表
+
+  // 以下查詢互不相依 → 同時發出（舊版 7 段串行，每段一趟往返約 250ms，開 modal 要等 2 秒以上）
+  const pLeaderOv = ensureLeaderOverrides(); // 律師清單所長判定需要前台標註對照表
+  const pLawyerFlags = ensureLawyerFlags();
 
   // 查詢該事務所所有律師（含分所：用 LIKE prefix）
-  let allLawyers = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await db.from('moj_lawyers')
-      .select('name, lic_no, sex, birth_year, office, office_normalized, main_region, email, tel, state_desc')
-      .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
-      .order('name')
-      .range(from, from + 999);
-    if (error) { bodyEl.innerHTML = `<div style="color:var(--red);">查詢失敗: ${error.message}</div>`; return; }
-    if (!data || data.length === 0) break;
-    allLawyers = allLawyers.concat(data);
-    if (data.length < 1000) break;
-    from += 1000;
-  }
+  const pLawyers = (async () => {
+    let rows = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await db.from('moj_lawyers')
+        .select('name, lic_no, sex, birth_year, office, office_normalized, main_region, email, tel, state_desc')
+        .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
+        .order('name')
+        .range(from, from + 999);
+      if (error) return { error };
+      if (!data || data.length === 0) break;
+      rows = rows.concat(data);
+      if (data.length < 1000) break;
+    }
+    return { rows };
+  })();
+
+  // 官方訴訟戰力（lawyers_with_stats：官方彙總 + 同名旗標；同名律師不計入，口徑與版圖頁一致）
+  const pFirmStats = (async () => {
+    let rows = [];
+    try {
+      for (let sFrom = 0; ; sFrom += 1000) {
+        const { data: fs } = await db.from('lawyers_with_stats')
+          .select('name, official_cases_5yr, official_cats_5yr, official_top_court, name_ambiguous')
+          .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
+          .range(sFrom, sFrom + 999);
+        if (fs?.length) rows = rows.concat(fs);
+        if (!fs || fs.length < 1000) break;
+      }
+    } catch (e) { console.log('firm official stats error:', e); }
+    return rows;
+  })();
+
+  // 所級去重案量（mig 186）：同判決同所共同署名只計 1 件；firm_key 截到第一個
+  // 「法律/律師事務所」（分所合併，口徑同 refresh_firm_dedup_stats）；素材 2021/01 起
+  const pDedup = (async () => {
+    try {
+      const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
+      const { data: ddr } = await db.from('firm_dedup_month_stats')
+        .select('ym,nominal_cases,dup_cases,dedup_cases').eq('firm_key', fk).range(0, 199);
+      return ddr || [];
+    } catch (e) { console.log('firm dedup stats error:', e); return []; }
+  })();
+
+  // 上市櫃獨董席次（含分所，firm_indep_directorships view 已過濾為覆核確認者）
+  const pIndep = (async () => {
+    try {
+      const { data: fi } = await db.from('firm_indep_directorships').select('*')
+        .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
+        .order('person_name');
+      return fi || [];
+    } catch (e) { console.log('firm indep dirs error:', e); return []; }
+  })();
+
+  // 政府標案（含分所 LIKE prefix；gov_tender_firms/gov_tenders，mig 063）
+  const pGov = (async () => {
+    try {
+      const { data: gt } = await db.from('gov_tender_firms')
+        .select('firm_name, is_winner, award_amount, gov_tenders(title, unit_name, award_year, award_date)')
+        .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
+        .range(0, 999);
+      return (gt || []).filter(r => r.gov_tenders);
+    } catch (e) { console.log('firm gov tenders error:', e); return []; }
+  })();
+
+  // 商標/專利代理件數（tipo_firm_stats，mig 092；含分所 LIKE prefix）
+  const pTipo = (async () => {
+    try {
+      const { data: tf } = await db.from('tipo_firm_stats')
+        .select('kind,year_tw,cases,agents_n')
+        .or(`firm.eq.${firmName},firm.like.${firmName}%`);
+      return tf || [];
+    } catch (e) { console.log('firm tipo stats error:', e); return []; }
+  })();
+
+  const [lawRes, firmStats, dedupRows, firmIndep, govRows, tipoFm] =
+    await Promise.all([pLawyers, pFirmStats, pDedup, pIndep, pGov, pTipo, pLeaderOv, pLawyerFlags]);
+  if (firmName !== _currentFirmName) return; // 等待期間已切到別的所
+  if (lawRes.error) { bodyEl.innerHTML = `<div style="color:var(--red);">查詢失敗: ${lawRes.error.message}</div>`; return; }
+  let allLawyers = lawRes.rows;
 
   // 已除名者（state_desc=名冊查無（推定除名），mig 079）不計入現役統計，清單沉底標註
   const deregLawyers = allLawyers.filter(l => (l.state_desc || '').startsWith('名冊查無'));
@@ -7317,28 +7385,6 @@ async function showFirmDetail(firmName) {
     return;
   }
 
-  // 官方訴訟戰力（lawyers_with_stats：官方彙總 + 同名旗標；同名律師不計入，口徑與版圖頁一致）
-  let firmStats = [];
-  try {
-    for (let sFrom = 0; ; sFrom += 1000) {
-      const { data: fs } = await db.from('lawyers_with_stats')
-        .select('name, official_cases_5yr, official_cats_5yr, official_top_court, name_ambiguous')
-        .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
-        .range(sFrom, sFrom + 999);
-      if (fs?.length) firmStats = firmStats.concat(fs);
-      if (!fs || fs.length < 1000) break;
-    }
-  } catch (e) { console.log('firm official stats error:', e); }
-
-  // 所級去重案量（mig 186）：同判決同所共同署名只計 1 件；firm_key 截到第一個
-  // 「法律/律師事務所」（分所合併，口徑同 refresh_firm_dedup_stats）；素材 2021/01 起
-  let dedupRows = [];
-  try {
-    const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
-    const { data: ddr } = await db.from('firm_dedup_month_stats')
-      .select('ym,nominal_cases,dup_cases,dedup_cases').eq('firm_key', fk).range(0, 199);
-    dedupRows = ddr || [];
-  } catch (e) { console.log('firm dedup stats error:', e); }
   const dedupByYear = {}, dedupTot = { nominal: 0, dedup: 0 };
   dedupRows.forEach(r => {
     const y = r.ym.slice(0, 4);
@@ -7347,39 +7393,13 @@ async function showFirmDetail(firmName) {
     dedupTot.nominal += r.nominal_cases; dedupTot.dedup += r.dedup_cases;
   });
 
-  // 上市櫃獨董席次（含分所，firm_indep_directorships view 已過濾為覆核確認者）
-  let firmIndep = [];
-  try {
-    const { data: fi } = await db.from('firm_indep_directorships').select('*')
-      .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
-      .order('person_name');
-    firmIndep = fi || [];
-  } catch (e) { console.log('firm indep dirs error:', e); }
   const indepByLawyer = {};
   firmIndep.forEach(r => { (indepByLawyer[r.person_name] = indepByLawyer[r.person_name] || []).push(r); });
 
-  // 政府標案（含分所 LIKE prefix；gov_tender_firms/gov_tenders，mig 063）
-  let govRows = [];
-  try {
-    const { data: gt } = await db.from('gov_tender_firms')
-      .select('firm_name, is_winner, award_amount, gov_tenders(title, unit_name, award_year, award_date)')
-      .or(`firm_name.eq.${firmName},firm_name.like.${firmName}%`)
-      .range(0, 999);
-    govRows = (gt || []).filter(r => r.gov_tenders);
-  } catch (e) { console.log('firm gov tenders error:', e); }
   const govWins = govRows.filter(r => r.is_winner)
     .sort((a, b) => (b.gov_tenders.award_date || '').localeCompare(a.gov_tenders.award_date || ''));
   const govAmtSum = govWins.reduce((s, r) => s + (r.award_amount || 0), 0);
   const govWins5 = govWins.filter(r => r.gov_tenders.award_year >= new Date().getFullYear() - 4);
-
-  // 商標/專利代理件數（tipo_firm_stats，mig 092；含分所 LIKE prefix）
-  let tipoFm = [];
-  try {
-    const { data: tf } = await db.from('tipo_firm_stats')
-      .select('kind,year_tw,cases,agents_n')
-      .or(`firm.eq.${firmName},firm.like.${firmName}%`);
-    tipoFm = tf || [];
-  } catch (e) { console.log('firm tipo stats error:', e); }
 
   // 官方訴訟戰力排除同名不明者與已除名者（已除名＝非現任名冊，口徑同人數統計）
   const litLawyers = firmStats.filter(s => !s.name_ambiguous && !deregNames.has(s.name));
@@ -8140,10 +8160,12 @@ function switchFirmTab(tab) {
 async function loadFirmResearch(firmName) {
   const body = document.getElementById('firmModalBody');
   body.innerHTML = '<div class="loading">載入研究資料...</div>';
-  // Load firm_profile
-  const { data: profile } = await db.from('firm_profiles').select('*').eq('firm_name', firmName).maybeSingle();
-  // Load firm_websites
-  const { data: fw } = await db.from('firm_websites').select('website_url, website_title, description').eq('firm_name', firmName).maybeSingle();
+  // firm_profiles 與 firm_websites 同時發出（舊版串行兩趟）
+  const [{ data: profile }, { data: fw }] = await Promise.all([
+    db.from('firm_profiles').select('*').eq('firm_name', firmName).maybeSingle(),
+    db.from('firm_websites').select('website_url, website_title, description').eq('firm_name', firmName).maybeSingle(),
+  ]);
+  if (firmName !== _currentFirmName) return; // 等待期間已切到別的所
 
   const webUrl = profile?.website_url || fw?.website_url || '';
   const notes = profile?.user_notes || '';
@@ -8266,13 +8288,19 @@ function renderMarkdown(text) {
 async function loadFirmAnalysis(firmName) {
   const body = document.getElementById('firmModalBody');
   body.innerHTML = '<div class="loading">載入 AI 分析...</div>';
-  const { data: profile } = await db.from('firm_profiles').select('ai_analysis, ai_analyzed_at').eq('firm_name', firmName).maybeSingle();
+  // 分析文與去重合計互不相依 → 同時發出（舊版串行兩趟）
+  const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
+  const [{ data: profile }, dtRes] = await Promise.all([
+    db.from('firm_profiles').select('ai_analysis, ai_analyzed_at').eq('firm_name', firmName).maybeSingle(),
+    db.from('firm_dedup_totals').select('nominal_total,dup_total,dedup_total').eq('firm_key', fk).maybeSingle()
+      .then(r => r, () => ({ data: null })),
+  ]);
+  if (firmName !== _currentFirmName) return; // 等待期間已切到別的所
 
   // 口徑標注（mig 186）：分析文中的案量/營收以名目署名數為基礎；重複率高的所文中數字偏高
   let dedupBanner = '';
   try {
-    const fk = (firmName.match(/^(.+?(?:法律|律師)事務所)/) || [null, firmName])[1];
-    const { data: dt } = await db.from('firm_dedup_totals').select('nominal_total,dup_total,dedup_total').eq('firm_key', fk).maybeSingle();
+    const dt = dtRes?.data;
     if (dt?.nominal_total) {
       const pct = Math.round(dt.dup_total * 100 / dt.nominal_total);
       dedupBanner = `<div style="padding:8px 12px;margin-bottom:12px;border:1px solid ${pct >= 30 ? 'var(--orange)' : 'var(--border)'};border-radius:8px;font-size:0.76rem;line-height:1.6;color:var(--text-muted);">
