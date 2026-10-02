@@ -2802,7 +2802,7 @@
           <div class="kpi-card"><div class="kpi-label">CR10 / CR100</div><div class="kpi-value" id="drKpiCr">-</div><div class="kpi-sub">頭部集中度</div></div>
           <div class="kpi-card"><div class="kpi-label">推估 ≥1 億</div><div class="kpi-value" style="color:var(--gold);" id="drKpiRich">-</div><div class="kpi-sub">5 人以上所</div></div>
           <div class="kpi-card"><div class="kpi-label">接班風險亮燈</div><div class="kpi-value" style="color:var(--red);" id="drKpiSucc">-</div><div class="kpi-sub">速讀最大風險點名</div></div>
-          <div class="kpi-card"><div class="kpi-label">有廣告碼</div><div class="kpi-value" id="drKpiAds">-</div><div class="kpi-sub">5 人以上所（官網主域）</div></div>
+          <div class="kpi-card"><div class="kpi-label">有廣告碼</div><div class="kpi-value" id="drKpiAds">-</div><div class="kpi-sub">5 人以上所（官網，含 GTM）</div></div>
         </div>
         <div style="font-size:0.8rem;line-height:1.8;margin-top:10px;" id="drRecap"></div>
       </div>
@@ -2812,7 +2812,7 @@
           <div class="kpi-card"><div class="kpi-label">B2C 行銷型（5人+）</div><div class="kpi-value" id="drB2cN">-</div><div class="kpi-sub" id="drB2cNSub">-</div></div>
           <div class="kpi-card"><div class="kpi-label">合計推估營收</div><div class="kpi-value" id="drB2cRev">-</div><div class="kpi-sub">/年</div></div>
           <div class="kpi-card"><div class="kpi-label">人均營收中位</div><div class="kpi-value" id="drB2cPc">-</div><div class="kpi-sub" id="drB2cPcSub">-</div></div>
-          <div class="kpi-card"><div class="kpi-label">真投廣告碼</div><div class="kpi-value" style="color:var(--gold);" id="drB2cAds">-</div><div class="kpi-sub">FB Pixel / Google Ads</div></div>
+          <div class="kpi-card"><div class="kpi-label">官網有廣告追蹤碼</div><div class="kpi-value" style="color:var(--gold);" id="drB2cAds">-</div><div class="kpi-sub">FB / Google Ads / LINE / Yahoo / TikTok</div></div>
         </div>
         <div style="font-size:0.82rem;font-weight:600;margin:12px 0 6px;">量產 vs 賺錢：年人均案量 × 人均營收（氣泡=律師人數，綠=喆律，點開詳情）</div>
         <div class="chart-container" style="height:380px;"><canvas id="drScatter"></canvas></div>
@@ -2822,7 +2822,7 @@
             <th data-k="firm">事務所</th><th data-k="region">地區</th><th data-k="lawyer_count" style="text-align:right;">人數</th>
             <th data-k="cases_5y" style="text-align:right;" title="同判決同所共同署名去重後的 distinct 判決數，2021/01 起合計（mig 186）">案量(去重)</th><th data-k="percase" style="text-align:right;">年人均</th>
             <th data-k="rev" style="text-align:right;">推估營收(萬/年)</th><th data-k="percap" style="text-align:right;">人均(萬)</th>
-            <th data-k="ads" style="text-align:center;">廣告碼</th><th data-k="g_reviews" style="text-align:right;">評論</th><th data-k="founded_year" style="text-align:right;">成立</th>
+            <th data-k="ads" style="text-align:center;" title="官網追蹤碼種類數（滑過勾勾看種類）；含 GTM 容器內的碼，已排除建站平台共用碼">廣告碼</th><th data-k="g_reviews" style="text-align:right;">評論</th><th data-k="founded_year" style="text-align:right;">成立</th>
           </tr></thead>
           <tbody id="drB2cBody"></tbody>
         </table></div>
@@ -2851,7 +2851,7 @@
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#129504; 戰略意涵</div>
         <div style="font-size:0.84rem;line-height:2;" id="drInsights"></div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">口徑：營收＝訴訟行情公式＋可觀測非訟推估（非財報）；案量為去重口徑（同判決同所共同署名只計 1 件，2021/01 起合計）；廣告碼掃描僅及官網主域（站外品牌站不可見）；資料集 firm_analysis_facts 隨分析批次重灌。本頁 admin 限定。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">口徑：營收＝訴訟行情公式＋可觀測非訟推估（非財報）；案量為去重口徑（同判決同所共同署名只計 1 件，2021/01 起合計）；廣告碼＝官網首頁＋聯絡/服務內頁的追蹤碼（原始碼、GTM 容器、瀏覽器實際送出請求三來源，已排除建站平台共用碼，mig 239），有碼不等於正在投放，站外品牌站不可見；資料集 firm_analysis_facts 隨分析批次重灌。本頁 admin 限定。</div>
       </div>
     </div>
     <div id="tab-alumni" class="tab-content">
@@ -12472,6 +12472,11 @@ async function dlCourtChange() {
 
 const isZheluFirm = f => !!f && f.includes('喆律');
 
+// 官網廣告追蹤碼（mig 239：原始碼＋GTM 容器＋無頭瀏覽器實際請求三來源，已排除建站平台共用碼）
+const AD_KINDS = [['fb_pixel', 'FB Pixel'], ['google_ads', 'Google Ads'], ['line_tag', 'LINE Tag'], ['yahoo_ads', 'Yahoo'], ['tiktok_pixel', 'TikTok']];
+function adKindsOf(r) { return AD_KINDS.filter(([k]) => r[k] === 1).map(([, label]) => label); }
+function hasAds(r) { return adKindsOf(r).length > 0; }
+
 // ===== 產業結構分析（firm_analysis_facts，mig 179；AI 分析 398 家的結構化聚合）=====
 let _isLoaded = false, _isRows = [];
 async function loadIndustryStructure() {
@@ -12552,7 +12557,7 @@ async function loadIndustryStructure() {
       const mPer = med(g.map(r => rev(r) / Math.max(r.lawyer_count || 1, 1)));
       // 去重案量年化：dedup_months=去重口徑全窗月數（202101 起）；無去重歸戶的舊值退回 5 年名目
       const mCase = med(g.filter(r => r.cases_5y).map(r => r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / (r.dedup_months ? r.dedup_months / 12 : 5)));
-      const ads = g.filter(r => r.fb_pixel === 1 || r.google_ads === 1).length;
+      const ads = g.filter(hasAds).length;
       return `<tr><td>${escHtml(t)}</td><td style="text-align:right;">${g.length}</td><td style="text-align:right;font-weight:600;color:var(--gold);">${Math.round(mRev).toLocaleString()}</td><td style="text-align:right;">${Math.round(mPer)}</td><td style="text-align:right;">${Math.round(mCase)}</td><td style="text-align:right;">${ads}</td></tr>`;
     }).join('');
   } catch (e) { _isLoaded = false; console.error('產業結構分析載入失敗', e); }
@@ -12617,7 +12622,8 @@ async function loadDeepReportOnce() {
     document.getElementById('drKpiCr').textContent = cr(10) + '% / ' + cr(100) + '%';
     document.getElementById('drKpiRich').textContent = rv.filter(r => _drRev(r) >= 10000).length + ' 家';
     document.getElementById('drKpiSucc').textContent = top.filter(r => r.succession_risk === 1).length + ' 家';
-    document.getElementById('drKpiAds').textContent = top.filter(r => r.fb_pixel === 1 || r.google_ads === 1).length + ' 家';
+    const adsTop = top.filter(hasAds).length;
+    document.getElementById('drKpiAds').textContent = adsTop + ' 家';
     const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
     const tShare = TYPES.map(t => `${t.replace('型', '')} ${Math.round(100 * top.filter(r => r.type === t).length / top.length)}%`).join('、');
     const exj = top.filter(r => (r.ex_judicial_n || 0) > 0);
@@ -12626,7 +12632,7 @@ async function loadDeepReportOnce() {
     document.getElementById('drRecap').innerHTML =
       `型態組成（5 人以上 ${top.length} 家）：${tShare}。規模化幾乎只發生在企業非訟（30 人以上 12 家中佔 8 家）；` +
       `掛名制度約 ${concPct('掛名制度')}%（協作型大所 ${concPct('協作型大所')}%、真集中 ${concPct('真集中')}%、分散 ${concPct('分散/非掛名')}%——署名重複率×top1 集中度判定）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
-      `頭部市場的數位獲客滲透率不到 5% —— 前 300 大裡真的掛廣告碼的所是極少數。`;
+      `官網掛廣告追蹤碼（FB/Google Ads/LINE/Yahoo/TikTok）的 ${adsTop} 家，佔 5 人以上所 ${Math.round(100 * adsTop / top.length)}%——有追蹤碼不等於正在投放，是「曾建置投放基礎」的上限口徑。`;
 
     // --- B2C 全解剖 ---
     const b2c = top.filter(r => r.type === 'B2C行銷型');
@@ -12635,7 +12641,8 @@ async function loadDeepReportOnce() {
       rev: _drRev(r),
       percap: _drRev(r) != null ? _drRev(r) / Math.max(r.lawyer_count || 1, 1) : null,
       percase: r.cases_5y ? r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / (r.dedup_months ? r.dedup_months / 12 : 5) : null,
-      ads: (r.fb_pixel === 1 ? 1 : 0) + (r.google_ads === 1 ? 1 : 0),
+      ads: adKindsOf(r).length,
+      adKinds: adKindsOf(r).join('、'),
     }));
     const withRev = _drB2c.filter(r => r.rev != null);
     document.getElementById('drB2cN').textContent = b2c.length + ' 家';
@@ -12728,9 +12735,9 @@ async function loadDeepReportOnce() {
     const adsList = _drB2c.filter(r => r.ads > 0).sort((a, b) => (b.lawyer_count || 0) - (a.lawyer_count || 0));
     const caseMed = _drMed(_drB2c.filter(r => r.percase != null).map(r => r.percase));
     document.getElementById('drInsights').innerHTML = [
-      `<strong>1. 真正的同構對手只有 ${adsList.length} 家。</strong>B2C 行銷型 ${b2c.length} 家裡，官網真的掛廣告碼（Pixel/Ads）的僅 ${adsList.length} 家：${adsList.map(r => firmLink(r.firm)).join('、')}——其餘多為內容/口碑導流，不是真數位投放。`,
+      `<strong>1. 真正的同構對手只有 ${adsList.length} 家。</strong>B2C 行銷型 ${b2c.length} 家裡，官網掛廣告追蹤碼的 ${adsList.length} 家：${adsList.map(r => firmLink(r.firm)).join('、')}——其餘官網無任何追蹤碼，多為內容/口碑導流。`,
       `<strong>2. 量產不等於賺錢。</strong>B2C 型年人均案量中位 ${caseMed.toFixed(0)} 件（全體約 25 件）但人均營收中位 ${Math.round(pcMed)} 萬反而低於傳統轉介（${Math.round(refMed)} 萬）——多數同型態所靠債務/車禍等低單價案型堆量。維持家事/刑辯高單價案型組合，比衝案量更關鍵。`,
-      `<strong>3. 對手情報有盲區（雙向）。</strong>喆律官網主域掃不到廣告碼——投放都在站外品牌站（法律010 等）；同理，我們掃別家也可能漏掉其站外品牌矩陣，明細表的「廣告碼」欄是下限口徑。`,
+      `<strong>3. 追蹤碼 ≠ 正在投放，站外品牌站仍看不到。</strong>廣告碼欄偵測官網首頁＋聯絡/服務內頁的追蹤碼（含 GTM 容器內的碼），代表「曾建置投放追蹤」，不保證目前仍在花錢；另外各所的站外品牌站（如喆律的法律010）不在掃描範圍。要確認是否正在投放，需對照 Meta 廣告檔案庫／Google 廣告透明度中心。`,
       `<strong>4. 精品利基是人效天花板。</strong>不動產、金融、刑辯利基的人均營收中位 ${bl.length ? bl.slice(0, 3).map(([k, v]) => `${k} ${Math.round(_drMed(v.pc))} 萬`).join('、') : '-'}，全數高於 B2C 中位——高單價利基所是挖角與合署的優先目標池。`,
     ].map(s => `<div style="margin-bottom:8px;">${s}</div>`).join('');
   } catch (e) { _drLoaded = false; console.error('產業深度報告載入失敗', e); }
@@ -12813,7 +12820,7 @@ function renderDrB2cTable() {
     <td style="text-align:right;">${r.percase != null ? r.percase.toFixed(0) : '-'}</td>
     <td style="text-align:right;color:var(--gold);">${r.rev != null ? `${r.rev_low_wan.toLocaleString()}–${r.rev_high_wan.toLocaleString()}` : '-'}</td>
     <td style="text-align:right;font-weight:600;">${r.percap != null ? Math.round(r.percap) : '-'}</td>
-    <td style="text-align:center;">${r.ads > 0 ? '&#9989;' : '<span style="color:var(--text-muted);">-</span>'}</td>
+    <td style="text-align:center;"${r.ads > 0 ? ` title="${escHtml(r.adKinds)}"` : ''}>${r.ads > 0 ? '&#9989;' : '<span style="color:var(--text-muted);">-</span>'}</td>
     <td style="text-align:right;">${r.g_reviews ?? '-'}</td>
     <td style="text-align:right;font-size:0.76rem;">${r.founded_year ?? '-'}</td>
   </tr>`).join('');

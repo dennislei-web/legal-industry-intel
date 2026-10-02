@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""firm_digital_signals.py — 事務所官網社群連結＋廣告追蹤碼偵測（mig 169）
+"""firm_digital_signals.py — 事務所官網社群連結偵測（mig 169；廣告碼已移至 firm_ads_render_scan.py / mig 239）
 
 來源: firm_websites (verified=true, website_url not null)
 輸出: firm_digital_signals (upsert by firm_name)
@@ -117,6 +117,9 @@ def main():
                 "fb_url": None, "ig_url": None, "line_url": None, "yt_url": None,
                 "has_fb_pixel": False, "has_google_ads": False, "has_ga": False,
                 "has_gtm": False, "has_tiktok_pixel": False}
+            # 廣告碼欄位改由 firm_ads_render_scan.py（mig 239，含 GTM＋瀏覽器實測）負責；
+            # 這裡只寫社群連結，避免靜態掃描把補強結果蓋回 false
+            sig = {k: v for k, v in sig.items() if not k.startswith("has_")}
             for name in by_url[u]:
                 out.append({"firm_name": name, "url": u, "http_status": status,
                             **sig, "fetched_at": "now()"})
@@ -126,11 +129,10 @@ def main():
 
     upsert(out)
     ok = sum(1 for r in out if r["http_status"] == 200)
-    pix = sum(1 for r in out if r["has_fb_pixel"])
-    ads = sum(1 for r in out if r["has_google_ads"])
     fb = sum(1 for r in out if r["fb_url"])
     ln = sum(1 for r in out if r["line_url"])
-    print(f"DONE rows={len(out)} http200={ok} fb_page={fb} line={ln} fb_pixel={pix} google_ads={ads} elapsed={time.time()-t0:.0f}s")
+    print(f"DONE rows={len(out)} http200={ok} fb_page={fb} line={ln} elapsed={time.time()-t0:.0f}s")
+    print("廣告碼請接著跑: python firm_ads_render_scan.py --write")
 
 if __name__ == "__main__":
     main()

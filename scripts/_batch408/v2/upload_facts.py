@@ -38,7 +38,7 @@ H = {'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'applicati
 INT_COLS = {'lawyer_count', 'avg_cases', 'founded_year', 'roster_n', 'court_n', 'cases_5y',
             'cases_nominal', 'dedup_months',
             'rev_low_wan', 'rev_high_wan', 'succession_risk', 'ex_judicial_n', 'g_reviews',
-            'fb_pixel', 'google_ads', 'gov_tender_amt', 'indep_seats', 'awards_n'}
+            'fb_pixel', 'google_ads', 'line_tag', 'yahoo_ads', 'tiktok_pixel', 'gov_tender_amt', 'indep_seats', 'awards_n'}
 NUM_COLS = {'g_rating', 'dup_rate'}
 
 TABLE = '/rest/v1/firm_analysis_facts'
