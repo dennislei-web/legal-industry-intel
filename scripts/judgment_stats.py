@@ -624,8 +624,9 @@ def extract_month(yyyymm):
     工作目錄，解壓一律走這裡、不要各自再寫一份（parse、jy_copanel、corp_party_stats、
     client_concentration、appeal_stats、jcasefill、jcase_probe、phase2_sample_pairs）。
     先解到 <月份>.extracting，7z 回 rc=0 才改名成 <月份>——解壓途中行程被砍（關機、CI 逾時）
-    時，半套檔案只會留在暫存名底下，不會被下一次當成完整月包拿去解析。2026-10-01 pairamtfill
-    202501 就是死在解壓途中（只解出 8 萬檔，該月約 10 萬），舊寫法重跑會照常算出偏低的數字上傳。"""
+    或 7z 解到一半報錯時，半套檔案只會留在暫存名底下，不會被下一次當成完整月包拿去解析。
+    舊寫法是直接解到 <月份>/、目錄存在就跳過解壓，這種時候重跑會拿半套檔照常算出偏低的數字
+    上傳、不報錯（2026-10-01 pairamtfill 被關機打斷後盤點出來的隱患）。"""
     rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
     extract_dir = os.path.join(WORK_DIR, yyyymm)
     if os.path.isdir(extract_dir):
