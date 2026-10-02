@@ -41,7 +41,7 @@ failure_detail() {
   [ "$http_code" = 000 ] && src="$err"
   text="$(head -c 300 "$src")"
   text="${text//$'\r'/}"
-  text="${text//$'\n'/ }"  # 併成一行，才放得進 ::error::／::warning::
+  text="${text//$'\n'/ }"  # 併成一行，才放得進 ::error::
   case "$text" in '<'*) text='' ;; esac
   printf '%s' "$text"
 }
