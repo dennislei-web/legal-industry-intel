@@ -9,11 +9,10 @@
 #                               409 多半是前一次逾時的呼叫還在伺服器端跑、兩次撞鍵，等它結束再打就會過）
 #   其餘 4xx                     確定性錯誤（函數壞了、PGRST202 找不到函數、權限不足…）：重試也不會好，不重試
 #
-# 結果：
-#   最後停在 4xx          → ::error::，清單內其他 RPC 照跑，全部跑完後 exit 1（job 紅燈）
-#   5xx／連線錯誤重試耗盡  → ::warning::，不紅燈
-# 4xx 別改回 warning——它不會「下次重刷就好」：refresh_firm_map_cache 曾天天回 400、job 照樣綠燈，
-# firm_map_default_cache 停更一個月才被發現（mig 237）。
+# 只要有 RPC 沒成功（4xx，或暫時性錯誤重試 3 次仍失敗）→ ::error::，清單內其他 RPC 照跑，
+# 全部跑完後 exit 1（job 紅燈）。別改回 warning——這兩種都不會「下次重刷就好」：
+#   4xx：refresh_firm_map_cache 曾天天回 400、job 照樣綠燈，firm_map_default_cache 停更一個月才被發現（mig 237）
+#   5xx：PostgREST 把 statement timeout（57014）也回成 500，函數變慢到超時一樣不會自己好
 
 MAX_ATTEMPTS=3
 RETRY_WAIT=60  # 秒
@@ -47,8 +46,7 @@ failure_detail() {
   printf '%s' "$text"
 }
 
-failed=()   # 最後停在 4xx → 紅燈
-gave_up=()  # 5xx／連線錯誤重試耗盡 → 只警告
+failed=()  # 沒成功的 RPC（4xx，或重試耗盡）
 
 for rpc in "$@"; do
   ok=0
@@ -83,21 +81,17 @@ for rpc in "$@"; do
 
   case "$http_code" in
     5??|000)
-      echo "::warning::${rpc} 重試 ${MAX_ATTEMPTS} 次仍失敗（HTTP ${http_code}），這次沒刷新${detail:+：${detail}}"
-      gave_up+=("$rpc") ;;
+      echo "::error::${rpc} 重試 ${MAX_ATTEMPTS} 次仍失敗（HTTP ${http_code}），沒刷新${detail:+：${detail}}" ;;
     *)
-      echo "::error::${rpc} 回 HTTP ${http_code}，沒刷新（4xx 不會自己好，要修函數或設定）${detail:+：${detail}}"
-      failed+=("$rpc") ;;
+      echo "::error::${rpc} 回 HTTP ${http_code}，沒刷新（4xx 不會自己好，要修函數或設定）${detail:+：${detail}}" ;;
   esac
+  failed+=("$rpc")
 done
 
 echo
-echo "=== 刷新結果：共 $# 支，4xx 失敗 ${#failed[@]} 支，重試耗盡 ${#gave_up[@]} 支 ==="
-if [ "${#gave_up[@]}" -gt 0 ]; then
-  echo "重試耗盡（只警告）：${gave_up[*]}"
-fi
+echo "=== 刷新結果：共 $# 支，失敗 ${#failed[@]} 支 ==="
 if [ "${#failed[@]}" -gt 0 ]; then
-  echo "4xx 失敗（紅燈）：${failed[*]}"
+  echo "失敗（紅燈）：${failed[*]}"
   exit 1
 fi
 exit 0

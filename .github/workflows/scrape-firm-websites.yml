@@ -49,7 +49,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx（函數壞了）→ exit 1
+        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx 或重試後仍失敗 → exit 1
         run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache
 
       - name: 回寫資料來源最後爬取時間

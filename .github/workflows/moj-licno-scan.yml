@@ -63,7 +63,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx（函數壞了）→ 清單跑完後 exit 1
+        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx 或重試後仍失敗 → 清單跑完後 exit 1
         # refresh_ex_judicial_lawyers：新發現的律師若是退場法官/檢察官，讓「轉任律師」
         # 比對每週隨掃描更新（原本只掛月更 causefill，退場法官名冊追蹤會晚一個月）
         run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache refresh_lawyer_stats refresh_ex_judicial_lawyers

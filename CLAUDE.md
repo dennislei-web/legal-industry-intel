@@ -484,13 +484,14 @@
   不載 safeupdate，所以**直連跑過不代表 RPC 會過**——refresh 函數要用 `TRUNCATE` 或 `DELETE … WHERE true`，
   新函數上線要實打一次 `/rest/v1/rpc/…` 驗證。實例：`refresh_firm_map_cache`（mig 178/190）無 WHERE，
   當時日更 workflow 又把 4xx 當 non-fatal warning（job 照樣綠燈），`firm_map_default_cache` 停更一個月才被發現
-  （函數 mig 237 修；workflow 2026-10-02 起 4xx 紅燈，見下一條；2026-10-01 掃過線上 174 個 public 函數僅此一支，
-  scripts 的 REST DELETE 也都帶 filter）
+  （函數 mig 237 修；workflow 2026-10-02 起 refresh 沒成功就紅燈，見下一條；2026-10-01 掃過線上 174 個 public 函數
+  僅此一支，scripts 的 REST DELETE 也都帶 filter）
 - **爬蟲 workflow 收尾的 refresh RPC 一律走 `.github/scripts/refresh-rpcs.sh <rpc> …`**（2026-10-02；
   moj-office-refresh／moj-licno-scan／scrape-moj-lawyers／scrape-firm-websites 共用，只支援無參數函數）：
   2xx OK；5xx／連線錯誤／408／409／429 隔 60 秒重試、最多 3 次；其餘 4xx（函數壞了、PGRST202 找不到函數、
-  權限不足）是確定性錯誤、不重試——清單照樣跑完，最後 exit 1 讓 job 紅燈（4xx 不會「下次重刷就好」，別改回 warning）。
-  5xx／連線錯誤重試耗盡只印 warning、不紅燈。要多刷一支 RPC＝在該 workflow 的呼叫列加名字。
+  權限不足）是確定性錯誤、不重試。只要有 RPC 沒成功（4xx，或重試 3 次仍失敗）就印 `::error::`，清單照樣跑完，
+  最後 exit 1 讓 job 紅燈。**別改回 warning**（2026-10-02 使用者決定）：4xx 不會「下次重刷就好」；5xx 也一樣——
+  PostgREST 把 statement timeout（57014）回成 500，函數變慢到超時不會自己好。要多刷一支 RPC＝在該 workflow 的呼叫列加名字。
   refresh 後面還有步驟的 workflow（licno-scan 的 detail fetch、firm-websites 的 last_scraped_at 回寫）用
   `continue-on-error`＋最後一個 gate 步驟紅燈，refresh 失敗不擋後面的步驟。
   curl 小地雷：`-w "%{http_code}"` 在 curl 自己失敗（逾時、連不上）時仍會印 `000`，舊寫法接 `|| echo "ERR"`
