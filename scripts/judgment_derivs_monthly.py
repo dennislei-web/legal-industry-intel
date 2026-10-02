@@ -20,10 +20,18 @@
     6. bullying_mine batch            霸凌關鍵詞全文掃描（已有 _bully 檔跳過）
     7. bullying_analyze（＋stats）→ bullying_upload cases/stats（筆數防呆）
     8. match_company_litigation → build_prospects  勞資爭議名單訴訟比對重建（筆數防呆）
+  legal-industry-intel（尾端，不看目標月；2026-10-02 加入）
+    9. _batch408/v2/facts_extract → upload_facts  事務所分析 facts 快照（firm_analysis_facts；
+       「產業結構分析」「產業深度報告」直讀）。不吃月包快取，但要讀本機 _batch408/leaders/*.json
+       （不在版控），所以也只能排本機。每次都照 firm_dedup_totals 當下的全窗重產——月表比 21 日
+       晚到的月份，下一次執行就會補上；寫入是 upsert＋防呆＋驗證（見 upload_facts.py）。
+       寫完再核對去重 cache 有沒有跟上月表（沒跟上＝雲端月更的 refresh 鏈沒跑完，facts 只能停在舊窗）。
+       步驟 1–8 中途丟例外（步驟之間的 rest_count 等）只會中止 1–8，這一步照跑。
 
 用法：
   python judgment_derivs_monthly.py            # 自動判定目標月
   python judgment_derivs_monthly.py 202607     # 指定目標月
+  python judgment_derivs_monthly.py facts      # 只跑步驟 9（月表晚到、不想等下個月時補 facts 用）
 log：scripts/judgment_derivs_monthly.log（追加）
 """
 import datetime as dt
@@ -112,21 +120,8 @@ def run(desc, args, cwd, env_extra, timeout=3 * 3600):
     return True
 
 
-def main():
-    log('=' * 60)
-    if len(sys.argv) > 1:
-        target = sys.argv[1]
-    else:
-        target = rest_get('lawyer_month_stats?select=yyyymm&order=yyyymm.desc&limit=1')[0]['yyyymm']
-    log(f'裁判書衍生管線月更開始；目標月 {target}')
-    fails = []
-
-    def step(desc, args, cwd, env_extra):
-        ok = run(desc, args, cwd, env_extra)
-        if not ok:
-            fails.append(desc)
-        return ok
-
+def derivs(target, step, fails):
+    """步驟 1–8：吃本機 .judgment_work 月包快取的衍生管線。"""
     lii = (HERE, {})
     # 1-2 當事人快取＋集中度
     if step('當事人快取補抓', ['client_concentration.py', 'collect', '202111', target], *lii):
@@ -164,10 +159,60 @@ def main():
                 log('❌ 名單筆數縮水超過 5%，請人工檢查')
                 fails.append('名單筆數縮水')
 
+
+def refresh_facts(step, fails):
+    """步驟 9：重產 firm_analysis_facts，寫完核對去重 cache 有沒有跟上月表。
+    facts 的資料窗跟著 firm_dedup_totals 走（兩者一致由 upload_facts.py 驗）；它比月表舊，表示雲端月更的
+    refresh 鏈沒把新月份刷進去重 cache——facts 這次只能停在舊窗，補跑 refresh 後再跑一次這兩支才補得上。"""
+    v2 = (os.path.join(HERE, '_batch408', 'v2'), {})
+    if not (step('事務所 facts 重產', ['facts_extract.py'], *v2) and
+            step('事務所 facts 寫入', ['upload_facts.py'], *v2)):
+        return
+    try:
+        latest = rest_get('lawyer_month_stats?select=yyyymm&order=yyyymm.desc&limit=1')[0]['yyyymm']
+        dedup_to = rest_get('firm_dedup_totals?select=ym_to&order=ym_to.desc&limit=1')[0]['ym_to']
+    except Exception as e:
+        log(f'❌ facts 資料窗核對失敗：{type(e).__name__}: {str(e)[:200]}')
+        fails.append('facts 資料窗核對')
+        return
+    if dedup_to < latest:
+        log(f'❌ facts 資料窗只到 {dedup_to}，月表已到 {latest}：去重 cache 沒跟上，先補跑 '
+            'python judgment_stats.py refresh，再到 _batch408/v2 跑 facts_extract.py、upload_facts.py')
+        fails.append('facts 資料窗落後月表')
+    else:
+        log(f'  facts 資料窗至 {dedup_to}（月表最新 {latest}）')
+
+
+def main():
+    log('=' * 60)
+    only_facts = sys.argv[1:] == ['facts']
+    fails = []
+
+    def step(desc, args, cwd, env_extra):
+        ok = run(desc, args, cwd, env_extra)
+        if not ok:
+            fails.append(desc)
+        return ok
+
+    if only_facts:
+        log('只跑步驟 9（事務所 facts）')
+    else:
+        if len(sys.argv) > 1:
+            target = sys.argv[1]
+        else:
+            target = rest_get('lawyer_month_stats?select=yyyymm&order=yyyymm.desc&limit=1')[0]['yyyymm']
+        log(f'裁判書衍生管線月更開始；目標月 {target}')
+        try:
+            derivs(target, step, fails)
+        except Exception as e:  # 步驟之間的 rest_count／讀檔丟例外：記下來，尾端不相依的 facts 照跑
+            log(f'❌ 步驟 1–8 中途例外，後面的步驟沒跑：{type(e).__name__}: {str(e)[:200]}')
+            fails.append('步驟 1–8 中途例外')
+    refresh_facts(step, fails)
+
     if fails:
         log(f'❌ 完成但有失敗：{"、".join(fails)}')
         sys.exit(1)
-    log('✅ 裁判書衍生管線全部完成')
+    log('✅ 步驟 9 完成' if only_facts else '✅ 裁判書衍生管線全部完成')
 
 
 if __name__ == '__main__':

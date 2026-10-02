@@ -246,6 +246,29 @@
     firm_cause_shares 利基卡加名目口徑 footnote（案由層無去重素材，勿做案由層去重）；
     AI 分析 tab 頂部加去重 banner（重複率 ≥30% 加強警示）
   - **未做**：ai_analysis 文字批次重寫（擇機，dup_rate>30% 的所優先——前端 banner 已先擋）
+- **facts 快照月更（2026-10-02）**：`firm_analysis_facts`（「產業結構分析」「產業深度報告」直讀，PK=firm）是
+  `facts_extract.py` 產 `facts.tsv`、`upload_facts.py` 寫入的快照，資料窗＝`dedup_months`。原本沒有排程
+  （9/01 產完就停在 65 個月、月表進新月份也不會動），現在是本機排程 `judgment-derivs-monthly`
+  （`scripts/judgment_derivs_monthly.py`，每月 21 日 10:00）的步驟 9，排在管線尾端。
+  - 只能本機跑：要讀 `scripts/_batch408/leaders/*.json`（不在版控——`_batch408` 只有 v2 這兩支腳本進 git，
+    其餘是本機工作檔；repo 是公開的，別把整個目錄加進去）。
+  - 不看目標月，每次照 `firm_dedup_totals` 當下的全窗重產，所以月表比 21 日晚到的月份下一次執行就補上；
+    不想等就 `python judgment_derivs_monthly.py facts`（只跑步驟 9，寫同一份 log）。步驟 1–8 中途丟例外
+    不會連累這一步。
+  - launcher 寫完會核對 `firm_dedup_totals` 的最新月有沒有跟上 `lawyer_month_stats`；落後記 ❌
+    （＝雲端月更的 refresh 鏈沒把新月份刷進去重 cache，facts 只能停在舊窗）→ 先
+    `python judgment_stats.py refresh`，再重跑 facts。
+  - `upload_facts.py` 是一次 upsert（`on_conflict=firm`、單一請求＝單一交易、每列帶同一個 `refreshed_at`），
+    **不再先 DELETE 全表**（舊版中途失敗時兩個頁面會讀到空表）；DB 有而 TSV 沒有的欄位保留原值。
+    寫入前防呆，任一成立就不寫、exit 1：列數比現行少超過 5%／要刪的舊列超過現行 5%／任一欄由有值變空的所
+    超過 max(10 家, 該欄原有值家數的 5%)（抽取或來源讀取壞了）／`firm_dedup_totals` 讀不到、TSV 的資料窗月數
+    與它不同（TSV 是舊的）或比 DB 現行值小。事務所集合不同時新增的照寫，多出來的舊列等 upsert 驗證通過
+    才刪（點名＋`refreshed_at` 早於本次），差異都印在 log。連線錯誤／5xx／429 退避重試（5→15→45 秒），
+    寫完重讀全表逐欄核對。`--dry-run` 只比對不寫；`--force` 略過防呆（人工看過差異才用）。
+  - `facts_extract.py`：任何來源重試後仍讀不到、或讀回 0 列就中止、不產 TSV；TSV 先寫暫存檔再換上。
+    數值欄的 null 在 TSV 裡是字面 `None`，`upload_facts.py` 轉成 NULL（比對兩邊時也要當空值）。
+  - 加新欄位的順序：先套 migration（TSV 有、DB 沒有的欄位會被擋下）→ `facts_extract.py` 的 out dict →
+    數值欄加進 `upload_facts.py` 的 `INT_COLS`／`NUM_COLS`（沒加會以字串送出，遇到字面 `None` 會寫入失敗）。
 - **事務所版圖去重（mig 189/190，2026-09-01）**：`lawyer_group_court_month_stats`
   （ym×court×cat×律師集合；判決只屬一法院一案類，聚掉維度＝mig 186 舊表，parse 同趟產兩表）
   ＋`firm_court_dup_month_stats`（dup cache，⚠️ 歸戶用 047 排行口徑 lawyers_combined

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """firm_facts 抽取：把 ai_analysis 文字＋leaders json＋DB 訊號抽成每所一列的分析資料集。
 輸出：facts.tsv（同目錄）。營收/掛名等文字欄位抽取為啟發式，parse 不到留空並計數回報。
+任何來源讀不到（重試後仍失敗，或讀回 0 列）就中止、不產 facts.tsv——寧可這次沒更新，也不拿缺一塊的資料蓋掉舊的。
+寫入 DB 是 upload_facts.py 的事；每月由 scripts/judgment_derivs_monthly.py 在尾端連著跑這兩支。
 """
-import io, os, json, re, sys, urllib.request, urllib.parse
+import io, os, json, re, sys, time, urllib.error, urllib.request, urllib.parse
+from http.client import HTTPException
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 ROOT = r"C:\projects\legal-industry-intel\scripts\_batch408"
@@ -18,19 +21,41 @@ URL = env['SUPABASE_URL']
 KEY = env.get('SUPABASE_SERVICE_KEY') or env.get('SUPABASE_KEY')
 
 
+def _get(req):
+    """讀一頁。連線錯誤／逾時／5xx／429 退避重試（Cloudflare 偶發 502）；最後一次仍失敗或其餘 4xx 就往外丟。"""
+    for wait in (5, 15, 45, None):
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if wait is None or (e.code < 500 and e.code not in (408, 429)):
+                raise
+        except (OSError, HTTPException, ValueError):  # URLError 是 OSError；ValueError＝回應不是 JSON
+            if wait is None:
+                raise
+        time.sleep(wait)
+
+
 def getall(path):
+    """分頁讀完。超過 1000 列的來源，path 要帶唯一鍵的 order（無序分頁行序不保證，可能漏列或重複）。"""
     out, start = [], 0
     while True:
-        req = urllib.request.Request(URL + path, headers={
+        rows = _get(urllib.request.Request(URL + path, headers={
             'apikey': KEY, 'Authorization': 'Bearer ' + KEY,
-            'Range': '%d-%d' % (start, start + 999)})
-        with urllib.request.urlopen(req) as r:
-            rows = json.load(r)
+            'Range': '%d-%d' % (start, start + 999)}))
         out += rows
         if len(rows) < 1000:
             break
         start += 1000
     return out
+
+
+def must(label, rows):
+    """來源讀回 0 列＝讀不到（表被清空、查詢壞了），中止而不是拿空資料產 facts。"""
+    if not rows:
+        print('%s 讀回 0 列，中止（不產 facts.tsv）' % label)
+        sys.exit(1)
+    return rows
 
 
 def num(s):
@@ -191,22 +216,19 @@ def extract(a):
 
 
 def main():
-    rows = getall('/rest/v1/firm_profiles?select=firm_name,ai_analysis,practice_focus,founded_year,ex_judicial_officers&ai_analysis=not.is.null')
-    cache = {r['firm_name']: r for r in getall('/rest/v1/moj_firm_stats_cache?select=firm_name,lawyer_count,main_region,avg_cases')}
+    rows = must('firm_profiles', getall('/rest/v1/firm_profiles?select=firm_name,ai_analysis,practice_focus,founded_year,ex_judicial_officers&ai_analysis=not.is.null&order=firm_name'))
+    cache = {r['firm_name']: r for r in must('moj_firm_stats_cache', getall('/rest/v1/moj_firm_stats_cache?select=firm_name,lawyer_count,main_region,avg_cases&order=firm_name'))}
     # 去重口徑（mig 186/188）：202101 起所級名目/去重合計；年化分母用全窗月數（非各所活躍月數，
     # 否則零星活躍的小所會被高估）
     # view 是 GROUP BY 聚合，分頁必須帶 order（無序分頁每頁重算、行序不穩會漏列）
-    dedup = {r['firm_key']: r for r in getall('/rest/v1/firm_dedup_totals?select=*&order=firm_key')}
-    if dedup:
-        yms = sorted(set([r['ym_from'] for r in dedup.values()] + [r['ym_to'] for r in dedup.values()]))
-        lo, hi = yms[0], yms[-1]
-        window_months = (int(hi[:4]) - int(lo[:4])) * 12 + int(hi[4:]) - int(lo[4:]) + 1
-    else:
-        window_months = 0
+    dedup = {r['firm_key']: r for r in must('firm_dedup_totals', getall('/rest/v1/firm_dedup_totals?select=*&order=firm_key'))}
+    yms = sorted(set([r['ym_from'] for r in dedup.values()] + [r['ym_to'] for r in dedup.values()]))
+    lo, hi = yms[0], yms[-1]
+    window_months = (int(hi[:4]) - int(lo[:4])) * 12 + int(hi[4:]) - int(lo[4:]) + 1
     # top1 署名占比（concentration 重分桶用；名目 mention 口徑即可，量的是集中度）
     top1 = {}
     _fsum, _fmax = {}, {}
-    for r in getall('/rest/v1/lawyers_with_stats?select=firm_name,official_cases_5yr,name_ambiguous&official_cases_5yr=gt.0&order=name'):
+    for r in must('lawyers_with_stats', getall('/rest/v1/lawyers_with_stats?select=firm_name,official_cases_5yr,name_ambiguous&official_cases_5yr=gt.0&order=name')):
         if r.get('name_ambiguous') or not r.get('firm_name'):
             continue
         k = firm_key_of(r['firm_name'])
@@ -216,22 +238,19 @@ def main():
     for k, s in _fsum.items():
         if s > 0:
             top1[k] = _fmax[k] / s
-    gplaces = {r['firm_name']: r for r in getall('/rest/v1/firm_google_places?select=firm_name,rating,reviews_count')}
-    dsig = {r['firm_name']: r for r in getall('/rest/v1/firm_digital_signals?select=*')}
+    gplaces = {r['firm_name']: r for r in must('firm_google_places', getall('/rest/v1/firm_google_places?select=firm_name,rating,reviews_count'))}
+    dsig = {r['firm_name']: r for r in must('firm_digital_signals', getall('/rest/v1/firm_digital_signals?select=*'))}
     gov = {}
-    for r in getall('/rest/v1/gov_tender_firms?select=firm_name,award_amount,is_winner&is_winner=eq.true'):
+    for r in must('gov_tender_firms', getall('/rest/v1/gov_tender_firms?select=firm_name,award_amount,is_winner&is_winner=eq.true&order=tender_key,firm_seq')):
         gov[r['firm_name']] = gov.get(r['firm_name'], 0) + (r.get('award_amount') or 0)
     indep = {}
-    for r in getall('/rest/v1/firm_indep_directorships?select=office_normalized'):
+    for r in must('firm_indep_directorships', getall('/rest/v1/firm_indep_directorships?select=office_normalized')):
         k = r.get('office_normalized')
         if k:
             indep[k] = indep.get(k, 0) + 1
     awards = {}
-    try:
-        for r in getall('/rest/v1/firm_awards?select=firm_name'):
-            awards[r['firm_name']] = awards.get(r['firm_name'], 0) + 1
-    except Exception:
-        pass
+    for r in must('firm_awards', getall('/rest/v1/firm_awards?select=firm_name')):
+        awards[r['firm_name']] = awards.get(r['firm_name'], 0) + 1
 
     # leaders json 補 type/tagline（文字抽不到時）
     ldir = os.path.join(ROOT, 'leaders')
@@ -243,6 +262,7 @@ def main():
                 ljson[d.get('firm', fn[:-5])] = d
             except Exception:
                 pass
+    must('leaders/*.json（本機，不在版控）', ljson)
 
     out = []
     miss = {'type': 0, 'scale': 0, 'rev': 0, 'dedup': 0}
@@ -317,12 +337,16 @@ def main():
         })
     cols = list(out[0].keys())
     dst = os.path.join(ROOT, 'v2', 'facts.tsv')
-    with io.open(dst, 'w', encoding='utf-8', newline='\n') as fp:
+    # 先寫暫存檔、寫完才換上去：中途失敗不會留下半份 facts.tsv 給 upload_facts.py 讀。
+    # 值裡的 tab／換行換成空白，否則一列會被拆成兩列
+    tmp = dst + '.tmp'
+    with io.open(tmp, 'w', encoding='utf-8', newline='\n') as fp:
         fp.write('\t'.join(cols) + '\n')
         for o in out:
-            fp.write('\t'.join(str(o[c]) for c in cols) + '\n')
-    print('rows=%d  miss_type=%d miss_scale=%d miss_rev=%d miss_dedup=%d window=%d月  -> %s' % (
-        len(out), miss['type'], miss['scale'], miss['rev'], miss['dedup'], window_months, dst))
+            fp.write('\t'.join(re.sub(r'[\t\r\n]+', ' ', str(o[c])) for c in cols) + '\n')
+    os.replace(tmp, dst)
+    print('rows=%d  miss_type=%d miss_scale=%d miss_rev=%d miss_dedup=%d window=%d月（%s–%s）  -> %s' % (
+        len(out), miss['type'], miss['scale'], miss['rev'], miss['dedup'], window_months, lo, hi, dst))
 
 
 if __name__ == '__main__':
