@@ -43,17 +43,14 @@ jobs:
         run: python scrape_firm_websites.py
 
       - name: 重建事務所快取（前端「有官網」卡讀 moj_firm_stats_cache，不刷新不會反映新官網）
+        id: refresh
+        # 這步失敗先不擋後面的 last_scraped_at 回寫（爬蟲本身有跑完），由最後一步統一紅燈
+        continue-on-error: true
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
-          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
-          http_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 120 -X POST "$SUPABASE_URL/rest/v1/rpc/refresh_firm_stats_cache" \
-            -H "apikey: $SUPABASE_SERVICE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-            -H "Content-Type: application/json" -d '{}') || true
-          echo "refresh_firm_stats_cache: HTTP $http_code"
+        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx（函數壞了）→ exit 1
+        run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache
 
       - name: 回寫資料來源最後爬取時間
         env:
@@ -69,4 +66,16 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}")
           echo "PATCH data_sources: HTTP $http_code"
-          [ "$http_code" = "204" ] || { echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; }
+          case "$http_code" in
+            2??) ;;
+            # 4xx＝表／欄位／權限出問題，不會自己好 → 紅燈；其餘（5xx）下次排程會重寫，只警告
+            4??) echo "::error::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; exit 1 ;;
+            *) echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo ;;
+          esac
+
+      - name: 快取刷新失敗 → 紅燈
+        # 放最後：refresh 步驟失敗時先讓 last_scraped_at 照寫，再由這裡把整個 run 標成失敗
+        if: ${{ !cancelled() && steps.refresh.outcome == 'failure' }}
+        run: |
+          echo "::error::快取刷新失敗：回了什麼，看「重建事務所快取」步驟的 log"
+          exit 1

@@ -1,0 +1,2 @@
+# shell script 一律 LF：混進 CRLF 的話 runner 的 bash 會報 $'\r': command not found
+*.sh text eol=lf

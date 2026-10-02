@@ -30,25 +30,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          # secrets 可能帶尾端空白/換行，會讓 PostgREST 回 400 PGRST102（curl 不像 Python 會 strip）
-          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
-          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
-          for rpc in refresh_firm_stats_cache refresh_lawyer_stats; do
-            success=0
-            for attempt in 1 2 3; do
-              http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" \
-                --max-time 180 \
-                -X POST "$SUPABASE_URL/rest/v1/rpc/${rpc}" \
-                -H "apikey: $SUPABASE_SERVICE_KEY" \
-                -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
-                -H "Content-Type: application/json" -d '{}' 2>&1 || echo "ERR")
-              echo "${rpc} attempt ${attempt}: HTTP $http_code"
-              case "$http_code" in
-                204|200) echo "  ✅ OK"; success=1; break ;;
-                5*|52*|ERR) echo "  retrying in 60s..."; sleep 60 ;;
-                *) echo "::warning::${rpc} returned $http_code"; cat /tmp/resp.txt | head -c 300; echo; break ;;
-              esac
-            done
-            [ $success -eq 0 ] && echo "::warning::${rpc} failed after retries" || true
-          done
+        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx（函數壞了）→ 清單跑完後 job 紅燈
+        run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache refresh_lawyer_stats

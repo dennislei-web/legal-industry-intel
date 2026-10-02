@@ -475,15 +475,25 @@
 - Supabase 是 **Micro compute (1GB RAM)**，爬蟲若一次載入太多資料會讓 DB 不穩
   - `fetch_existing_lics()` 已優化為按年份分批讀取
   - 上傳 batch size 50、每次上傳後 sleep 2s
-- `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 最後會 fire-and-forget 呼叫 RPC，server 端非同步跑完）
+- `moj_firm_stats_cache` 需手動 refresh（爬蟲 workflow 收尾會呼叫 refresh RPC，規則見下方 `refresh-rpcs.sh` 條）
 - 前端登入後若無資料可能是 RLS 設定問題（需 auth.uid() IS NOT NULL）
 - **PostgREST 路徑載入 pg-safeupdate**（`authenticator` role 帶 `session_preload_libraries=safeupdate`）：
   函數內無 WHERE 的 `DELETE`／`UPDATE` 經 RPC 呼叫一律 HTTP 400 `21000 DELETE requires a WHERE clause`
   （session 層 hook，`SECURITY DEFINER` 也擋；`TRUNCATE` 不擋）。`supabase db query --linked` 走 postgres role
   不載 safeupdate，所以**直連跑過不代表 RPC 會過**——refresh 函數要用 `TRUNCATE` 或 `DELETE … WHERE true`，
   新函數上線要實打一次 `/rest/v1/rpc/…` 驗證。實例：`refresh_firm_map_cache`（mig 178/190）無 WHERE，
-  日更 workflow 又把 4xx 當 non-fatal warning，`firm_map_default_cache` 停更一個月才被發現（mig 237 修；
-  2026-10-01 掃過線上 174 個 public 函數僅此一支，scripts 的 REST DELETE 也都帶 filter）
+  當時日更 workflow 又把 4xx 當 non-fatal warning（job 照樣綠燈），`firm_map_default_cache` 停更一個月才被發現
+  （函數 mig 237 修；workflow 2026-10-02 起 4xx 紅燈，見下一條；2026-10-01 掃過線上 174 個 public 函數僅此一支，
+  scripts 的 REST DELETE 也都帶 filter）
+- **爬蟲 workflow 收尾的 refresh RPC 一律走 `.github/scripts/refresh-rpcs.sh <rpc> …`**（2026-10-02；
+  moj-office-refresh／moj-licno-scan／scrape-moj-lawyers／scrape-firm-websites 共用，只支援無參數函數）：
+  2xx OK；5xx／連線錯誤／408／409／429 隔 60 秒重試、最多 3 次；其餘 4xx（函數壞了、PGRST202 找不到函數、
+  權限不足）是確定性錯誤、不重試——清單照樣跑完，最後 exit 1 讓 job 紅燈（4xx 不會「下次重刷就好」，別改回 warning）。
+  5xx／連線錯誤重試耗盡只印 warning、不紅燈。要多刷一支 RPC＝在該 workflow 的呼叫列加名字。
+  refresh 後面還有步驟的 workflow（licno-scan 的 detail fetch、firm-websites 的 last_scraped_at 回寫）用
+  `continue-on-error`＋最後一個 gate 步驟紅燈，refresh 失敗不擋後面的步驟。
+  curl 小地雷：`-w "%{http_code}"` 在 curl 自己失敗（逾時、連不上）時仍會印 `000`，舊寫法接 `|| echo "ERR"`
+  得到 `000ERR`、比不中 `ERR`，連線錯誤其實從沒重試過——判斷連線錯誤要看 curl 的 exit code
 - **PostgREST RPC 的 statement_timeout**：`authenticator`／`authenticated` 預設 8s、`anon` 3s。函數自帶
   `SET statement_timeout`（proconfig）時，PostgREST（v14.4）會把它提升成交易層設定、以函數值為準——
   2026-10-01 實測：有 SET 的函數跑 15s 回 200，沒 SET 的在 8s 被砍（57014）。所以各 refresh 函數的
