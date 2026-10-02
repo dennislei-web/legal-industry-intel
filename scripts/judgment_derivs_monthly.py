@@ -46,6 +46,9 @@ BULLY = r'C:\projects\bullying-intel\scripts'
 LOG = os.path.join(HERE, 'judgment_derivs_monthly.log')
 PY = sys.executable.replace('pythonw.exe', 'python.exe')
 NO_WIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+if hasattr(sys.stdout, 'reconfigure'):  # 排程用 pythonw 跑時沒有 stdout
+    # 手動跑、輸出又被導到 cp950 管線時，▶✅❌ 編不出來會丟 UnicodeEncodeError 讓整支中止；改印成 ?
+    sys.stdout.reconfigure(errors='replace')
 
 
 def log(msg):
