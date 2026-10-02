@@ -16885,7 +16885,7 @@ function csMarketCols(group) {
   const base = fullYears[Math.max(0, fullYears.length - 4)];
   const get = y => rows.filter(r => r.y === y && r.cause_group === group).reduce((s, r) => s + r.n, 0);
   const nl = get(latest), nb = get(base);
-  return { nl, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null };
+  return { nl, nb: base !== latest ? nb : 0, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null };
 }
 
 let _csRows = [], _csCat = '民事';
@@ -16951,7 +16951,51 @@ async function loadCauseSupply(cat) {
       ${repCell}
       ${mktCells}
     </tr>`;
-  }).join('');
+  }).join('') + csSummaryRows(rows, ft, showMkt);
+}
+
+// 表尾「合計」＋「每類平均」兩列（2026-10-02）。律師數跨類重複（一人可辦多類），合計不可加 → 只給平均
+function csSummaryRows(rows, ft, showMkt) {
+  const k = rows.length;
+  const sum = f => rows.reduce((s, r) => s + Number(f(r) || 0), 0);
+  const fmt = v => Math.round(v).toLocaleString();
+  const pctTd = v => `<td style="text-align:right;">${v == null ? '-' : (v * 100).toFixed(1) + '%'}</td>`;
+  const dash = t => `<td style="text-align:right;color:var(--text-muted);" title="${t}">-</td>`;
+  const top10s = rows.filter(r => r.top10_share != null);
+  // 委任率：合計＝依終結件數加權；平均＝各類委任率簡單平均
+  let repSumTd = '', repAvgTd = '';
+  if (ft) {
+    const rr = rows.map(r => csRepRate(ft, r.cause_group)).filter(x => x && x.rate != null);
+    const n = rr.reduce((s, x) => s + x.n, 0);
+    repSumTd = pctTd(n ? rr.reduce((s, x) => s + x.rate * x.n, 0) / n : null);
+    repAvgTd = pctTd(rr.length ? rr.reduce((s, x) => s + x.rate, 0) / rr.length : null);
+  }
+  let mktSumTds = '', mktAvgTds = '';
+  if (showMkt) {
+    const ms = rows.map(r => csMarketCols(r.cause_group)).filter(m => m && m.nl);
+    const nl = ms.reduce((s, m) => s + m.nl, 0), nb = ms.reduce((s, m) => s + (m.nb || 0), 0);
+    const chgTd = c => `<td style="text-align:right;color:${c >= 0 ? 'var(--red)' : 'var(--green)'};">${c == null ? '-' : (c >= 0 ? '+' : '') + c.toFixed(1) + '%'}</td>`;
+    const chgs = ms.filter(m => m.chg != null);
+    mktSumTds = `<td style="text-align:right;">${nl.toLocaleString()}</td>` + chgTd(nb ? (nl - nb) / nb * 100 : null);
+    mktAvgTds = `<td style="text-align:right;">${ms.length ? fmt(nl / ms.length) : '-'}</td>`
+      + chgTd(chgs.length ? chgs.reduce((s, m) => s + m.chg, 0) / chgs.length : null);
+  }
+  const st = 'background:var(--bg-hover,rgba(255,255,255,0.04));font-weight:600;';
+  const noLawyerSum = '同一律師可辦多類，跨類相加會重複計算，故不給合計';
+  return `<tr style="${st}border-top:2px solid var(--border);">
+      <td>合計 <span style="color:var(--text-muted);font-size:0.72rem;font-weight:400;">（${k} 類）</span></td>
+      <td style="text-align:right;color:var(--gold);">${sum(r => r.total_cases).toLocaleString()}</td>
+      ${dash(noLawyerSum)}${dash(noLawyerSum)}${dash('集中度不可相加')}
+      ${repSumTd}${mktSumTds}
+    </tr>
+    <tr style="${st}">
+      <td>每類平均</td>
+      <td style="text-align:right;color:var(--gold);">${fmt(sum(r => r.total_cases) / k)}</td>
+      <td style="text-align:right;">${fmt(sum(r => r.lawyers) / k)}</td>
+      <td style="text-align:right;">${fmt(sum(r => r.active_lawyers) / k)}</td>
+      ${pctTd(top10s.length ? top10s.reduce((s, r) => s + Number(r.top10_share), 0) / top10s.length : null)}
+      ${repAvgTd}${mktAvgTds}
+    </tr>`;
 }
 
 // 案由種類鑽取：點列開 modal 看 TOP 律師/事務所（可切年度，mig 098）＋桶內原始案由明細（mig 080）
