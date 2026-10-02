@@ -260,10 +260,11 @@
 - **facts 快照月更（2026-10-02）**：`firm_analysis_facts`（「產業結構分析」「產業深度報告」直讀，PK=firm）是
   `facts_extract.py` 產 `facts.tsv`、`upload_facts.py` 寫入的快照，資料窗＝`dedup_months`。原本沒有排程
   （9/01 產完就停在 65 個月、月表進新月份也不會動），現在是本機排程 `judgment-derivs-monthly`
-  （`scripts/judgment_derivs_monthly.py`，每月 21 日 10:00）的步驟 9，排在管線尾端。
+  （`scripts/judgment_derivs_monthly.py`，每月最後一天 10:00；2026-10-02 由 21 日挪過來，排在雲端月更
+  17／20／23／27 日四次嘗試之後）的步驟 9，排在管線尾端。
   - 只能本機跑：要讀 `scripts/_batch408/leaders/*.json`（不在版控——`_batch408` 只有 v2 這兩支腳本進 git，
     其餘是本機工作檔；repo 是公開的，別把整個目錄加進去）。
-  - 不看目標月，每次照 `firm_dedup_totals` 當下的全窗重產，所以月表比 21 日晚到的月份下一次執行就補上；
+  - 不看目標月，每次照 `firm_dedup_totals` 當下的全窗重產，所以月表比排程日晚到的月份下一次執行就補上；
     不想等就 `python judgment_derivs_monthly.py facts`（只跑步驟 9，寫同一份 log）。步驟 1–8 中途丟例外
     不會連累這一步。
   - launcher 寫完會核對 `firm_dedup_totals` 的最新月有沒有跟上 `lawyer_month_stats`；落後記 ❌

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""裁判書月包「衍生管線」月更 launcher（Windows 排程 judgment-derivs-monthly）
+"""裁判書月包「衍生管線」月更 launcher（Windows 排程 judgment-derivs-monthly，每月最後一天 10:00；
+2026-10-02 由 21 日挪過來——雲端月更最晚 27 日才落地，21 日跑會撲空、衍生表晚一個月）
 
 背景（2026-09-24）：下列管線上線時都是一次性手動回填，沒有排程，頁面數字停在回填當月
 （霸凌判決停 202605、企業當事人停 202604、金額/收費/大額停 202606、集中度停 7/31）。
@@ -23,7 +24,7 @@
   legal-industry-intel（尾端，不看目標月；2026-10-02 加入）
     9. _batch408/v2/facts_extract → upload_facts  事務所分析 facts 快照（firm_analysis_facts；
        「產業結構分析」「產業深度報告」直讀）。不吃月包快取，但要讀本機 _batch408/leaders/*.json
-       （不在版控），所以也只能排本機。每次都照 firm_dedup_totals 當下的全窗重產——月表比 21 日
+       （不在版控），所以也只能排本機。每次都照 firm_dedup_totals 當下的全窗重產——月表比排程日
        晚到的月份，下一次執行就會補上；寫入是 upsert＋防呆＋驗證（見 upload_facts.py）。
        寫完再核對去重 cache 有沒有跟上月表（沒跟上＝雲端月更的 refresh 鏈沒跑完，facts 只能停在舊窗）。
        步驟 1–8 中途丟例外（步驟之間的 rest_count 等）只會中止 1–8，這一步照跑。
