@@ -147,6 +147,32 @@
     `env.LAST_ATTEMPT_DAY`，改 cron 要同步）或手動指定月份才紅燈
   - 手動：`gh workflow run judgment-stats-monthly.yml -f yyyymm=<ym>` 預設也是已上傳就跳過，
     **強制重跑（整月刪後重插）加 `-f force=true`**；本機 `python judgment_stats.py run <ym>` 仍無條件重跑
+  - 月表已落地但 refresh 鏈有項目沒完成（`run` exit 76）＝紅燈：月表步驟先放行，共署 pair／遷調邊／
+    last_scraped_at 照跑，最後一步才把 run 標成失敗。**之後的排程不會自動補**（月表已上傳會被跳過）
+    ——看月表步驟 log 的「refresh 摘要」，排除原因後本機跑 `python judgment_stats.py refresh`
+- **refresh 鏈（2026-10-02 補強，mig 238）**：月表落地後 `refresh_and_report()` 依序跑 `REFRESH_CHAIN`
+  （清洗 → 法官／檢察官 rollup → 律師三支 rollup → judge_changes 四支）→ 逐月去重 cache →（月更／`refresh`
+  模式）`prune_pairs()`，最後印「refresh 摘要」；有任何項目失敗或被略過就以 **exit 76**
+  （`EXIT_REFRESH_FAILED`）結束。`upload`／`backfill`／`reclassify` 的收尾同一套（不含 prune）。
+  - 補跑：`python judgment_stats.py refresh`（只跑 refresh 鏈＋prune，不下載不上傳；全部都是整表重建
+    或冪等重算，可重複跑）
+  - **重 rollup 回 504 不等於失敗**：三支律師 rollup 各要一兩分鐘，閘道先回 504、函數在伺服器端照樣
+    跑完。腳本不重打，改輪詢該表的「完成標記」（`refreshed_at`；judge_changes 用 `detected_at`——
+    TRUNCATE＋INSERT 同一個交易寫入，讀得到新值＝已 commit）到換新才打下一支，不然幾支重的會在
+    伺服器端疊著跑；等超過該函數的 statement_timeout＋60 秒還沒換新才記失敗。明確回錯（交易已
+    rollback）的重 rollup 最多重打一次。**新增重 rollup 時**：表上放
+    `refreshed_at timestamptz DEFAULT now()`、INSERT 帶欄位清單，並登記進 `REFRESH_CHAIN`
+  - 清洗（`clean_judge_name_truncations`）沒成功 → 讀 judge_month_stats 的法官端 5 支（
+    `REFRESH_NEEDS_CLEAN`）直接略過、不拿沒清的資料算，其餘照跑；法官端彙總停在上一次的結果，補跑即回
+  - 逐月去重 RPC 與沒有完成標記的短函數：連線錯誤／5xx／409 退避重試（5→15→45 秒）；去重單月
+    最終失敗只記錄、繼續下一個月，摘要點名失敗月份（以前一次連線重置就整支腳本結束、prune 也沒跑）
+  - `REFRESH_CHAIN` 第三欄＝該函數在 DB 端的 statement_timeout，**要與 migration 的 SET 同步**。
+    mig 238 起鏈上 10 支都有 SET（原本清洗＋5 支是空的、只靠 8 秒內跑完）；`CREATE OR REPLACE` 不帶
+    SET 會把它清掉，重寫時把 SET 寫在 CREATE 裡
+  - 清洗函數兩個地雷（mig 238 EXPLAIN 實測）：①函數內的暫存表沒有統計，planner 當它有數百列，
+    `UPDATE lawyer_judge_pairs … FROM _trunc_map` 會選全表掃——建完要 `ANALYZE`；②候選名查詢靠部分
+    索引 `idx_jms_trunc_candidates`（兩字名＋「法」結尾，104 kB），**改函數的候選條件要同步改索引
+    謂詞**，否則退回兩次全表掃 judge_month_stats（各 3 秒＋，原本平常路徑就貼著 8 秒上限）
 - **開放平臺會員約每 3 個月要到註冊信箱點確認連結重新啟用**：未啟用時登入回 400「請您先啟動會員帳號
   完成認證，謝謝。」（密碼錯是「帳號或密碼錯誤!」），`get_od_token()` 會把這句帶進例外訊息——月更紅燈先看 log
 - **Phase B 案由層（migration 069/070）**：parse 帶 JTITLE → `lawyer_month_stats.causes` /
@@ -202,7 +228,7 @@
   `refresh_firm_dedup()` 與 groupfill CI 都逐月打單月版。
   **（2026-10-01 更正）「函數層 SET 蓋不掉」不成立**，當時被砍應是剛 `ALTER FUNCTION` 完
   就測（schema cache 還是舊值），機制見「已知 Gotchas」的 statement_timeout 條；
-  本函數全量走 RPC 尚未重測，逐月版照常可用
+  本函數全量走 RPC 尚未重測，逐月版照常可用（逐月迴圈的重試與失敗處理見「裁判書管線」節的 refresh 鏈）
 - 回填：`judgment-groupfill.yml`（202101–202504 分 5 shard＋202505–202605 補 2 shard，
   月更 run 自動增量）。`python judgment_stats.py groupfill <起> <迄>` 冪等（已上傳月跳過）。
   ⚠️ **名目端是從 lawyer_month_stats 全期灌的**：firm_dedup_month_stats 的 ym 涵蓋

@@ -131,6 +131,14 @@ jobs:
             echo "::notice::$YM 裁判書月包尚未上架，本次不算失敗；本月後續排程（UTC 16／19／22／26 日 20:00）會再試"
             exit 0
           fi
+          if [ "$rc" -eq 76 ]; then
+            # 76 = judgment_stats.EXIT_REFRESH_FAILED：月表已落地，但 refresh 鏈有項目沒完成。
+            # 這步先不紅：後面的共署 pair／遷調邊／last_scraped_at 和 refresh 鏈無關、照跑，
+            # 由最後一步統一紅燈。之後的排程會因「已上傳」跳過月表步驟，不會自動補 refresh。
+            { echo "state=uploaded"; echo "refresh_failed=true"; } >> "$GITHUB_OUTPUT"
+            echo "::error::$YM 月表已上傳，但 refresh 鏈有項目沒完成（見本步驟 log 的「refresh 摘要」）。排除原因後在本機補跑：python scripts/judgment_stats.py refresh"
+            exit 0
+          fi
           if [ "$rc" -eq 0 ]; then echo "state=uploaded" >> "$GITHUB_OUTPUT"; fi
           exit "$rc"
 
@@ -185,3 +193,10 @@ jobs:
             -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}")
           echo "PATCH data_sources: HTTP $http_code"
           [ "$http_code" = "204" ] || { echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; }
+
+      - name: refresh 鏈沒跑完 → 紅燈
+        # 放最後：月表步驟回 76 時先讓前面幾步照跑，再由這裡把整個 run 標成失敗
+        if: ${{ !cancelled() && steps.stats.outputs.refresh_failed == 'true' }}
+        run: |
+          echo "::error::月表已落地，但 refresh 鏈有項目沒完成。看「Run judgment stats pipeline」步驟 log 的「refresh 摘要」，排除原因後在本機補跑：python scripts/judgment_stats.py refresh"
+          exit 1

@@ -13,6 +13,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py parse 202504             # 解析 RAR → 聚合 JSON
   python judgment_stats.py upload 202504            # 聚合 JSON → Supabase
   python judgment_stats.py run 202504               # download + parse + upload 一條龍
+  python judgment_stats.py refresh                  # 只重跑 refresh 鏈＋prune（不下載不上傳；refresh 沒跑完時補跑用）
   python judgment_stats.py backfill 202001 202504   # 依序跑一段區間（跳過已上傳的月份）
   python judgment_stats.py pairfill 202005 202504   # Phase 2 配對回填（強制重解、跳過已上傳 pair 的月）
   python judgment_stats.py causefill 202105 202604  # Phase B 案由回填（強制重解、跳過已帶 causes 的月）
@@ -1010,79 +1011,266 @@ def causes_uploaded(yyyymm):
     return r.status_code == 200 and len(r.json()) > 0
 
 
+# ============================================================
+# refresh 鏈（月表落地後重建各彙總）
+# ============================================================
+# 這一段的函數都不丟例外：各自回傳結果列 [(名稱, 'ok'｜'fail'｜'skip', 說明, 秒數)]，
+# 由 refresh_and_report() 印摘要，有沒完成的項目就讓行程以 EXIT_REFRESH_FAILED 結束。
+
+EXIT_REFRESH_FAILED = 76  # 月表已落地，但 refresh 鏈有項目失敗或被略過（自訂值，接在 75 後面）
+
+# refresh 鏈，依序執行。每項＝(RPC, 完成標記 (表, 欄) 或 None, 該函數在 DB 端的 statement_timeout 秒數)
+# 完成標記：函數 TRUNCATE＋INSERT 重建的那張表上的時間戳欄。同一個交易寫入，讀得到新值就代表
+#   整支函數已 commit。重的 rollup 走 RPC 會被閘道先回 504、函數其實還在伺服器端跑（2026-10-01
+#   三支律師 rollup 都是），靠它確認跑完才打下一支，不然幾支重的會在伺服器端疊在一起跑。
+#   沒有標記的都是冪等的短函數，結果不明時直接重打。
+# statement_timeout：要與 migration 裡各函數的 SET 一致（mig 238 起全鏈都有）——等超過這個秒數
+#   標記還沒換新，就代表函數已經被砍掉。
+REFRESH_CHAIN = (
+    # 折行截斷清洗：先清 judge_month_stats 源頭再重算各彙總（migration 134）
+    ('clean_judge_name_truncations', None, 300),
+    ('refresh_judge_judgment_stats', ('judge_judgment_stats', 'refreshed_at'), 600),
+    ('refresh_prosecutor_stats', ('prosecutor_stats', 'refreshed_at'), 600),
+    # refresh_family_lawyer_stats 已退役（mig 183；領域律師版圖改掛 refresh_lawyer_cause_stats 尾端）
+    ('refresh_lawyer_judgment_stats', ('lawyer_judgment_stats', 'refreshed_at'), 600),
+    ('refresh_lawyer_region_stats', ('lawyer_region_year_stats', 'refreshed_at'), 600),
+    ('refresh_lawyer_cause_stats', ('lawyer_cause_stats', 'refreshed_at'), 900),
+    ('refresh_judge_changes', ('judge_changes', 'detected_at'), 600),
+    # judge_changes 是 TRUNCATE 重建，遷調配對欄要跟著補（migration 084）
+    ('refresh_judge_change_transfers', None, 600),
+    # 官方邊之外，用署名軌跡＋區間重疊防呆補推定轉調（migration 089）
+    ('refresh_judge_change_inferred_transfers', None, 600),
+    # 進退場信心旗標：標記另一側是否有跨院署名（migration 090）
+    ('refresh_judge_change_confidence_flag', None, 600),
+)
+# 清洗沒成功就不算的：這幾支都讀 judge_month_stats，沒清就算等於把截斷名當成獨立法官寫進彙總
+# 與異動事件。略過只是讓法官端彙總停在上一次的結果，排除原因後跑 `refresh` 就補得回來。
+REFRESH_NEEDS_CLEAN = frozenset((
+    'refresh_judge_judgment_stats', 'refresh_judge_changes', 'refresh_judge_change_transfers',
+    'refresh_judge_change_inferred_transfers', 'refresh_judge_change_confidence_flag'))
+
+# 結果不明的回應：閘道逾時／上游斷線，請求可能已送到 PostgREST、函數還在伺服器端跑
+RPC_UNSURE_STATUS = (502, 503, 504, 520, 522, 524)
+RPC_BACKOFF = (5, 15, 45)   # 重打前等幾秒（依第幾次失敗）
+REFRESH_POLL_SEC = 15       # 等完成標記換新時的輪詢間隔
+_UNKNOWN = object()         # 完成標記讀不到（和「表是空的」的 None 分開）
+
+
+def _rpc_error(r):
+    """非 2xx 回應的摘要：PostgREST 的錯誤 JSON 取 code＋message；閘道回的 HTML 頁不印"""
+    try:
+        j = r.json()
+    except ValueError:
+        j = None
+    if isinstance(j, dict) and (j.get('code') or j.get('message')):
+        return f"{j.get('code') or ''} {j.get('message') or ''}".strip()[:200]
+    text = ' '.join((r.text or '').split())
+    return '' if text.startswith('<') else text[:120]
+
+
+def _read_marker(table, col, tries=1):
+    """讀 rollup 表的完成標記（整表同一個交易寫入、每列同值，取一列即可）。
+    表是空的回 None；讀不到回 _UNKNOWN。"""
+    for attempt in range(tries):
+        try:
+            r = requests.get(f'{SUPABASE_URL}/rest/v1/{table}',
+                             params={'select': col, 'limit': 1},
+                             headers=HEADERS_SB, timeout=30, verify=False)
+            if r.status_code == 200:
+                rows = r.json()
+                return rows[0][col] if rows else None
+        except (requests.RequestException, ValueError):
+            pass
+        if attempt < tries - 1:
+            time.sleep(3)
+    return _UNKNOWN
+
+
+def _wait_marker(table, col, before, deadline):
+    """輪詢完成標記到換新為止，回新值；過了 deadline 還沒換新回 _UNKNOWN。
+    refresh 進行中 TRUNCATE 握著表鎖，讀取會被擋到逾時（讀不到），繼續等就好。"""
+    t0 = last_note = time.time()
+    while True:
+        cur = _read_marker(table, col)
+        if cur is not _UNKNOWN and cur is not None and cur != before:
+            return cur
+        if time.time() >= deadline:
+            return _UNKNOWN
+        if time.time() - last_note >= 60:
+            last_note = time.time()
+            print(f'    ...還在等 {table}.{col} 換新（已等 {last_note - t0:.0f} 秒）')
+        time.sleep(REFRESH_POLL_SEC)
+
+
+def _call_rpc(rpc, payload=None, marker=None, wait_max=660, tries=3, http_timeout=600):
+    """打一支 refresh RPC，回 (成功與否, 說明)。
+    - 2xx：成功。
+    - 結果不明（RPC_UNSURE_STATUS、連線中斷、讀取逾時）：有完成標記就不重打（函數多半還在
+      伺服器端跑，重打只會疊在一起），輪詢標記到換新為止，最多等到這次呼叫後 wait_max 秒；
+      沒有標記的短函數退避後重打。
+    - PostgREST 明確回錯（交易已 rollback）：5xx／408／409／429 退避後重打，其餘 4xx 直接失敗。
+      409 多半是前一次不明的呼叫其實還在跑、兩次撞鍵，等它結束再打就會過。"""
+    tag = rpc + (f' {payload}' if payload else '')
+    where = f'{marker[0]}.{marker[1]}' if marker else ''
+    before = _read_marker(*marker, tries=3) if marker else None
+    detail = ''
+    for attempt in range(1, tries + 1):
+        t0 = time.time()
+        try:
+            r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}', json=payload or {},
+                              headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                              timeout=(30, http_timeout), verify=False)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            unsure = retryable = True
+            detail = f'{type(e).__name__}（{str(e)[:100]}）'
+        else:
+            if r.status_code in (200, 204):
+                body = r.text.strip()
+                return True, f'HTTP {r.status_code}' + (f'，回傳 {body[:40]}' if body else '')
+            unsure = r.status_code in RPC_UNSURE_STATUS
+            retryable = unsure or r.status_code >= 500 or r.status_code in (408, 409, 429)
+            detail = f'HTTP {r.status_code} {_rpc_error(r)}'.strip()
+        if unsure and marker:
+            if before is _UNKNOWN:
+                return False, f'{detail} → 呼叫前讀不到 {where}，無法確認有沒有跑完'
+            print(f'    {tag}: {detail} → 函數可能還在伺服器端跑，等 {where} 換新 ...')
+            if _wait_marker(marker[0], marker[1], before, t0 + wait_max) is _UNKNOWN:
+                return False, f'{detail} → 等到呼叫後 {wait_max} 秒，{where} 仍未換新'
+            return True, f'{detail} → {where} 已換新，確認跑完'
+        if not retryable or attempt == tries:
+            break
+        delay = RPC_BACKOFF[min(attempt, len(RPC_BACKOFF)) - 1]
+        print(f'    {tag}: {detail}（第 {attempt} 次），{delay} 秒後重試')
+        time.sleep(delay)
+    return False, f'{detail}（共試 {attempt} 次）'
+
+
 def prune_pairs():
     """滾動視窗維護：刪掉配對三表中早於 (資料最新月 − 59 月) 的列。
-    月更 run 後呼叫，讓配對表恆為近 60 月。"""
-    r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
-                     params={'select': 'yyyymm', 'order': 'yyyymm.desc', 'limit': 1},
-                     headers=HEADERS_SB, timeout=30, verify=False)
-    if r.status_code != 200 or not r.json():
-        return
-    maxym = r.json()[0]['yyyymm']
+    月更 run 後呼叫，讓配對表恆為近 60 月。回傳結果列；刪除條件是「早於門檻」，
+    這次沒刪成的列下次月更會一併刪掉。"""
+    name = 'prune 配對表'
+    try:
+        r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_judge_pairs',
+                         params={'select': 'yyyymm', 'order': 'yyyymm.desc', 'limit': 1},
+                         headers=HEADERS_SB, timeout=30, verify=False)
+        r.raise_for_status()
+        rows = r.json()
+    except (requests.RequestException, ValueError) as e:
+        return [(name, 'fail', f'讀不到 lawyer_judge_pairs 最新月：{type(e).__name__}（{str(e)[:100]}）', 0)]
+    if not rows:
+        return []
+    maxym = rows[0]['yyyymm']
     y, m = int(maxym[:4]), int(maxym[4:])
     m -= 59
     while m <= 0:
         y -= 1
         m += 12
     cutoff = f'{y}{m:02d}'
+    t0 = time.time()
+    bad = []
     for table in ('lawyer_judge_pairs', 'lawyer_cocounsel_pairs', 'lawyer_opposing_pairs'):
-        resp = requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
-                               params={'yyyymm': f'lt.{cutoff}'},
-                               headers=HEADERS_SB, timeout=300, verify=False)
-        print(f'  prune {table} < {cutoff}: HTTP {resp.status_code}')
+        try:
+            resp = requests.delete(f'{SUPABASE_URL}/rest/v1/{table}',
+                                   params={'yyyymm': f'lt.{cutoff}'},
+                                   headers=HEADERS_SB, timeout=300, verify=False)
+            ok, status = resp.status_code in (200, 204), f'HTTP {resp.status_code}'
+        except requests.RequestException as e:
+            ok, status = False, f'{type(e).__name__}（{str(e)[:100]}）'
+        print(f'  prune {table} < {cutoff}: {status}')
+        if not ok:
+            bad.append(f'{table}（{status}）')
+    if bad:
+        return [(name, 'fail', f'< {cutoff} 沒刪成：' + '、'.join(bad), time.time() - t0)]
+    return [(name, 'ok', f'< {cutoff}', time.time() - t0)]
 
 
 def refresh_stats():
-    for rpc in (
-                # 折行截斷清洗：先清 judge_month_stats 源頭再重算各彙總（migration 134）
-                'clean_judge_name_truncations',
-                'refresh_judge_judgment_stats', 'refresh_prosecutor_stats',
-                # refresh_family_lawyer_stats 已退役（mig 183；領域律師版圖改掛 refresh_lawyer_cause_stats 尾端）
-                'refresh_lawyer_judgment_stats',
-                'refresh_lawyer_region_stats', 'refresh_lawyer_cause_stats',
-                'refresh_judge_changes',
-                # judge_changes 是 TRUNCATE 重建，遷調配對欄要跟著補（migration 084）
-                'refresh_judge_change_transfers',
-                # 官方邊之外，用署名軌跡＋區間重疊防呆補推定轉調（migration 089）
-                'refresh_judge_change_inferred_transfers',
-                # 進退場信心旗標：標記另一側是否有跨院署名（migration 090）
-                'refresh_judge_change_confidence_flag'):
+    """依序跑 refresh 鏈，再逐月刷去重 cache。回傳結果列。"""
+    results = []
+    cleaned = True
+    for rpc, marker, stmt_timeout in REFRESH_CHAIN:
+        if not cleaned and rpc in REFRESH_NEEDS_CLEAN:
+            print(f'  略過 {rpc}()：清洗沒成功')
+            results.append((rpc, 'skip', '清洗沒成功，不拿沒清的 judge_month_stats 算', 0))
+            continue
         print(f'  呼叫 {rpc}() ...')
-        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
-                          json={}, headers={**HEADERS_SB, 'Content-Type': 'application/json'},
-                          timeout=600, verify=False)
-        print(f'  HTTP {r.status_code}')
-    refresh_firm_dedup()
+        t0 = time.time()
+        # 重的（有完成標記）頂多重打一次：每打一次都是整張表 TRUNCATE 重建
+        ok, detail = _call_rpc(rpc, marker=marker, wait_max=stmt_timeout + 60,
+                               tries=2 if marker else 3)
+        secs = time.time() - t0
+        print(f'  {"OK" if ok else "失敗"}（{secs:.0f}s）{detail}')
+        results.append((rpc, 'ok' if ok else 'fail', detail, secs))
+        if rpc == 'clean_judge_name_truncations' and not ok:
+            cleaned = False
+    results.extend(refresh_firm_dedup())
+    return results
 
 
 def refresh_firm_dedup():
-    """所×月去重 cache（mig 186）逐月重刷。全量版（p_ym=NULL）~10s 會撞
-    PostgREST authenticator 的 8s statement_timeout（函數層 SET 蓋不掉已武裝
-    的頂層計時器），只能逐月打單月增量版（每月 ~5s）；逐月全刷也順便吸收
-    名冊歸戶漂移（現任名冊回溯口徑）。範圍 = lawyer_group_month_stats 的 min~max ym。"""
+    """所×月去重 cache（mig 186）＋版圖 dup cache（mig 189）逐月重刷，回傳結果列。
+    逐月打單月版（每月 ~5s）而不是一次全量：全量版走 RPC 還沒重測過，逐月全刷也順便吸收
+    名冊歸戶漂移（現任名冊回溯口徑）。範圍 = lawyer_group_month_stats 的 min~max ym。
+    每支 RPC 遇到連線錯誤／5xx 會退避重試；單月最終失敗只記下來、繼續下一個月
+    （以前一次連線重置就整支腳本結束，後面的月份和 prune_pairs 都沒跑到）。"""
+    name = '去重 cache（逐月）'
+
     def _edge(order):
         r = requests.get(f'{SUPABASE_URL}/rest/v1/lawyer_group_month_stats',
                          params={'select': 'ym', 'order': f'ym.{order}', 'limit': 1},
                          headers=HEADERS_SB, timeout=30, verify=False)
-        rows = r.json() if r.status_code == 200 else []
+        r.raise_for_status()
+        rows = r.json()
         return rows[0]['ym'] if rows else None
-    lo, hi = _edge('asc'), _edge('desc')
+    t0 = time.time()
+    try:
+        lo, hi = _edge('asc'), _edge('desc')
+    except (requests.RequestException, ValueError) as e:
+        # 讀不到範圍不能當成「沒有素材」跳過
+        return [(name, 'fail',
+                 f'讀不到 lawyer_group_month_stats 的月份範圍：{type(e).__name__}（{str(e)[:100]}）', 0)]
     if not lo:
         print('  refresh_firm_dedup_stats: 無 lawyer_group 素材，跳過')
-        return
+        return []
     print(f'  逐月 refresh_firm_dedup_stats + refresh_firm_court_dup {lo}~{hi} ...')
-    bad = 0
+    failed = []
     for ym in month_range(lo, hi):
         # mig 189 的版圖 dup cache 一起刷（同素材趟；素材月缺新表列時算出空集無害）
         for rpc in ('refresh_firm_dedup_stats', 'refresh_firm_court_dup'):
-            r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/{rpc}',
-                              json={'p_ym': ym},
-                              headers={**HEADERS_SB, 'Content-Type': 'application/json'},
-                              timeout=60, verify=False)
-            if r.status_code not in (200, 204):
-                bad += 1
-                print(f'    {ym} {rpc}: HTTP {r.status_code} {r.text[:120]}')
-    print(f'  去重 cache 刷新完成（{bad} 次失敗）' if bad else '  去重 cache 刷新完成')
+            ok, detail = _call_rpc(rpc, {'p_ym': ym}, tries=4, http_timeout=120)
+            if not ok:
+                failed.append(f'{ym} {rpc}')
+                print(f'    {ym} {rpc}: 失敗 — {detail}')
+    secs = time.time() - t0
+    if failed:
+        print(f'  去重 cache 刷新完成（{len(failed)} 次失敗）')
+        return [(name, 'fail', f'{lo}~{hi} 有 {len(failed)} 次失敗：' + '、'.join(failed), secs)]
+    print('  去重 cache 刷新完成')
+    return [(name, 'ok', f'{lo}~{hi}', secs)]
+
+
+def refresh_and_report(prune=False):
+    """月表落地後的收尾：refresh 鏈（月更再加 prune_pairs）→ 印摘要 → 有沒完成的項目就以
+    EXIT_REFRESH_FAILED 結束（CI 才會紅）。"""
+    results = []
+    try:
+        results += refresh_stats()
+    finally:
+        if prune:
+            results += prune_pairs()  # refresh 鏈出什麼事都要維護配對表滾動視窗
+    label = {'ok': 'OK', 'fail': '失敗', 'skip': '略過'}
+    print('=== refresh 摘要 ===')
+    for name, status, detail, secs in results:
+        took = '' if status == 'skip' else f'（{secs:.0f}s）'
+        print(f'  [{label[status]}] {name}{took} {detail}')
+    bad = [x for x in results if x[1] != 'ok']
+    if not bad:
+        print('  全部完成')
+        return
+    print(f'  {len(bad)} 項沒完成。月表已落地、不必重新上傳；排除原因後補跑：'
+          'python judgment_stats.py refresh')
+    sys.exit(EXIT_REFRESH_FAILED)
 
 
 def cleanup(yyyymm, purge_rar=False):
@@ -1128,7 +1316,10 @@ if __name__ == '__main__':
         parse(sys.argv[2])
     elif cmd == 'upload':
         upload(sys.argv[2])
-        refresh_stats()
+        refresh_and_report()
+    elif cmd == 'refresh':
+        # 只重跑 refresh 鏈＋prune，不下載、不上傳：月表已落地但 refresh 沒跑完（exit 76）時補跑用
+        refresh_and_report(prune=True)
     elif cmd == 'run':
         # 無條件重跑（刪後重插）。「已上傳就跳過」由月更 workflow 的 check 步驟決定，不在這裡。
         try:
@@ -1137,8 +1328,8 @@ if __name__ == '__main__':
             # 月包還沒上架不是真正的失敗：用專屬 exit code 回報，其他例外照舊 traceback＋exit 1
             print(f'{sys.argv[2]}: {e}')
             sys.exit(EXIT_NOT_PUBLISHED)
-        refresh_stats()
-        prune_pairs()  # 月更後維護配對表滾動視窗
+        # 月表到這裡已落地；refresh 鏈有項目沒完成時以 EXIT_REFRESH_FAILED 結束
+        refresh_and_report(prune=True)  # prune：月更後維護配對表滾動視窗
     elif cmd == 'pairfill':
         # Phase 2 配對回填：強制重解（刪 agg 快取以帶出新 pair key），冪等跳過已上傳 pair 的月份。
         # 會一併冪等重傳 judge/lawyer/prosecutor 月表（內容不變），故不呼叫 refresh_stats。
@@ -1159,7 +1350,7 @@ if __name__ == '__main__':
                 run_month(ym, skip_uploaded=True, purge_rar=True)
             except Exception as e:
                 print(f'{ym}: 失敗 — {e}')
-        refresh_stats()
+        refresh_and_report()
     elif cmd == 'causefill':
         # Phase B 案由回填：強制重解（agg 快取沒存 JTITLE），冪等跳過已帶案由的月份。
         # 會一併冪等重傳全部月表與 pair 表（內容除 causes 外不變）。
@@ -1299,6 +1490,6 @@ if __name__ == '__main__':
                 run_month(ym, skip_uploaded=False, purge_rar=True)
             except Exception as e:
                 print(f'{ym}: 失敗 — {e}')
-        refresh_stats()
+        refresh_and_report()
     else:
         print(__doc__)
