@@ -4,7 +4,7 @@
 前提: <yyyymm>.rar 已在 .judgment_work（會自行解壓，結束後刪解壓目錄）
 輸出: scratchpad/pair_stats_<yyyymm>.json
 """
-import os, re, sys, json, time, subprocess
+import os, re, sys, json, time
 from collections import defaultdict
 
 sys.path.insert(0, r'C:\projects\legal-industry-intel\scripts')
@@ -96,15 +96,11 @@ def extract_lawyers_sided(jfull):
 
 
 def main():
-    rar = os.path.join(WORK, f'{YM}.rar')
-    exdir = os.path.join(WORK, YM)
-    if not os.path.isdir(exdir):
-        print(f'解壓 {rar} ...', flush=True)
-        t0 = time.time()
-        r = subprocess.run([JS.SEVENZ, 'x', rar, f'-o{exdir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(r.stderr[:500])
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    fresh = not os.path.isdir(os.path.join(WORK, YM))
+    t0 = time.time()
+    exdir = JS.extract_month(YM)
+    if fresh:
         print(f'解壓完成 {(time.time()-t0)/60:.1f} 分', flush=True)
 
     st = defaultdict(int)

@@ -66,6 +66,17 @@
 - 月包晚兩個月發布，但上架日不固定（平臺 publishedDate 標 9/16 的 202607 包，9/17 清晨排程仍查不到）；`judgment-stats-monthly.yml` 同月試 4 次，見下方「裁判書管線」節「每月增量」
 - 已回填 2020-01 ~ 2025-04；`avg_processing_days` 是估算值（裁判日 − 案號年 1/1），僅供法官間相對比較
 - **多 session 注意**：backfill 不要兩個 session 同時跑（會撞 `.judgment_work` 檔案鎖與 upload 重複鍵）
+- **月包解壓一律走 `judgment_stats.extract_month()`**（2026-10-02）：先解到 `<月份>.extracting`、7z 回 rc=0 才改名成
+  `<月份>/`；解壓途中行程被砍或 7z 中途報錯，半套檔只會留在暫存名（下次解同一月時自動清掉重解）。吃裁判書月包的
+  8 個呼叫點（`parse`、`jy_copanel`、`corp_party_stats`、`client_concentration`、`appeal_stats`、`jcasefill`、
+  `jcase_probe`、`phase2_sample_pairs`）共用 `scripts/.judgment_work/`，任何一支留下半套 `<月份>/` 都會被其他腳本
+  當成完整月包拿去算（數字偏低、不報錯）——**新腳本不要自己寫 7z 解壓**。⚠️ `<月份>/` 已存在就直接沿用、不驗
+  完整性：改版前留下的半套目錄、清理（`rmtree`）到一半被砍留下的殘骸都分辨不出來，懷疑時手動刪掉該目錄再重跑。
+  ⚠️ **還有兩支沒改**（不在本 repo 的 git 裡，2026-10-02 盤點）：主 checkout 未入 git 的 `scripts/achievement_stats.py`
+  （每月 20 日 `achievement_monthly.bat` 排程）、bullying-intel 的 `scripts/bullying_mine.py`（`judgment_derivs_monthly.py`
+  月更呼叫）——同一個工作目錄、仍是「`<月份>/` 存在就跳過解壓、直接解到 `<月份>/`」的舊寫法，它們留下的半套目錄
+  已改的 8 支照樣會沿用。終結案件月包三支（`closed_case_stats`／`lawyer_case_amount`／`big_amount_cases`）各用各的
+  工作目錄、每次都重新下載並先刪舊目錄再解，沒有這個問題
 
 ## 法官/檢察官懲戒紀錄（migration 121）
 

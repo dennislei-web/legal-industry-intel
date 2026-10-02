@@ -26,7 +26,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -37,7 +36,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from judgment_stats import (  # noqa: E402
-    WORK_DIR, SEVENZ, download, normalize_court, extract_judges, classify,
+    WORK_DIR, download, extract_month, normalize_court, extract_judges, classify,
     doctype_of, RE_COURT)
 
 for line in io.open(os.path.join(HERE, '.env'), encoding='utf-8'):
@@ -92,14 +91,9 @@ def month(yyyymm, keep_rar=False):
         print(f'  {yyyymm} 快取已存在，跳過')
         return
     download(yyyymm)
-    extract_dir = os.path.join(WORK_DIR, yyyymm)
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    extract_dir = extract_month(yyyymm)
     rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
-    if not os.path.isdir(extract_dir):
-        print(f'  解壓 {yyyymm}.rar ...')
-        r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
     n = n_jc = n_ap = 0
     t0 = time.time()
     with gzip.open(jcase_path + '.part', 'wt', encoding='utf-8') as fj, \

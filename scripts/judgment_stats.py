@@ -620,7 +620,9 @@ def doctype_of(jfull_head):
 
 
 def extract_month(yyyymm):
-    """把月包解壓到 WORK_DIR/<月份>/ 並回傳該目錄；目錄已在就直接用（parse 與 jy_copanel 共用）。
+    """把月包解壓到 WORK_DIR/<月份>/ 並回傳該目錄；目錄已在就直接用。吃裁判書月包的腳本共用同一個
+    工作目錄，解壓一律走這裡、不要各自再寫一份（parse、jy_copanel、corp_party_stats、
+    client_concentration、appeal_stats、jcasefill、jcase_probe、phase2_sample_pairs）。
     先解到 <月份>.extracting，7z 回 rc=0 才改名成 <月份>——解壓途中行程被砍（關機、CI 逾時）
     時，半套檔案只會留在暫存名底下，不會被下一次當成完整月包拿去解析。2026-10-01 pairamtfill
     202501 就是死在解壓途中（只解出 8 萬檔，該月約 10 萬），舊寫法重跑會照常算出偏低的數字上傳。"""

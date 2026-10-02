@@ -23,7 +23,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 import time
 from collections import defaultdict, Counter
@@ -153,13 +152,8 @@ def collect(ym):
         return
     t0 = time.time()
     rar = js.download(ym)
-    ext = os.path.join(js.WORK_DIR, ym)
-    if not os.path.isdir(ext):
-        print(f'  解壓 {ym}.rar ...')
-        r = subprocess.run([js.SEVENZ, 'x', rar, f'-o{ext}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 失敗: {r.stderr[:300]}')
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    ext = js.extract_month(ym)
     n_files = n_hit = 0
     rows = []
     for root, _d, files in os.walk(ext):

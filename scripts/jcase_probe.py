@@ -5,11 +5,11 @@
 用法：python jcase_probe.py 202001
 沿用 judgment_stats.py 的下載/法院正規化/文件類型函式；不動任何 DB。
 """
-import sys, os, json, time, subprocess, collections
+import sys, os, json, time, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from judgment_stats import download, WORK_DIR, SEVENZ, doctype_of  # noqa: E402
+from judgment_stats import download, extract_month, WORK_DIR, doctype_of  # noqa: E402
 
 
 def probe(yyyymm):
@@ -18,14 +18,11 @@ def probe(yyyymm):
         t0 = time.time()
         download(yyyymm)
         print(f'  下載耗時 {(time.time() - t0) / 60:.1f} 分鐘')
-    extract_dir = os.path.join(WORK_DIR, yyyymm)
-    if not os.path.isdir(extract_dir):
-        t0 = time.time()
-        print(f'  解壓 {yyyymm}.rar ...')
-        r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    fresh = not os.path.isdir(os.path.join(WORK_DIR, yyyymm))
+    t0 = time.time()
+    extract_dir = extract_month(yyyymm)
+    if fresh:
         print(f'  解壓耗時 {(time.time() - t0) / 60:.1f} 分鐘')
 
     t0 = time.time()

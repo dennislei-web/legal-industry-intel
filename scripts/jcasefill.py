@@ -20,13 +20,12 @@ import json
 import gzip
 import time
 import shutil
-import subprocess
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from judgment_stats import (  # noqa: E402
-    download, month_range, WORK_DIR, SEVENZ, SUPABASE_URL, HEADERS_SB,
+    download, extract_month, month_range, WORK_DIR, SUPABASE_URL, HEADERS_SB,
     RE_COURT, normalize_court, doctype_of, classify, extract_judges, extract_lawyers,
     _upload_rows,
 )
@@ -40,15 +39,10 @@ def cache_path(ym):
 def build_cache(ym):
     """下載＋解壓＋逐案掃描 → 逐案快取。回傳快取路徑。"""
     rar_path = os.path.join(WORK_DIR, f'{ym}.rar')
-    extract_dir = os.path.join(WORK_DIR, ym)
-    if not os.path.isdir(extract_dir):
-        if not os.path.exists(rar_path):
-            download(ym)
-        print(f'  解壓 {ym}.rar ...')
-        r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
+    if not os.path.isdir(os.path.join(WORK_DIR, ym)) and not os.path.exists(rar_path):
+        download(ym)
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    extract_dir = extract_month(ym)
     t0 = time.time()
     n = n_ok = 0
     tmp = cache_path(ym) + '.part'

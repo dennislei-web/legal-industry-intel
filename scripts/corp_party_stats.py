@@ -26,11 +26,10 @@ os.environ.pop('SSLKEYLOGFILE', None)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from judgment_stats import (  # noqa: E402
-    WORK_DIR, SEVENZ, RE_COURT, normalize_court, classify,
-    extract_lawyers_sided, download, LAWYER_ROLES, _party_label,
+    WORK_DIR, RE_COURT, normalize_court, classify,
+    extract_lawyers_sided, download, extract_month, LAWYER_ROLES, _party_label,
     PARTY_CAMP,
 )
-import subprocess  # noqa: E402
 import shutil  # noqa: E402
 
 # 公司/法人判定（kind: corp=營利企業, org=非營利法人）
@@ -157,16 +156,11 @@ def parse_corp(yyyymm):
     if os.path.exists(out_path):
         print(f'  {yyyymm}_corp.json 已存在，跳過')
         return out_path
-    extract_dir = os.path.join(WORK_DIR, yyyymm)
-    rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
-    if not os.path.isdir(extract_dir):
-        if not os.path.exists(rar_path):
-            raise RuntimeError(f'{yyyymm}: 無解壓目錄也無 RAR，請先 download')
-        print(f'  解壓 {yyyymm}.rar ...')
-        r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
+    if not (os.path.isdir(os.path.join(WORK_DIR, yyyymm))
+            or os.path.exists(os.path.join(WORK_DIR, f'{yyyymm}.rar'))):
+        raise RuntimeError(f'{yyyymm}: 無解壓目錄也無 RAR，請先 download')
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    extract_dir = extract_month(yyyymm)
 
     litigant = defaultdict(lambda: {'n': 0, 'repr': 0})     # (company,kind) → 案件數/有代理數
     pairs = defaultdict(int)                                 # (company,lawyer,camp) → n
