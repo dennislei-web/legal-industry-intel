@@ -655,6 +655,37 @@ def extract_month(yyyymm):
     return extract_dir
 
 
+def remove_extract_dir(yyyymm):
+    """刪掉 WORK_DIR/<月份>/（解析完的收尾），和 extract_month() 成對：吃月包的腳本收尾都走這裡，
+    不要各自 shutil.rmtree(<月份>/)。
+    先把目錄改名成 <月份>.deleting 再刪。月包約 10 萬個小檔，Windows 上刪完要數十秒；直接 rmtree
+    的話，刪到一半行程被砍（關機），或個別檔被防毒／索引器鎖住、被 ignore_errors 略過，都會留下
+    只剩部分檔的 <月份>/——那支腳本自己的產出已經寫完、不會再碰它，之後處理同一個月的腳本看到
+    目錄存在就拿殘骸去解析，數字偏低、不報錯。改名是原子的：改成之後，沒刪完的只會留在 .deleting
+    名下（下次清同一個月時先刪掉），不會被當成月包。
+    改名被拒（Windows 上目錄裡還有檔案被開著）稍等再試；仍不行就整個目錄原封不動留著、印警告。
+    完整的目錄之後被沿用沒有問題，只是佔磁碟。不退回就地刪除（那就是會留下半套的做法），也不丟
+    例外（呼叫端的產出這時都已落地，不該因為暫存目錄清不掉而中止後面的步驟）。"""
+    extract_dir = os.path.join(WORK_DIR, yyyymm)
+    trash = extract_dir + '.deleting'
+    for attempt in range(5):
+        shutil.rmtree(trash, ignore_errors=True)  # 上次沒刪完的殘骸；留著會擋住改名
+        try:
+            os.rename(extract_dir, trash)
+            break
+        except FileNotFoundError:
+            return  # 沒有解壓目錄（沒解過，或已經刪掉）
+        except OSError as e:
+            if attempt == 4:
+                print(f'  {yyyymm}/ 改名被拒、這次沒有刪（{e.strerror or e}）；'
+                      f'目錄是完整的，之後可沿用或手動刪掉')
+                return
+            time.sleep(3)
+    shutil.rmtree(trash, ignore_errors=True)
+    if os.path.isdir(trash):
+        print(f'  {yyyymm}.deleting 沒刪乾淨（有檔案刪不掉），下次清理 {yyyymm} 時會再刪，也可以手動刪')
+
+
 def parse(yyyymm):
     """解壓並逐檔解析，聚合成 (法官, 法院) × 月 的統計 JSON"""
     out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
@@ -1304,9 +1335,7 @@ def refresh_and_report(prune=False):
 def cleanup(yyyymm, purge_rar=False):
     """刪掉解壓目錄（保留 agg.json）以省磁碟；purge_rar 時連 rar 一起刪
     （backfill 幾十個月會累積數十 GB；agg.json 留著即可冪等重傳）"""
-    d = os.path.join(WORK_DIR, yyyymm)
-    if os.path.isdir(d):
-        shutil.rmtree(d, ignore_errors=True)
+    remove_extract_dir(yyyymm)
     if purge_rar:
         rar = os.path.join(WORK_DIR, f'{yyyymm}.rar')
         if os.path.exists(rar):

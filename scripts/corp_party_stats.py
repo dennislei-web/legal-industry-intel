@@ -27,10 +27,9 @@ os.environ.pop('SSLKEYLOGFILE', None)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from judgment_stats import (  # noqa: E402
     WORK_DIR, RE_COURT, normalize_court, classify,
-    extract_lawyers_sided, download, extract_month, LAWYER_ROLES, _party_label,
-    PARTY_CAMP,
+    extract_lawyers_sided, download, extract_month, remove_extract_dir,
+    LAWYER_ROLES, _party_label, PARTY_CAMP,
 )
-import shutil  # noqa: E402
 
 # 公司/法人判定（kind: corp=營利企業, org=非營利法人）
 RE_CORP = re.compile(r'公司|商業銀行|合作社|農會|漁會|證券|投信|票券|資產管理|保險')
@@ -218,9 +217,7 @@ def purge_month(yyyymm):
     p = os.path.join(WORK_DIR, f'{yyyymm}.rar')
     if os.path.exists(p):
         os.remove(p)
-    d = os.path.join(WORK_DIR, yyyymm)
-    if os.path.isdir(d):
-        shutil.rmtree(d, ignore_errors=True)
+    remove_extract_dir(yyyymm)
 
 
 def month_range(a, b):

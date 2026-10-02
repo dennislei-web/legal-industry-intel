@@ -19,13 +19,13 @@ import os
 import json
 import gzip
 import time
-import shutil
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from judgment_stats import (  # noqa: E402
-    download, extract_month, month_range, WORK_DIR, SUPABASE_URL, HEADERS_SB,
+    download, extract_month, remove_extract_dir, month_range, WORK_DIR,
+    SUPABASE_URL, HEADERS_SB,
     RE_COURT, normalize_court, doctype_of, classify, extract_judges, extract_lawyers,
     _upload_rows,
 )
@@ -74,7 +74,7 @@ def build_cache(ym):
     os.replace(tmp, cache_path(ym))
     print(f'  逐案快取完成：{n_ok}/{n} 檔、{(time.time() - t0) / 60:.1f} 分鐘')
     # 磁碟清理：rar 與解壓目錄都刪（快取已足以重建聚合）
-    shutil.rmtree(extract_dir, ignore_errors=True)
+    remove_extract_dir(ym)
     if os.path.exists(rar_path):
         os.remove(rar_path)
     return cache_path(ym)

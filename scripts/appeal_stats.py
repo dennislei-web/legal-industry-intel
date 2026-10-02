@@ -25,7 +25,6 @@ import io
 import json
 import os
 import re
-import shutil
 import sys
 import time
 from collections import defaultdict
@@ -36,8 +35,8 @@ sys.stdout.reconfigure(encoding='utf-8')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from judgment_stats import (  # noqa: E402
-    WORK_DIR, download, extract_month, normalize_court, extract_judges, classify,
-    doctype_of, RE_COURT)
+    WORK_DIR, download, extract_month, remove_extract_dir, normalize_court,
+    extract_judges, classify, doctype_of, RE_COURT)
 
 for line in io.open(os.path.join(HERE, '.env'), encoding='utf-8'):
     if '=' in line and not line.strip().startswith('#'):
@@ -148,7 +147,7 @@ def month(yyyymm, keep_rar=False):
     os.replace(appeal_path + '.part', appeal_path)
     print(f'  {yyyymm}: {n} 檔 → 索引 {n_jc} 判決、上訴審 {n_ap} 列，'
           f'{(time.time()-t0)/60:.1f} 分鐘', flush=True)
-    shutil.rmtree(extract_dir, ignore_errors=True)
+    remove_extract_dir(yyyymm)
     if not keep_rar and os.path.exists(rar_path):
         os.remove(rar_path)
 

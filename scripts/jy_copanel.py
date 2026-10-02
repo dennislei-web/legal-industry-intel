@@ -18,7 +18,6 @@ import os
 import sys
 import json
 import time
-import shutil
 from collections import defaultdict
 
 import requests
@@ -114,9 +113,7 @@ def run_month(yyyymm, purge_rar=True):
     parse_copanel(yyyymm)
     upload(yyyymm)
     # 清理解壓目錄 + RAR（copanel json 保留，冪等重傳用）
-    d = os.path.join(js.WORK_DIR, yyyymm)
-    if os.path.isdir(d):
-        shutil.rmtree(d, ignore_errors=True)
+    js.remove_extract_dir(yyyymm)
     rar = os.path.join(js.WORK_DIR, f'{yyyymm}.rar')
     if purge_rar and os.path.exists(rar):
         os.remove(rar)

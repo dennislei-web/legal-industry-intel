@@ -22,7 +22,6 @@ import gzip
 import json
 import os
 import re
-import shutil
 import sys
 import time
 from collections import defaultdict, Counter
@@ -182,7 +181,7 @@ def collect(ym):
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
     os.replace(out_path + '.tmp', out_path)
-    shutil.rmtree(ext, ignore_errors=True)
+    js.remove_extract_dir(ym)
     if os.path.exists(rar):
         os.remove(rar)
     print(f'{ym}: {n_files} 檔 / 命中 {n_hit} 律師案次，{(time.time()-t0)/60:.1f} 分')

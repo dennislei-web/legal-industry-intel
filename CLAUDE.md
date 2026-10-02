@@ -71,12 +71,28 @@
   8 個呼叫點（`parse`、`jy_copanel`、`corp_party_stats`、`client_concentration`、`appeal_stats`、`jcasefill`、
   `jcase_probe`、`phase2_sample_pairs`）共用 `scripts/.judgment_work/`，任何一支留下半套 `<月份>/` 都會被其他腳本
   當成完整月包拿去算（數字偏低、不報錯）——**新腳本不要自己寫 7z 解壓**。⚠️ `<月份>/` 已存在就直接沿用、不驗
-  完整性：改版前留下的半套目錄、清理（`rmtree`）到一半被砍留下的殘骸都分辨不出來，懷疑時手動刪掉該目錄再重跑。
+  完整性（沒有完成標記，靠的是進出都改名：解壓見上、刪除見下一條）：不走這兩個函數留下的半套目錄分辨不出來，
+  懷疑時手動刪掉該目錄再重跑。
   ⚠️ **還有兩支沒改**（不在本 repo 的 git 裡，2026-10-02 盤點）：主 checkout 未入 git 的 `scripts/achievement_stats.py`
   （每月 20 日 `achievement_monthly.bat` 排程）、bullying-intel 的 `scripts/bullying_mine.py`（`judgment_derivs_monthly.py`
   月更呼叫）——同一個工作目錄、仍是「`<月份>/` 存在就跳過解壓、直接解到 `<月份>/`」的舊寫法，它們留下的半套目錄
   已改的 8 支照樣會沿用。終結案件月包三支（`closed_case_stats`／`lawyer_case_amount`／`big_amount_cases`）各用各的
   工作目錄、每次都重新下載並先刪舊目錄再解，沒有這個問題
+- **月包解壓目錄的刪除一律走 `judgment_stats.remove_extract_dir()`**（2026-10-02；`cleanup()` 與 `jy_copanel`／
+  `corp_party_stats`／`client_concentration`／`appeal_stats`／`jcasefill` 的收尾都呼叫它）：先把 `<月份>/` 改名成
+  `<月份>.deleting` 再 `rmtree`。月包約 10 萬個小檔、Windows 上刪完要數十秒；以前直接
+  `rmtree(<月份>/, ignore_errors=True)`，刪到一半行程被砍、或個別檔被防毒／索引器鎖住而被靜默略過，都會留下只剩
+  部分檔的 `<月份>/`，下一支處理同一個月的腳本直接沿用（假月包實測：被砍後剩 3/12 份、被鎖時剩 1/12 份，
+  下一支照算不報錯）。**新腳本收尾不要自己 `shutil.rmtree(<月份>/)`**。
+  - 改名被拒（目錄裡有檔案被開著）→ 每 3 秒重試、共試 5 次，仍不行就**整個目錄原封不動留著**並印「改名被拒、這次
+    沒有刪」：完整的目錄被沿用沒有問題、只是佔磁碟，之後處理同一個月的腳本收尾時會再刪。不退回就地刪除（那就是
+    會留下半套的做法），也不丟例外（月表／快取這時都已落地，不讓暫存目錄清不掉中止後面的步驟）。
+  - `<月份>.deleting`／`<月份>.extracting` 都是沒清完的暫存，不會被當成月包，可以直接手動刪。`.deleting` 會在下次
+    清理同一個月時先刪掉；那個月之後沒有腳本再處理的話就一直留著（佔磁碟、不影響數字）。
+  - 沒有做「完成標記」（評估過）：進出都改名之後「`<月份>/` 存在」本身就代表完整；標記多防到的只有不走共用函數
+    留下的目錄，代價是 `extract_month()` 得主動砍掉沒有標記的既有目錄（可能是別的行程、舊版程式正在用的）。
+  - ⚠️ 另兩支（主 checkout 未入 git 的 `achievement_stats.py`、bullying-intel 的 `bullying_mine.py`）的收尾還是直接
+    `shutil.rmtree(<月份>/, ignore_errors=True)`（2026-10-02）；它們刪到一半留下的殘骸，其他腳本照樣會沿用。
 
 ## 法官/檢察官懲戒紀錄（migration 121）
 
