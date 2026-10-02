@@ -29,6 +29,7 @@ import re
 import sys
 import json
 import time
+import shutil
 import subprocess
 from collections import defaultdict
 from datetime import date
@@ -618,9 +619,41 @@ def doctype_of(jfull_head):
     return '其他'
 
 
+def extract_month(yyyymm):
+    """把月包解壓到 WORK_DIR/<月份>/ 並回傳該目錄；目錄已在就直接用（parse 與 jy_copanel 共用）。
+    先解到 <月份>.extracting，7z 回 rc=0 才改名成 <月份>——解壓途中行程被砍（關機、CI 逾時）
+    時，半套檔案只會留在暫存名底下，不會被下一次當成完整月包拿去解析。2026-10-01 pairamtfill
+    202501 就是死在解壓途中（只解出 8 萬檔，該月約 10 萬），舊寫法重跑會照常算出偏低的數字上傳。"""
+    rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
+    extract_dir = os.path.join(WORK_DIR, yyyymm)
+    if os.path.isdir(extract_dir):
+        return extract_dir
+    tmp_dir = extract_dir + '.extracting'
+    if os.path.isdir(tmp_dir):
+        print(f'  清掉上次沒解完的 {yyyymm}.extracting')
+        shutil.rmtree(tmp_dir)
+    print(f'  解壓 {yyyymm}.rar ...')
+    r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{tmp_dir}', '-y', '-bso0', '-bsp0'],
+                       capture_output=True, text=True, errors='replace')
+    if r.returncode != 0:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        # p7zip 舊版部分錯誤只進 stdout 或兩者皆空（如不支援的 RAR 打包），rc 一併帶出
+        raise RuntimeError(f'7z 解壓失敗 rc={r.returncode}: '
+                           f'{(r.stderr or r.stdout or "")[:500]}')
+    # Windows 上剛解完的檔案偶爾還被防毒／索引器開著，改名會被拒，稍等再試
+    for attempt in range(5):
+        try:
+            os.rename(tmp_dir, extract_dir)
+            break
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(3)
+    return extract_dir
+
+
 def parse(yyyymm):
     """解壓並逐檔解析，聚合成 (法官, 法院) × 月 的統計 JSON"""
-    rar_path = os.path.join(WORK_DIR, f'{yyyymm}.rar')
     out_path = os.path.join(WORK_DIR, f'{yyyymm}_agg.json')
     if os.path.exists(out_path):
         print(f'  {yyyymm}_agg.json 已存在，跳過解析')
@@ -628,15 +661,7 @@ def parse(yyyymm):
 
     # 7z 列出檔名，逐檔用 7z e -so 串流讀出（避免全部解壓佔磁碟）
     # 實測月包內為多層目錄，JSON 檔數十萬個 → 全解壓到暫存目錄較快
-    extract_dir = os.path.join(WORK_DIR, yyyymm)
-    if not os.path.isdir(extract_dir):
-        print(f'  解壓 {yyyymm}.rar ...')
-        r = subprocess.run([SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True, errors='replace')
-        if r.returncode != 0:
-            # p7zip 舊版部分錯誤只進 stdout 或兩者皆空（如不支援的 RAR 打包），rc 一併帶出
-            raise RuntimeError(f'7z 解壓失敗 rc={r.returncode}: '
-                               f'{(r.stderr or r.stdout or "")[:500]}')
+    extract_dir = extract_month(yyyymm)
 
     # 聚合鍵：(name, court) → {n, sum_days, cats{}, causes{}, doctypes{}}
     agg = defaultdict(lambda: {'n': 0, 'sum_days': 0, 'n_days': 0,
@@ -1276,7 +1301,6 @@ def refresh_and_report(prune=False):
 def cleanup(yyyymm, purge_rar=False):
     """刪掉解壓目錄（保留 agg.json）以省磁碟；purge_rar 時連 rar 一起刪
     （backfill 幾十個月會累積數十 GB；agg.json 留著即可冪等重傳）"""
-    import shutil
     d = os.path.join(WORK_DIR, yyyymm)
     if os.path.isdir(d):
         shutil.rmtree(d, ignore_errors=True)

@@ -19,7 +19,6 @@ import sys
 import json
 import time
 import shutil
-import subprocess
 from collections import defaultdict
 
 import requests
@@ -37,14 +36,8 @@ def parse_copanel(yyyymm):
     if os.path.exists(out_path):
         print(f'  {yyyymm}_copanel.json 已存在，跳過解析')
         return out_path
-    rar_path = os.path.join(js.WORK_DIR, f'{yyyymm}.rar')
-    extract_dir = os.path.join(js.WORK_DIR, yyyymm)
-    if not os.path.isdir(extract_dir):
-        print(f'  解壓 {yyyymm}.rar ...')
-        r = subprocess.run([js.SEVENZ, 'x', rar_path, f'-o{extract_dir}', '-y', '-bso0', '-bsp0'],
-                           capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f'7z 解壓失敗: {r.stderr[:500]}')
+    # 與 judgment_stats.parse() 共用同一個解壓函數（先解到暫存名、成功才改名，防半套目錄）
+    extract_dir = js.extract_month(yyyymm)
 
     pairs = defaultdict(int)   # (a, b, court) canonical a<b
     n_files = n_panel = 0
