@@ -192,7 +192,12 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{\"last_scraped_at\": \"$(date -u +%FT%TZ)\"}")
           echo "PATCH data_sources: HTTP $http_code"
-          [ "$http_code" = "204" ] || { echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; }
+          case "$http_code" in
+            2??) ;;
+            # 4xx＝表／欄位／權限出問題，不會自己好 → 紅燈；其餘（5xx）下次排程會重寫，只警告
+            4??) echo "::error::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; exit 1 ;;
+            *) echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo ;;
+          esac
 
       - name: refresh 鏈沒跑完 → 紅燈
         # 放最後：月表步驟回 76 時先讓前面幾步照跑，再由這裡把整個 run 標成失敗

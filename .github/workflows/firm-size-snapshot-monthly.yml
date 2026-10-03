@@ -46,10 +46,18 @@ jobs:
           done
           [ $success -eq 1 ] || { echo "::error::take_firm_size_snapshot failed"; exit 1; }
 
-          # 回寫 data_sources.last_scraped_at（資料來源頁「上次執行」）
-          curl -sk --max-time 60 -X PATCH \
+          # 回寫 data_sources.last_scraped_at（資料來源頁「上次執行」）。走到這裡表示快照 RPC 已成功，
+          # 這裡紅燈＝只有回寫壞了。原本只看 curl 的 exit code（4xx 時 curl 仍 exit 0，完全無聲）
+          http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" --max-time 60 -X PATCH \
             "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.firm_size_snapshot" \
             -H "apikey: $SUPABASE_SERVICE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
             -H "Content-Type: application/json" -H "Prefer: return=minimal" \
-            -d "{\"last_scraped_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" || echo "::warning::data_sources PATCH failed (non-fatal)"
+            -d "{\"last_scraped_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}")
+          echo "PATCH data_sources: HTTP $http_code"
+          case "$http_code" in
+            2??) ;;
+            # 4xx＝表／欄位／權限出問題，不會自己好 → 紅燈；其餘（5xx）下次排程會重寫，只警告
+            4??) echo "::error::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; exit 1 ;;
+            *) echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo ;;
+          esac
