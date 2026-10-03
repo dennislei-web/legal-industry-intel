@@ -517,7 +517,10 @@
   2026-10-01 實測：有 SET 的函數跑 15s 回 200，沒 SET 的在 8s 被砍（57014）。所以各 refresh 函數的
   `SET statement_timeout` **不是裝飾，重寫函數時要保留**（`refresh_firm_map_cache` 通常 6～7s、DB 忙時到 19s，靠它才不被砍）。
   ⚠️ 設定讀自 schema cache：剛 `CREATE`／`ALTER FUNCTION` 完數十秒內仍沿用舊值（實測 ALTER 後立刻打
-  仍 8s 被砍、30 秒後正常），要立刻生效就 `NOTIFY pgrst, 'reload schema'`
+  仍 8s 被砍、30 秒後正常），要立刻生效就 `NOTIFY pgrst, 'reload schema'`。
+  漏掉的實例：`refresh_ex_judicial_lawyers`（mig 151 定義無 SET，licno-scan 收尾的 refresh 2026-08-15～09-12
+  連 6 週第一次都在 8 秒被砍、靠 60 秒後重試才過）→ mig 240（2026-10-03）以 `ALTER FUNCTION … SET` 補 600s，
+  純 metadata 不動本體；之後 `CREATE OR REPLACE` 重寫時要把 SET 寫進 CREATE，不然 proconfig 又被清掉
 - **PostgREST 每回應上限 1000 列**：大表要逐頁 `.range()`，但**別「抓一頁、等回來、再抓下一頁」串行**——
   異動與懲戒頁 judge_changes 6,000+ 列曾因 7 趟串行 round-trip 載入 3～8 秒（2026-09-22 修，commit b3edaf4）。
   一律改用 index.html 的 `fetchAllPagesParallel(buildQuery, { pageSize, prefetchPages })`（定義在 JUDGE-CHANGES 區段）：
