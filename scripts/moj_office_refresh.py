@@ -35,6 +35,8 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
     sys.stdout.reconfigure(line_buffering=True, encoding='utf-8')
+else:
+    sys.stdout.reconfigure(line_buffering=True)  # Actions log 時間戳才準（否則緩衝到第一次 flush 才一起吐）
 
 from moj_licno_scan import normalize_office, query_lic_status  # noqa: E402（需要先 load_dotenv）
 
@@ -44,6 +46,9 @@ HEADERS_SB = {'apikey': SERVICE_KEY, 'Authorization': f'Bearer {SERVICE_KEY}'}
 
 DEREG_STATE = '名冊查無（推定除名）'
 DEREG_CONFIRM_MIN_DAYS = 3  # 候選→確認的最小間隔（分片週期 7 天，防同輪重跑秒確認）
+# 連續連線失敗達此數 → 判定 MOJ 端點不通，提早 exit 1（每筆 flaky 約 45 秒，40 筆≈30 分鐘）。
+# 2026-10-04 事故：MOJ 對 runner 整段不通，200/200 全 flaky，空轉到 300 分鐘 timeout 被取消
+MAX_CONSECUTIVE_FLAKY = 40
 
 
 def fetch_current_rows():
@@ -109,14 +114,22 @@ def main(limit=None, shard=None):
     dereg_cand = 0   # 本輪新記除名候選
     dereg_conf = 0   # 本輪確認除名
     dereg_hold = 0   # 已確認除名、本輪仍查無（維持現狀）
+    consec_flaky = 0
+    aborted = False
 
     for i, row in enumerate(rows, 1):
         lic_no = row['lic_no']
         name = row.get('name') or lic_no
         data, st = query_lic_status(lic_no)
+        consec_flaky = consec_flaky + 1 if st == 'flaky' else 0
         if data is None and st == 'flaky':
             # 連線問題重試耗盡，無法斷定 → 跳過不動（不能當成異動）
             flaky += 1
+            if consec_flaky >= MAX_CONSECUTIVE_FLAKY:
+                print(f'  !! 連續 {consec_flaky} 筆連線失敗（第 {i}/{len(rows)} 筆），'
+                      f'判定 MOJ 端點不通，提早中止', flush=True)
+                aborted = True
+                break
         elif data is None:  # st == 'gone'：MOJ 確定查無（200 空 data / 404）
             if row.get('deregistered_at'):
                 dereg_hold += 1  # 已標除名，維持現狀
@@ -191,6 +204,9 @@ def main(limit=None, shard=None):
     print(f'連線失敗: {flaky} 筆（無法斷定，未動）')
     print(f'寫入失敗: {fail} 筆')
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
+    if aborted:
+        print(f'結果: 中止（連續 {MAX_CONSECUTIVE_FLAKY} 筆連線失敗），本分片未刷完，請稍後以 --shard 重跑')
+        sys.exit(1)
 
 
 def fetch_one(lic_no):
