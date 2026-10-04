@@ -116,6 +116,7 @@ def main(limit=None, shard=None):
     dereg_hold = 0   # 已確認除名、本輪仍查無（維持現狀）
     consec_flaky = 0
     aborted = False
+    events = []      # 給結尾「異動摘要」用：(類別, 說明)
 
     for i, row in enumerate(rows, 1):
         lic_no = row['lic_no']
@@ -141,6 +142,7 @@ def main(limit=None, shard=None):
                                'state_desc': DEREG_STATE}
                     if patch_lawyer(lic_no, payload):
                         dereg_conf += 1
+                        events.append(('除名確認', f'{name}（{lic_no}）兩輪皆查無，推定除名'))
                         print(f'  除名確認: {name} {lic_no}（候選於 {row["dereg_candidate_at"][:10]}，'
                               f'兩輪皆查無）', flush=True)
                         time.sleep(1)
@@ -151,6 +153,7 @@ def main(limit=None, shard=None):
                 payload = {'dereg_candidate_at': datetime.now(timezone.utc).isoformat()}
                 if patch_lawyer(lic_no, payload):
                     dereg_cand += 1
+                    events.append(('除名候選', f'{name}（{lic_no}）名冊首輪查無，待下輪複驗'))
                     print(f'  除名候選: {name} {lic_no}（名冊查無，待下輪 >= '
                           f'{DEREG_CONFIRM_MIN_DAYS} 天後複驗）', flush=True)
                 else:
@@ -178,6 +181,13 @@ def main(limit=None, shard=None):
             if payload:
                 if patch_lawyer(lic_no, payload):
                     changed += 1
+                    disp = data.get('name') or name
+                    if 'office_normalized' in payload:
+                        events.append(('事務所異動', f'{disp}（{lic_no}）{db_norm or "未登錄"} → {new_norm or "未登錄"}'))
+                    if 'state_desc' in payload:
+                        events.append(('執業狀態', f'{disp}（{lic_no}）{db_state or "-"} → {new_state_desc}'))
+                    if 'deregistered_at' in payload:
+                        events.append(('除名解除', f'{disp}（{lic_no}）名冊又查得到，清除除名旗標'))
                     if 'office_normalized' in payload or 'state_desc' in payload:
                         print(f'  異動: {data.get("name")} {lic_no} '
                               f'{db_norm or "-"} → {new_norm or "-"}'
@@ -204,9 +214,44 @@ def main(limit=None, shard=None):
     print(f'連線失敗: {flaky} 筆（無法斷定，未動）')
     print(f'寫入失敗: {fail} 筆')
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
+    print_change_summary(events, len(rows), flaky, fail, aborted, shard)
     if aborted:
         print(f'結果: 中止（連續 {MAX_CONSECUTIVE_FLAKY} 筆連線失敗），本分片未刷完，請稍後以 --shard 重跑')
         sys.exit(1)
+
+
+SUMMARY_ORDER = ['事務所異動', '執業狀態', '除名確認', '除名候選', '除名解除']
+
+
+def print_change_summary(events, total, flaky, fail, aborted, shard):
+    """結尾印一段人看的異動摘要（BEGIN/END 標記供每日巡檢從 log 擷取），
+    在 Actions 上另寫入 $GITHUB_STEP_SUMMARY。"""
+    shard_txt = f'分片 {shard[0]}/{shard[1]}' if shard else '全量'
+    head = (f'{shard_txt}：比對 {total:,} 位' + ('（中途中止，未刷完）' if aborted else '')
+            + f'，連線失敗 {flaky} 筆、寫入失敗 {fail} 筆')
+    lines = [head]
+    if not events:
+        lines.append('本輪無任何異動。')
+    for cat in SUMMARY_ORDER:
+        items = [d for c, d in events if c == cat]
+        if items:
+            lines.append(f'【{cat}】{len(items)} 筆')
+            lines.extend(f'- {d}' for d in items)
+    print('\n=== 異動摘要 BEGIN ===')
+    for ln in lines:
+        print(ln)
+    print('=== 異動摘要 END ===', flush=True)
+
+    path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if path:
+        try:
+            with open(path, 'a', encoding='utf-8') as f:
+                md = ['## MOJ 律師異動摘要', '']
+                for ln in lines:
+                    md.extend([ln] if ln.startswith('- ') else ['', ln, ''])
+                f.write('\n'.join(md) + '\n')
+        except OSError as e:
+            print(f'  ! 寫入 GITHUB_STEP_SUMMARY 失敗: {type(e).__name__}', flush=True)
 
 
 def fetch_one(lic_no):
