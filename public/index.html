@@ -7711,6 +7711,9 @@ async function showFirmDetail(firmName) {
       <div class="kpi-card"><div class="kpi-label">平均年資</div><div class="kpi-value" style="color:var(--green);">${avgSeniority}</div><div class="kpi-sub">${seniorities.length}/${total} 有資料</div></div>
     </div>
 
+    <!-- LINE 官方帳號（line_oa_accounts / line_oa_daily，開啟後非同步填入；放 KPI 下方第一張） -->
+    <div id="firmLineCard" style="display:none;"></div>
+
     ${exJudicial.length ? `
     <!-- 前司法官 -->
     <div class="card" style="border-left:3px solid var(--purple);margin-bottom:16px;">
@@ -7727,9 +7730,6 @@ async function showFirmDetail(firmName) {
 
     <!-- 近期人員異動（moj_lawyer_changes 即時，開啟後非同步填入） -->
     <div id="firmMovesCard" style="display:none;"></div>
-
-    <!-- LINE 官方帳號（line_oa_accounts / line_oa_daily，開啟後非同步填入） -->
-    <div id="firmLineCard" style="display:none;"></div>
 
     ${firmIndep.length ? `
     <!-- 上市櫃/興櫃獨立董事 -->
