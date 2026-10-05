@@ -1156,6 +1156,29 @@
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">2026-07-03 起追蹤（分所歸戶、累積口徑）；完整異動總表與出走矩陣見 <a href="#" onclick="gotoTab('lawyer','changes');return false;" style="color:var(--blue);">事務所異動追蹤</a>。</div>
         </div>
       </div>
+      <!-- LINE 官方帳號（mig 241：line_oa_accounts / line_oa_daily，line-oa-daily.yml 每日） -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128172; LINE 官方帳號 — 好友數 TOP 10 事務所</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="foLineNote">載入中…</div>
+        <div class="grid-2" style="margin-bottom:0;">
+          <div>
+            <div id="foLineTop"><div class="loading">載入中</div></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+              <span style="font-size:0.85rem;font-weight:600;" id="foLineTrendTitle">好友數趨勢</span>
+              <select id="foLineFirmSel" onchange="showLineTrend(this.value)" style="margin-left:auto;max-width:220px;background:var(--bg-card,#1a2233);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.78rem;"></select>
+            </div>
+            <div class="chart-container" style="height:240px;"><canvas id="chartLineTrend"></canvas></div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;" id="foLineTrendSub"></div>
+          </div>
+        </div>
+        <details style="margin-top:10px;" id="foLineAllWrap">
+          <summary style="cursor:pointer;font-size:0.82rem;color:var(--blue);">查看全部事務所（點所名看趨勢）</summary>
+          <div id="foLineAll" style="margin-top:8px;overflow-x:auto;"></div>
+        </details>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">來源＝LINE 官方帳號公開主頁（page.line.me）每日擷取；只有<strong>認證帳號（藍盾）</strong>有公開主頁與好友數，未認證帳號只能確認「有開」。日增＝<strong>淨增</strong>（新增好友−封鎖），真正的新增／封鎖數只有帳號擁有者後台看得到。同所多帳號（例：喆律各品牌）合計。帳號名冊＝事務所官網 LINE 連結＋競品追蹤表＋搜尋發現，非全市場普查。</div>
+      </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#9878;&#65039; 法檢轉任 — 前法官/前檢察官聚集的事務所</div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="exJudFirmNote">載入中…</div>
@@ -5406,6 +5429,7 @@ function loadFirmOverviewOnce() {
   loadIndustryStructure(); // 產業結構分析（AI 分析 398 家，firm_analysis_facts）
   loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
   loadFoFlowSnapshot();
+  loadFoLine();           // LINE 官方帳號 TOP 10＋趨勢（mig 241）
   initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
   loadFoIndep();
   loadFoGov();
@@ -5429,6 +5453,192 @@ async function loadFoFlowSnapshot() {
       text: r => String(r.net), valColor: 'var(--red)', barColor: 'rgba(224,90,90,0.55)',
     });
   } catch (e) { inBox.innerHTML = rankFailMsg(e); outBox.innerHTML = ''; }
+}
+
+// ============================================================
+// LINE 官方帳號（mig 241：line_oa_accounts / line_oa_daily，line-oa-daily.yml 每日）
+// friend_count 是淨好友數；同所多帳號合計時只取「所有帳號當天都有資料」的日期，避免帳號中途加入造成假跳升
+// ============================================================
+const _lineCharts = {};
+let _lineRank = [];
+const lineAddDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const lineDeltaHtml = v => v == null ? '<span style="color:var(--text-muted);">—</span>'
+  : `<span style="color:${v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)'};">${v > 0 ? '+' : ''}${Number(v).toLocaleString()}</span>`;
+
+async function fetchLineDaily(ids) {
+  const out = [];
+  for (let s = 0; ; s += 1000) {
+    const { data, error } = await db.from('line_oa_daily').select('search_id,snap_date,friend_count')
+      .in('search_id', ids).order('snap_date').order('search_id').range(s, s + 999);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < 1000) return out;
+  }
+}
+// 單一帳號（rows 依日期升冪）：最新值與 n 天前（當日或之前最近一筆）的差
+function lineDeltaAt(rows, days) {
+  if (!rows || rows.length < 2) return null;
+  const last = rows[rows.length - 1], cut = lineAddDays(last.snap_date, -days);
+  for (let i = rows.length - 2; i >= 0; i--) if (rows[i].snap_date <= cut) return last.friend_count - rows[i].friend_count;
+  return null;
+}
+// 多帳號合計序列：只留所有帳號都有資料的日期；gain＝與前一個有效日期的差
+function lineFirmSeries(rows) {
+  const ids = new Set(rows.map(r => r.search_id)), byDate = {};
+  rows.forEach(r => { (byDate[r.snap_date] = byDate[r.snap_date] || []).push(r.friend_count); });
+  const pts = Object.keys(byDate).sort().filter(d => byDate[d].length === ids.size)
+    .map(d => ({ d, v: byDate[d].reduce((a, b) => a + b, 0) }));
+  pts.forEach((p, i) => { p.gain = i ? p.v - pts[i - 1].v : null; });
+  return pts;
+}
+function drawLineTrend(canvasId, pts) {
+  if (_lineCharts[canvasId]) { _lineCharts[canvasId].destroy(); delete _lineCharts[canvasId]; }
+  const cv = document.getElementById(canvasId);
+  if (!cv || !pts.length) return;
+  _lineCharts[canvasId] = new Chart(cv, {
+    data: {
+      labels: pts.map(p => p.d.slice(5)),
+      datasets: [
+        { type: 'line', label: '好友數', data: pts.map(p => p.v), yAxisID: 'y', borderColor: '#4cc38a',
+          backgroundColor: 'rgba(76,195,138,0.15)', pointRadius: pts.length > 40 ? 0 : 2, tension: 0.2, fill: false },
+        { type: 'bar', label: '日淨增', data: pts.map(p => p.gain), yAxisID: 'y1', backgroundColor: 'rgba(79,142,247,0.45)' },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { ticks: { color: '#8899aa', font: { size: 10 }, maxRotation: 0, autoSkip: true }, grid: { display: false } },
+        y: { position: 'left', ticks: { color: '#8899aa', callback: v => Number(v).toLocaleString() }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y1: { position: 'right', ticks: { color: '#6f86b8' }, grid: { display: false }, beginAtZero: true },
+      },
+      plugins: {
+        legend: { labels: { color: '#8899aa', boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}：${c.raw == null ? '—' : Number(c.raw).toLocaleString()}` } },
+      },
+    },
+  });
+}
+
+async function loadFoLine() {
+  const topBox = document.getElementById('foLineTop'), note = document.getElementById('foLineNote');
+  try {
+    const [{ data: rank, error }, { data: accs, error: e2 }] = await Promise.all([
+      db.rpc('line_oa_firm_ranking'),
+      db.from('line_oa_accounts').select('is_certified,firm_name').eq('excluded', false).range(0, 4999),
+    ]);
+    if (error || e2) throw (error || e2);
+    _lineRank = rank || [];
+    const cert = (accs || []).filter(a => a.is_certified).length, all = (accs || []).length;
+    const firms = new Set((accs || []).filter(a => a.firm_name).map(a => a.firm_name)).size;
+    const latest = _lineRank.reduce((m, r) => r.latest_date > m ? r.latest_date : m, '');
+    note.innerHTML = `追蹤 ${all} 個帳號（${firms} 家事務所）：認證 ${cert} 個有好友數、未認證 ${all - cert} 個只知道有開；最新資料 ${latest || '-'}。點所名看右側趨勢，「詳情」開事務所頁。`;
+    topBox.innerHTML = rankListHtml(_lineRank.slice(0, 10), {
+      value: r => r.friends,
+      label: r => `<a href="#" onclick="showLineTrend('${_nameArg(r.firm_name)}');return false;" style="color:var(--blue);text-decoration:none;">${escHtml(r.firm_name)}</a>`
+        + ` <a href="#" onclick="showFirmDetail('${_nameArg(r.firm_name)}');return false;" style="font-size:0.7rem;color:var(--text-muted);">詳情</a>`,
+      sub: r => `${r.accounts > 1 ? r.accounts + ' 帳號｜' : ''}7 日 ${r.d7 == null ? '—' : (r.d7 > 0 ? '+' : '') + Number(r.d7).toLocaleString()}`,
+      text: r => Number(r.friends).toLocaleString(),
+      barColor: 'rgba(76,195,138,0.6)',
+    });
+    const sel = document.getElementById('foLineFirmSel');
+    sel.innerHTML = _lineRank.map(r => `<option value="${escHtml(r.firm_name)}">${escHtml(r.firm_name)}（${Number(r.friends).toLocaleString()}）</option>`).join('');
+    renderFoLineAll('friends');
+    if (_lineRank.length) showLineTrend(_lineRank[0].firm_name);
+  } catch (e) { topBox.innerHTML = rankFailMsg(e); note.textContent = ''; }
+}
+
+function renderFoLineAll(sortKey) {
+  const box = document.getElementById('foLineAll');
+  const rows = _lineRank.slice().sort((a, b) => (b[sortKey] ?? -1e15) - (a[sortKey] ?? -1e15));
+  const th = (k, t) => `<th style="text-align:right;padding:4px 8px;cursor:pointer;${k === sortKey ? 'color:var(--gold);' : ''}" onclick="renderFoLineAll('${k}')">${t}${k === sortKey ? ' ↓' : ''}</th>`;
+  box.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+    <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
+      <th style="text-align:left;padding:4px 8px;">#</th><th style="text-align:left;padding:4px 8px;">事務所</th>
+      ${th('accounts', '帳號')}${th('friends', '好友數')}${th('d1', '日淨增')}${th('d7', '7 日')}${th('d30', '30 日')}
+      <th style="text-align:right;padding:4px 8px;">起算日</th></tr></thead>
+    <tbody>${rows.map((r, i) => `<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:4px 8px;color:var(--text-muted);">${i + 1}</td>
+      <td style="padding:4px 8px;"><a href="#" onclick="showLineTrend('${_nameArg(r.firm_name)}');document.getElementById('foLineTrendTitle').scrollIntoView({block:'center',behavior:'smooth'});return false;" style="color:var(--blue);text-decoration:none;">${escHtml(r.firm_name)}</a>
+        <a href="#" onclick="showFirmDetail('${_nameArg(r.firm_name)}');return false;" style="font-size:0.7rem;color:var(--text-muted);">詳情</a></td>
+      <td style="text-align:right;padding:4px 8px;">${r.accounts}</td>
+      <td style="text-align:right;padding:4px 8px;font-weight:600;">${Number(r.friends).toLocaleString()}</td>
+      <td style="text-align:right;padding:4px 8px;">${lineDeltaHtml(r.d1)}</td>
+      <td style="text-align:right;padding:4px 8px;">${lineDeltaHtml(r.d7)}</td>
+      <td style="text-align:right;padding:4px 8px;">${lineDeltaHtml(r.d30)}</td>
+      <td style="text-align:right;padding:4px 8px;color:var(--text-muted);">${r.first_date || '-'}</td></tr>`).join('')}</tbody></table>
+    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">「—」＝追蹤天數還不夠比較（起算日之後才有資料）。</div>`;
+}
+
+async function showLineTrend(firmName) {
+  const title = document.getElementById('foLineTrendTitle'), sub = document.getElementById('foLineTrendSub');
+  const sel = document.getElementById('foLineFirmSel');
+  if (sel && sel.value !== firmName) sel.value = firmName;
+  title.innerHTML = `${firmLink(firmName)} 好友數趨勢`;
+  sub.textContent = '載入中…';
+  try {
+    const { data: accs, error } = await db.from('line_oa_accounts').select('search_id')
+      .eq('firm_name', firmName).eq('excluded', false).eq('is_certified', true);
+    if (error) throw error;
+    const rows = accs?.length ? await fetchLineDaily(accs.map(a => a.search_id)) : [];
+    if ((sel && sel.value !== firmName)) return;  // 使用者已切到別所
+    const pts = lineFirmSeries(rows);
+    drawLineTrend('chartLineTrend', pts);
+    const r = _lineRank.find(x => x.firm_name === firmName);
+    sub.innerHTML = pts.length
+      ? `${pts[0].d} 起 ${pts.length} 個資料日；目前 ${Number(pts[pts.length - 1].v).toLocaleString()} 人${r ? `，7 日 ${lineDeltaHtml(r.d7)}、30 日 ${lineDeltaHtml(r.d30)}` : ''}${(accs || []).length > 1 ? `（${accs.length} 個認證帳號合計）` : ''}`
+      : '尚無好友數資料';
+  } catch (e) { sub.textContent = '載入失敗：' + (e.message || e); }
+}
+
+// 事務所 modal 概覽：LINE 官方帳號卡
+async function loadFirmLineCard(firmName) {
+  try {
+    const { data: accs, error } = await db.from('line_oa_accounts')
+      .select('search_id,display_name,premium_id,basic_id,is_certified,brand_group,source,last_status')
+      .eq('firm_name', firmName).eq('excluded', false);
+    if (error || firmName !== _currentFirmName) return;
+    const el = document.getElementById('firmLineCard');
+    if (!el) return;
+    const head = `<div class="card-title" style="color:#4cc38a;">💬 LINE 官方帳號</div>`;
+    if (!accs || !accs.length) {
+      el.innerHTML = `<div class="card" style="border-left:3px solid var(--border);margin-bottom:16px;">${head}
+        <div style="font-size:0.8rem;color:var(--text-muted);">官網與追蹤名單中未發現 LINE 官方帳號（官網沒放連結的帳號可能漏列）。</div></div>`;
+      el.style.display = '';
+      return;
+    }
+    const certIds = accs.filter(a => a.is_certified).map(a => a.search_id);
+    const rows = certIds.length ? await fetchLineDaily(certIds) : [];
+    if (firmName !== _currentFirmName) return;
+    const by = {};
+    rows.forEach(r => (by[r.search_id] = by[r.search_id] || []).push(r));
+    const latest = id => { const s = by[id]; return s && s.length ? s[s.length - 1] : null; };
+    accs.sort((a, b) => (latest(b.search_id)?.friend_count ?? -1) - (latest(a.search_id)?.friend_count ?? -1));
+    const shownId = a => '@' + ((a.premium_id || a.basic_id || a.search_id).replace(/^@/, ''));
+    const total = certIds.reduce((s, id) => s + (latest(id)?.friend_count || 0), 0);
+    const pts = lineFirmSeries(rows);
+    el.innerHTML = `<div class="card" style="border-left:3px solid #4cc38a;margin-bottom:16px;">${head}
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">${accs.length} 個帳號（認證 ${certIds.length} 個）${certIds.length ? `｜認證帳號好友合計 <strong style="color:var(--text);">${total.toLocaleString()}</strong>` : ''}｜每日擷取公開主頁，增減為淨增（新增−封鎖）</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
+          <th style="text-align:left;padding:4px 6px;">帳號</th><th style="text-align:left;padding:4px 6px;">認證</th>
+          <th style="text-align:right;padding:4px 6px;">好友數</th><th style="text-align:right;padding:4px 6px;">日淨增</th>
+          <th style="text-align:right;padding:4px 6px;">7 日</th><th style="text-align:right;padding:4px 6px;">30 日</th></tr></thead>
+        <tbody>${accs.map(a => {
+          const s = by[a.search_id] || [], l = latest(a.search_id);
+          return `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:4px 6px;">${escHtml(a.display_name || '')} <a href="https://page.line.me/${encodeURIComponent(a.search_id)}" target="_blank" rel="noopener" style="color:var(--text-muted);font-size:0.72rem;">${escHtml(shownId(a))}</a></td>
+            <td style="padding:4px 6px;">${a.is_certified ? '<span style="color:#4f8ef7;">✔ 認證</span>' : '<span style="color:var(--text-muted);">未認證</span>'}</td>
+            <td style="text-align:right;padding:4px 6px;font-weight:600;">${l ? l.friend_count.toLocaleString() : '<span style="color:var(--text-muted);font-weight:400;">不公開</span>'}</td>
+            <td style="text-align:right;padding:4px 6px;">${a.is_certified ? lineDeltaHtml(lineDeltaAt(s, 1)) : ''}</td>
+            <td style="text-align:right;padding:4px 6px;">${a.is_certified ? lineDeltaHtml(lineDeltaAt(s, 7)) : ''}</td>
+            <td style="text-align:right;padding:4px 6px;">${a.is_certified ? lineDeltaHtml(lineDeltaAt(s, 30)) : ''}</td></tr>`;
+        }).join('')}</tbody></table></div>
+      ${pts.length > 1 ? `<div class="chart-container" style="height:200px;margin-top:10px;"><canvas id="chartFirmLine"></canvas></div>` : ''}
+      ${!certIds.length ? '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">未認證帳號沒有公開主頁，外部無法取得好友數。</div>' : ''}
+    </div>`;
+    el.style.display = '';
+    if (pts.length > 1) drawLineTrend('chartFirmLine', pts);
+  } catch (e) { /* 卡片為輔助資訊，載入失敗不擋 modal */ }
 }
 
 // 上市櫃獨董席次 TOP 10 事務所（分所歸戶主所名，口徑同事務所列表徽章）
@@ -7518,6 +7728,9 @@ async function showFirmDetail(firmName) {
     <!-- 近期人員異動（moj_lawyer_changes 即時，開啟後非同步填入） -->
     <div id="firmMovesCard" style="display:none;"></div>
 
+    <!-- LINE 官方帳號（line_oa_accounts / line_oa_daily，開啟後非同步填入） -->
+    <div id="firmLineCard" style="display:none;"></div>
+
     ${firmIndep.length ? `
     <!-- 上市櫃/興櫃獨立董事 -->
     <div class="card" style="border-left:3px solid var(--gold);margin-bottom:16px;">
@@ -7709,6 +7922,9 @@ async function showFirmDetail(firmName) {
 
   // 概覽：近期人員異動卡（即時讀 moj_lawyer_changes，與 AI 分析文脫鉤避免過時）
   loadFirmMovesCard(firmName);
+
+  // 概覽：LINE 官方帳號卡（line_oa_*，mig 241）
+  loadFirmLineCard(firmName);
 
   // 概覽：國際評鑑獎項卡（firm_awards，mig 175）
   loadFirmAwardsCard(firmName);

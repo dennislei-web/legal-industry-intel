@@ -1,0 +1,43 @@
+name: 事務所 LINE 官方帳號每日好友數
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # UTC 23:00 = 台灣 07:00（GitHub 排程常晚 1～3 小時；snap_date 用執行當下台北日期）
+  workflow_dispatch:
+
+jobs:
+  line-oa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install requests
+      - name: Discover + daily snapshot（mig 241）
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python line_oa_daily.py
+      - name: 回寫 data_sources.last_scraped_at
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          SUPABASE_URL="$(printf %s "$SUPABASE_URL" | tr -d '[:space:]')"
+          SUPABASE_SERVICE_KEY="$(printf %s "$SUPABASE_SERVICE_KEY" | tr -d '[:space:]')"
+          http_code=$(curl -sk -o /tmp/resp.txt -w "%{http_code}" --max-time 60 -X PATCH \
+            "$SUPABASE_URL/rest/v1/data_sources?scraper_name=eq.line_oa_daily" \
+            -H "apikey: $SUPABASE_SERVICE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+            -H "Content-Type: application/json" -H "Prefer: return=minimal" \
+            -d "{\"last_scraped_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}")
+          echo "PATCH data_sources: HTTP $http_code"
+          case "$http_code" in
+            2??) ;;
+            4??) echo "::error::last_scraped_at 回寫失敗 HTTP $http_code"; head -c 300 /tmp/resp.txt; echo; exit 1 ;;
+            *) echo "::warning::last_scraped_at 回寫失敗 HTTP $http_code" ;;
+          esac
