@@ -118,6 +118,7 @@ def fetch_profile(search_id):
         "friends": ai.get("friendCount"),
         "basic_id": (ai.get("basicSearchId") or "").lower() or None,
         "premium_id": (ai.get("premiumSearchId") or "").lower() or None,
+        "country": ai.get("countryCode"),
     }
 
 

@@ -2,7 +2,8 @@ name: 事務所 LINE 官方帳號每日好友數
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # UTC 23:00 = 台灣 07:00（GitHub 排程常晚 1～3 小時；snap_date 用執行當下台北日期）
+    - cron: '0 23 * * 1-6'  # UTC 23:00 = 台灣 07:00（GitHub 排程常晚 1～3 小時；snap_date 用執行當下台北日期）
+    - cron: '0 23 * * 0'    # 週日 UTC＝台灣週一：同上＋官網深掃（看 github.event.schedule 判斷，不用 runner 時間）
   workflow_dispatch:
 
 jobs:
@@ -15,13 +16,20 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install requests
+        run: pip install requests urllib3
       - name: Discover + daily snapshot（mig 241）
         working-directory: scripts
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python line_oa_daily.py
+      - name: 每週一深掃事務所官網 LINE 連結（firm_websites 首頁＋聯絡頁）
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 23 * * 0'
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python line_oa_site_scan.py && python line_oa_daily.py daily
       - name: 回寫 data_sources.last_scraped_at
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
