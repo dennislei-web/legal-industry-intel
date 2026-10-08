@@ -7632,7 +7632,7 @@ async function showFirmDetail(firmName) {
     let rows = [];
     for (let from = 0; ; from += 1000) {
       const { data, error } = await db.from('moj_lawyers')
-        .select('name, lic_no, sex, birth_year, office, office_normalized, main_region, email, tel, state_desc')
+        .select('name, lic_no, sex, birth_year, office, office_normalized, main_region, guild_names, address, email, tel, state_desc')
         .or(`office_normalized.eq.${firmName},office_normalized.like.${firmName}%`)
         .order('name')
         .range(from, from + 999);
@@ -7926,7 +7926,7 @@ async function showFirmDetail(firmName) {
       <div class="table-wrap" style="max-height:400px;overflow-y:auto;">
         <table>
           <thead><tr>
-            <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th>地區</th><th>聯繫</th>
+            <th>姓名</th><th>性別</th><th>出生年</th><th>證號</th><th title="名冊登錄的執業處所地址所在縣市">執業地</th><th title="加入的律師公會（可多個；不代表執業地）">所屬公會</th><th>聯繫</th>
           </tr></thead>
           <tbody>${(() => {
             // 一人所：唯一「正常」狀態律師即所長（口徑同 mig 106 view，這裡用手上名單直接判；含個人姓名登錄）
@@ -7954,7 +7954,8 @@ async function showFirmDetail(firmName) {
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${age}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
-              <td>${escHtml(l.main_region || '-')}</td>
+              <td title="${escHtml(l.address || '')}">${escHtml(addrRegion(l.address) || '-')}</td>
+              <td style="font-size:0.78rem;" title="${escHtml((l.guild_names || []).join('、'))}">${escHtml(guildShort(l.guild_names) || l.main_region || '-')}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;">${escHtml(contact)}</td>
             </tr>`;
           }).join('')
@@ -7964,7 +7965,8 @@ async function showFirmDetail(firmName) {
               <td>${l.sex || '-'}</td>
               <td style="font-size:0.8rem;">${l.birth_year && l.birth_year < 200 ? `民${l.birth_year}` : '-'}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);" title="${escHtml(l.lic_no || '')}">${escHtml((l.lic_no || '').slice(-10))}</td>
-              <td>${escHtml(l.main_region || '-')}</td>
+              <td>${escHtml(addrRegion(l.address) || '-')}</td>
+              <td style="font-size:0.78rem;">${escHtml(guildShort(l.guild_names) || l.main_region || '-')}</td>
               <td style="font-size:0.75rem;color:var(--text-muted);">名冊查無（推定除名）</td>
             </tr>`).join('');
           })()}</tbody>
@@ -8142,6 +8144,18 @@ async function loadLawyerAwardsCard(name) {
 }
 
 // ============================================================
+// 執業地：地址開頭縣市（同 mig 243 addr_region；moj_office_refresh 每週隨異動比對同步地址）
+const ADDR_REGIONS = ['台北','新北','桃園','台中','台南','高雄','基隆','新竹','苗栗','彰化','南投','雲林','嘉義','屏東','宜蘭','花蓮','台東','澎湖','金門','連江'];
+function addrRegion(addr) {
+  const a = String(addr || '').replace(/^[0-9０-９\s-]+/, '').replace(/臺/g, '台').slice(0, 2);
+  return ADDR_REGIONS.includes(a) ? a : '';
+}
+// 所屬公會：「社團法人台北律師公會」→「台北」；全聯會→「全聯會」
+function guildShort(gs) {
+  return (gs || []).map(g => String(g).replace('社團法人', '').trim())
+    .map(g => /全國|聯合會/.test(g) ? '全聯會' : g.replace(/律師公會.*$/, '')).filter(Boolean).join('、');
+}
+
 // 概覽 tab：近期人員異動卡（moj_lawyer_changes，2026-07-03 起追蹤）
 // ============================================================
 async function loadFirmMovesCard(firmName) {

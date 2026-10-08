@@ -38,7 +38,7 @@ if sys.platform == 'win32':
 else:
     sys.stdout.reconfigure(line_buffering=True)  # Actions log 時間戳才準（否則緩衝到第一次 flush 才一起吐）
 
-from moj_licno_scan import normalize_office, query_lic_status  # noqa: E402（需要先 load_dotenv）
+from moj_licno_scan import normalize_office, query_lic_status, to_lawyer_record  # noqa: E402（需要先 load_dotenv）
 
 SUPABASE_URL = os.environ['SUPABASE_URL'].strip()
 SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY'].strip()
@@ -58,7 +58,7 @@ def fetch_current_rows():
     while True:
         r = requests.get(
             f'{SUPABASE_URL}/rest/v1/moj_lawyers'
-            f'?select=lic_no,name,office_normalized,state_desc,dereg_candidate_at,deregistered_at'
+            f'?select=lic_no,name,office_normalized,state_desc,dereg_candidate_at,deregistered_at,address,guild_names'
             f'&order=lic_no&offset={page * 1000}&limit=1000',
             headers=HEADERS_SB, verify=False, timeout=60,
         )
@@ -109,6 +109,7 @@ def main(limit=None, shard=None):
     print('[2/2] 逐位比對 MOJ API...')
     t0 = time.time()
     changed = 0
+    contact_upd = 0  # 只更新地址／聯絡方式／公會
     flaky = 0
     fail = 0
     dereg_cand = 0   # 本輪新記除名候選
@@ -171,6 +172,21 @@ def main(limit=None, shard=None):
             if new_state_desc != db_state and new_state_desc is not None:
                 payload['state'] = str(data.get('state')) if data.get('state') is not None else None
                 payload['state_desc'] = new_state_desc
+            # 執業地址／聯絡方式／公會：同一支 API 回應就有，順手同步（detail fetch 只在新發現時抓一次，
+            # 轉所後地址會停在舊所）。轉所或地址變了就更新並刷新 detail_fetched_at——
+            # change_regions()（mig 243）靠它判斷地址屬於異動前或異動後。API 回空值時保留舊值。
+            rec = to_lawyer_record(lic_no, data)
+            new_addr = rec.get('address')
+            if new_addr and ('office_normalized' in payload or new_addr != row.get('address')):
+                payload['address'] = new_addr
+                if rec.get('email'):
+                    payload['email'] = rec['email']
+                if rec.get('tel'):
+                    payload['tel'] = rec['tel']
+                payload['detail_fetched_at'] = datetime.now(timezone.utc).isoformat()
+            if rec.get('guild_names') and rec['guild_names'] != (row.get('guild_names') or None):
+                payload['guild_names'] = rec['guild_names']
+                payload['main_region'] = rec.get('main_region')
             if row.get('deregistered_at') or row.get('dereg_candidate_at'):
                 # 名冊又查得到（重新登錄/先前誤判）→ 解除除名旗標；
                 # state_desc 由上面比對還原成 API 現值，trigger 自動記回異動追蹤
@@ -178,7 +194,15 @@ def main(limit=None, shard=None):
                 payload['deregistered_at'] = None
                 print(f'  除名解除: {name} {lic_no} 名冊查得到，清除候選/除名旗標', flush=True)
 
-            if payload:
+            # 只有地址／公會變了（非事務所／狀態異動）另計，不灌進「異動」數也不長睡
+            contact_only = not ({'office_normalized', 'state_desc', 'deregistered_at'} & payload.keys())
+            if payload and contact_only:
+                if patch_lawyer(lic_no, payload):
+                    contact_upd += 1
+                    time.sleep(0.2)
+                else:
+                    fail += 1
+            elif payload:
                 if patch_lawyer(lic_no, payload):
                     changed += 1
                     disp = data.get('name') or name
@@ -211,6 +235,7 @@ def main(limit=None, shard=None):
     print(f'異動: {changed} 筆（含事務所變更 + 執業狀態變更 + 除名解除）')
     print(f'除名候選: {dereg_cand} 筆（首輪查無，待複驗）/ 除名確認: {dereg_conf} 筆'
           f' / 已除名維持: {dereg_hold} 筆')
+    print(f'地址／公會同步: {contact_upd} 筆（非異動，不記入異動追蹤）')
     print(f'連線失敗: {flaky} 筆（無法斷定，未動）')
     print(f'寫入失敗: {fail} 筆')
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
@@ -257,7 +282,7 @@ def print_change_summary(events, total, flaky, fail, aborted, shard):
 def fetch_one(lic_no):
     r = requests.get(
         f'{SUPABASE_URL}/rest/v1/moj_lawyers'
-        f'?select=lic_no,name,office_normalized,state_desc,dereg_candidate_at,deregistered_at'
+        f'?select=lic_no,name,office_normalized,state_desc,dereg_candidate_at,deregistered_at,address,guild_names'
         f'&lic_no=eq.{quote(lic_no)}',
         headers=HEADERS_SB, verify=False, timeout=60,
     )
