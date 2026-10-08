@@ -1012,6 +1012,15 @@
           <div id="lwTopActiveList"><div class="loading">載入中</div></div>
         </div>
       </div>
+      <!-- 律師所在事務所規模分布（mig 244 lawyer_firm_size_dist） -->
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127970; 律師所在事務所規模分布</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="lwFirmSizeNote">載入中…</div>
+        <div class="grid-2" style="margin-bottom:0;">
+          <div class="chart-container" style="height:280px;"><canvas id="chartLawyerFirmSize"></canvas></div>
+          <div id="lwFirmSizeTable" style="overflow-x:auto;"><div class="loading">載入中</div></div>
+        </div>
+      </div>
       <div class="grid-2">
         <div class="card">
           <div class="card-title">&#128200; 律師活動量變化 · 近 3 年 vs 前 3 年</div>
@@ -4978,6 +4987,57 @@ async function loadDemographicCharts() {
   });
 }
 
+// 律師所在事務所規模分布：現職律師依所屬單位人數分組（mig 244 lawyer_firm_size_dist）
+async function loadLawyerFirmSizeDist() {
+  const note = document.getElementById('lwFirmSizeNote'), tbl = document.getElementById('lwFirmSizeTable');
+  try {
+    const { data, error } = await db.rpc('lawyer_firm_size_dist');
+    if (error) throw error;
+    const rows = data || [];
+    const total = rows.reduce((a, r) => a + (r.lawyers || 0), 0) || 1;
+    const pct = n => (n / total * 100).toFixed(1) + '%';
+    const firmRows = rows.filter(r => r.sort <= 7);
+    const big = rows.filter(r => r.sort >= 5 && r.sort <= 7).reduce((a, r) => a + r.lawyers, 0);
+    const small = rows.filter(r => r.sort <= 3).reduce((a, r) => a + r.lawyers, 0);
+    note.textContent = `現職律師 ${total.toLocaleString()} 位；在 5 人以下事務所 ${pct(small)}、11 人以上事務所 ${pct(big)}。單位口徑＝法務部名冊登錄單位（分所歸戶），即時計算。`;
+    const colors = rows.map(r => r.sort <= 7 ? 'rgba(155,126,216,0.7)' : 'rgba(136,153,170,0.45)');
+    if (chartInstances.lawyerFirmSize) chartInstances.lawyerFirmSize.destroy();
+    const txt = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
+    const opts = {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: txt, font: { size: 10 }, autoSkip: false, maxRotation: 45 }, grid: { color: 'transparent' } },
+        y: { ticks: { color: txt, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      },
+    };
+    opts.plugins = {
+      legend: { display: false },
+      tooltip: { callbacks: { label: c => {
+        const r = rows[c.dataIndex];
+        return `${r.lawyers.toLocaleString()} 位（${pct(r.lawyers)}）` + (r.units != null ? `｜${r.units.toLocaleString()} 個單位` : '');
+      } } },
+    };
+    chartInstances.lawyerFirmSize = new Chart(document.getElementById('chartLawyerFirmSize').getContext('2d'), {
+      type: 'bar',
+      data: { labels: rows.map(r => r.band), datasets: [{ label: '律師數', data: rows.map(r => r.lawyers), backgroundColor: colors, borderRadius: 4 }] },
+      options: opts,
+    });
+    const td = 'padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);';
+    const th = 'padding:5px 8px;text-align:right;color:var(--text-muted);font-weight:500;border-bottom:1px solid var(--border);';
+    let cum = 0;
+    tbl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <thead><tr><th style="${th}text-align:left;">所屬單位規模</th><th style="${th}">律師</th><th style="${th}">佔比</th><th style="${th}">累計</th><th style="${th}">單位數</th></tr></thead>
+      <tbody>${rows.map(r => {
+        cum += r.lawyers;
+        const muted = r.sort > 7 ? 'color:var(--text-muted);' : '';
+        return `<tr style="${muted}"><td style="${td}text-align:left;">${r.band}</td><td style="${td}">${r.lawyers.toLocaleString()}</td>
+          <td style="${td}font-weight:600;">${pct(r.lawyers)}</td><td style="${td}color:var(--text-muted);">${pct(cum)}</td>
+          <td style="${td}">${r.units != null ? r.units.toLocaleString() : '—'}</td></tr>`;
+      }).join('')}</tbody></table>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">非事務所單位＝企業、法人、機關等；未登錄＝名冊未填或「律師未顯示」。</div>`;
+  } catch (e) { tbl.innerHTML = rankFailMsg(e); note.textContent = ''; }
+}
+
 async function loadFirmSizeChart() {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
   const firmColor = 'rgba(155,126,216,0.65)'; // 紫
@@ -5232,6 +5292,7 @@ let _lwRankLoaded = false;
 function loadLawyerRankCardsOnce() {
   if (_lwRankLoaded) return;
   _lwRankLoaded = true;
+  loadLawyerFirmSizeDist();  // 律師所在事務所規模分布（mig 244）
   loadExJudicialKpi();
   loadLwTopActive();
   loadLwGrowth();
