@@ -978,7 +978,8 @@
         <div class="card">
           <div class="card-title">&#9878;&#65039; 訴訟領域律師 TOP 10</div>
           <div class="sub-tabs" id="ctlCatTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:8px 0;">
-            <button class="sub-tab-btn active" data-cat="民事">民事</button>
+            <button class="sub-tab-btn active" data-cat="">全部</button>
+            <button class="sub-tab-btn" data-cat="民事">民事</button>
             <button class="sub-tab-btn" data-cat="刑事">刑事</button>
             <button class="sub-tab-btn" data-cat="家事">家事</button>
             <button class="sub-tab-btn" data-cat="行政">行政</button>
@@ -5350,7 +5351,7 @@ async function loadLwGrowth() {
 }
 
 // 訴訟領域律師 TOP 10（cause_top_lawyers RPC，mig 093；種類清單借 cause_supply_stats 依件數排序）
-let _ctlGroups = null, _ctlCat = '民事';
+let _ctlGroups = null, _ctlCat = '';  // '' ＝全部案類
 async function initCtlCard() {
   document.querySelectorAll('#ctlCatTabs .sub-tab-btn').forEach(btn => {
     btn.onclick = () => {
@@ -5369,25 +5370,28 @@ async function initCtlCard() {
 }
 function ctlFillGroups() {
   const sel = document.getElementById('ctlGroupSel');
-  const list = (_ctlGroups || []).filter(g => g.cat === _ctlCat);
-  // 預設選件數最大的非「其他」剩餘桶（桶仍列在下拉可手動選）
-  const def = (list.find(g => !/^其他/.test(g.cause_group)) || list[0] || {}).cause_group || '';
-  sel.innerHTML = list.map(g =>
-    `<option value="${escHtml(g.cause_group)}"${g.cause_group === def ? ' selected' : ''}>${escHtml(g.cause_group)}（${Number(g.total_cases).toLocaleString()} 件）</option>`).join('');
+  // 預設＝「全部」（該案類加總；全部分頁＝全部案類），再下拉選種類；全部分頁的下拉列出各案類種類並標案類
+  const list = (_ctlGroups || []).filter(g => !_ctlCat || g.cat === _ctlCat);
+  const sum = list.reduce((a, g) => a + Number(g.total_cases || 0), 0);
+  sel.innerHTML = `<option value="" selected>全部${_ctlCat ? _ctlCat : '案類'}（${sum.toLocaleString()} 件）</option>` + list.map(g =>
+    `<option value="${escHtml(g.cause_group)}">${_ctlCat ? '' : escHtml(g.cat) + '｜'}${escHtml(g.cause_group)}（${Number(g.total_cases).toLocaleString()} 件）</option>`).join('');
   ctlLoadRank();
 }
 window.ctlLoadRank = async function() {
   const group = document.getElementById('ctlGroupSel').value;
   const box = document.getElementById('ctlList');
-  if (!group) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0;">此案類無資料</div>'; return; }
   box.innerHTML = '<div class="loading">載入中</div>';
   try {
-    const { data, error } = await db.rpc('cause_top_lawyers', { p_group: group, p_limit: 10 });
+    // group 空＝「全部」：該案類加總（_ctlCat 空＝全部案類，mig 245）；否則單一種類（mig 093）
+    const { data, error } = group
+      ? await db.rpc('cause_top_lawyers', { p_group: group, p_limit: 10 })
+      : await db.rpc('cause_top_lawyers_cat', { p_cat: _ctlCat || null, p_limit: 10 });
     if (error) throw error;
+    const allCases = !group && !_ctlCat;
     box.innerHTML = rankListHtml(data || [], {
       value: r => r.cases,
       label: r => lwNameLink(r.name),
-      sub: r => '佔其出庭 ' + Math.round((r.share || 0) * 100) + '%',
+      sub: allCases ? null : r => '佔其出庭 ' + Math.round((r.share || 0) * 100) + '%',
     });
   } catch (e) { box.innerHTML = rankFailMsg(e); }
 };
