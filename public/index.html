@@ -8082,7 +8082,7 @@ async function loadLawyerAwardsCard(name) {
 async function loadFirmMovesCard(firmName) {
   try {
     const { data: chg, error } = await db.from('moj_lawyer_changes')
-      .select('name, change_type, old_office, new_office, changed_at')
+      .select('id, name, change_type, old_office, new_office, changed_at')
       .or(`old_office.eq.${firmName},old_office.like.${firmName}%,new_office.eq.${firmName},new_office.like.${firmName}%`)
       .order('changed_at', { ascending: false })
       .limit(120);
@@ -8105,6 +8105,28 @@ async function loadFirmMovesCard(firmName) {
       rows.push({ ...c, kind });
     });
     if (!rows.length) return;
+    // 兩端所在地區（mig 243 change_regions）；失敗不擋整張卡
+    const reg = {};
+    try {
+      const { data: rg } = await db.rpc('change_regions', { p_ids: rows.slice(0, 40).map(r => r.id) });
+      (rg || []).forEach(x => { reg[x.id] = x; });
+    } catch (e) { console.log('change_regions error:', e); }
+    if (firmName !== _currentFirmName) return;
+    const regSide = (r, src, multi) => !r ? '<span style="color:var(--text-muted);">—</span>'
+      : (src === 'office' && multi)
+        ? `<span title="該所登錄於多個地區，取律師最多的地區" style="border-bottom:1px dotted var(--text-muted);">${r}等</span>`
+        : r;
+    const regionCell = r => {
+      const x = reg[r.id];
+      if (!x || (!x.from_region && !x.to_region)) return '<span style="color:var(--text-muted);">—</span>';
+      if (r.kind === 'new') return regSide(x.to_region, x.to_src, x.to_multi);
+      if (r.kind === 'dereg') return regSide(x.from_region, x.from_src, x.from_multi);
+      // 同區：任一端是本人地址（確定）就不標「等」
+      if (x.from_region && x.from_region === x.to_region)
+        return regSide(x.to_region, 'office', (x.from_src === 'office' && x.from_multi) && (x.to_src === 'office' && x.to_multi));
+      const moved = x.from_region && x.to_region;
+      return `<span style="${moved ? 'color:var(--gold);font-weight:600;' : ''}">${regSide(x.from_region, x.from_src, x.from_multi)} → ${regSide(x.to_region, x.to_src, x.to_multi)}</span>`;
+    };
     const nIn = rows.filter(r => r.kind === 'in' || r.kind === 'new').length;
     const nOut = rows.filter(r => r.kind === 'out' || r.kind === 'dereg').length;
     const net = nIn - nOut;
@@ -8117,10 +8139,10 @@ async function loadFirmMovesCard(firmName) {
     el.innerHTML = `
     <div class="card" style="border-left:3px solid var(--blue);margin-bottom:16px;">
       <div class="card-title" style="color:var(--blue);">🔄 近期人員異動（${rows.length} 位｜淨流 ${net > 0 ? '+' : ''}${net}）</div>
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">MOJ 名冊逐日比對（2026-07-03 起追蹤）— 即時資料，AI 分析文不再列逐筆明細</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">MOJ 名冊逐日比對（2026-07-03 起追蹤）— 即時資料，AI 分析文不再列逐筆明細；地區＝執業處所地址縣市（舊→新，跨區標金色；「等」＝多地所取主要地區）</div>
       <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
         <table>
-          <thead><tr><th style="width:88px;">日期</th><th style="width:70px;">異動</th><th>律師</th><th>對象所</th></tr></thead>
+          <thead><tr><th style="width:88px;">日期</th><th style="width:70px;">異動</th><th>律師</th><th>對象所</th><th style="width:120px;">地區</th></tr></thead>
           <tbody>${rows.slice(0, 40).map(r => {
             const k = KIND[r.kind];
             const other = r.kind === 'in' ? (r.old_office || '（新登錄）')
@@ -8131,6 +8153,7 @@ async function loadFirmMovesCard(firmName) {
               <td style="color:${k.color};font-size:0.82rem;white-space:nowrap;">${k.sym} ${k.lbl}</td>
               <td>${lawyerLink(r.name, 'font-weight:600;')}</td>
               <td style="font-size:0.78rem;color:var(--text-muted);">${escHtml(other)}</td>
+              <td style="font-size:0.78rem;white-space:nowrap;">${regionCell(r)}</td>
             </tr>`;
           }).join('')}</tbody>
         </table>
