@@ -611,3 +611,15 @@
 
 - Skill `/legal-research` — 法律產業深度研究助手（查 DB、分析事務所、討論產業趨勢）
 - `ANTHROPIC_API_KEY` 僅用於 `generate-insights.yml` workflow（AI 市場分析，已改為前端 Edge Function 觸發）
+
+## 法律產業薪資分析（喆律戰情最後一個 tab，admin-only，mig 247，2026-10-11）
+
+- 口徑並列不混算：站內名冊年資（即時）／已發布調查（長表種子）／面試筆記市場帶（admin）；官方統計、法定俸給、喆律人資池級**尚未接入**（頁尾有待辦）。
+- `labor_comp_series`：薪酬／年資長表，source×role×metric×category 一列一數字（UNIQUE NULLS NOT DISTINCT 六鍵），
+  `visibility='public'` 列由 `labor_comp_series_get(p_source)` RPC 供前端（anon 可呼叫）；admin 專用列走 RLS、另開 RPC。
+  **數字一律進長表，前端不寫死**。目前種子：`lawsnote_jobboard_2023`（113 列；年薪×年資折線是讀圖估值）＋`mol_occupation_survey_quoted`（報告引述的勞動部區間）。
+- `labor_seniority_dist()`：律師（`moj_lawyers.practice_start_date`、正常未除名）／法官（`judges_combined.seniority_years`，全是首判年推估，司法院名冊無到職日）／檢察官（裁判書首現年，現職＝近 12 個月具名且累計 ≥12 資料月）七段年資帶（`labor_band()`／`labor_band_sort()`）。
+- `lawyer_cohort_retention()`：「檢證字」證號流水號跨年連續，當年發證＝該年最大號－前一年最大號；對名冊現職＝仍在執業登錄比例（下限；補證字／外檢證字排除；最近兩年新科未入會，比例偏低屬正常）。
+- 前端 `tab-salary`（`loadSalaryOnce`、`_salCharts`、`salRender*`）；面試筆記市場帶用 `fnFetchPaged('interview_market_bands')`，測試殼可用 `window.__salBandsOverride` 餵資料。
+  本機測試殼：複製 index.html 注入 `isAdmin=true`、`#loginPage` 隱藏、`#dashboard` **display:block**（不能給空字串，CSS 預設是 none）、`showSection('zhelu'); showTab('salary')`。
+- 下一步候選：勞動部職類別薪資「律師」職類年序列（pswst.mol.gov.tw）、主計總處 M69 行業月薪、法官法 §71 俸表 24 級＋專業加給做法定階梯、法律學門畢業生薪資、104 薪資情報年資帶、喆律人資池級（lawyer-dashboard 側先彙總）。
