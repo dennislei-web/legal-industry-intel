@@ -623,3 +623,11 @@
 - 前端 `tab-salary`（`loadSalaryOnce`、`_salCharts`、`salRender*`）；面試筆記市場帶用 `fnFetchPaged('interview_market_bands')`，測試殼可用 `window.__salBandsOverride` 餵資料。
   本機測試殼：複製 index.html 注入 `isAdmin=true`、`#loginPage` 隱藏、`#dashboard` **display:block**（不能給空字串，CSS 預設是 none）、`showSection('zhelu'); showTab('salary')`。
 - 下一步候選：勞動部職類別薪資「律師」職類年序列（pswst.mol.gov.tw）、主計總處 M69 行業月薪、法官法 §71 俸表 24 級＋專業加給做法定階梯、法律學門畢業生薪資、104 薪資情報年資帶、喆律人資池級（lawyer-dashboard 側先彙總）。
+- **第二版（mig 248，同日）**：(a) `lawyer_cohort_retention()` 改離群剔除＋「次年第一號減本年第一號」（原最大號差法讓 93 年留存 126%）；
+  (b) 律師薪資只呈現**一個整合估計**：`salLawyerPayIntegrated()`＝Lawsnote 2023 年薪分布級距內插的中位／四分位，與面試筆記
+  「底薪中位 ×（12＋年終三節中位月數）」取平均，年資曲線用問卷折線按整合中位校正；來源明細（Lawsnote 分布、三來源對照、
+  市場帶表、律所端）全部收進 `.ff-toggle` 可展開卡（展開時 `salToggleDetails` 會 resize 圖）；
+  (c) 新增「公部門法定薪給階梯」：法官俸表 24 級本俸圖（種子 `moj_judge_scale`：俸點＋115 年俸額＋起敘級）、各職務月薪表
+  （`tpi_trainee_rule` 學員津貼、`court_assistant_notice` 助理薪點、`ly_doc_2015` 加給例示與推算、`public_com_tw_2026` 民間整理）；
+  加給現行官方全表仍未取得，710 俸點例的加給是 2015 例示 × 通案調幅推算（職務加給推算值 33,730 對得上現行簡任 13 主管加給表）；
+  (d) 年資結構加銓敘部「司法行政機關」官方對照行（`mocs_judicial_admin`）。
