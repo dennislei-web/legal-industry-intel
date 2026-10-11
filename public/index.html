@@ -1701,6 +1701,13 @@
         <div class="chart-container" style="height:300px;"><canvas id="ckExamChart"></canvas></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128207; 缺額率代理指標 — 年度補缺量 ÷ 前一年底實有人數</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
+          司法院<strong>沒有公開</strong>歷年書記官缺額表，只對外說過 2026-03 全國缺 353 人（10.02%）。此處用「司法院每年報給考選部的四等書記官需用正額（含考前增列）」÷「前一年底全國法院書記官實有人數」當代理：補缺量＝既有缺額＋預估當年離退，所以會<strong>高於</strong>時點缺額率，看趨勢不看絕對值。菱形點＝司法院揭露的實際缺額率。
+        </div>
+        <div class="chart-container" style="height:300px;"><canvas id="ckProxyChart"></canvas></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#128200; 各審級書記官實有人數（民國 104–114，年底數）</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;">
           口徑＝書記官長＋書記官（含兼科長/股長），不含錄事與會計/統計室課員。地院 111 年觸頂 2,388 後回落；112 年高等行政法院跳增＝行政訴訟堅實第一審新制（地方庭併入），非淨增。
@@ -1714,7 +1721,7 @@
         </div>
         <div class="chart-container" style="height:620px;"><canvas id="ckCourtChart"></canvas></div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">
-          ※ 資料源：司法統計年報 114 年「員工實有人數」各表（<code>scripts/clerk_staff_stats.py</code> 解析，年更）；特考數字＝公職王/高點彙整交叉核對（108–114 兩源一致），104–107 需用名額無公開資料；115 年錄取 970（正額 557＋增額 413）＝考試院公報第 45 卷 49 期（115-10-07）錄取名單，報考／到考＝公職王＋三民輔考兩源一致；錄取率口徑一律＝錄取÷到考。缺額數＝司法院 2026-03 對外說明（聯合報法律前線系列），無常規統計表。書記官異動不經人審會，無法官 <code>judge_transfers</code> 式的遷調結構資料。
+          ※ 資料源：司法統計年報 114 年「員工實有人數」各表（<code>scripts/clerk_staff_stats.py</code> 解析，年更）；特考數字＝公職王/高點彙整交叉核對（108–114 兩源一致），104–107 需用名額無公開資料；115 年錄取 970（正額 557＋增額 413）＝考試院公報第 45 卷 49 期（115-10-07）錄取名單，報考／到考＝公職王＋三民輔考兩源一致；錄取率口徑一律＝錄取÷到考。缺額數＝司法院 2026-03 對外說明（聯合報法律前線系列），無常規統計表；年報與主管預算書都沒有書記官預算員額，故缺額率只能用「需用正額÷前一年底實有」代理。書記官異動不經人審會，無法官 <code>judge_transfers</code> 式的遷調結構資料。
         </div>
       </div>
     </div>
@@ -16905,6 +16912,42 @@ async function loadClerkStats() {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } } },
       scales: { x: { ticks: { color: muted } }, y: { beginAtZero: true, ticks: { color: muted } } },
+    },
+  });
+
+  // 缺額率代理：年度補缺量（考前需用正額，含增列）÷ 前一年底全國法院書記官實有人數
+  // （司法院無公開歷年缺額表；2026-03 揭露 353 人／10.02% 以菱形點標在 115 年）
+  const clerksByYear = {};
+  years.forEach(y => { clerksByYear[y] = courtOrgs.filter(r => r.year_roc === y).reduce((s, r) => s + (r.clerks || 0), 0); });
+  const px = ex.filter(r => r.quota_regular != null && clerksByYear[r.year_roc - 1]);
+  const KNOWN_GAP = { year_roc: 115, gap: 353, rate: 10.02, asof: '2026-03' };
+  mkChart('ckProxyChart', 'ckProxy', {
+    data: {
+      labels: px.map(r => r.year_roc + '年'),
+      datasets: [
+        { type: 'bar', label: '年度補缺量（需用正額）', data: px.map(r => r.quota_regular), backgroundColor: '#c9a84c', yAxisID: 'y', order: 3 },
+        { type: 'line', label: '補缺量 ÷ 前一年底實有 %', data: px.map(r => +(r.quota_regular / clerksByYear[r.year_roc - 1] * 100).toFixed(2)), borderColor: '#e0596e', backgroundColor: '#e0596e', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: false, yAxisID: 'y1', order: 1 },
+        { type: 'line', label: `司法院揭露缺額率（${KNOWN_GAP.asof}）`, data: px.map(r => r.year_roc === KNOWN_GAP.year_roc ? KNOWN_GAP.rate : null), showLine: false, pointStyle: 'rectRot', pointRadius: 8, pointHoverRadius: 10, borderColor: '#4f8ef7', backgroundColor: '#4f8ef7', yAxisID: 'y1', order: 0 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 }, usePointStyle: false } },
+        tooltip: { callbacks: { afterBody: items => {
+          const r = px[items[0].dataIndex]; if (!r) return [];
+          const base = clerksByYear[r.year_roc - 1];
+          const out = [`前一年底（${r.year_roc - 1} 年）實有 ${base.toLocaleString()} 人`];
+          if (r.quota_extra != null) out.push(`另有榜示前擬增額 ${r.quota_extra}（未計入比率）`);
+          if (r.year_roc === KNOWN_GAP.year_roc) out.push(`司法院 ${KNOWN_GAP.asof} 揭露：全國缺 ${KNOWN_GAP.gap} 人（${KNOWN_GAP.rate}%）`);
+          return out;
+        } } },
+      },
+      scales: {
+        x: { ticks: { color: muted } },
+        y: { position: 'left', beginAtZero: true, ticks: { color: muted }, title: { display: true, text: '人數', color: muted, font: { size: 10 } } },
+        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: muted, callback: v => v + '%' } },
+      },
     },
   });
 
