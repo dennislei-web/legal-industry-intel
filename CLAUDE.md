@@ -639,3 +639,9 @@
   （年報多在 p136／138）。**勿用程式驅動 pswst.mol.gov.tw 動態查詢表單**（本機 session 走這條被安全分類器攔下）。年更＝每年 5–6 月年報出後手動加一列。
   前端：明細區「一、勞動部官方序列」圖＋法律服務業各職務表；三來源對照改真實序列；整合估計說明標明代表中小所年資 5 年內、官方申報（偏中大所）列上限；
   `salRpc()` 對 statement timeout（57014）重試一次；`salToggleDetails` 展開時 resize＋draw（隱藏容器建的圖要等 draw 才套用尺寸）。
+- **第四版（mig 250，2026-10-12）**：「年資對年薪：律師／法官／檢察官（整合評估）」三線圖取代單線。律師＝兩層整合：中小所層（Lawsnote＋面試筆記取平均）
+  與官方申報層（勞動部最新全年薪資所得 × Lawsnote 分布的中位／平均比），權重＝官方調查受僱律師數 ÷ 名冊推估受僱律師數
+  （`lawyer_firm_size_dist()` 多人所律師數減所數，RPC 已開放 anon），整合中位校正問卷九段折線後內插成年資 1–25 年（`salLawyerPayIntegrated`）。
+  法官／檢察官＝法定推算（`salJudgeCurve`）：年資→俸級 max(1, 25−n)，本俸依 `moj_judge_scale`，加給在候補第 1 年（`judge_pay_model.junior_monthly_total_est`
+  107,000 總額，民間整理）與 710 俸點例示推算（`ly_doc_2015.allowance_est`）兩錨點線性內插，年薪＝月薪 × `months_per_year` 14.5；
+  官方加給表到手後只換 `labor_comp_series` 種子即可。卡內另有 1／3／5／10／15／20／25 年對照表；KPI 第 5 卡＝法官第 10 年年薪。
