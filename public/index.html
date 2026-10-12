@@ -2425,7 +2425,8 @@
     </div>
 
 
-    <!-- ==================== TAB: SALARY（法律產業薪資分析；admin 限定，mig 247／248） ==================== -->
+
+    <!-- ==================== TAB: SALARY（法律產業薪資分析；admin 限定，mig 247／248／249） ==================== -->
     <div id="tab-salary" class="tab-content">
       <style>
         .sal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;}
@@ -2458,11 +2459,11 @@
       <div class="card" style="margin-top:16px;border:1px solid var(--gold);">
         <div class="card-title">&#128274; 法律產業薪資分析 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.7;">
-          法律產業從業人員的年資結構與薪資水準。律師沒有法定薪給，把市場問卷與面試筆記<strong>整合成一個估計數</strong>（來源與明細收在下方可展開區塊）；
+          法律產業從業人員的年資結構與薪資水準。律師沒有法定薪給，把市場問卷與面試筆記<strong>整合成一個估計數</strong>（來源、官方序列與明細收在下方可展開區塊）；
           法官、檢察官、書記官等公部門人員薪給是法定的，直接列階梯。年資結構用站內名冊即時計算。每塊磚都標口徑與樣本。
         </div>
         <div style="margin-bottom:6px;">
-          <span class="sal-src on">站內名冊年資 ✓</span><span class="sal-src on">律師薪資整合估計 ✓</span><span class="sal-src on">公部門法定薪給 ✓</span>
+          <span class="sal-src on">站內名冊年資 ✓</span><span class="sal-src on">律師薪資整合估計 ✓</span><span class="sal-src on">公部門法定薪給 ✓</span><span class="sal-src on">勞動部職類別薪資 2003–2025 ✓</span>
           <span class="sal-src">主計總處行業月薪（待接）</span><span class="sal-src">喆律人資池級（待接）</span>
         </div>
         <div id="salStatus" class="loading">載入中…</div>
@@ -2498,7 +2499,7 @@
         <div class="chart-container" style="height:320px;"><canvas id="salCohortChart"></canvas></div>
         <div class="sal-cap" id="salCohortCap">載入中…</div>
         <div class="sal-cap">
-          ※ 發證量＝「檢證字」律師證號流水號跨年連續，次年第一號減本年第一號（證號依流水號排序後，前後鄰居都不是同一年的離群證號先剔除）；
+          ※ 發證量＝「檢證字」律師證號流水號跨年連續，次年第一號減本年第一號（證號依流水號排序後，前後鄰居都不是同一年、或離該年中位數過遠的離群證號先剔除）；
           名冊現職＝該年證號在法務部名冊中正常執業者。比例＝仍在執業登錄的下限（名冊靠證號遍歷掃描，少數漏掃；補證字、外國法事務律師不計）。
           最近兩年新科律師多數尚未入會登錄，比例偏低不是流失。越早的世代，差額同時包含退休、轉任司法官與公職、轉入企業不再登錄。
         </div>
@@ -2525,18 +2526,25 @@
       <div class="card">
         <div class="card-title ff-toggle" onclick="salToggleDetails(this)" style="cursor:pointer;"><span class="ff-caret">&#9654;</span> 律師薪資的資料來源與明細（點開）</div>
         <div class="ff-body" style="display:none;">
-          <div class="sal-sub-t">一、Lawsnote JobBoard《2023 台灣律師職涯市場報告》</div>
+          <div class="sal-sub-t">一、勞動部職類別薪資調查：法律服務業受僱律師（官方申報口徑，2003–2025）</div>
+          <div class="sal-grid">
+            <div><div class="chart-container" style="height:280px;"><canvas id="salMolChart"></canvas></div><div class="sal-cap" id="salMolCap"></div></div>
+            <div id="salMolTable"></div>
+          </div>
+          <div class="sal-cap">※ 事業單位每年 7 月申報、全時員工、不含雇主與自營；「法律服務業」含律師事務所、地政士事務所等；2011 年起職類名稱為「律師及相關專業人員」。
+            2022 年起「總薪資」改為前一年全年薪資所得（扣繳憑單口徑、含年終），與 7 月月薪不可直接相除。有申報能力的中大所權重高，所以數字高於中小所市場。</div>
+          <div class="sal-sub-t">二、Lawsnote JobBoard《2023 台灣律師職涯市場報告》</div>
           <div class="sal-grid">
             <div><div style="font-size:0.78rem;margin-bottom:4px;">受僱律師年薪分布（含年終獎金、不含自接案抽成）</div><div class="chart-container" style="height:280px;"><canvas id="salLsDistChart"></canvas></div></div>
             <div class="sal-grid" id="salLsFacts" style="grid-template-columns:1fr;"></div>
           </div>
           <div class="sal-cap">※ 問卷 2022-12 至 2023-01，受僱律師部分約 320 份。填答者偏年輕（26–35 歲 74%）、偏台北（74%）、碩士 61%，是求職平台使用者，不是全體受僱律師的隨機樣本。年薪級距 20 萬一格。單一年份快照，無續版。</div>
-          <div class="sal-sub-t">二、三個來源的年薪落點</div>
+          <div class="sal-sub-t">三、三個來源的年薪落點</div>
           <div class="sal-grid" id="salCrossBody"></div>
-          <div class="sal-cap">※ 口徑不同：面試筆記是「底薪 × 月數」換算，Lawsnote 是「含年終的年薪級距」，勞動部是「事業單位申報的月總薪資 × 12」（含加班費與非經常性給與、樣本偏大所，不納入整合估計）。</div>
-          <div class="sal-sub-t">三、面試筆記市場帶：底薪、年終、在職月數（admin）</div>
+          <div class="sal-cap">※ 口徑不同：面試筆記是「底薪 × 月數」換算，Lawsnote 是「含年終的年薪級距」，勞動部是「事業單位申報的全年薪資所得」（含年終獎金、全年均在職者，偏中大所）。整合估計只用前兩者。</div>
+          <div class="sal-sub-t">四、面試筆記市場帶：底薪、年終、在職月數（admin）</div>
           <div id="salBandsBody"><div class="loading">載入中…</div></div>
-          <div class="sal-sub-t">四、律所端觀點（Lawsnote JobBoard 2023）</div>
+          <div class="sal-sub-t">五、律所端觀點（Lawsnote JobBoard 2023）</div>
           <div class="sal-grid" id="salFirmBody"></div>
           <div class="sal-cap">※ 律所部分約 110 份，填答律所偏小所新所（5 人以下七成、成立 6 年以下六成）。「最高年薪」是律所自報所內受僱律師的最高值，可當薪資天花板參考。</div>
         </div>
@@ -2546,10 +2554,10 @@
         <div class="card-title">&#128203; 資料源、口徑與尚未接入</div>
         <div class="sal-cap" style="margin-top:0;">
           <strong>已接入</strong>：法務部律師名冊（即時）、司法院法官名冊＋裁判書首判年（即時）、裁判書檢察官具名（月更）、Lawsnote JobBoard 2023（種子）、面試筆記市場帶 <code>interview_market_bands</code>（admin，隨月更增量同步換版）、
+          勞動部職類別薪資調查 法律服務業 × 律師 2003–2025（種子：2003–2019 政大論文整理、2020 起各年年報表 15，年更手動）、
           法官法附表法官俸表＋115 年俸點對俸額表＋立法院 2015 加給例示推算（種子）、司法院學員津貼規則、法官助理／檢察官助理薪點制公告、公職王 2026 司法特考月薪整理（民間）、銓敘部司法行政機關公務人員序列。<br>
-          <strong>尚未接入、下一步</strong>：法官專業加給表與職務加給表的現行官方全表（目前只有 710 俸點例示推算，候補法官加給未有官方數）；司法人員專業加給表（書記官等）官方數額；
-          勞動部職類別薪資調查「律師」職類年序列（目前只有報告引述的 2018–2022 區間）；主計總處「法律及會計服務業」行業月薪；法律學門畢業生各年薪資；喆律人資池級（只進 admin）。
-          數字一律放 <code>labor_comp_series</code> 長表，前端不寫死。
+          <strong>尚未接入、下一步</strong>：法官專業加給表與職務加給表的現行官方全表（人事總處網站未公開；目前只有 710 俸點例示推算，候補法官加給未有官方數）；司法人員專業加給表（書記官等）官方數額；
+          主計總處「法律及會計服務業」行業月薪；法律學門畢業生各年薪資；喆律人資池級（只進 admin）。數字一律放 <code>labor_comp_series</code> 長表，前端不寫死。
         </div>
       </div>
     </div>
@@ -15737,14 +15745,16 @@ async function nlRankSearch() {
 }
 
 // ============================================================
-// 法律產業薪資分析（喆律戰情；admin-only；mig 247／248）
-// 口徑：站內名冊年資（labor_seniority_dist／lawyer_cohort_retention 即時）／律師薪資整合估計（Lawsnote 2023 種子＋面試筆記市場帶，兩來源取平均）／
-// 公部門法定薪給（labor_comp_series 種子：法官俸表、115 年俸額、加給例示推算、學員津貼、助理薪點、公職王整理）。數字全部來自 DB，前端不寫死。
+// 法律產業薪資分析（喆律戰情；admin-only；mig 247／248／249）
+// 口徑並列不混算：站內名冊年資（labor_seniority_dist／lawyer_cohort_retention 即時）／律師薪資整合估計（Lawsnote 2023 種子＋面試筆記市場帶，兩來源取平均）／
+// 公部門法定薪給（labor_comp_series 種子：法官俸表、115 年俸額、加給例示推算、學員津貼、助理薪點、公職王整理）／
+// 勞動部職類別薪資調查官方序列（labor_comp_series 種子 mol_occupation_survey：法律服務業 × 律師 2003–2025，明細區與對照卡）。數字全部來自 DB，前端不寫死。
 // 測試殼可用 window.__salBandsOverride 餵市場帶（無登入時 RLS 讀不到 admin 表）。
 // ============================================================
 let _salLoaded = false;
 const _salCharts = {};
 const SAL_LS = 'lawsnote_jobboard_2023';
+const SAL_MOL = 'mol_occupation_survey';
 const SAL_SIZE_ORDER = ['1-3', '4-10', '11-30', '31+', 'all'];
 const SAL_SIZE_LABEL = { '1-3': '1–3 位', '4-10': '4–10 位', '11-30': '11–30 位', '31+': '31 位以上', all: '全部', unknown: '未對到名冊' };
 function _salChart(id, cfg) {
@@ -15764,6 +15774,11 @@ function salVal(S, source, role, metric, stat, category) {
   const r = S.ser.find(x => x.source === source && x.role === role && x.metric === metric && x.stat === stat && (category == null || x.category === category));
   return r ? Number(r.value) : null;
 }
+// 勞動部官方序列：period＝西元年（7 月調查年；全年所得列為所得年），sort＝西元年
+function salMol(S, role, metric) { return salRows(S, SAL_MOL, role, metric); }
+function salMolLatest(S, role, metric) { const r = salMol(S, role, metric); return r.length ? r[r.length - 1] : null; }
+// RPC 呼叫：Micro compute 偶發 statement timeout（57014），失敗一次就重試一次
+async function salRpc(name) { let r = await db.rpc(name); if (r.error && /timeout|57014/i.test(String(r.error.message || r.error.code))) { await new Promise(res => setTimeout(res, 800)); r = await db.rpc(name); } return r; }
 // 市場帶單格：office=all；size 沒給取綜合格；year 沒給取全年度格
 function salBand(S, dim, pos, size, year) {
   size = size || 'all';
@@ -15772,7 +15787,7 @@ function salBand(S, dim, pos, size, year) {
 }
 window.salToggleDetails = function(el) {
   toggleFf(el);
-  requestAnimationFrame(() => Object.values(_salCharts).forEach(c => { try { c.resize(); } catch (e) {} }));
+  requestAnimationFrame(() => Object.values(_salCharts).forEach(c => { try { c.resize(); c.draw(); } catch (e) {} }));
 };
 
 async function loadSalaryOnce() {
@@ -15784,7 +15799,7 @@ async function loadSalaryOnce() {
       ? Promise.resolve(window.__salBandsOverride)
       : fnFetchPaged('interview_market_bands', 'id').catch(e => { console.warn('interview_market_bands 讀取失敗（非 admin 或未建表）', e); return []; });
     const [sen, coh, ser, bands] = await Promise.all([
-      db.rpc('labor_seniority_dist'), db.rpc('lawyer_cohort_retention'), db.rpc('labor_comp_series_get'), bandsReq,
+      salRpc('labor_seniority_dist'), salRpc('lawyer_cohort_retention'), salRpc('labor_comp_series_get'), bandsReq,
     ]);
     [sen, coh, ser].forEach(r => { if (r.error) throw r.error; });
     const S = { sen: sen.data || {}, coh: coh.data || [], ser: ser.data || [], bands: bands || [] };
@@ -15795,6 +15810,7 @@ async function loadSalaryOnce() {
     salRenderCohort(S);
     salRenderIntegrated(S);
     salRenderPublicPay(S);
+    salRenderOfficial(S);
     salRenderLawsnote(S);
     salRenderCross(S);
     salRenderBands(S);
@@ -15808,7 +15824,7 @@ async function loadSalaryOnce() {
 }
 
 // 受僱律師年薪整合估計：Lawsnote 分布（級距內線性內插）與面試筆記（底薪 × 月數）各算中位／四分位，可得者取平均；
-// 年資曲線以 Lawsnote 曲線為骨幹，按整合中位對 Lawsnote 中位的比例校正。
+// 年資曲線以 Lawsnote 曲線為骨幹，按整合中位對 Lawsnote 中位的比例校正。勞動部官方申報口徑偏大所，不納入、列為上限參考。
 function salLawyerPayIntegrated(S) {
   const dist = salRows(S, SAL_LS, 'associate_lawyer', 'annual_pay_dist', 'share');
   const bins = dist.map(r => {
@@ -15830,7 +15846,8 @@ function salLawyerPayIntegrated(S) {
   const line = salRows(S, SAL_LS, 'associate_lawyer', 'annual_pay_by_seniority', 'median_est');
   const k = ls && ls.median && integ.median ? integ.median / ls.median : 1;
   const sd = salRows(S, SAL_LS, 'associate_lawyer', 'seniority_dist', 'share');
-  return { ls, fn, integ, k, sources: (ls ? 1 : 0) + (fn ? 1 : 0),
+  const molAnn = salMolLatest(S, 'lawyer_employee', 'annual_pay'), molReg = salMolLatest(S, 'lawyer_employee', 'monthly_regular_pay');
+  return { ls, fn, integ, k, sources: (ls ? 1 : 0) + (fn ? 1 : 0), molAnn, molReg,
     curve: line.map(r => ({ band: r.category, v: Math.round(Number(r.value) * k), share: (sd.find(x => x.category === r.category) || {}).value })) };
 }
 
@@ -15919,7 +15936,7 @@ function salRenderIntegrated(S) {
     <div class="sal-cross-t">受僱律師年薪中位（整合估計）</div>
     <div><span class="sal-big-n">${_salNum(Math.round(pay.integ.median), 0)}</span><span class="sal-big-u">萬元／年</span></div>
     <div class="sal-big-s">四分位 <b>${_salWan(pay.integ.p25)}–${_salWan(pay.integ.p75)}</b>（一半的受僱律師落在這個區間）<br>換算月薪約 <b>${_salNum(Math.round(monthly / 1000), 0)} 千元</b>（年薪含年終三節約 2 個月）</div>
-    <div class="sal-cross-c" style="margin-top:8px;">${pay.sources} 個獨立來源整合${pay.ls ? `：市場問卷 ${pay.ls.n ? 'n≈' + _salNum(pay.ls.n, 0) : ''}（2023）` : ''}${pay.fn ? `、面試筆記 n=${pay.fn.n}（2025–26）` : ''}；年資 1 年以下約 ${_salWan(pay.curve[0] && pay.curve[0].v)}，15 年以上約 ${_salWan(pay.curve[pay.curve.length - 1] && pay.curve[pay.curve.length - 1].v)}。</div>`;
+    <div class="sal-cross-c" style="margin-top:8px;">${pay.sources} 個獨立來源整合${pay.ls ? `：市場問卷 ${pay.ls.n ? 'n≈' + _salNum(pay.ls.n, 0) : ''}（2023）` : ''}${pay.fn ? `、面試筆記 n=${pay.fn.n}（2025–26）` : ''}；年資 1 年以下約 ${_salWan(pay.curve[0] && pay.curve[0].v)}，15 年以上約 ${_salWan(pay.curve[pay.curve.length - 1] && pay.curve[pay.curve.length - 1].v)}。${pay.molAnn ? `官方申報口徑（勞動部，偏大所）${pay.molAnn.period} 年全年所得 ${_salWan(pay.molAnn.value)}，列為上限參考。` : ''}</div>`;
   if (pay.curve.length) _salChart('salPayCurveChart', {
     type: 'bar',
     data: { labels: pay.curve.map(p => p.band), datasets: [
@@ -15935,7 +15952,8 @@ function salRenderIntegrated(S) {
     const parts = [];
     if (pay.ls) parts.push(`市場問卷（Lawsnote JobBoard 2023）年薪分布內插：中位 ${_salWan(pay.ls.median)}、四分位 ${_salWan(pay.ls.p25)}–${_salWan(pay.ls.p75)}`);
     if (pay.fn) parts.push(`面試筆記底薪中位 ${_salNum(pay.fn.base)} 千／月 × ${pay.fn.months.toFixed(1)} 個月（12 個月＋年終三節中位 ${_salNum(pay.fn.bonus)} 個月）＝${_salWan(pay.fn.median)}、四分位 ${_salWan(pay.fn.p25)}–${_salWan(pay.fn.p75)}`);
-    method.innerHTML = `※ 整合方法：${parts.join('；')}；兩者取平均。年資曲線以問卷的年資對年薪折線為骨幹（9 段，讀圖估值），按整合中位校正（係數 ${pay.k.toFixed(2)}）；11 年以上三段樣本只占 7.5%，尾端僅供參考。年薪含年終獎金、不含自接案抽成。勞動部行業申報口徑（偏大所）不納入，見下方明細。`;
+    method.innerHTML = `※ 整合方法：${parts.join('；')}；兩者取平均。年資曲線以問卷的年資對年薪折線為骨幹（9 段，讀圖估值），按整合中位校正（係數 ${pay.k.toFixed(2)}）；11 年以上三段樣本只占 7.5%，尾端僅供參考。年薪含年終獎金、不含自接案抽成。
+      這個估計代表的是<strong>中小所、年資 5 年內為主</strong>的受僱律師（兩個來源的樣本都偏這一群）；勞動部職類別薪資調查是事業單位申報、偏中大所${pay.molReg ? `（${pay.molReg.period} 年 7 月經常性薪資 ${_salNum(pay.molReg.value, 0)} 元` : ''}${pay.molAnn ? `、${pay.molAnn.period} 年全年所得 ${_salWan(pay.molAnn.value)}` : ''}${pay.molReg || pay.molAnn ? '）' : ''}，不納入估計、列為上限，序列見下方明細。`;
   }
 }
 
@@ -15970,7 +15988,7 @@ function salRenderPublicPay(S) {
     const tr = (label, val, src) => `<tr><td>${label}</td><td style="text-align:right;white-space:nowrap;"><b>${val}</b></td><td style="color:var(--text-muted);font-size:0.72rem;">${src}</td></tr>`;
     let rows = '';
     const trainee = salVal(S, 'tpi_trainee_rule', 'judicial_trainee', 'monthly_allowance', 'amount', '合計');
-    if (trainee != null) rows += tr('司法官學員（受訓 2 年）', `${_salNum(trainee, 0)}`, '司法院問答規則 × 115 年俸額表與專業加給表一；115/7 起另加 2,000');
+    if (trainee != null) rows += tr('司法官學員（受訓 2 年）', `${_salNum(trainee, 0)}`, '司法院問答規則 × 115 年俸額表與專業加給表；115/7 起另加 2,000');
     const lo24 = gradePay(24), hi19 = gradePay(19);
     if (lo24 != null) rows += tr('候補法官／檢察官（第 24→19 級）', `本俸 ${_salNum(lo24, 0)}–${_salNum(hi19, 0)}＋加給`, '本俸＝法官俸表 × 115 年俸額；候補加給官方表未取得，民間整理合計約 10–11.4 萬');
     if (je) rows += tr('實任法官／檢察官（710 俸點、第 6 級）', `約 ${_salNum(je.total, 0)}`, `本俸 ${_salNum(je.base, 0)}＋專業加給 ${_salNum(je.pro, 0)}＋職務加給 ${_salNum(je.duty, 0)}（推算）`);
@@ -15983,7 +16001,46 @@ function salRenderPublicPay(S) {
     tbl.innerHTML = `<table class="sal-table"><thead><tr><th>職務</th><th style="text-align:right;">月薪（元）</th><th>來源與口徑</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   const note = document.getElementById('salPublicNote');
-  if (note) note.innerHTML = `※ 法官法第 71 條：法官不列官等職等，俸給＝本俸＋專業加給＋職務加給＋地域加給；本俸依法官俸表俸點按公務人員俸表折算（115 年俸額自 114/1/1 起未變），檢察官準用（第 89 條）。行政院 116 年待遇方案：專業加給與主管職務加給自 115/7/1 起定額加 2,000，116/1/1 起通案調薪 4%。公職王整理的職務月薪是民間估算（含各項加給），官方「司法人員專業加給表」尚未取得，取得後改接長表。`;
+  if (note) note.innerHTML = `※ 法官法第 71 條：法官不列官等職等，俸給＝本俸＋專業加給＋職務加給＋地域加給；本俸依法官俸表俸點按公務人員俸表折算（115 年俸額自 114/1/1 起未變），檢察官準用（第 89 條）。行政院 116 年待遇方案：專業加給與主管職務加給自 115/7/1 起定額加 2,000，116/1/1 起通案調薪 4%。公職王整理的職務月薪是民間估算（含各項加給），官方「法官專業加給表」「司法人員專業加給表」人事總處網站未公開全表，取得後改接長表。`;
+}
+
+// 勞動部職類別薪資調查：法律服務業 × 律師（及相關專業人員）官方序列（明細區）
+function salRenderOfficial(S) {
+  const reg = salMol(S, 'lawyer_employee', 'monthly_regular_pay'), tot = salMol(S, 'lawyer_employee', 'monthly_total_pay');
+  const ann = salMol(S, 'lawyer_employee', 'annual_pay'), emp = salMol(S, 'lawyer_employee', 'employees');
+  const cap = document.getElementById('salMolCap'), tbl = document.getElementById('salMolTable');
+  if (!reg.length) { if (cap) cap.textContent = '無資料'; return; }
+  const years = [...new Set([...reg, ...tot, ...emp].map(r => r.period))].sort();
+  const pick = (rows, y) => { const r = rows.find(x => x.period === y); return r ? Number(r.value) : null; };
+  const green = _lafVar('--green'), blue = _lafVar('--blue'), gold = _lafVar('--gold');
+  _salChart('salMolChart', {
+    type: 'bar',
+    data: { labels: years, datasets: [
+      { type: 'line', label: '7 月經常性薪資（元／月）', data: years.map(y => pick(reg, y)), borderColor: green, backgroundColor: green, tension: 0.2, pointRadius: 3, yAxisID: 'y', spanGaps: true, order: 1 },
+      { type: 'line', label: '7 月總薪資（元／月，2021 年止）', data: years.map(y => pick(tot, y)), borderColor: gold, backgroundColor: gold, borderDash: [4, 3], tension: 0.2, pointRadius: 2, yAxisID: 'y', spanGaps: true, order: 2 },
+      { type: 'bar', label: '受僱律師人數（法律服務業）', data: years.map(y => pick(emp, y)), backgroundColor: blue + '44', borderColor: blue + '88', borderWidth: 1, yAxisID: 'y2', order: 3 },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => c.dataset.yAxisID === 'y2' ? `${c.dataset.label}：${_salNum(c.parsed.y, 0)} 位` : `${c.dataset.label}：${_salNum(c.parsed.y, 0)} 元` } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => _salNum(v / 10000, 0) + '萬' } }, y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { callback: v => _salNum(v, 0) } }, x: { ticks: { font: { size: 10 } } } } }
+  });
+  if (cap) {
+    const regL = reg[reg.length - 1];
+    cap.innerHTML = `${regL.period} 年 7 月經常性薪資 ${_salNum(regL.value, 0)} 元（受僱律師 ${_salNum(regL.n, 0)} 位）。全年薪資所得：${ann.map(a => `${a.period} 年 ${_salWan(a.value)}`).join('、')}（扣繳憑單口徑，含年終獎金）。2003–2019 取自政大論文整理之動態查詢結果（2007 年缺），2020 年起取自各年年報表 15。`;
+  }
+  if (tbl) {
+    const roles = [['lawyer_employee', '律師'], ['legal_staff', '法務人員'], ['patent_notary', '專利工程師及公證人'], ['land_agent', '土地代書（地政士）'], ['secretary', '專業秘書'], ['law_firm_all', '法律服務業全體全時員工']];
+    const tr = (label, e, r, a) => `<tr><td>${label}</td><td style="text-align:right;">${e ? _salNum(e.value, 0) : '-'}</td><td style="text-align:right;">${r ? _salNum(r.value, 0) : '-'}</td><td style="text-align:right;">${a ? _salNum(a.value, 1) : '-'}</td></tr>`;
+    const yr = reg[reg.length - 1].period;
+    let rows = '';
+    roles.forEach(([role, label]) => {
+      const e = salMolLatest(S, role, 'employees'), r = salMolLatest(S, role, 'monthly_regular_pay'), a = salMolLatest(S, role, 'annual_pay');
+      if (e || r || a) rows += tr(label, e, r, a);
+    });
+    const annYr = ann.length ? ann[ann.length - 1].period : '-';
+    tbl.innerHTML = `<div style="overflow-x:auto;"><table class="sal-table"><thead><tr><th>法律服務業職務</th><th style="text-align:right;">${yr} 年 7 月人數</th><th style="text-align:right;">7 月經常性薪資（元）</th><th style="text-align:right;">${annYr} 年全年所得（萬）</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
 }
 
 function salRenderLawsnote(S) {
@@ -16009,12 +16066,13 @@ function salRenderLawsnote(S) {
 function salRenderCross(S) {
   const el = document.getElementById('salCrossBody'); if (!el) return;
   const pay = S.pay;
-  const mol = S.ser.filter(r => r.source === 'mol_occupation_survey_quoted');
-  const molMin = mol.find(r => r.stat === 'min'), molMax = mol.find(r => r.stat === 'max');
   const cards = [];
   if (pay && pay.fn) cards.push({ t: '面試筆記市場帶（換算）', v: `約 ${_salWan(pay.fn.median)}／年`, col: '--purple', s: `底薪中位 ${_salNum(pay.fn.base)} 千／月 × ${pay.fn.months.toFixed(1)} 個月${pay.fn.p25 != null ? `；四分位 ${_salWan(pay.fn.p25)}–${_salWan(pay.fn.p75)}` : ''}`, c: `候選人自述前東家底薪、離職者視角；n=${pay.fn.n}` });
   if (pay && pay.ls) cards.push({ t: 'Lawsnote JobBoard 2023', v: `約 ${_salWan(pay.ls.median)}／年`, col: '--gold', s: `年薪分布級距內插的中位；四分位 ${_salWan(pay.ls.p25)}–${_salWan(pay.ls.p75)}；含年終獎金、不含自接案抽成`, c: '求職平台問卷約 320 份；台北 74%、年資 3 年以下 50%' });
-  if (molMin && molMax) cards.push({ t: '勞動部職類別薪資調查（報告引述，不納入整合）', v: `${Math.round(molMin.value * 12 / 10)}–${Math.round(molMax.value * 12 / 10)} 萬／年`, col: '--green', s: `月總薪資 ${_salNum(molMin.value, 0)}–${_salNum(molMax.value, 0)} 千元（${molMin.period}）× 12 換算；報告稱逐年倒退`, c: '法律服務業 × 律師及相關專業人員；事業單位申報、樣本偏大所' });
+  const regL = salMolLatest(S, 'lawyer_employee', 'monthly_regular_pay'), annL = salMolLatest(S, 'lawyer_employee', 'annual_pay');
+  if (regL || annL) cards.push({ t: '勞動部職類別薪資調查（官方申報，不納入整合）', v: annL ? `${_salWan(annL.value)}／年` : `${Math.round(regL.value * 12 / 10)} 萬／年`, col: '--green',
+    s: `${annL ? `${annL.period} 年全年薪資所得 ${_salWan(annL.value)}（扣繳憑單口徑，含年終）；` : ''}${regL ? `${regL.period} 年 7 月經常性薪資 ${_salNum(regL.value, 0)} 元（受僱律師 ${_salNum(regL.n, 0)} 位）` : ''}`,
+    c: '法律服務業 × 律師及相關專業人員；事業單位申報、全年均在職者，偏中大所' });
   el.innerHTML = cards.map(c => `<div class="sal-cross" style="border-left:3px solid var(${c.col});"><div class="sal-cross-t">${c.t}</div><div class="sal-cross-v">${c.v}</div><div class="sal-cross-s">${c.s}</div><div class="sal-cross-c">口徑：${c.c}</div></div>`).join('')
     || '<div style="color:var(--text-muted);font-size:0.8rem;">無資料</div>';
 }
