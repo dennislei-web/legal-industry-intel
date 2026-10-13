@@ -2513,6 +2513,7 @@
           <div><div style="font-size:0.78rem;margin-bottom:4px;">年資對年薪（整合曲線，萬元／年）：律師＝市場整合估計中位，法官與檢察官＝法定俸表推算</div><div class="chart-container" style="height:300px;"><canvas id="salPayCurveChart"></canvas></div></div>
         </div>
         <div id="salCurveTable" style="margin-top:10px;"></div>
+        <div id="salZheluTable" style="margin-top:10px;"></div>
         <div class="sal-cap" id="salPayMethod"></div>
       </div>
 
@@ -15802,13 +15803,17 @@ async function loadSalaryOnce() {
     const bandsReq = window.__salBandsOverride
       ? Promise.resolve(window.__salBandsOverride)
       : fnFetchPaged('interview_market_bands', 'id').catch(e => { console.warn('interview_market_bands 讀取失敗（非 admin 或未建表）', e); return []; });
-    const [sen, coh, ser, bands, fsd] = await Promise.all([
+    // 喆律在職律師年薪×執業年資池級彙總（lawyer-dashboard scripts/build_hr_pay_bands.py 每日寫 hr_pay_bands；admin-only RLS，非 admin 讀到空陣列）
+    const zlReq = window.__salZlOverride
+      ? Promise.resolve(window.__salZlOverride)
+      : fnFetchPaged('hr_pay_bands', 'band_from').catch(e => { console.warn('hr_pay_bands 讀取失敗（非 admin 或未建表）', e); return []; });
+    const [sen, coh, ser, bands, fsd, zl] = await Promise.all([
       salRpc('labor_seniority_dist'), salRpc('lawyer_cohort_retention'), salRpc('labor_comp_series_get'), bandsReq,
-      salRpc('lawyer_firm_size_dist').catch(e => ({ error: e })),
+      salRpc('lawyer_firm_size_dist').catch(e => ({ error: e })), zlReq,
     ]);
     [sen, coh, ser].forEach(r => { if (r.error) throw r.error; });
     if (fsd.error) console.warn('lawyer_firm_size_dist 讀取失敗，權重改用預設', fsd.error);
-    const S = { sen: sen.data || {}, coh: coh.data || [], ser: ser.data || [], bands: bands || [], fsd: fsd.data || [] };
+    const S = { sen: sen.data || {}, coh: coh.data || [], ser: ser.data || [], bands: bands || [], fsd: fsd.data || [], zl: zl || [] };
     S.pay = salLawyerPayIntegrated(S);
     S.judge = salJudgeCurve(S);
     window._salData = S;
@@ -15974,12 +15979,37 @@ function salRenderCohort(S) {
   });
 }
 
-// 年資對年薪三線整合曲線：律師（整合估計）／法官（法定推算）／檢察官（準用，同一俸表）
+// 喆律在職律師池級年資帶（hr_pay_bands，admin）對市場整合曲線：各帶中位 → 同年資（帶內平均執業年資）市場中位 → 對數常態百分位（σ 取問卷四分位）
+function salZheluBands(S) {
+  const pay = S.pay, src = S.zl || [];
+  const rows = src.filter(b => b.band_key !== 'all' && b.median_wan != null).sort((a, b) => Number(a.band_from) - Number(b.band_from));
+  if (!pay || !pay.curve || !rows.length) return null;
+  const sigma = pay.ls && pay.ls.p25 && pay.ls.p75 ? Math.log(pay.ls.p75 / pay.ls.p25) / 1.349 : 0.285;
+  const curve = pay.curve.filter(p => p.x != null);
+  const Phi = z => { const t = 1 / (1 + 0.2316419 * Math.abs(z)), d = 0.3989423 * Math.exp(-z * z / 2), p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - p : p; };
+  const out = rows.map(b => {
+    const x = Math.max(0.5, b.mean_years != null ? Number(b.mean_years) : Number(b.band_mid));
+    const market = salInterpBands(curve, x);
+    const pr = market ? Math.min(99, Math.max(1, Math.round(Phi(Math.log(Number(b.median_wan) / market) / sigma) * 100))) : null;
+    return Object.assign({}, b, { x, market, pr });
+  });
+  const all = src.find(b => b.band_key === 'all') || null;
+  const nIncl = out.reduce((a, b) => a + Number(b.n), 0);
+  const wAvgPr = nIncl ? Math.round(out.reduce((a, b) => a + (b.pr || 0) * Number(b.n), 0) / nIncl) : null;
+  return { rows: out, all, sigma, nIncl, nTotal: all ? Number(all.n_total) : null, wAvgPr, window: (all || out[0]).window_label,
+    byYear: y => out.find(b => Number(b.band_from) <= y && y <= Number(b.band_to)) || null };
+}
+
+// 年資對年薪三線整合曲線：律師（整合估計）／法官（法定推算）／檢察官（準用，同一俸表）；admin 另疊喆律在職律師中位線
 function salRenderIntegrated(S) {
   const pay = S.pay, J = S.judge, big = document.getElementById('salPayBig'), method = document.getElementById('salPayMethod'), tbl = document.getElementById('salCurveTable');
   if (!pay || pay.integ.median == null) { if (big) big.textContent = '無資料'; return; }
   const gold = _lafVar('--gold'), purple = _lafVar('--purple'), green = _lafVar('--green');
   const jAt = y => J ? (J.rows.find(r => r.year === y) || {}) : {};
+  const zl = salZheluBands(S), red = _lafVar('--red');
+  const zlBig = zl ? `<div class="sal-cross-t" style="margin-top:12px;">喆律在職律師（admin，窗 ${zl.window}）</div>
+    <div class="sal-big-s" style="margin-top:2px;">年薪中位 <b>${zl.all && zl.all.median_wan != null ? _salWan(zl.all.median_wan) : '-'}</b>（納入 ${zl.nIncl}${zl.nTotal ? '／在職 ' + zl.nTotal : ''} 位）；對同年資市場的人數加權 PR 約 <b>${zl.wAvgPr}</b></div>
+    <div class="sal-cross-c">各年資帶中位 vs 同年資市場中位的百分位見下表；年薪含年終、排除主持律師／股東／合署／實習，n&lt;3 的帶不顯示。</div>` : '';
   if (big) big.innerHTML = `
     <div class="sal-cross-t">受僱律師年薪中位（整合估計）</div>
     <div><span class="sal-big-n">${_salNum(Math.round(pay.integ.median), 0)}</span><span class="sal-big-u">萬元／年</span></div>
@@ -15987,27 +16017,46 @@ function salRenderIntegrated(S) {
     <div class="sal-cross-c" style="margin-top:6px;">中小所層 ${_salWan(pay.small.median)}（市場問卷${pay.ls && pay.ls.n ? ' n≈' + _salNum(pay.ls.n, 0) : ''}＋面試筆記${pay.fn ? ' n=' + pay.fn.n : ''}）× ${Math.round((1 - pay.w) * 100)}%，官方申報層 ${pay.large != null ? _salWan(pay.large) : '-'}（勞動部 ${pay.molAnn ? pay.molAnn.period + ' 年全年所得 ' + _salWan(pay.molAnn.value) : ''} 換算中位）× ${Math.round(pay.w * 100)}%。</div>
     ${J ? `<div class="sal-cross-t" style="margin-top:12px;">法官／檢察官年薪（法定推算）</div>
     <div class="sal-big-s" style="margin-top:2px;">第 1 年約 <b>${_salWan(jAt(1).annual)}</b>、第 10 年約 <b>${_salWan(jAt(10).annual)}</b>、第 20 年約 <b>${_salWan(jAt(20).annual)}</b></div>
-    <div class="sal-cross-c">本俸依法官俸表 × 115 年俸額；加給在候補第 1 年與 710 俸點兩個錨點間內插；年薪＝月薪 × ${J.months} 個月。</div>` : ''}`;
+    <div class="sal-cross-c">本俸依法官俸表 × 115 年俸額；加給在候補第 1 年與 710 俸點兩個錨點間內插；年薪＝月薪 × ${J.months} 個月。</div>` : ''}${zlBig}`;
   const jAnnual = J ? SAL_YEARS.map(y => jAt(y).annual) : SAL_YEARS.map(() => null);
+  // 喆律線：各年資帶中位鋪在帶內每一年（15 年以上只鋪到 20 年），帶與帶之間不連線
+  const zlYear = SAL_YEARS.map(y => { const b = zl ? zl.byYear(y) : null; return b && y <= Math.min(Number(b.band_to), 20) ? Number(b.median_wan) : null; });
   _salChart('salPayCurveChart', {
     type: 'line',
     data: { labels: SAL_YEARS.map(y => `${y}`), datasets: [
       { label: '律師（受僱，整合估計中位）', data: pay.yearCurve, borderColor: gold, backgroundColor: gold, tension: 0.25, pointRadius: 2, borderWidth: 2.5 },
       { label: '法官（法定推算）', data: jAnnual, borderColor: purple, backgroundColor: purple, tension: 0.2, pointRadius: 2, borderWidth: 2.5 },
       { label: '檢察官（準用法官俸給）', data: jAnnual.map(v => v == null ? null : v + 0.0001), borderColor: green, backgroundColor: green, borderDash: [6, 4], tension: 0.2, pointRadius: 0, borderWidth: 2 },
+      ...(zl ? [{ label: '喆律在職律師（年資帶中位，admin）', data: zlYear, borderColor: red, backgroundColor: red, borderDash: [3, 3], tension: 0, pointRadius: 2.5, borderWidth: 2, spanGaps: false }] : []),
     ] },
     options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
       plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { title: items => `年資 ${items[0].label} 年`, label: c => `${c.dataset.label}：${_salNum(Math.round(c.parsed.y), 0)} 萬／年` } } },
+        tooltip: { callbacks: { title: items => `年資 ${items[0].label} 年`, label: c => {
+          const base = `${c.dataset.label}：${_salNum(Math.round(c.parsed.y), 0)} 萬／年`;
+          if (zl && /喆律/.test(c.dataset.label)) { const b = zl.byYear(Number(c.label)); return b ? `${base}（${b.band_label}，n=${b.n}，市場 PR ${b.pr}）` : base; }
+          return base;
+        } } } },
       scales: { y: { beginAtZero: true, title: { display: true, text: '萬元／年' } }, x: { title: { display: true, text: '年資（年）' }, ticks: { font: { size: 10 }, maxRotation: 0 } } } }
   });
   if (tbl) {
     const ys = [1, 3, 5, 10, 15, 20, 25];
     tbl.innerHTML = `<div style="overflow-x:auto;"><table class="sal-table"><thead><tr><th>年資</th>${ys.map(y => `<th style="text-align:right;">${y} 年</th>`).join('')}</tr></thead><tbody>
       <tr><td>律師（整合中位）</td>${ys.map(y => `<td style="text-align:right;">${_salNum(pay.yearCurve[y - 1], 0)}</td>`).join('')}</tr>
+      ${zl ? `<tr><td style="color:${red};">喆律在職律師（年資帶中位）</td>${ys.map(y => { const b = y <= 20 ? zl.byYear(y) : null; return `<td style="text-align:right;color:${red};">${b ? _salNum(b.median_wan, 0) : '–'}</td>`; }).join('')}</tr>
+      <tr><td style="color:var(--text-muted);">喆律 vs 同年資市場（PR）</td>${ys.map(y => { const b = y <= 20 ? zl.byYear(y) : null; return `<td style="text-align:right;color:var(--text-muted);">${b ? 'PR ' + b.pr + '<span style="font-size:0.7rem;">（n=' + b.n + '）</span>' : '–'}</td>`; }).join('')}</tr>` : ''}
       ${J ? `<tr><td>法官／檢察官（法定推算）</td>${ys.map(y => `<td style="text-align:right;">${_salNum(jAt(y).annual, 0)}</td>`).join('')}</tr>
       <tr><td style="color:var(--text-muted);">法官俸級</td>${ys.map(y => `<td style="text-align:right;color:var(--text-muted);">第 ${jAt(y).grade} 級</td>`).join('')}</tr>` : ''}
     </tbody></table></div>`;
+  }
+  const ztbl = document.getElementById('salZheluTable');
+  if (ztbl) {
+    if (!zl) ztbl.innerHTML = '';
+    else ztbl.innerHTML = `<div class="sal-cross-t" style="margin-top:8px;">喆律在職律師 vs 同年資市場（admin；窗 ${zl.window}）</div>
+      <div style="overflow-x:auto;"><table class="sal-table"><thead><tr><th>執業年資帶</th><th style="text-align:right;">喆律人數（納入／在職）</th><th style="text-align:right;">喆律中位（萬）</th><th style="text-align:right;">喆律四分位</th><th style="text-align:right;">市場中位（同年資）</th><th style="text-align:right;">喆律 vs 市場</th><th style="text-align:right;">市場 PR</th></tr></thead><tbody>
+      ${zl.rows.map(b => `<tr><td>${b.band_label}<span style="color:var(--text-muted);font-size:0.72rem;">（平均 ${_salNum(b.x, 1)} 年）</span></td><td style="text-align:right;">${b.n}／${b.n_total}</td><td style="text-align:right;color:${red};"><b>${_salNum(b.median_wan, 0)}</b></td><td style="text-align:right;">${b.p25_wan != null ? _salNum(b.p25_wan, 0) + '–' + _salNum(b.p75_wan, 0) : '<span style="color:var(--text-muted);">n&lt;5</span>'}</td><td style="text-align:right;">${_salNum(b.market, 0)}</td><td style="text-align:right;">${b.market ? (Number(b.median_wan) / b.market).toFixed(2) + ' ×' : '-'}</td><td style="text-align:right;"><b>${b.pr != null ? 'PR ' + b.pr : '-'}</b></td></tr>`).join('')}
+      ${zl.all ? `<tr><td><b>全體</b></td><td style="text-align:right;">${zl.all.n}／${zl.all.n_total}</td><td style="text-align:right;color:${red};"><b>${zl.all.median_wan != null ? _salNum(zl.all.median_wan, 0) : '-'}</b></td><td style="text-align:right;">${zl.all.p25_wan != null ? _salNum(zl.all.p25_wan, 0) + '–' + _salNum(zl.all.p75_wan, 0) : '-'}</td><td style="text-align:right;color:var(--text-muted);">（各帶不同）</td><td style="text-align:right;">-</td><td style="text-align:right;"><b>人數加權 PR ${zl.wAvgPr}</b></td></tr>` : ''}
+      </tbody></table></div>
+      <div class="sal-cap">※ 喆律資料來自儀表板人資薪資表的池級彙總（lawyer-dashboard <code>hr_pay_bands</code>，每日重算；只有人數與中位／四分位，沒有個人資料）：在職律師、排除主持律師／股東／合署／實習／自聘；年薪＝近 12 個月整月應發月均 × 12 ＋ 年終等特別發放；執業年資＝基準年 − 律師證號年（全國名冊）；證號近兩年者剔除實習期月份；整月不足 3 個月者不納入（納入／在職人數的差）。市場 PR＝喆律帶中位對「同年資市場整合曲線中位」的對數常態百分位，σ＝ln(問卷 P75／P25)÷1.349≈${zl.sigma.toFixed(2)}，PR 50 即落在整合曲線上；15 年以上段市場曲線樣本薄（問卷十餘位、偏中大所），該帶 PR 僅供參考。</div>`;
   }
   if (method) {
     const parts = [];
