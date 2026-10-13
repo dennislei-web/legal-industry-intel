@@ -1197,7 +1197,7 @@
           <summary style="cursor:pointer;font-size:0.82rem;color:var(--blue);">查看全部事務所（點所名看趨勢）</summary>
           <div id="foLineAll" style="margin-top:8px;overflow-x:auto;"></div>
         </details>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">來源＝LINE 官方帳號公開主頁（page.line.me）每日擷取；只有<strong>認證帳號（藍盾）</strong>有公開主頁與好友數，未認證帳號只能確認「有開」。日增＝<strong>淨增</strong>（新增好友−封鎖），真正的新增／封鎖數只有帳號擁有者後台看得到。同所多帳號（例：喆律各品牌）合計。帳號名冊＝事務所官網 LINE 連結＋競品追蹤表＋搜尋發現，非全市場普查。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">來源＝LINE 官方帳號公開主頁（page.line.me）每日擷取；只有<strong>認證帳號（藍盾）</strong>有公開主頁與好友數，未認證帳號只能確認「有開」。公開好友數＝LINE 的<strong>累計加入次數</strong>（使用者封鎖後不會扣除），所以日增＝<strong>毛新增</strong>，不是淨增；封鎖數與真正淨增只有帳號擁有者後台（Insight API）看得到。同所多帳號（例：喆律各品牌）合計。帳號名冊＝事務所官網 LINE 連結＋競品追蹤表＋搜尋發現，非全市場普查。</div>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#9878;&#65039; 法檢轉任 — 前法官/前檢察官聚集的事務所</div>
@@ -5730,7 +5730,7 @@ async function loadFoTurnover() {
 
 // ============================================================
 // LINE 官方帳號（mig 241：line_oa_accounts / line_oa_daily，line-oa-daily.yml 每日）
-// friend_count 是淨好友數；同所多帳號合計時只取「所有帳號當天都有資料」的日期，避免帳號中途加入造成假跳升
+// friend_count 是累計加入次數（封鎖不扣，等於 Insight API 的 followers），日差＝毛新增非淨增；同所多帳號合計時只取「所有帳號當天都有資料」的日期，避免帳號中途加入造成假跳升
 // ============================================================
 const _lineCharts = {};
 let _lineRank = [];
@@ -5774,7 +5774,7 @@ function drawLineTrend(canvasId, pts) {
       datasets: [
         { type: 'line', label: '好友數', data: pts.map(p => p.v), yAxisID: 'y', borderColor: '#4cc38a',
           backgroundColor: 'rgba(76,195,138,0.15)', pointRadius: pts.length > 40 ? 0 : 2, tension: 0.2, fill: false },
-        { type: 'bar', label: '日淨增', data: pts.map(p => p.gain), yAxisID: 'y1', backgroundColor: 'rgba(79,142,247,0.45)' },
+        { type: 'bar', label: '日新增（毛）', data: pts.map(p => p.gain), yAxisID: 'y1', backgroundColor: 'rgba(79,142,247,0.45)' },
       ],
     },
     options: {
@@ -5827,7 +5827,7 @@ function renderFoLineAll(sortKey) {
   box.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
     <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
       <th style="text-align:left;padding:4px 8px;">#</th><th style="text-align:left;padding:4px 8px;">事務所</th>
-      ${th('accounts', '帳號')}${th('friends', '好友數')}${th('d1', '日淨增')}${th('d7', '7 日')}${th('d30', '30 日')}
+      ${th('accounts', '帳號')}${th('friends', '好友數')}${th('d1', '日新增')}${th('d7', '7 日')}${th('d30', '30 日')}
       <th style="text-align:right;padding:4px 8px;">起算日</th></tr></thead>
     <tbody>${rows.map((r, i) => `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:4px 8px;color:var(--text-muted);">${i + 1}</td>
@@ -5890,11 +5890,11 @@ async function loadFirmLineCard(firmName) {
     const total = certIds.reduce((s, id) => s + (latest(id)?.friend_count || 0), 0);
     const pts = lineFirmSeries(rows);
     el.innerHTML = `<div class="card" style="border-left:3px solid #4cc38a;margin-bottom:16px;">${head}
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">${accs.length} 個帳號（認證 ${certIds.length} 個）${certIds.length ? `｜認證帳號好友合計 <strong style="color:var(--text);">${total.toLocaleString()}</strong>` : ''}｜每日擷取公開主頁，增減為淨增（新增−封鎖）</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;">${accs.length} 個帳號（認證 ${certIds.length} 個）${certIds.length ? `｜認證帳號好友合計 <strong style="color:var(--text);">${total.toLocaleString()}</strong>` : ''}｜每日擷取公開主頁；好友數＝累計加入次數（封鎖不扣），增量＝毛新增，非淨增</div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
         <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);">
           <th style="text-align:left;padding:4px 6px;">帳號</th><th style="text-align:left;padding:4px 6px;">認證</th>
-          <th style="text-align:right;padding:4px 6px;">好友數</th><th style="text-align:right;padding:4px 6px;">日淨增</th>
+          <th style="text-align:right;padding:4px 6px;">好友數</th><th style="text-align:right;padding:4px 6px;">日新增</th>
           <th style="text-align:right;padding:4px 6px;">7 日</th><th style="text-align:right;padding:4px 6px;">30 日</th></tr></thead>
         <tbody>${accs.map(a => {
           const s = by[a.search_id] || [], l = latest(a.search_id);

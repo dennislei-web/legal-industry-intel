@@ -7,7 +7,7 @@
 --   account.profile.badgeType='certified' → 認證帳號（藍盾）
 --   account.accountInfo.friendCount       → 好友數（帳號關閉「顯示好友數」時 JSON 仍有值）
 -- 只有認證帳號有公開主頁；未認證帳號只回「Add LINE friend」空殼頁 → 拿不到人數（is_certified=false）。
--- friendCount 是淨好友數：日差＝新增−封鎖，真正的新增／封鎖數只有帳號擁有者後台看得到。
+-- friendCount＝Insight API 的 followers（累計加入次數，封鎖不扣）：日差＝毛新增、不是淨增（2026-10-14 驗證）；封鎖數只有帳號擁有者後台看得到。
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS line_oa_accounts (
@@ -85,5 +85,5 @@ INSERT INTO data_sources (name, url, description, data_type, scraper_name, updat
 SELECT '事務所 LINE 官方帳號', 'https://page.line.me/',
        'LINE 官方帳號公開主頁 → 認證盾牌＋每日好友數（line_oa_accounts / line_oa_daily）',
        'firms', 'line_oa_daily', 'daily', true,
-       '每日排程（line-oa-daily.yml）：先從 firm_digital_signals 官網 LINE 連結發現新帳號，再抓所有帳號主頁；未認證帳號無公開主頁、無人數；日差為淨增（新增−封鎖）'
+       '每日排程（line-oa-daily.yml）：先從 firm_digital_signals 官網 LINE 連結發現新帳號，再抓所有帳號主頁；未認證帳號無公開主頁、無人數；好友數＝累計加入次數（封鎖不扣），日差＝毛新增非淨增'
 WHERE NOT EXISTS (SELECT 1 FROM data_sources WHERE scraper_name = 'line_oa_daily');

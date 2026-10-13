@@ -9,7 +9,7 @@
 
 資料來源＝page.line.me/<id> 的 __NEXT_DATA__（badgeType / friendCount）。
 只有認證帳號有公開主頁；未認證帳號回空殼頁（記 no_page、不寫好友數）。
-friendCount 是淨好友數，日差＝新增−封鎖。
+friendCount＝Messaging API insight 的 followers（累計加入次數，封鎖後不減），日差＝毛新增、不是淨增（2026-10-14 逐日對照驗證）。
 """
 import json
 import os
