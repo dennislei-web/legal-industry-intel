@@ -19,7 +19,7 @@ MOJ 事務所／公會資料每週四批次更新 → 排程每週五跑（moj-d
 
 用法:
   python moj_detail_sweep.py                    # 全部有雜湊的律師
-  python moj_detail_sweep.py --shard 0 3        # 第 0/3 分片（按證號 crc32）
+  python moj_detail_sweep.py --shard 0 5        # 第 0/5 分片（按證號 crc32）
   python moj_detail_sweep.py --limit 20         # 只跑前 20 位（測試）
   python moj_detail_sweep.py --dry-run          # 只比對、不寫 DB
   python moj_detail_sweep.py --hash 0x…         # 抓單頁印解析結果（email／電話／地址只標有無）
@@ -223,12 +223,12 @@ def main(limit=None, shard=None, dry_run=False):
     now_iso = datetime.now(timezone.utc).isoformat()
     t0 = time.time()
     events, checked = [], []
-    changed = contact_upd = cand_cleared = flaky = fail = missing = mismatch = consec_flaky = 0
+    changed = contact_upd = cand_cleared = flaky = fail = missing = mismatch = consec_flaky = retried = 0
     aborted, abort_reason = False, ''
 
     for i, row in enumerate(rows, 1):
-        throttle.wait()
-        st, f, note = mdp.fetch_detail(row['page_hash'], sess)
+        st, f, note, tries = mdp.fetch_detail_retry(row['page_hash'], sess, throttle)
+        retried += 1 if tries else 0
         consec_flaky = consec_flaky + 1 if st == 'flaky' else 0
         if st == 'flaky':
             flaky += 1
@@ -289,7 +289,7 @@ def main(limit=None, shard=None, dry_run=False):
     print(f'地址／公會／更新日期同步: {contact_upd} 筆（非異動）')
     print(f'詳細頁 404: {missing} 筆（記 page_hash_missing_at，非除名）')
     print(f'雜湊不符: {mismatch} 筆')
-    print(f'連線失敗: {flaky} 筆（無法斷定，未動）')
+    print(f'連線失敗: {flaky} 筆（重試 {len(mdp.RETRY_DELAYS)} 次仍失敗，無法斷定，未動）；曾重試後成功或失敗: {retried} 筆')
     print(f'寫入失敗: {fail} 筆')
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
     print_change_summary(events, len(rows), flaky, fail, missing, aborted, shard, cand_cleared)

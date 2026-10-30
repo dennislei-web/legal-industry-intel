@@ -182,8 +182,7 @@ def main(dry_run=False, allow_new=True):
             if not allow_new:
                 stat['新律師（--no-new 略過）'] += 1
                 continue
-            throttle.wait()
-            st, f, note = mdp.fetch_detail(h['id_no'], sess)
+            st, f, note, _ = mdp.fetch_detail_retry(h['id_no'], sess, throttle)
             if st != 'ok':
                 stat['新律師：詳細頁讀不到'] += 1
                 review.append((h['lic_no'], f'新律師，詳細頁 {st} {note}'.strip()))

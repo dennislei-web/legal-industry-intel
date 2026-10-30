@@ -98,6 +98,23 @@ def fetch_detail(page_hash, session=None, timeout=(10, 30)):
     return 'ok', fields, ''
 
 
+RETRY_DELAYS = (5, 15)
+
+
+def fetch_detail_retry(page_hash, session, throttle, delays=RETRY_DELAYS):
+    """fetch_detail 加退避重試：'flaky' 才重試（404 與成功都直接回）。
+    2026-10-30 GitHub runner 實測：約 1/3 請求間歇回 200＋805 bytes「Error」頁或 ConnectionError，
+    本機（台灣 IP）兩輪 150 頁 0 次 → 暫時性，隔幾秒重抓即可。回傳 (status, fields, note, 重試次數)"""
+    tries = 0
+    while True:
+        throttle.wait()
+        st, f, note = fetch_detail(page_hash, session)
+        if st != 'flaky' or tries >= len(delays):
+            return st, f, note, tries
+        time.sleep(delays[tries])
+        tries += 1
+
+
 def parse_detail(html):
     """詳細頁 HTML（前段即可）→ 欄位 dict（值為字串；缺的欄位不放）"""
     cut = html.find('data:image')
