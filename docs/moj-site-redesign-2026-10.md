@@ -101,3 +101,13 @@
 - 書籤小程式在官網（CSP 嚴格）能否執行：Chrome 一般不對書籤套用頁面 CSP；若被擋，改用「複製程式碼」貼到 DevTools Console。
 - 官網查詢字串對「台／臺」與括號是否寬鬆比對：清單照名冊原字串切（`89台檢證字第` 與 `89臺檢證字第` 各一條），實際查詢若互通，少數條會重複收到同一批，ingest 會去重。
 - 39 筆格式異常證號的建議寫法沿用舊 API 怪癖（`(80)臺檢證字第…`、92 年後補證補零），以官網實際顯示為準。
+
+## 合併後狀態（2026-10-30 晚）
+
+- PR #1 已 squash 合併進 main；正式站收成頁 `https://dennislei-web.github.io/legal-industry-intel/tools/moj-harvest.html` 上線（書籤要在正式站頁重新拖一次）。
+- `scrape-moj-lawyers` 已重新啟用並手動實跑成功：16 公會合計 13,603 人、寫入 17 筆 `industry_stats`、快取刷新 OK。
+- **每週掃描改本機排程**：GitHub runner 打官網，75 頁有 26 頁重試兩次仍失敗（200＋805 bytes「Error」頁，或整個 runner 連線被切；常是同一批頁面），本機（台灣 IP）兩輪 75/75。
+  → Windows 排程 `moj-detail-sweep-weekly`（每週五 09:30，pythonw 跑 `scripts/moj_detail_sweep_weekly.py`：ingest → sweep → 三支 refresh RPC），
+  log 追加到 `scripts/moj_detail_sweep_weekly.log`（含姓名，已 gitignore），最後一行 `[launcher] ingest_rc=… sweep_rc=… refresh_ok=N/3`。
+  `moj-detail-sweep.yml` 只留手動觸發；`fetch_detail_retry` 對暫時性失敗退避重試（5s、15s）。
+- 舊 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 仍 disabled，一次性建表完成、本機 sweep 跑過一輪後刪除。

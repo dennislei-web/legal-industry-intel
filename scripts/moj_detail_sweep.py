@@ -4,7 +4,7 @@ MOJ 律師詳細頁每週掃描（2026-10-29 官網改版後取代 moj_office_re
 對 moj_lawyers 裡已有 page_hash 的律師逐頁 GET /lawyer/{hash}（公開頁、免驗證碼），
 比對事務所／公會／執業狀態／懲戒記錄，只 PATCH 有變動者；事務所與執業狀態異動由 DB trigger
 moj_lawyers_log_change 自動寫入 moj_lawyer_changes（異動追蹤頁照常吃得到）。
-MOJ 事務所／公會資料每週四批次更新 → 排程每週五跑（moj-detail-sweep.yml）。
+MOJ 事務所／公會資料每週四批次更新 → 每週五本機排程跑（moj_detail_sweep_weekly.py；GitHub runner 連官網不穩，見該檔）。
 
 判定：
   200 → 比對、page_checked_at=now（批次寫）；先前有除名候選／除名旗標者自動解除（頁面查得到＝仍在名冊）
