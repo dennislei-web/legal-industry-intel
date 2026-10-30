@@ -174,11 +174,12 @@ def diff_row(row, f):
     return payload, events
 
 
-def print_change_summary(events, total, flaky, fail, missing, aborted, shard):
+def print_change_summary(events, total, flaky, fail, missing, aborted, shard, cand_cleared=0):
     """格式同 moj_office_refresh.print_change_summary（BEGIN/END 標記供每日巡檢擷取）"""
     shard_txt = f'分片 {shard[0]}/{shard[1]}' if shard else '全量'
     head = (f'{shard_txt}：比對 {total:,} 位' + ('（中途中止，未刷完）' if aborted else '')
-            + f'，連線失敗 {flaky} 筆、寫入失敗 {fail} 筆、詳細頁 404 {missing} 筆')
+            + f'，連線失敗 {flaky} 筆、寫入失敗 {fail} 筆、詳細頁 404 {missing} 筆'
+            + (f'、清除除名候選 {cand_cleared} 筆' if cand_cleared else ''))
     lines = [head]
     if not [e for e in events if e[0] != '詳細頁 404']:
         lines.append('本輪無任何異動。')
@@ -222,7 +223,7 @@ def main(limit=None, shard=None, dry_run=False):
     now_iso = datetime.now(timezone.utc).isoformat()
     t0 = time.time()
     events, checked = [], []
-    changed = contact_upd = flaky = fail = missing = mismatch = consec_flaky = 0
+    changed = contact_upd = cand_cleared = flaky = fail = missing = mismatch = consec_flaky = 0
     aborted, abort_reason = False, ''
 
     for i, row in enumerate(rows, 1):
@@ -252,21 +253,22 @@ def main(limit=None, shard=None, dry_run=False):
             events.append(('雜湊不符', f'{row["lic_no"]} 的雜湊指向另一張證書，未寫入，請人工確認'))
         else:
             payload, evs = diff_row(row, f)
-            significant = {'office_normalized', 'state_desc', 'deregistered_at', 'discipline'} & payload.keys()
-            if payload and not dry_run:
-                if patch_lawyer(row['lic_no'], payload):
-                    events.extend(evs)
-                    if significant:
-                        changed += 1
-                        time.sleep(0.5)  # 寫入後讓 DB 喘口氣（Micro compute）
-                    else:
-                        contact_upd += 1
-                else:
-                    fail += 1
-            elif payload:
+            # 異動＝事務所／狀態／懲戒，或解除「已確認」除名；只清除「候選」（10/29 事故誤標居多）另計
+            significant = bool({'office_normalized', 'state_desc', 'discipline'} & payload.keys()) \
+                or bool(row.get('deregistered_at'))
+            cand_only = bool(row.get('dereg_candidate_at')) and not significant
+            if payload and (dry_run or patch_lawyer(row['lic_no'], payload)):
                 events.extend(evs)
-                changed += 1 if significant else 0
-                contact_upd += 0 if significant else 1
+                if significant:
+                    changed += 1
+                    if not dry_run:
+                        time.sleep(0.5)  # 寫入後讓 DB 喘口氣（Micro compute）
+                elif cand_only:
+                    cand_cleared += 1
+                else:
+                    contact_upd += 1
+            elif payload:
+                fail += 1
             checked.append(row['page_hash'])
 
         if len(checked) >= 200 and not dry_run:
@@ -283,13 +285,14 @@ def main(limit=None, shard=None, dry_run=False):
     print('\n=== 完成 ===')
     print(f'比對: {len(rows):,} 位（實際走訪 {i if rows else 0:,}）')
     print(f'異動: {changed} 筆（事務所／執業狀態／除名解除／懲戒）')
+    print(f'清除除名候選: {cand_cleared} 筆（詳細頁查得到＝仍在名冊，非異動）')
     print(f'地址／公會／更新日期同步: {contact_upd} 筆（非異動）')
     print(f'詳細頁 404: {missing} 筆（記 page_hash_missing_at，非除名）')
     print(f'雜湊不符: {mismatch} 筆')
     print(f'連線失敗: {flaky} 筆（無法斷定，未動）')
     print(f'寫入失敗: {fail} 筆')
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
-    print_change_summary(events, len(rows), flaky, fail, missing, aborted, shard)
+    print_change_summary(events, len(rows), flaky, fail, missing, aborted, shard, cand_cleared)
     if aborted:
         print(f'結果: 中止（{abort_reason}）')
         sys.exit(1)

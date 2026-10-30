@@ -79,6 +79,14 @@
 | 每週掃描 | `scripts/moj_detail_sweep.py`、`.github/workflows/moj-detail-sweep.yml` | 完成、dry-run 通過（目前 0 位有雜湊）。≤1 req/s、三片依序跑（`max-parallel: 1`）、每週五 UTC 00:00；404 → `page_hash_missing_at`（**非除名**），404 率 >5%（看過 ≥100 頁）中止；頁面證號與 DB 不符不寫入；查得到者自動清除除名候選／旗標（10/29 事故的誤標會隨掃描自癒）；懲戒欄舊表是 HTML 連結、新站是純文字，只把「有／無」翻轉算異動。結尾印「異動摘要 BEGIN/END」 |
 | 公會人數 | `scripts/moj_lawyer_scraper.py` | 改讀 `/Home/GuildCounter`、`/Guild/Info`、首頁更新截止日（伺服器端 HTML、免驗證碼），三份存檔解析通過（16 公會 13,603 人、17 列公會資訊全部對上既有 ID）。公會 ID 依 DB 修正（宜蘭 ELBA、台東 TDBA）。**`scrape-moj-lawyers` 尚未重新啟用**——workflow 跑的是 main，合併前啟用會跑到舊碼 |
 
+### 首次實測（2026-10-30 晚，本機測試版收成頁）
+
+- 書籤在官網可執行（Chrome 未對書籤套用頁面 CSP）；官網查 `103臺檢證字第117` 回 75 筆＝清單預期 75。
+- 整條鏈跑通：收成 75 筆 → ingest 寫入雜湊 75（對上率 100%）→ sweep 75 頁全部 200、0 個 404、0 個雜湊不符、1.4 分鐘；
+  記到 1 筆真實事務所異動（trigger 正常寫入 moj_lawyer_changes），並清掉這段 14 筆 10/29 事故誤記的除名候選。
+- 立即重跑 sweep：0 異動、0 同步（冪等）。
+- 修過的 bug：書籤產生時佔位字串只換第一個（換到註解），書籤退回正式站網址 → 改全部替換；sweep 把「清除除名候選」算進異動數 → 另計。
+
 ### 合併後要做
 
 1. `gh workflow enable scrape-moj-lawyers.yml`，手動 `gh workflow run scrape-moj-lawyers.yml` 驗一次 `industry_stats`。
