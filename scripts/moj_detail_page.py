@@ -88,9 +88,13 @@ def fetch_detail(page_hash, session=None, timeout=(10, 30)):
         return 'flaky', None, type(e).__name__
     except requests.exceptions.RequestException as e:
         return 'flaky', None, type(e).__name__
-    fields = parse_detail(head.decode('utf-8', errors='ignore'))
+    text = head.decode('utf-8', errors='ignore')
+    fields = parse_detail(text)
     if not fields.get('lic_no'):
-        return 'flaky', None, '解析不到證書字號（版面可能改了）'
+        # 診斷：只印大小與 <title>（錯誤頁／攔截頁的標題不含個資），不印內容
+        m = re.search(r'<title>(.*?)</title>', text, re.S | re.I)
+        title = re.sub(r'\s+', ' ', BeautifulSoup(m.group(1), 'html.parser').get_text()).strip()[:60] if m else '-'
+        return 'flaky', None, f'解析不到證書字號（{len(head)} bytes，title={title}）'
     return 'ok', fields, ''
 
 

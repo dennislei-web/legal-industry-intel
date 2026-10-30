@@ -232,7 +232,7 @@ def main(limit=None, shard=None, dry_run=False):
         consec_flaky = consec_flaky + 1 if st == 'flaky' else 0
         if st == 'flaky':
             flaky += 1
-            if flaky <= 5:
+            if flaky <= 10:
                 print(f'  ? {row["lic_no"]} 無法斷定（{note}）', flush=True)
             if consec_flaky >= MAX_CONSECUTIVE_FLAKY:
                 aborted, abort_reason = True, f'連續 {MAX_CONSECUTIVE_FLAKY} 頁連線失敗'
