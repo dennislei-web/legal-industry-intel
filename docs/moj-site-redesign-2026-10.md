@@ -111,3 +111,11 @@
   log 追加到 `scripts/moj_detail_sweep_weekly.log`（含姓名，已 gitignore），最後一行 `[launcher] ingest_rc=… sweep_rc=… refresh_ok=N/3`。
   `moj-detail-sweep.yml` 只留手動觸發；`fetch_detail_retry` 對暫時性失敗退避重試（5s、15s）。
 - 舊 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 仍 disabled，一次性建表完成、本機 sweep 跑過一輪後刪除。
+
+## 校友試跑結果（2026-10-30 晚，本機排程手動觸發）
+
+- 收成 36 條：預期 2,630、收到 2,586（差額≈已除名者）、不重複雜湊 2,579。
+- ingest：2,504 筆待處理 → 寫入雜湊 2,490、新律師 6（核對詳細頁後入庫）、留佇列 8（全是「姓名不同」）。
+- sweep：2,571 頁全 200、0 個 404、0 雜湊不符、0 連線失敗，44 分鐘；真實異動＝事務所 8 筆＋懲戒 1 筆（異動追蹤表實寫 firm_change 8、new_lawyer 6）；清除 10/29 誤標除名候選 356 筆。
+- **姓名不同 8 筆全是同一人**：異體字（勲／勳、姸／妍、澐／芸）或官網查詢結果少一個字（罕用字／造字顯示不出）→ ingest 放寬為「證號唯一對上＋姓氏相同＋只差一字」即採證號對應，名冊姓名不改（身分由 sweep 核對詳細頁證號把關）。
+- 計數修正：懲戒欄舊 HTML 換新站純文字（這批 13 位）不再算進「異動」。

@@ -253,9 +253,9 @@ def main(limit=None, shard=None, dry_run=False):
             events.append(('雜湊不符', f'{row["lic_no"]} 的雜湊指向另一張證書，未寫入，請人工確認'))
         else:
             payload, evs = diff_row(row, f)
-            # 異動＝事務所／狀態／懲戒，或解除「已確認」除名；只清除「候選」（10/29 事故誤標居多）另計
-            significant = bool({'office_normalized', 'state_desc', 'discipline'} & payload.keys()) \
-                or bool(row.get('deregistered_at'))
+            # 異動＝有寫進摘要的事件（事務所／狀態／除名解除／懲戒有無翻轉）；
+            # 懲戒欄舊 HTML 換新站純文字、只清除除名「候選」都不算異動，另計
+            significant = bool(evs)
             cand_only = bool(row.get('dereg_candidate_at')) and not significant
             if payload and (dry_run or patch_lawyer(row['lic_no'], payload)):
                 events.extend(evs)

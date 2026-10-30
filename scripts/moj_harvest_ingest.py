@@ -100,8 +100,24 @@ def match(h, by_triple, by_num):
             return None, 'ambiguous'
         cands = named
     if h.get('name') and cands[0].get('name') != h['name']:
+        if name_close(cands[0].get('name'), h['name']):
+            return cands[0], 'variant'
         return None, 'name_mismatch'
     return cands[0], 'ok'
+
+
+def name_close(db_name, site_name):
+    """證號已唯一對上時，姓名只差異體字或一個字也算同一人。
+    2026-10-30 首批 8 筆實例：勲／勳、姸／妍、澐／芸（異體字）；官網查詢結果少一個字
+    （黃祺婷→黃婷、洪暄祐→洪暄，多半是罕用字／造字在官網文字版顯示不出來）。
+    身分不靠姓名把關：每週掃描會核對詳細頁上的證號，雜湊指錯人不會寫入。"""
+    a, b = (db_name or '').strip(), (site_name or '').strip()
+    if len(a) < 2 or len(b) < 2 or a[0] != b[0] or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) <= 1
+    short, long_ = (a, b) if len(a) < len(b) else (b, a)
+    return any(long_[:i] + long_[i + 1:] == short for i in range(len(long_)))
 
 
 def record_from_page(h, f):
@@ -158,6 +174,9 @@ def main(dry_run=False, allow_new=True):
             continue
         seen_hash[hid] = h
         row, reason = match(h, by_triple, by_num)
+        if reason == 'variant':
+            stat['姓名用字不同（以證號對應，名冊姓名不改）'] += 1
+            reason = 'ok'
 
         if reason == 'ok':
             holder = by_hash.get(hid)
