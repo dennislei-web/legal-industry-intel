@@ -9125,6 +9125,7 @@ async function showLawyerDetail(name, certNumber) {
           ${row('事務所', firmLink)}
           ${row('主區域公會', escHtml((moj?.guild_names || []).join('、') || region || '-'))}
           ${row('證號', escHtml(licNo || '-'))}
+          ${moj ? row('法務部官方頁', mojOfficialPageCell(moj)) : ''}
           ${row('年資', seniority)}
           ${row('出生年齡', age)}
           ${row('性別', escHtml(l.moj_sex || moj?.sex || '-'))}
@@ -9630,6 +9631,20 @@ function renderCauseCard(cs, ambiguous) {
         </div>
       </div>
     </div>`;
+}
+
+// 法務部官方律師頁連結（2026-10 新站 /lawyer/{資料雜湊值}，含照片）。
+// 照片不下載、不儲存：只放連結，由使用者瀏覽器直接向法務部載入（官網 X-Frame-Options: DENY，不能內嵌，開新分頁）。
+// 雜湊來自人工收成（public/tools/moj-harvest.html），尚未收錄者顯示提示；每週掃描遇 404 會記 page_hash_missing_at。
+function mojOfficialPageCell(moj) {
+  const h = moj && moj.page_hash;
+  if (!h || !/^0x[0-9a-fA-F]{64}$/.test(h))
+    return '<span style="color:var(--text-muted);" title="此律師的法務部詳細頁雜湊尚未經人工查詢收成，收成後會自動出現連結">尚未收錄</span>';
+  const link = `<a href="https://lawyerbc.moj.gov.tw/lawyer/${h}" target="_blank" rel="noopener noreferrer" style="color:var(--blue);" title="在新分頁開啟法務部律師查詢系統的官方資料頁（含照片，由法務部網站提供）">開啟法務部律師資料頁（含照片）&#8599;</a>`;
+  const stale = moj.page_hash_missing_at
+    ? ` <span style="color:var(--orange);font-size:0.75rem;" title="每週掃描於 ${escHtml(moj.page_hash_missing_at.slice(0, 10))} 查無此頁，連結可能已失效，待重新收成">（上次檢查查無，可能失效）</span>`
+    : '';
+  return link + stale;
 }
 
 // 懲戒記錄欄（moj_lawyers.discipline 存的是 MOJ 原始 HTML 片段：
