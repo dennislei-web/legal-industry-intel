@@ -147,6 +147,10 @@ def _query_once(lic_no):
         return ('empty', None)
 
     if r.status_code == 404 or 400 <= r.status_code < 500:
+        # 4xx 但不是 JSON（IIS「找不到檔案」HTML、WAF 擋頁）＝端點本身不見了，不是查無此證號。
+        # 2026-10-29 事故：MOJ 改版拿掉 /api/cert/lyinfosd，整片 1,910 位被誤記除名候選
+        if 'json' not in (r.headers.get('Content-Type') or '').lower():
+            return ('retry', None)
         return ('notfound', None)
     # 5xx（含 429 gateway 過載）→ 暫時性失敗
     return ('retry', None)

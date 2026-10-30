@@ -49,6 +49,10 @@ DEREG_CONFIRM_MIN_DAYS = 3  # 候選→確認的最小間隔（分片週期 7 �
 # 連續連線失敗達此數 → 判定 MOJ 端點不通，提早 exit 1（每筆 flaky 約 45 秒，40 筆≈30 分鐘）。
 # 2026-10-04 事故：MOJ 對 runner 整段不通，200/200 全 flaky，空轉到 300 分鐘 timeout 被取消
 MAX_CONSECUTIVE_FLAKY = 40
+# 真實除名一片頂多個位數；查無比例破此值＝API 行為異常（2026-10-29 改版事故 1,910/1,931），
+# 中止且不再寫入。前 GONE_RATIO_MIN_SEEN 筆不判斷，避免小樣本誤觸
+GONE_RATIO_MAX = 0.05
+GONE_RATIO_MIN_SEEN = 100
 
 
 def fetch_current_rows():
@@ -116,7 +120,9 @@ def main(limit=None, shard=None):
     dereg_conf = 0   # 本輪確認除名
     dereg_hold = 0   # 已確認除名、本輪仍查無（維持現狀）
     consec_flaky = 0
+    gone_seen = 0    # 本輪 MOJ 回查無、且尚未標除名的筆數，給比例防呆用
     aborted = False
+    abort_reason = ''
     events = []      # 給結尾「異動摘要」用：(類別, 說明)
 
     for i, row in enumerate(rows, 1):
@@ -131,8 +137,16 @@ def main(limit=None, shard=None):
                 print(f'  !! 連續 {consec_flaky} 筆連線失敗（第 {i}/{len(rows)} 筆），'
                       f'判定 MOJ 端點不通，提早中止', flush=True)
                 aborted = True
+                abort_reason = f'連續 {MAX_CONSECUTIVE_FLAKY} 筆連線失敗'
                 break
         elif data is None:  # st == 'gone'：MOJ 確定查無（200 空 data / 404）
+            gone_seen += 0 if row.get('deregistered_at') else 1
+            if gone_seen > max(GONE_RATIO_MIN_SEEN, i) * GONE_RATIO_MAX:
+                print(f'  !! 查無比例異常（{gone_seen}/{i}），判定 MOJ API 行為改變，'
+                      f'提早中止、本筆起不再寫入', flush=True)
+                aborted = True
+                abort_reason = f'查無比例異常 {gone_seen}/{i}'
+                break
             if row.get('deregistered_at'):
                 dereg_hold += 1  # 已標除名，維持現狀
             elif row.get('dereg_candidate_at'):
@@ -241,7 +255,7 @@ def main(limit=None, shard=None):
     print(f'耗時: {(time.time() - t0) / 60:.1f} 分鐘')
     print_change_summary(events, len(rows), flaky, fail, aborted, shard)
     if aborted:
-        print(f'結果: 中止（連續 {MAX_CONSECUTIVE_FLAKY} 筆連線失敗），本分片未刷完，請稍後以 --shard 重跑')
+        print(f'結果: 中止（{abort_reason}），本分片未刷完，請稍後以 --shard 重跑')
         sys.exit(1)
 
 
