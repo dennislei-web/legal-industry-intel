@@ -31,3 +31,6 @@ scripts/_preview_analysis.txt
 scripts/.chambers_cache/
 
 scripts/.interview_work/
+
+# MOJ 新站人工查詢清單（moj_query_plan.py 輸出，含完整證號）
+scripts/.moj_harvest_work/

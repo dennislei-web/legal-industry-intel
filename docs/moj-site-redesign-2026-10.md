@@ -42,7 +42,7 @@
 4. 半自動：人工過驗證碼、程式整理結果。每碼最多 100 筆，全名冊約 140 次，只適合小名單（校友 ~52 位、競品所）。
 5. 正式途徑：依法務部資料開放宣告，向資訊處申請名冊資料集或 API（開放資料平臺 139256 目前只是系統說明 CSV）。
 
-## 2026-10-30 下午人工驗證結果（雷本人在 Chrome 操作）
+## 2026-10-30 下午人工驗證結果（人工在 Chrome 操作）
 
 - **前綴查詢可行**：`115臺檢證字第193` 回 74 筆（19300～19399）。`115臺檢證字第19` 回「找不到或超過 100 筆」——
   這句錯誤訊息兩種情況共用，不能區分。
@@ -52,7 +52,7 @@
   內容：執業狀態、姓名、英文姓名、性別、出生年、證號、公會、事務所、email、電話、地址、懲戒、備註、發布日期、更新日期、區塊鏈交易序號。
   全頁 1.4 MB 是大頭照 base64 內嵌（offset ≈ 19.9 KB 起）；**所有欄位都在前 20 KB**，串流讀到 32 KB 即可斷線。
   Range 不支援（回 200 全頁）。
-- **雜湊穩定性**：才文淇舊 API ut_date 2026-07-09（有 1 筆異動），但區塊鏈發行日 2026-06-04、頁面更新日期 2026-10-29；
+- **雜湊穩定性**：抽查一位 115 年新科律師，舊 API ut_date 2026-07-09（有 1 筆異動），但區塊鏈發行日 2026-06-04、頁面更新日期 2026-10-29；
   雜湊未隨 7/9 異動重發 → 偏向穩定。下週四更新後以 404 率再確認。
 - 查詢次數（用現有名冊算）：一律三位數區段 383 次；小系列（≤100 人，105 個）整系列一次查＋大年度切三位數 **322 次**（最大區段 93 人、0 個破百）；
   若多條件一次查成立（`A B` 半形空格）可壓到約 135 次（**未測**）。39 筆 lic_no 格式異常（無「第」或無「號」）另列人工。
@@ -67,12 +67,29 @@
    一次性建表 322 次（約 1 小時，可分天）；之後每週補最新年度新區段 1～3 次＋404 佇列。
 3. 不做的事：任何形式的驗證碼自動化（OCR、語音念碼端點、Session 重用）。
 
-## 待做（新 session 接手）
+## 實作狀態（2026-10-30 晚，分支 `feat/moj-detail-sweep`，尚未合併）
 
-- migration：`moj_lawyers` 加 `page_hash text`、`page_checked_at timestamptz`、`page_hash_missing_at timestamptz`；
-  新表 `moj_search_harvest(id, name, lic_no, office, guild_name, id_no, query, harvested_at, ingested_at)`。
-- `scripts/moj_query_plan.py`：由 DB 產 322 條查詢字串（＋之後的增量：最新年度已知最大號之後的區段）。
-- 瀏覽器助手 `public/tools/moj-harvest-bookmarklet.js`（或 userscript）＋ ingest 腳本把 harvest → page_hash。
-- `scripts/moj_detail_sweep.py` ＋ workflow `moj-detail-sweep.yml`（每週五 UTC 00:00）。
-- `moj_lawyer_scraper.py` 改讀 `/Home/GuildCounter` HTML（16 公會人數）→ `industry_stats`，重新啟用 `scrape-moj-lawyers`。
-- 舊的 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 由新掃描取代後移除或改寫。
+| 項目 | 檔案 | 狀態 |
+|---|---|---|
+| migration 253 | `supabase/migrations/253_moj_page_hash_and_harvest.sql` | **已套用正式庫**。`moj_lawyers` 加 `page_hash`（部分唯一索引）、`page_checked_at`、`page_hash_missing_at`；新表 `moj_search_harvest`（id_no＋lic_no 唯一、CHECK 雜湊格式與長度）、`moj_harvest_queries`（每次送出一列，含 0 筆）；寫入入口 RPC `moj_harvest_submit(p_query, p_rows)`（SECURITY DEFINER，anon 可呼叫，單次 ≤200 列，去重插入、只回筆數）；anon 可讀的聚合 view `moj_harvest_progress`（不含姓名／證號）。收成原表只有 admin 能讀。anon 實測：格式錯 400、讀原表回空、RPC 去重正確 |
+| 查詢清單 | `scripts/moj_query_plan.py` | 完成、已實跑。全量 **327 條**（研究估 322，差在前綴計入已除名者），單條預期最多 95 筆、0 條破百；校友試跑 36 條（54 位校友：對上 47、名冊查無 6、同名非本人 1）；每週增量 5 條。格式異常 39 筆另列 CSV 附建議寫法。`--publish` 寫 `public/tools/moj-harvest-plan.json`（只放前綴型查詢與預期筆數）；完整證號的 404 複查佇列只進本機 CSV（`scripts/.moj_harvest_work/`，已 gitignore） |
+| 書籤助手＋進度頁 | `public/tools/moj-harvest.js`、`moj-harvest.html` | 完成。**官網 CSP 的 connect-src 只允許 'self' 與 etherscan，書籤在官網頁內直接 POST 到 Supabase 會被瀏覽器擋** → 改成書籤讀頁面上已顯示的結果表、開收成頁並把資料放網址 # 片段（不送任何伺服器），由收成頁呼叫 RPC 寫入後立刻清掉網址。查詢字串以官網全域 `lastSearch`（最近一次通過驗證碼的條件）為準，最近一次按搜尋失敗時改問「要不要記成 0 筆」，避免把殘留的舊結果記到新字串下。收成頁由自己的網址組書籤，本機起靜態伺服器即可在合併前實測。本機預覽已驗證：寫入、0 筆標黃、下一條自動前進。**待人工在官網實測一條** |
+| ingest | `scripts/moj_harvest_ingest.py` | 完成、dry-run 通過（佇列 0 筆）。三元組比對＋（臺檢證／臺證／補證）類型＋編號備援、姓名需一致；名冊沒有的新律師先 GET 詳細頁核對證號才插入（收成入口是公開的，擋假資料）；雜湊已掛別人、同證號多筆、姓名不同都留在佇列給人看 |
+| 詳細頁解析 | `scripts/moj_detail_page.py` | 完成。DOM 依實抓頁面寫（標籤 el-col＋值 el-col），存檔與線上各測一頁，15 個欄位全取到；讀到 32 KB 或 `data:image` 即斷線，不下載大頭照；404 且 0 byte 才算「查無」，404 帶錯誤頁算連線問題 |
+| 每週掃描 | `scripts/moj_detail_sweep.py`、`.github/workflows/moj-detail-sweep.yml` | 完成、dry-run 通過（目前 0 位有雜湊）。≤1 req/s、三片依序跑（`max-parallel: 1`）、每週五 UTC 00:00；404 → `page_hash_missing_at`（**非除名**），404 率 >5%（看過 ≥100 頁）中止；頁面證號與 DB 不符不寫入；查得到者自動清除除名候選／旗標（10/29 事故的誤標會隨掃描自癒）；懲戒欄舊表是 HTML 連結、新站是純文字，只把「有／無」翻轉算異動。結尾印「異動摘要 BEGIN/END」 |
+| 公會人數 | `scripts/moj_lawyer_scraper.py` | 改讀 `/Home/GuildCounter`、`/Guild/Info`、首頁更新截止日（伺服器端 HTML、免驗證碼），三份存檔解析通過（16 公會 13,603 人、17 列公會資訊全部對上既有 ID）。公會 ID 依 DB 修正（宜蘭 ELBA、台東 TDBA）。**`scrape-moj-lawyers` 尚未重新啟用**——workflow 跑的是 main，合併前啟用會跑到舊碼 |
+
+### 合併後要做
+
+1. `gh workflow enable scrape-moj-lawyers.yml`，手動 `gh workflow run scrape-moj-lawyers.yml` 驗一次 `industry_stats`。
+2. 舊的 `moj-office-refresh.yml`／`moj-licno-scan.yml`／`alumni-refresh.yml` 維持 disabled：**由 sweep＋人工收成取代，待一次性建表完成、sweep 跑過一輪後刪除**（含 `moj_office_refresh.py` 的除名兩段確認：新站沒有「確定查無」訊號，404 只進複查佇列）。
+3. 校友試跑整條鏈：收成頁「校友試跑」36 條 → `python moj_harvest_ingest.py` → `python moj_detail_sweep.py --limit 50`（或 dispatch workflow 帶 limit）。
+4. 一次性建表 327 條分天做；每週增量用「每週增量」清單（`python moj_query_plan.py --incremental --publish` 重產）。
+5. 第一次整輪 sweep 後看 404 率：>5% 會自動中止——代表雜湊會重發，要改成「每週重收成」而不是掃已知雜湊。
+
+### 未解／待觀察
+
+- 雜湊是否會隨週四更新重發：下週五第一輪 sweep 的 404 率就是答案。
+- 書籤小程式在官網（CSP 嚴格）能否執行：Chrome 一般不對書籤套用頁面 CSP；若被擋，改用「複製程式碼」貼到 DevTools Console。
+- 官網查詢字串對「台／臺」與括號是否寬鬆比對：清單照名冊原字串切（`89台檢證字第` 與 `89臺檢證字第` 各一條），實際查詢若互通，少數條會重複收到同一批，ingest 會去重。
+- 39 筆格式異常證號的建議寫法沿用舊 API 怪癖（`(80)臺檢證字第…`、92 年後補證補零），以官網實際顯示為準。
