@@ -42,8 +42,37 @@
 4. 半自動：人工過驗證碼、程式整理結果。每碼最多 100 筆，全名冊約 140 次，只適合小名單（校友 ~52 位、競品所）。
 5. 正式途徑：依法務部資料開放宣告，向資訊處申請名冊資料集或 API（開放資料平臺 139256 目前只是系統說明 CSV）。
 
-## 待驗證（需人工在瀏覽器查一次）
+## 2026-10-30 下午人工驗證結果（雷本人在 Chrome 操作）
 
-- `/Home/search` 回應中 `id_no` 的形態（流水號？雜湊？）。
-- `/lawyer/{id_no}` 是否免 Session 可直接開啟；若可且 id_no 可推算，詳細頁本身是公開資源，可逐頁抓。
-- `lic_no` 條件是否支援前綴／部分比對（決定半自動工具每碼能帶回多少筆）。
+- **前綴查詢可行**：`115臺檢證字第193` 回 74 筆（19300～19399）。`115臺檢證字第19` 回「找不到或超過 100 筆」——
+  這句錯誤訊息兩種情況共用，不能區分。
+- **MOJ 事務所／公會資料每週四批次更新**（頁面明文；更新截止日 115/10/29）→ 刷新節奏每週一次即可，日分片已無意義。
+- **`id_no` ＝ 資料雜湊值**（`0x`＋64 hex，詳細頁也印在「資料雜湊值」欄），不可推算。
+- **詳細頁 `/lawyer/{hash}` 是公開資源**：無 cookie 的 curl 直接 200；假雜湊 404（0 byte）；HEAD 也可（0.1 s）。
+  內容：執業狀態、姓名、英文姓名、性別、出生年、證號、公會、事務所、email、電話、地址、懲戒、備註、發布日期、更新日期、區塊鏈交易序號。
+  全頁 1.4 MB 是大頭照 base64 內嵌（offset ≈ 19.9 KB 起）；**所有欄位都在前 20 KB**，串流讀到 32 KB 即可斷線。
+  Range 不支援（回 200 全頁）。
+- **雜湊穩定性**：才文淇舊 API ut_date 2026-07-09（有 1 筆異動），但區塊鏈發行日 2026-06-04、頁面更新日期 2026-10-29；
+  雜湊未隨 7/9 異動重發 → 偏向穩定。下週四更新後以 404 率再確認。
+- 查詢次數（用現有名冊算）：一律三位數區段 383 次；小系列（≤100 人，105 個）整系列一次查＋大年度切三位數 **322 次**（最大區段 93 人、0 個破百）；
+  若多條件一次查成立（`A B` 半形空格）可壓到約 135 次（**未測**）。39 筆 lic_no 格式異常（無「第」或無「號」）另列人工。
+
+## 決定的架構：兩層
+
+1. **每週自動掃描（免驗證碼）** `moj_detail_sweep.py`：每週五對已知 `page_hash` 逐頁 GET、讀前 32 KB、解析欄位、
+   比對 `moj_lawyers`（office_normalized / guild_names / state_desc / 懲戒），異動經既有 trigger 進 `moj_lawyer_changes`；
+   404 → `page_hash_missing_at`，進人工複查佇列。速率 ≤1 req/s（全量約 4 小時，可分片）。
+2. **人工過碼（小量）**：瀏覽器端助手（書籤小程式）——同仁在法務部網頁自己打驗證碼搜尋，助手讀
+   `$('#table_QueryResults').bootstrapTable('getData')`（含 `id_no`）POST 到 `moj_search_harvest`，並顯示下一條查詢字串。
+   一次性建表 322 次（約 1 小時，可分天）；之後每週補最新年度新區段 1～3 次＋404 佇列。
+3. 不做的事：任何形式的驗證碼自動化（OCR、語音念碼端點、Session 重用）。
+
+## 待做（新 session 接手）
+
+- migration：`moj_lawyers` 加 `page_hash text`、`page_checked_at timestamptz`、`page_hash_missing_at timestamptz`；
+  新表 `moj_search_harvest(id, name, lic_no, office, guild_name, id_no, query, harvested_at, ingested_at)`。
+- `scripts/moj_query_plan.py`：由 DB 產 322 條查詢字串（＋之後的增量：最新年度已知最大號之後的區段）。
+- 瀏覽器助手 `public/tools/moj-harvest-bookmarklet.js`（或 userscript）＋ ingest 腳本把 harvest → page_hash。
+- `scripts/moj_detail_sweep.py` ＋ workflow `moj-detail-sweep.yml`（每週五 UTC 00:00）。
+- `moj_lawyer_scraper.py` 改讀 `/Home/GuildCounter` HTML（16 公會人數）→ `industry_stats`，重新啟用 `scrape-moj-lawyers`。
+- 舊的 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 由新掃描取代後移除或改寫。
