@@ -50,7 +50,10 @@ def log(msg):
 
 
 def env_of(path):
-    env = {}
+    """讀 .env；沒有檔案時退回環境變數（子程序的 load_dotenv 也是 override=False，兩者一致）"""
+    env = {k: os.environ[k] for k in ('SUPABASE_URL', 'SUPABASE_SERVICE_KEY') if k in os.environ}
+    if not os.path.exists(path):
+        return env
     with open(path, encoding='utf-8-sig') as f:
         for ln in f:
             if '=' in ln and not ln.strip().startswith('#'):
