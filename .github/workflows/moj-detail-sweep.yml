@@ -1,17 +1,20 @@
-name: MOJ 律師詳細頁掃描（每週，事務所／執業狀態）
+name: MOJ 律師詳細頁掃描（手動；每週排程在本機）
 
 # 2026-10-29 官網改版後取代 moj-office-refresh.yml：
 #   對已有 page_hash 的律師逐頁 GET 公開詳細頁（免驗證碼），比對後只 PATCH 有變動者，
 #   異動由 trigger 記進 moj_lawyer_changes。MOJ 事務所／公會資料每週四批次更新 → 週五跑。
-# 速率 ≤1 req/s：三個分片「依序」跑（max-parallel: 1），不平行打官網。全量約 13,600 頁 ≈ 4 小時。
+# 速率 ≤1 req/s：五個分片「依序」跑（max-parallel: 1），不平行打官網。全量約 13,600 頁；
+# runner（海外 IP）約 1/3 請求間歇回 805 bytes Error 頁，靠退避重試（5s、15s），每片約 2 小時。
+
+# ⚠️ 2026-10-30 起每週排程改在本機（Windows 排程 moj-detail-sweep-weekly，scripts/moj_detail_sweep_weekly.py）：
+#   runner 海外 IP 打官網 75 頁有 26 頁重試後仍失敗（805 bytes Error 頁／連線被切），本機 75/75。
+#   本 workflow 只留手動觸發（測試或本機無法跑時的備援，覆蓋率會不全）。
 
 on:
-  schedule:
-    - cron: '0 0 * * 5'  # 每週五 UTC 00:00 = 台灣 08:00（MOJ 週四更新後）
   workflow_dispatch:
     inputs:
       shard:
-        description: '只跑這個分片 0~2（留空=三片依序全跑）'
+        description: '只跑這個分片 0~4（留空=五片依序全跑）'
         required: false
         default: ''
       limit:
@@ -30,12 +33,12 @@ concurrency:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 240
     strategy:
       max-parallel: 1
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.shard != '') && format('[{0}]', inputs.shard) || '[0,1,2]') }}
+        shard: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.shard != '') && format('[{0}]', inputs.shard) || '[0,1,2,3,4]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,11 +55,11 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         working-directory: scripts
         run: |
-          ARGS="--shard ${{ matrix.shard }} 3"
+          ARGS="--shard ${{ matrix.shard }} 5"
           LIMIT="${{ inputs.limit }}"
           [ -n "$LIMIT" ] && ARGS="$ARGS --limit $LIMIT"
           [ "${{ inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
-          echo "=== 分片 ${{ matrix.shard }}/3 ==="
+          echo "=== 分片 ${{ matrix.shard }}/5 ==="
           python moj_detail_sweep.py $ARGS
 
   refresh:

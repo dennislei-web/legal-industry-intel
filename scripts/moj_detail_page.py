@@ -88,10 +88,31 @@ def fetch_detail(page_hash, session=None, timeout=(10, 30)):
         return 'flaky', None, type(e).__name__
     except requests.exceptions.RequestException as e:
         return 'flaky', None, type(e).__name__
-    fields = parse_detail(head.decode('utf-8', errors='ignore'))
+    text = head.decode('utf-8', errors='ignore')
+    fields = parse_detail(text)
     if not fields.get('lic_no'):
-        return 'flaky', None, '解析不到證書字號（版面可能改了）'
+        # 診斷：只印大小與 <title>（錯誤頁／攔截頁的標題不含個資），不印內容
+        m = re.search(r'<title>(.*?)</title>', text, re.S | re.I)
+        title = re.sub(r'\s+', ' ', BeautifulSoup(m.group(1), 'html.parser').get_text()).strip()[:60] if m else '-'
+        return 'flaky', None, f'解析不到證書字號（{len(head)} bytes，title={title}）'
     return 'ok', fields, ''
+
+
+RETRY_DELAYS = (5, 15)
+
+
+def fetch_detail_retry(page_hash, session, throttle, delays=RETRY_DELAYS):
+    """fetch_detail 加退避重試：'flaky' 才重試（404 與成功都直接回）。
+    2026-10-30 GitHub runner 實測：約 1/3 請求間歇回 200＋805 bytes「Error」頁或 ConnectionError，
+    本機（台灣 IP）兩輪 150 頁 0 次 → 暫時性，隔幾秒重抓即可。回傳 (status, fields, note, 重試次數)"""
+    tries = 0
+    while True:
+        throttle.wait()
+        st, f, note = fetch_detail(page_hash, session)
+        if st != 'flaky' or tries >= len(delays):
+            return st, f, note, tries
+        time.sleep(delays[tries])
+        tries += 1
 
 
 def parse_detail(html):
