@@ -1,34 +1,37 @@
 """
-法務部律師查詢系統爬蟲
+法務部律師查詢系統爬蟲（公會人數統計＋公會聯絡資訊）
 來源：https://lawyerbc.moj.gov.tw/
 
-已確認的 API endpoints (免 CAPTCHA):
-  /api/cert/sdlyguild/summary  - 各公會會員人數統計
-  /api/cert/sdlyguild/info     - 各公會聯絡資訊
-  /api/cert/lyinfosd/notice/upDate - 資料更新日期
+2026-10-29 官網改版：舊 /api/cert/sdlyguild/* JSON 端點下架，改讀新站伺服器端渲染的 HTML（免驗證碼）：
+  /Home/GuildCounter  - 16 個地方公會「XXX律師公會 N 筆」（取代 sdlyguild/summary）
+  /Guild/Info         - 公會名稱／地址及服務信箱／電話／傳真表格（取代 sdlyguild/info）
+  /                   - 首頁「事務所及公會資料更新截止日：民國115年10月29日」（取代 lyinfosd/notice/upDate）
 
-個別律師查詢需要 CAPTCHA，留待後續實作。
+個別律師查詢需人工驗證碼，不在本程式範圍（見 docs/moj-site-redesign-2026-10.md）。
 """
 import json
+import re
 import time
 import requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from utils import get_supabase, log, scrape_start, scrape_end, polite_delay
 
-BASE_URL = 'https://lawyerbc.moj.gov.tw/api'
+BASE_URL = 'https://lawyerbc.moj.gov.tw'
 
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LegalIndustryIntel/1.0',
-    'Accept': 'application/json',
+    'User-Agent': 'LegalIndustryIntel/1.0',
+    'Accept': 'text/html',
     'Referer': 'https://lawyerbc.moj.gov.tw/',
 }
 
-# 公會 ID → 地區對應
+# 公會 ID → 地區對應（ID 沿用舊 API，law_firms.registration_number = GUILD-{ID}；
+# 宜蘭 ELBA、台東 TDBA 以 DB 既有列為準）
 GUILD_REGION_MAP = {
     'TBA': '全國',
     'TPBA': '台北',
     'KLBA': '基隆',
-    'ILBA': '宜蘭',
+    'ELBA': '宜蘭',
     'HCBA': '新竹',
     'TYBA': '桃園',
     'MLBA': '苗栗',
@@ -40,24 +43,34 @@ GUILD_REGION_MAP = {
     'TNBA': '台南',
     'KSBA': '高雄',
     'PTBA': '屏東',
-    'TTBA': '台東',
+    'TDBA': '台東',
     'HLBA': '花蓮',
 }
+_REGION_TO_ID = {v: k for k, v in GUILD_REGION_MAP.items()}
+
+
+def guild_id(name):
+    """'台北律師公會'／'臺北律師公會' → 'TPBA'；全聯會 → 'TBA'"""
+    n = (name or '').replace('臺', '台').replace('社團法人', '').strip()
+    if '全國' in n or '聯合會' in n:
+        return 'TBA'
+    return _REGION_TO_ID.get(n.replace('律師公會', ''))
 
 
 # GitHub runner 偶發連不到 lawyerbc（Errno 101 Network is unreachable，2026-08-23、08-30
-# 兩次週更都是首次連線就死）。同 host 的 moj_licno_scan.py 有 retry 所以沒事，這裡補上。
+# 兩次週更都是首次連線就死）→ 連線類錯誤退避重試
 RETRY_DELAYS = [15, 30, 60, 120]
 
 
-def _get_json(path):
+def _get_html(path):
     """帶退避重試的 GET；連線類錯誤才重試，HTTP 4xx/5xx 直接拋"""
     last_err = None
     for attempt in range(len(RETRY_DELAYS) + 1):
         try:
             resp = requests.get(f'{BASE_URL}{path}', headers=HEADERS, timeout=30)
             resp.raise_for_status()
-            return resp.json()
+            resp.encoding = 'utf-8'
+            return resp.text
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             last_err = e
             if attempt < len(RETRY_DELAYS):
@@ -67,35 +80,76 @@ def _get_json(path):
     raise RuntimeError(f'連線 {path} 重試 {len(RETRY_DELAYS) + 1} 次仍失敗: {last_err}')
 
 
+def parse_guild_counter(html):
+    """GuildCounter HTML → [{'name': '台北律師公會', 'count': 8531}, ...]"""
+    soup = BeautifulSoup(html, 'html.parser')
+    out = []
+    for card in soup.select('.guild-counter-card'):
+        name_el, cnt_el = card.select_one('.guild-counter-name'), card.select_one('.guild-counter-count')
+        if not name_el or not cnt_el:
+            continue
+        m = re.search(r'([\d,]+)', cnt_el.get_text())
+        if m:
+            out.append({'name': name_el.get_text(strip=True), 'count': int(m.group(1).replace(',', ''))})
+    return out
+
+
 def fetch_guild_summary():
     """取得各律師公會會員人數統計"""
-    log('取得各公會會員統計...')
-    data = _get_json('/cert/sdlyguild/summary')
-
-    if data.get('status') != 1:
-        raise Exception(f"API 回應異常: {data}")
-
-    guilds = data['data']
+    log('取得各公會會員統計（/Home/GuildCounter）...')
+    guilds = parse_guild_counter(_get_html('/Home/GuildCounter'))
+    # 版面防呆：改版前後都是 16 個地方公會；數量差太多代表 HTML 結構又變了，寧可紅燈也不寫錯數字
+    if len(guilds) < 14 or any(g['count'] <= 0 for g in guilds):
+        raise RuntimeError(f'GuildCounter 解析結果異常：{len(guilds)} 個公會，請檢查版面是否改了')
     total = sum(g['count'] for g in guilds)
     log(f'共 {len(guilds)} 個公會，合計 {total} 位律師')
     return guilds
 
 
+def parse_guild_info(html):
+    """Guild/Info 表格 → [{'id','name','zip','address','email','phone','fax'}, ...]"""
+    soup = BeautifulSoup(html, 'html.parser')
+    out = []
+    for tr in soup.select('tr.guild-row'):
+        tds = tr.find_all('td')
+        if len(tds) < 4:
+            continue
+        name = tds[0].get_text(strip=True)
+        addr_el = tds[1].select_one('.guild-address-text')
+        address = addr_el.get_text(strip=True) if addr_el else ''
+        strings = [s.strip() for s in tds[1].stripped_strings]
+        zip_code = strings[0] if strings and re.fullmatch(r'\d{3,6}', strings[0]) else ''
+        email = next((s for s in strings if '@' in s), '')
+        out.append({
+            'id': guild_id(name),
+            'name': name,
+            'zip': zip_code,
+            'address': [address] if address else [],
+            'email': email,
+            'phone': [tds[2].get_text(strip=True)],
+            'fax': [tds[3].get_text(strip=True)],
+        })
+    return out
+
+
 def fetch_guild_info():
     """取得各律師公會聯絡資訊"""
-    log('取得各公會聯絡資訊...')
-    data = _get_json('/cert/sdlyguild/info')
-
-    if data.get('status') != 1:
-        raise Exception(f"API 回應異常: {data}")
-
-    return data['data']
+    log('取得各公會聯絡資訊（/Guild/Info）...')
+    info = parse_guild_info(_get_html('/Guild/Info'))
+    if len(info) < 14:
+        raise RuntimeError(f'Guild/Info 解析結果異常：{len(info)} 列，請檢查版面是否改了')
+    unknown = [g['name'] for g in info if not g['id']]
+    if unknown:
+        log(f'  ! 對不上公會 ID、略過：{unknown}')
+    return [g for g in info if g['id']]
 
 
 def fetch_update_date():
-    """取得資料最後更新日期"""
-    data = _get_json('/cert/lyinfosd/notice/upDate')
-    return data.get('data', '')
+    """首頁「事務所及公會資料更新截止日」（只記 log）"""
+    html = _get_html('/')
+    text = BeautifulSoup(html, 'html.parser').get_text(' ', strip=True)
+    m = re.search(r'更新截止日[：:]\s*(民國\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)', text)
+    return m.group(1).replace(' ', '') if m else '（首頁找不到更新截止日）'
 
 
 def save_guild_stats(sb, guilds):
@@ -120,7 +174,7 @@ def save_guild_stats(sb, guilds):
             'unit': '人',
             'region': region,
             'source': 'moj_lawyerbc',
-            'source_url': 'https://lawyerbc.moj.gov.tw/',
+            'source_url': 'https://lawyerbc.moj.gov.tw/Home/GuildCounter',
             'notes': name,
         })
 
@@ -133,7 +187,7 @@ def save_guild_stats(sb, guilds):
         'unit': '人',
         'region': None,
         'source': 'moj_lawyerbc',
-        'source_url': 'https://lawyerbc.moj.gov.tw/',
+        'source_url': 'https://lawyerbc.moj.gov.tw/Home/GuildCounter',
         'notes': f'全國執業律師合計 ({len(guilds)} 個公會)',
     })
 
@@ -167,7 +221,7 @@ def save_guild_info_as_firms(sb, guild_info):
             'status': 'active',
             'organization_type': '律師公會',
             'source': 'moj_lawyerbc',
-            'source_url': 'https://lawyerbc.moj.gov.tw/guild/info',
+            'source_url': 'https://lawyerbc.moj.gov.tw/Guild/Info',
             'raw_data': json.dumps(g, ensure_ascii=False),
         })
 

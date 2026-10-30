@@ -1,0 +1,73 @@
+name: MOJ 律師詳細頁掃描（每週，事務所／執業狀態）
+
+# 2026-10-29 官網改版後取代 moj-office-refresh.yml：
+#   對已有 page_hash 的律師逐頁 GET 公開詳細頁（免驗證碼），比對後只 PATCH 有變動者，
+#   異動由 trigger 記進 moj_lawyer_changes。MOJ 事務所／公會資料每週四批次更新 → 週五跑。
+# 速率 ≤1 req/s：三個分片「依序」跑（max-parallel: 1），不平行打官網。全量約 13,600 頁 ≈ 4 小時。
+
+on:
+  schedule:
+    - cron: '0 0 * * 5'  # 每週五 UTC 00:00 = 台灣 08:00（MOJ 週四更新後）
+  workflow_dispatch:
+    inputs:
+      shard:
+        description: '只跑這個分片 0~2（留空=三片依序全跑）'
+        required: false
+        default: ''
+      limit:
+        description: '每片只處理前 N 位（測試用，留空=整片）'
+        required: false
+        default: ''
+      dry_run:
+        description: '只比對不寫入（true/false）'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: moj-detail-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.shard != '') && format('[{0}]', inputs.shard) || '[0,1,2]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv beautifulsoup4
+
+      - name: Run detail sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        working-directory: scripts
+        run: |
+          ARGS="--shard ${{ matrix.shard }} 3"
+          LIMIT="${{ inputs.limit }}"
+          [ -n "$LIMIT" ] && ARGS="$ARGS --limit $LIMIT"
+          [ "${{ inputs.dry_run }}" = "true" ] && ARGS="$ARGS --dry-run"
+          echo "=== 分片 ${{ matrix.shard }}/3 ==="
+          python moj_detail_sweep.py $ARGS
+
+  refresh:
+    needs: sweep
+    if: ${{ !cancelled() && inputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refresh all caches (with retry)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        # 重試與紅綠燈規則在 script 裡：5xx／連線錯誤重試 3 次；4xx 或重試後仍失敗 → 清單跑完後 job 紅燈
+        run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache refresh_lawyer_stats refresh_firm_map_cache

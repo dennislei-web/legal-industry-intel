@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>MOJ 名冊收成</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --fg: #1d1d1f; --muted: #6b6b70; --line: #e3e3e0;
+    --accent: #1f6feb; --ok: #1a7f37; --warn: #b35900; --bad: #c62828; --code: #f0f0ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618; --card: #1f1f22; --fg: #ececee; --muted: #a0a0a8; --line: #33333a;
+      --accent: #5b9dff; --ok: #4cc27a; --warn: #f0a050; --bad: #ff6b6b; --code: #2a2a2f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.6 system-ui, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  ol.steps { margin: 0; padding-left: 22px; }
+  ol.steps li { margin: 2px 0; }
+  .bm { display: inline-block; padding: 6px 12px; border-radius: 6px; background: var(--accent); color: #fff;
+        text-decoration: none; font-weight: 600; cursor: grab; }
+  button { font: inherit; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--card); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  code, .q { font-family: ui-monospace, Consolas, "Noto Sans Mono CJK TC", monospace; background: var(--code);
+             padding: 1px 6px; border-radius: 4px; }
+  #banner { display: none; }
+  #banner.ok { display: block; border-color: var(--ok); }
+  #banner.bad { display: block; border-color: var(--bad); }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .next { font-size: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--ok); width: 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .s-todo { color: var(--muted); }
+  .s-ok { color: var(--ok); }
+  .s-warn { color: var(--warn); }
+  tr.is-next td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .muted { color: var(--muted); font-size: 13px; }
+  label.f { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MOJ 名冊收成助手</h1>
+  <div class="sub">法務部律師查詢系統改版後的名冊建表工具。驗證碼一律由人在法務部網頁上輸入，本頁只收「已經查出來、顯示在頁面上」的結果。</div>
+
+  <div class="card" id="banner"></div>
+
+  <div class="card">
+    <strong>使用步驟</strong>
+    <ol class="steps">
+      <li>把下方藍色按鈕拖到書籤列（只要做一次）。</li>
+      <li>到<a href="https://lawyerbc.moj.gov.tw/" target="_blank" rel="noopener">法務部律師查詢系統</a>，輸入本頁「下一條」查詢字串，自己打驗證碼並按搜尋。</li>
+      <li>結果出現後按書籤，會跳回本頁顯示「已寫入」，再照下一條繼續；官網說「找不到或超過 100 筆」時也按一次書籤，記成 0 筆。</li>
+    </ol>
+    <p style="margin:12px 0 4px">
+      <a class="bm" id="bmLink" href="#" title="拖到書籤列">MOJ 收成</a>
+      <button id="copyCode" type="button">複製程式碼（貼到 Console 用）</button>
+      <span class="muted" id="bmNote"></span>
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div id="summary" class="muted">載入中…</div>
+    <div class="bar" style="margin:8px 0"><i id="barFill"></i></div>
+    <div class="next" id="nextBox"></div>
+    <label class="f"><input type="checkbox" id="hideDone"> 只顯示未完成</label>
+  </div>
+
+  <div class="card tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>查詢字串</th><th class="num">預期</th><th>狀態</th><th>最近送出</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="muted" style="margin:10px 0 0">預期＝本站名冊中以該字串開頭的證號數（含已除名者，官網不會列出），只供對照。
+      收到筆數明顯少於預期、或 0 筆而預期不是 0，會標黃請人看一下。</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var SB_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
+  var SB_KEY = 'sb_publishable_NvTWZM6IGgc_Jn8iCXFvaA_QnvJsstM';
+  var SET_LABEL = { alumni: '校友試跑', full: '一次性建表', incremental: '每週增量' };
+  var SET_ORDER = ['alumni', 'full', 'incremental'];
+  var state = { plan: null, progress: {}, set: null };
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function sb(path, opts) {
+    opts = opts || {};
+    var headers = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    return fetch(SB_URL + '/rest/v1/' + path, { method: opts.method || 'GET', headers: headers, body: opts.body })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { /* 非 JSON */ }
+          if (!r.ok) throw new Error((j && (j.message || j.hint)) || ('HTTP ' + r.status));
+          return j;
+        });
+      });
+  }
+  function copy(text, btn) {
+    var done = function () { if (btn) { var o = btn.textContent; btn.textContent = '已複製'; setTimeout(function () { btn.textContent = o; }, 1200); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { prompt('複製失敗，請手動複製：', text); });
+    } else { prompt('請手動複製：', text); }
+  }
+  function banner(cls, html) { var b = $('banner'); b.className = 'card ' + cls; b.innerHTML = html; }
+
+  /* ---------- 1. 收書籤送來的資料（網址 # 片段） ---------- */
+  function takeIncoming() {
+    var h = location.hash || '';
+    if (h.indexOf('#h=') !== 0) return Promise.resolve();
+    history.replaceState(null, '', location.pathname + location.search);  /* 立刻清掉網址上的資料 */
+    var payload;
+    try { payload = JSON.parse(decodeURIComponent(h.slice(3))); } catch (e) {
+      banner('bad', '收到的資料格式不對，沒有寫入。請回法務部頁面再按一次書籤。');
+      return Promise.resolve();
+    }
+    var q = String(payload.q || '').trim();
+    var rows = Array.isArray(payload.rows) ? payload.rows : [];
+    if (!q || q.length > 60 || rows.length > 200) {
+      banner('bad', '查詢字串或筆數不合理（字串 1～60 字、最多 200 筆），沒有寫入。');
+      return Promise.resolve();
+    }
+    banner('ok', '收到「<span class="q">' + esc(q) + '</span>」' + rows.length + ' 筆，寫入中…');
+    return sb('rpc/moj_harvest_submit', { method: 'POST', body: JSON.stringify({ p_query: q, p_rows: rows }) })
+      .then(function (res) {
+        var skipped = res.received - res.inserted;
+        banner('ok', '✅ 已寫入「<span class="q">' + esc(q) + '</span>」：收到 ' + res.received + ' 筆，新增 '
+          + res.inserted + ' 筆' + (skipped ? '（' + skipped + ' 筆先前收過或格式不符，略過）' : '')
+          + '。<span class="muted">' + fmtTime(new Date().toISOString()) + '</span>');
+        state.lastQuery = q;
+      })
+      .catch(function (e) {
+        banner('bad', '❌ 寫入失敗：' + esc(e.message) + '。資料沒有進資料庫，請回法務部頁面再按一次書籤（不用重打驗證碼）。');
+      });
+  }
+
+  /* ---------- 2. 書籤連結（依本頁網址產生，本機測試也能用） ---------- */
+  function buildBookmarklet() {
+    return fetch('moj-harvest.js', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (src) {
+      var page = location.origin + location.pathname;
+      var code = src.split('__HARVEST_PAGE__').join(page);  /* 全部替換；只換第一個曾換到註解裡、書籤退回正式站 */
+      $('bmLink').href = 'javascript:' + encodeURIComponent(code);
+      $('bmLink').onclick = function (e) { e.preventDefault(); alert('請把這個按鈕「拖」到書籤列，再到法務部查詢結果頁按書籤。'); };
+      $('copyCode').onclick = function () { copy(code, $('copyCode')); };
+      if (!/github\.io$/.test(location.hostname)) $('bmNote').textContent = '（測試版：資料會送回 ' + location.host + '）';
+    }).catch(function () { $('bmNote').textContent = '讀不到 moj-harvest.js，書籤無法產生'; });
+  }
+
+  /* ---------- 3. 查詢清單＋進度 ---------- */
+  function loadPlan() {
+    return fetch('moj-harvest-plan.json', { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status); return r.json();
+    }).then(function (j) { state.plan = j; });
+  }
+  function loadProgress() {
+    var all = [];
+    var page = function (from) {
+      return sb('moj_harvest_progress?select=query,submits,last_at,last_received,max_received,hashes_n&order=query&offset=' + from + '&limit=1000')
+        .then(function (rows) { all = all.concat(rows || []); return rows && rows.length === 1000 ? page(from + 1000) : all; });
+    };
+    return page(0).then(function (rows) {
+      state.progress = {};
+      rows.forEach(function (r) { state.progress[r.query] = r; });
+    });
+  }
+  function statusOf(item) {
+    var p = state.progress[item.q];
+    if (!p) return { done: false, cls: 's-todo', text: '未查' };
+    var got = p.last_received;
+    if (got === 0) {
+      return item.n > 0
+        ? { done: true, cls: 's-warn', text: '0 筆（找不到或超過 100？預期 ' + item.n + '）', p: p }
+        : { done: true, cls: 's-ok', text: '0 筆', p: p };
+    }
+    if (item.n - got >= 5 && got < item.n * 0.5) return { done: true, cls: 's-warn', text: '收 ' + got + ' 筆，比預期少', p: p };
+    return { done: true, cls: 's-ok', text: '收 ' + got + ' 筆', p: p };
+  }
+  function render() {
+    var sets = (state.plan && state.plan.sets) || {};
+    var keys = SET_ORDER.filter(function (k) { return sets[k]; })
+      .concat(Object.keys(sets).filter(function (k) { return SET_ORDER.indexOf(k) < 0; }));
+    if (!keys.length) { $('summary').textContent = '還沒有查詢清單（moj-harvest-plan.json 是空的）。'; return; }
+    if (!state.set || !sets[state.set]) state.set = keys[0];
+    $('tabs').innerHTML = keys.map(function (k) {
+      return '<button type="button" data-set="' + esc(k) + '" class="' + (k === state.set ? 'on' : '') + '">'
+        + esc(SET_LABEL[k] || k) + '（' + sets[k].queries.length + '）</button>';
+    }).join('');
+    Array.prototype.forEach.call($('tabs').querySelectorAll('button'), function (b) {
+      b.onclick = function () { state.set = b.getAttribute('data-set'); saveSet(); render(); };
+    });
+
+    var items = sets[state.set].queries;
+    var st = items.map(statusOf);
+    var done = st.filter(function (s) { return s.done; }).length;
+    var warn = st.filter(function (s) { return s.cls === 's-warn'; }).length;
+    var nextIdx = st.findIndex(function (s) { return !s.done; });
+    $('summary').innerHTML = esc(SET_LABEL[state.set] || state.set) + '：已查 <b>' + done + '</b>／' + items.length + ' 條'
+      + (warn ? '，<span class="s-warn">' + warn + ' 條要人看</span>' : '')
+      + '　<span class="muted">清單產生於 ' + fmtTime(sets[state.set].generated_at) + '</span>';
+    $('barFill').style.width = (items.length ? (done / items.length * 100) : 0) + '%';
+    if (nextIdx >= 0) {
+      $('nextBox').innerHTML = '下一條：<span class="q" id="nextQ">' + esc(items[nextIdx].q) + '</span>'
+        + '<button type="button" id="copyNext">複製</button><span class="muted">預期 ' + items[nextIdx].n + ' 筆</span>';
+      $('copyNext').onclick = function () { copy(items[nextIdx].q, $('copyNext')); };
+    } else {
+      $('nextBox').innerHTML = '<span class="s-ok">這份清單全部查完了。</span>';
+    }
+
+    var hide = $('hideDone').checked;
+    $('rows').innerHTML = items.map(function (it, i) {
+      var s = st[i];
+      if (hide && s.done && s.cls !== 's-warn') return '';
+      return '<tr class="' + (i === nextIdx ? 'is-next' : '') + '"><td class="num">' + (i + 1) + '</td>'
+        + '<td><span class="q">' + esc(it.q) + '</span></td><td class="num">' + it.n + '</td>'
+        + '<td class="' + s.cls + '">' + esc(s.text) + '</td>'
+        + '<td class="muted">' + (s.p ? fmtTime(s.p.last_at) + (s.p.submits > 1 ? '（' + s.p.submits + ' 次）' : '') : '') + '</td>'
+        + '<td><button type="button" data-q="' + esc(it.q) + '">複製</button></td></tr>';
+    }).join('');
+    Array.prototype.forEach.call($('rows').querySelectorAll('button[data-q]'), function (b) {
+      b.onclick = function () { copy(b.getAttribute('data-q'), b); };
+    });
+  }
+  function saveSet() { try { localStorage.setItem('mojHarvestSet', state.set); } catch (e) { /* 無痕視窗 */ } }
+  try { state.set = localStorage.getItem('mojHarvestSet'); } catch (e) { /* 無痕視窗 */ }
+  $('hideDone').onchange = render;
+
+  buildBookmarklet();
+  takeIncoming()
+    .then(function () { return Promise.all([loadPlan(), loadProgress()]); })
+    .then(render)
+    .catch(function (e) { $('summary').textContent = '載入失敗：' + e.message; });
+  /* 從別的分頁切回來時更新進度（同仁可能在別台電腦也在查） */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && state.plan) loadProgress().then(render).catch(function () {});
+  });
+  window.addEventListener('hashchange', function () {
+    takeIncoming().then(loadProgress).then(render).catch(function () {});
+  });
+})();
+</script>
+</body>
+</html>
