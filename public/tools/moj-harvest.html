@@ -168,7 +168,7 @@
   function buildBookmarklet() {
     return fetch('moj-harvest.js', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (src) {
       var page = location.origin + location.pathname;
-      var code = src.replace('__HARVEST_PAGE__', page);
+      var code = src.split('__HARVEST_PAGE__').join(page);  /* 全部替換；只換第一個曾換到註解裡、書籤退回正式站 */
       $('bmLink').href = 'javascript:' + encodeURIComponent(code);
       $('bmLink').onclick = function (e) { e.preventDefault(); alert('請把這個按鈕「拖」到書籤列，再到法務部查詢結果頁按書籤。'); };
       $('copyCode').onclick = function () { copy(code, $('copyCode')); };

@@ -8,7 +8,7 @@
  * 頁內 fetch 到 Supabase 會被瀏覽器擋下；改成「開新分頁導向收成頁、資料放網址 # 片段」
  * （# 片段不送任何伺服器），由收成頁寫入。
  *
- * 書籤版由 moj-harvest.html 依它自己的網址產生（__HARVEST_PAGE__ 會被換掉）；
+ * 書籤版由 moj-harvest.html 依它自己的網址產生（下方 PAGE 的佔位字串會被換掉）；
  * 直接貼到 Console 時用正式站網址。
  */
 (function () {
