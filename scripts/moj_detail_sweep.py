@@ -2,8 +2,9 @@
 MOJ 律師詳細頁每週掃描（2026-10-29 官網改版後取代 moj_office_refresh.py）
 
 對 moj_lawyers 裡已有 page_hash 的律師逐頁 GET /lawyer/{hash}（公開頁、免驗證碼），
-比對事務所／公會／執業狀態／懲戒記錄，只 PATCH 有變動者；事務所與執業狀態異動由 DB trigger
-moj_lawyers_log_change 自動寫入 moj_lawyer_changes（異動追蹤頁照常吃得到）。
+比對事務所／公會／執業狀態／懲戒記錄，只 PATCH 有變動者；事務所、執業狀態與懲戒記錄異動由 DB trigger
+moj_lawyers_log_change 自動寫入 moj_lawyer_changes（異動追蹤頁照常吃得到；懲戒的舊／新內容原樣存
+old_discipline／new_discipline，mig 254——以前清成 NULL 就查不到原本是哪幾筆）。
 MOJ 事務所／公會資料每週四批次更新 → 每週五本機排程跑（moj_detail_sweep_weekly.py；GitHub runner 連官網不穩，見該檔）。
 
 判定：
@@ -147,6 +148,7 @@ def diff_row(row, f):
         payload['main_region'] = guild_to_region(guilds) or row.get('main_region')
 
     # 懲戒：舊表存的是 HTML 連結、新站是純文字 → 只把「有／無」翻轉算異動，格式換新靜默更新
+    # （異動紀錄由 trigger 寫，它比的是案號集合：格式換新不記、同時增減案號會記，比這裡的摘要細）
     new_disc, old_disc = norm_disc(f.get('discipline')), row.get('discipline')
     if (old_disc is None) != (new_disc is None):
         payload['discipline'] = new_disc

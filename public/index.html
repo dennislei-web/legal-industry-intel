@@ -2954,6 +2954,7 @@
             <option value="firm_change">事務所異動</option>
             <option value="new_lawyer">新進律師</option>
             <option value="state_change">執業狀態變更</option>
+            <option value="discipline_change">懲戒記錄</option>
           </select>
         </div>
         <div class="table-wrap">
@@ -11032,7 +11033,7 @@ async function loadChanges(force) {
   try {
     rows = await fetchAllPagesParallel((from, to, withCount) => {
       let q = db.from('moj_lawyer_changes')
-        .select('name,change_type,old_office,new_office,old_state,new_state,changed_at', withCount ? { count: 'exact' } : {})
+        .select('name,change_type,old_office,new_office,old_state,new_state,old_discipline,new_discipline,changed_at', withCount ? { count: 'exact' } : {})
         .order('changed_at', { ascending: false }).order('id', { ascending: true }).range(from, to);
       if (since) q = q.gte('changed_at', since);
       return q;
@@ -11057,7 +11058,14 @@ const CHG_TYPE_META = {
   firm_change: { label: '事務所異動', cls: 'badge-blue' },
   new_lawyer: { label: '新進律師', cls: 'badge-green' },
   state_change: { label: '狀態變更', cls: 'badge-orange' },
+  discipline_change: { label: '懲戒記錄', cls: 'badge-red' },
 };
+
+// 懲戒異動（mig 254）：old/new_discipline 是原樣存的 MOJ 內容（舊管線 HTML 片段／新站純文字），只取文字
+function chgDisciplineText(raw) {
+  const t = String(raw || '').replace(/<br\s*\/?>/gi, '　').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return t && t !== '無' ? t : '';
+}
 
 function renderChanges() {
   if (!_chgRows) return;
@@ -11121,6 +11129,11 @@ function renderChanges() {
         detail = `${officeCell(r.old_office)} <span style="color:var(--gold);">→</span> ${officeCell(r.new_office)}`;
       } else if (r.change_type === 'new_lawyer') {
         detail = `加入 ${officeCell(r.new_office)}`;
+      } else if (r.change_type === 'discipline_change') {
+        const o = chgDisciplineText(r.old_discipline), n = chgDisciplineText(r.new_discipline);
+        detail = !o ? `新增：${escHtml(n)}`
+          : !n ? `官網已不顯示：<span style="color:var(--text-muted);">${escHtml(o)}</span>`
+          : `${escHtml(o)} <span style="color:var(--gold);">→</span> ${escHtml(n)}`;
       } else {
         detail = `${escHtml(r.old_state || '-')} <span style="color:var(--gold);">→</span> ${escHtml(r.new_state || '-')}`;
       }
