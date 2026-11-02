@@ -1,16 +1,15 @@
 """
-喆律校友專用 MOJ 刷新爬蟲 — 只掃 zhelu_alumni 的 ~52 位離職律師
+喆律校友去向同步 — zhelu_alumni 的 ~52 位離職律師，現職／去向分類照 moj_lawyers 回寫
 
-全名冊刷新（moj_office_refresh.py 7 分片）一週才輪完一圈，校友動態要等最多 7 天；
-這支只掃校友，幾分鐘跑完，讓校友會頁的現職/去向更即時。
+2026-11 起不再問法務部（官網改版、舊 API 停用）：moj_lawyers 由每週詳細頁掃描
+（moj_detail_sweep.py）維持最新，本支只讀名冊、不連外，掛在每週排程 launcher
+（moj_detail_sweep_weekly.py）sweep 之後跑，幾秒鐘完成。
 
 流程：
   1. 讀 zhelu_alumni 全部列
-  2. 姓名 → moj_lawyers 解析 lic_no
-     - 同名多筆：用 current_firm 前綴比對消歧（例：楊筑鈞 → 茁越國際），對不上就跳過並警告
-  3. 逐位 query_lic() 問 MOJ 現值
-     - 有變動 → PATCH moj_lawyers（trigger moj_lawyers_log_change 自動記到 moj_lawyer_changes，
-       異動追蹤頁與事務所 modal 的人員異動卡照常吃得到）
+  2. 姓名 → moj_lawyers 列
+     - 同名多筆：用 current_firm 前綴比對消歧，對不上就跳過並警告
+  3. 名冊已推定除名（deregistered_at）→ 甫離職(recent) 自動轉 not_registered，其他分類只報告
   4. 回寫 zhelu_alumni：current_firm / current_region / category / updated_at
      - category 自動轉類只做「安全轉移」；cohort（轉合署）是人工判斷的業務分類，只報告不改；
        「名冊消失 → not_registered」與「not_registered → 重新登錄」可能是同名誤認，只報告不改
@@ -19,7 +18,7 @@
   python moj_alumni_refresh.py             # 正式跑（寫入）
   python moj_alumni_refresh.py --dry-run   # 只比對不寫入
   python moj_alumni_refresh.py 5           # 只處理前 5 位（測試）
-  python moj_alumni_refresh.py --name 蔡愷凌  # 只處理這一位（前端單人重爬按鈕走這裡）
+  python moj_alumni_refresh.py --name <姓名>  # 只處理這一位
 """
 import os
 import re
@@ -33,8 +32,6 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
     sys.stdout.reconfigure(line_buffering=True, encoding='utf-8')
-
-from moj_licno_scan import normalize_office, query_lic_status  # noqa: E402（需要先 load_dotenv）
 
 SUPABASE_URL = os.environ['SUPABASE_URL'].strip()
 SERVICE_KEY = os.environ['SUPABASE_SERVICE_KEY'].strip()
@@ -161,15 +158,15 @@ def main(limit=None, dry_run=False, only_name=None):
     names = sorted({a['name'] for a in alumni})
     in_list = ','.join(f'"{n}"' for n in names)
     moj_rows = sb_get(
-        f'moj_lawyers?select=lic_no,name,office,office_normalized,main_region,state_desc'
+        f'moj_lawyers?select=lic_no,name,office_normalized,main_region,deregistered_at'
         f'&name=in.({quote(in_list)})&limit=1000')
     moj_by_name = {}
     for r in moj_rows:
         moj_by_name.setdefault(r['name'], []).append(r)
 
-    print('[3/4] 逐位問 MOJ API...')
+    print('[3/4] 逐位比對...')
     t0 = time.time()
-    stats = {'moj_changed': 0, 'alumni_updated': 0, 'skipped': 0, 'api_miss': 0}
+    stats = {'alumni_updated': 0, 'skipped': 0}
     reports = []  # 需要人工看的事項
 
     for i, a in enumerate(alumni, 1):
@@ -193,49 +190,27 @@ def main(limit=None, dry_run=False, only_name=None):
             stats['skipped'] += 1
             continue
 
-        data, st = query_lic_status(moj['lic_no'])
-        if data is None:
-            if st == 'gone':
-                # 名冊已移除（註銷/停止登錄）。甫離職(recent)本來就在等這個訊號 → 自動轉；
-                # 其他分類（尤其 cohort）除名是大事，只報告請人工確認
-                if a['category'] == 'not_registered':
-                    pass  # 已是無登錄，moj_lawyers 舊列殘留造成的重複訊號，不再報告
-                elif a['category'] == 'recent':
-                    upd = {'category': 'not_registered', 'current_firm': None,
-                           'current_region': None,
-                           'updated_at': datetime.now(timezone.utc).isoformat()}
-                    print(f'  轉類: {tag} recent → not_registered（名冊已移除 {moj["lic_no"]}）', flush=True)
-                    if dry_run:
-                        print(f'  [dry-run] zhelu_alumni #{a["id"]} ← {upd}', flush=True)
-                        stats['alumni_updated'] += 1
-                    elif sb_patch(f'zhelu_alumni?id=eq.{a["id"]}', upd):
-                        stats['alumni_updated'] += 1
-                else:
-                    reports.append(f'🔔 {tag} 名冊已移除（{moj["lic_no"]}，原分類 {a["category"]}）'
-                                   f'→ 建議轉 not_registered，未自動改')
+        if moj.get('deregistered_at'):
+            # 名冊已移除（詳細頁掃描推定除名）。甫離職(recent)本來就在等這個訊號 → 自動轉；
+            # 其他分類（尤其 cohort）除名是大事，只報告請人工確認
+            if a['category'] == 'not_registered':
+                pass  # 已是無登錄，moj_lawyers 舊列殘留造成的重複訊號，不再報告
+            elif a['category'] == 'recent':
+                upd = {'category': 'not_registered', 'current_firm': None,
+                       'current_region': None,
+                       'updated_at': datetime.now(timezone.utc).isoformat()}
+                print(f'  轉類: {tag} recent → not_registered（名冊已移除 {moj["lic_no"]}）', flush=True)
+                if dry_run:
+                    print(f'  [dry-run] zhelu_alumni #{a["id"]} ← {upd}', flush=True)
+                    stats['alumni_updated'] += 1
+                elif sb_patch(f'zhelu_alumni?id=eq.{a["id"]}', upd):
+                    stats['alumni_updated'] += 1
             else:
-                reports.append(f'⚠ {tag} MOJ API 連線失敗（{moj["lic_no"]}），本輪未動')
-                stats['api_miss'] += 1
+                reports.append(f'🔔 {tag} 名冊已移除（{moj["lic_no"]}，原分類 {a["category"]}）'
+                               f'→ 建議轉 not_registered，未自動改')
             continue
 
-        # --- 更新 moj_lawyers（讓 trigger 記異動）---
-        new_norm = normalize_office(data.get('office'))
-        new_state = data.get('statedesc') or None
-        payload = {}
-        if new_norm != moj.get('office_normalized'):
-            payload['office'] = data.get('office')
-            payload['office_normalized'] = new_norm
-        if new_state is not None and new_state != moj.get('state_desc'):
-            payload['state'] = str(data.get('state')) if data.get('state') is not None else None
-            payload['state_desc'] = new_state
-        if payload:
-            print(f'  MOJ 異動: {tag} {moj.get("office_normalized") or "-"} → {new_norm or "-"}'
-                  + (f' / 狀態 → {new_state}' if 'state_desc' in payload else ''), flush=True)
-            if not dry_run and sb_patch(f'moj_lawyers?lic_no=eq.{quote(moj["lic_no"])}', payload):
-                stats['moj_changed'] += 1
-                time.sleep(1)
-            elif dry_run:
-                stats['moj_changed'] += 1
+        new_norm = moj.get('office_normalized') or None
 
         # --- 回寫 zhelu_alumni ---
         upd = {}
@@ -265,16 +240,12 @@ def main(limit=None, dry_run=False, only_name=None):
             elif sb_patch(f'zhelu_alumni?id=eq.{a["id"]}', upd):
                 stats['alumni_updated'] += 1
 
-        if i % 10 == 0:
-            print(f'  [{i}/{len(alumni)}] 已耗時 {(time.time()-t0)/60:.1f} 分鐘', flush=True)
-        time.sleep(0.2)
 
     print('\n[4/4] === 完成 ===')
     print(f'處理: {len(alumni)} 位' + ('（dry-run，未寫入）' if dry_run else ''))
-    print(f'moj_lawyers 異動: {stats["moj_changed"]} 筆')
     print(f'zhelu_alumni 更新: {stats["alumni_updated"]} 筆')
-    print(f'跳過（查無/同名）: {stats["skipped"]} 筆 / API 失敗: {stats["api_miss"]} 筆')
-    print(f'耗時: {(time.time()-t0)/60:.1f} 分鐘')
+    print(f'跳過（查無/同名/同名非本人）: {stats["skipped"]} 筆')
+    print(f'耗時: {time.time()-t0:.1f} 秒')
     if reports:
         print('\n=== 需人工確認 ===')
         for line in reports:

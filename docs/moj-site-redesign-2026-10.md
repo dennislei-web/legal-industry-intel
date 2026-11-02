@@ -90,7 +90,7 @@
 ### 合併後要做
 
 1. `gh workflow enable scrape-moj-lawyers.yml`，手動 `gh workflow run scrape-moj-lawyers.yml` 驗一次 `industry_stats`。
-2. 舊的 `moj-office-refresh.yml`／`moj-licno-scan.yml`／`alumni-refresh.yml` 維持 disabled：**由 sweep＋人工收成取代，待一次性建表完成、sweep 跑過一輪後刪除**（含 `moj_office_refresh.py` 的除名兩段確認：新站沒有「確定查無」訊號，404 只進複查佇列）。
+2. 舊的 `moj-office-refresh.yml`／`moj-licno-scan.yml`／`alumni-refresh.yml`：**已於 2026-11-02 刪除**（一次性建表完成、10-31 全量 sweep 跑過一輪後），由 sweep＋人工收成取代（含 `moj_office_refresh.py` 的除名兩段確認：新站沒有「確定查無」訊號，404 只進複查佇列）；校友去向改由每週 launcher 照名冊同步，前端校友重爬按鈕一併拿掉。
 3. 校友試跑整條鏈：收成頁「校友試跑」36 條 → `python moj_harvest_ingest.py` → `python moj_detail_sweep.py --limit 50`（或 dispatch workflow 帶 limit）。
 4. 一次性建表 327 條分天做；每週增量用「每週增量」清單（`python moj_query_plan.py --incremental --publish` 重產）。
 5. 第一次整輪 sweep 後看 404 率：>5% 會自動中止——代表雜湊會重發，要改成「每週重收成」而不是掃已知雜湊。
@@ -110,7 +110,7 @@
   → Windows 排程 `moj-detail-sweep-weekly`（每週五 09:30，pythonw 跑 `scripts/moj_detail_sweep_weekly.py`：ingest → sweep → 三支 refresh RPC），
   log 追加到 `scripts/moj_detail_sweep_weekly.log`（含姓名，已 gitignore），最後一行 `[launcher] ingest_rc=… sweep_rc=… refresh_ok=N/3`。
   `moj-detail-sweep.yml` 只留手動觸發；`fetch_detail_retry` 對暫時性失敗退避重試（5s、15s）。
-- 舊 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 仍 disabled，一次性建表完成、本機 sweep 跑過一輪後刪除。
+- 舊 `moj-office-refresh`／`moj-licno-scan`／`alumni-refresh` 已於 2026-11-02 刪除。
 
 ## 校友試跑結果（2026-10-30 晚，本機排程手動觸發）
 

@@ -43,21 +43,23 @@
 
 ## 律師異動追蹤（工作流動）
 
-- `scripts/moj_office_refresh.py` — 逐位比對 MOJ API 的事務所/執業狀態，只 PATCH 有變動的律師，trigger 自動記到 `moj_lawyer_changes`
-- MOJ API 每筆 ~3-5 秒，全量要 ~15 小時 → `moj-office-refresh.yml` 每日凌晨 1 點按證號 hash 分 7 片跑（`--shard k 7`），一週刷完一輪
-- `moj-licno-scan.yml` 每週日凌晨 2 點掃新證號 112~115（發現新進律師，INSERT 也會被 trigger 記錄）；
-  另每月 2 日凌晨 2 點**全年份洞補掃**（92~最新、無 years 參數，~5,000 查詢 3~5.5 小時、跳過 detail fetch）——
-  抓「早年掃描時查無（停業/未入會）、之後回役」的律師（例：廣于霙 95臺檢證字第7043號，2026-07 補入）
-- 注意：`moj_lawyer_detail_fetch.py` **不會**更新 office 欄位（只補 detail），別誤以為它能偵測異動
+- **2026-10-29 法務部官網改版、舊 API 下架**，名冊改由兩段維持（細節見 `docs/moj-site-redesign-2026-10.md`）：
+  ①同仁在官網自己打驗證碼查詢、書籤助手收結果進 `moj_search_harvest` → `moj_harvest_ingest.py` 寫 `page_hash`（新律師核對詳細頁才插入）；
+  ②`moj_detail_sweep.py` 逐頁讀公開詳細頁（≤1 req/s）比對事務所／執業狀態／懲戒，只 PATCH 有變動的欄位，trigger 自動記到 `moj_lawyer_changes`。
+  兩段＋校友去向同步（`moj_alumni_refresh.py`，只讀名冊回寫 `zhelu_alumni`）＋4 支 refresh RPC 由本機 Windows 排程
+  `moj-detail-sweep-weekly`（每週五 09:30，launcher `scripts/moj_detail_sweep_weekly.py`，全量約 4 小時）串起來；
+  GitHub runner 連官網約 1/3 失敗，所以不排 Actions（`moj-detail-sweep.yml` 只供手動）。
+- 舊的 `moj-office-refresh.yml`（每日分片問舊 API）／`moj-licno-scan.yml`（掃新證號）／`alumni-refresh.yml`（校友重爬＋前端 🔄 按鈕）
+  **2026-11 已刪除**；`moj_office_refresh.py`／`moj_licno_scan.py` 留著是因為 ingest 共用其中的寫入函數，直接執行會打已下架的 API。
+  新進律師只會從同仁收成進來（沒有自動掃新證號）；**沒有雜湊的律師每週掃描看不到**，要靠同仁補查
 - **事務所熄燈/新設（mig 117）**：RPC `firm_open_close()` 回 json `{closed, opened}`，前端「異動追蹤」兩張收合卡。
   關閉=追蹤期間有流失（轉所/停業/除名）且現「正常未除名」數歸零；新設=所有成員都是追蹤期間才轉入
   （現職無人缺轉入紀錄、離開者離開前也有轉入紀錄）。firm_key 同 083 flow_firm_key 分所歸戶；
   **整所改名會一關一開同時出現在兩表**（footnote 已標注）。前端對 RPC error 容錯顯示「尚未啟用」
-- **除名偵測（mig 079）**：MOJ「確定查無」（200 空 data / 404，`query_lic_status()` 已排除網路抖動）
-  兩段確認——首輪記 `dereg_candidate_at`，下輪（≥3 天）仍查無才標 `deregistered_at` +
-  state_desc=「名冊查無（推定除名）」（trigger 自動入異動追蹤）；之後又查得到會自動解除（自癒）。
-  已除名者不計入 `moj_firm_statistics()` 人數與 `moj_solo_firm_lawyers`；firm modal 清單沉底標「已除名」。
-  單筆手動：`moj_office_refresh.py --check <證號>`（唯讀）/ `--mark-dereg <證號>`（三次確認後標記）
+- **除名偵測（mig 079）**：舊 API「確定查無」兩段確認——首輪記 `dereg_candidate_at`、下輪仍查無才標 `deregistered_at` +
+  state_desc=「名冊查無（推定除名）」（trigger 自動入異動追蹤）。已除名者不計入 `moj_firm_statistics()` 人數與
+  `moj_solo_firm_lawyers`；firm modal 清單沉底標「已除名」。**新站沒有「確定查無」訊號**：詳細頁查得到會清除候選／解除除名（自癒），
+  404 只記 `page_hash_missing_at` 進人工複查、不推定除名——目前沒有任何管線會新標除名
 
 ## 裁判書開放資料管線（法官統計）
 
@@ -302,7 +304,7 @@
   ＋`firm_court_dup_month_stats`（dup cache，⚠️ 歸戶用 047 排行口徑 lawyers_combined
   截「事務所」，**不是** mig 186 moj fk——排行名目/去重必須同套歸戶才能相減）。
   `firm_court_ranking` v3 加 dup/dedup 欄、rank 按 dedup；`firm_map_default_cache`
-  （mig 178 預設快取）同步補欄；快取由 `moj-office-refresh.yml` 每日以 PostgREST RPC
+  （mig 178 預設快取）同步補欄；快取由本機每週排程 `moj-detail-sweep-weekly`（2026-11 前是 `moj-office-refresh.yml` 每日）以 PostgREST RPC
   `refresh_firm_map_cache` 刷新——⚠️ 函數內的 `DELETE … WHERE true` 不可拿掉（pg-safeupdate，
   見「已知 Gotchas」；原版無 WHERE，排程自 2026-08-31 起天天 400、快取停更一個月，mig 237 修）。
   前端 dup cache 有值才切去重呈現、案由種類路徑維持名目。
@@ -513,7 +515,7 @@
   （函數 mig 237 修；workflow 2026-10-02 起 refresh 沒成功就紅燈，見下一條；2026-10-01 掃過線上 174 個 public 函數
   僅此一支，scripts 的 REST DELETE 也都帶 filter）
 - **爬蟲 workflow 收尾的 refresh RPC 一律走 `.github/scripts/refresh-rpcs.sh <rpc> …`**（2026-10-02；
-  moj-office-refresh／moj-licno-scan／scrape-moj-lawyers／scrape-firm-websites 共用，只支援無參數函數）：
+  scrape-moj-lawyers／scrape-firm-websites／moj-detail-sweep 共用，只支援無參數函數；本機每週排程的 launcher 照同一套規則寫在 Python 裡）：
   2xx OK；5xx／連線錯誤／408／409／429 隔 60 秒重試、最多 3 次；其餘 4xx（函數壞了、PGRST202 找不到函數、
   權限不足）是確定性錯誤、不重試。只要有 RPC 沒成功（4xx，或重試 3 次仍失敗）就印 `::error::`，清單照樣跑完，
   最後 exit 1 讓 job 紅燈。**別改回 warning**（2026-10-02 使用者決定）：4xx 不會「下次重刷就好」；5xx 也一樣——
