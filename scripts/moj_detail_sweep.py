@@ -5,6 +5,8 @@ MOJ 律師詳細頁每週掃描（2026-10-29 官網改版後取代 moj_office_re
 比對事務所／公會／執業狀態／懲戒記錄，只 PATCH 有變動者；事務所、執業狀態與懲戒記錄異動由 DB trigger
 moj_lawyers_log_change 自動寫入 moj_lawyer_changes（異動追蹤頁照常吃得到；懲戒的舊／新內容原樣存
 old_discipline／new_discipline，mig 254——以前清成 NULL 就查不到原本是哪幾筆）。
+改名：官網姓名欄寫「現名 (舊名 : …)」，舊名裡有名冊姓名才把 name 換成現名、舊名存 old_name（不進異動追蹤，
+只列摘要【改名】）；異體字、族名並列等其他姓名差異一律不動。
 MOJ 事務所／公會資料每週四批次更新 → 每週五本機排程跑（moj_detail_sweep_weekly.py；GitHub runner 連官網不穩，見該檔）。
 
 判定：
@@ -51,7 +53,7 @@ MISSING_RATIO_MAX = 0.05
 MISSING_RATIO_MIN_SEEN = 100
 MAX_CONSECUTIVE_FLAKY = 20
 CHECKED_BATCH = 50
-SUMMARY_ORDER = ['事務所異動', '執業狀態', '除名解除', '懲戒記錄', '詳細頁 404', '雜湊不符']
+SUMMARY_ORDER = ['事務所異動', '執業狀態', '除名解除', '懲戒記錄', '改名', '詳細頁 404', '雜湊不符']
 
 
 def _env():
@@ -62,7 +64,7 @@ def _env():
 
 def fetch_rows():
     url, h = _env()
-    cols = ('lic_no,name,office,office_normalized,state_desc,guild_names,main_region,discipline,'
+    cols = ('lic_no,name,old_name,office,office_normalized,state_desc,guild_names,main_region,discipline,'
             'email,tel,address,moj_ut_date,dereg_candidate_at,deregistered_at,page_hash,page_hash_missing_at')
     out, offset = [], 0
     while True:
@@ -120,6 +122,15 @@ def diff_row(row, f):
     """回傳 (payload, events)；payload 空＝無變動"""
     payload, events = {}, []
     lic, name = row['lic_no'], row.get('name') or row['lic_no']
+
+    # 改名：官網把名冊上的姓名列為舊名才換（異體字、族名並列、官網少字都不動，也不列摘要）
+    page_nm, old_names = mdp.page_name(f)
+    if page_nm and page_nm != row.get('name') and row.get('name') in old_names:
+        payload['name'] = page_nm
+        payload['old_name'] = '、'.join(old_names)
+        events.append(('改名', f'{name} → {page_nm}（{lic}）'))
+    elif old_names and page_nm == row.get('name') and not row.get('old_name'):
+        payload['old_name'] = '、'.join(old_names)
 
     office_raw = mdp.page_office(f)
     new_norm = normalize_office(office_raw)
@@ -286,7 +297,7 @@ def main(limit=None, shard=None, dry_run=False):
 
     print('\n=== 完成 ===')
     print(f'比對: {len(rows):,} 位（實際走訪 {i if rows else 0:,}）')
-    print(f'異動: {changed} 筆（事務所／執業狀態／除名解除／懲戒）')
+    print(f'異動: {changed} 筆（事務所／執業狀態／除名解除／懲戒／改名）')
     print(f'清除除名候選: {cand_cleared} 筆（詳細頁查得到＝仍在名冊，非異動）')
     print(f'地址／公會／更新日期同步: {contact_upd} 筆（非異動）')
     print(f'詳細頁 404: {missing} 筆（記 page_hash_missing_at，非除名）')

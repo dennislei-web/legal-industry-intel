@@ -154,6 +154,21 @@ def clean_text(v):
     return None if v in NONE_TEXT else v
 
 
+def page_name(fields):
+    """姓名欄 → (現名, [舊名…])。改過名的人官網寫在同一欄：「新名 (舊名 : 舊名甲、舊名乙)」"""
+    v = clean_text(fields.get('name'))
+    m = re.match(r'^(.*?)\s*[（(]\s*舊名\s*[:：]\s*(.*?)\s*[)）]$', v or '')
+    if not m:
+        return v, []
+    return m.group(1).strip() or None, [x for x in re.split(r'[、,，\s]+', m.group(2)) if x]
+
+
+def same_with_native_name(db_name, site_name):
+    """原住民族名並列：名冊只有漢名、官網寫「漢名＋拉丁字母族名」（以 ‧ 分隔）→ 同一個名字"""
+    a, b = (db_name or '').strip(), (site_name or '').strip()
+    return bool(a) and b.startswith(a) and len(b) > len(a) and bool(re.fullmatch(r'[A-Za-z‧·・.\-\' ]+', b[len(a):]))
+
+
 def page_office(fields):
     """事務所原文：官網以空值或「@」開頭表示無事務所（查詢結果表顯示「無」）"""
     v = clean_text(fields.get('office'))

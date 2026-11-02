@@ -9,7 +9,9 @@ moj_search_harvest 由書籤助手寫入（同仁在官網自己打驗證碼查�
   對不上 → 新律師：先 GET 該雜湊的詳細頁，頁面證號與收成資料一致才插入（以頁面內容為準，
       欄位轉換沿用 moj_licno_scan.to_lawyer_record；trigger 會記 new_lawyer 進異動追蹤）。
       收成表 anon 可寫，這一步擋掉假資料。
-  同證號多筆／姓名不同／頁面驗證不過 → 不寫、留在佇列（ingested_at 維持空），印證號給人看
+  姓名不同 → 讀該雜湊的詳細頁：證號相同、且官網把名冊上的姓名列為「舊名」＝改名，
+      寫雜湊並把名冊姓名換成現名、舊名存 old_name（2026-11 首批 6 筆）
+  同證號多筆／其他姓名不同／頁面驗證不過 → 不寫、留在佇列（ingested_at 維持空），印證號給人看
 
 處理完的列標 ingested_at。證號比對用 moj_licno_norm（台→臺、去括號、補零）。
 
@@ -100,9 +102,9 @@ def match(h, by_triple, by_num):
             return None, 'ambiguous'
         cands = named
     if h.get('name') and cands[0].get('name') != h['name']:
-        if name_close(cands[0].get('name'), h['name']):
+        if name_close(cands[0].get('name'), h['name']) or mdp.same_with_native_name(cands[0].get('name'), h['name']):
             return cands[0], 'variant'
-        return None, 'name_mismatch'
+        return cands[0], 'name_mismatch'
     return cands[0], 'ok'
 
 
@@ -122,8 +124,9 @@ def name_close(db_name, site_name):
 
 def record_from_page(h, f):
     """詳細頁欄位 → moj_lawyers 新列（轉換沿用 to_lawyer_record 的舊 API 欄位名）"""
+    name, old_names = mdp.page_name(f)
     data = {
-        'name': mdp.clean_text(f.get('name')) or h.get('name') or '',
+        'name': name or h.get('name') or '',
         'sex': mdp.clean_text(f.get('sex')),
         'office': mdp.page_office(f),
         'guild_name': mdp.page_guilds(f),
@@ -139,6 +142,7 @@ def record_from_page(h, f):
     now_iso = datetime.now(timezone.utc).isoformat()
     rec.update({
         'english_name': mdp.clean_text(f.get('english_name')),
+        'old_name': '、'.join(old_names) or None,
         'moj_mk_date': mdp.page_date(f, 'mk_date'),
         'moj_ut_date': mdp.page_date(f, 'ut_date'),
         'page_hash': h['id_no'],
@@ -156,13 +160,13 @@ def main(dry_run=False, allow_new=True):
     if not pending:
         print('沒有待處理的收成列。')
         return
-    lawyers = sb_get_all('moj_lawyers?select=lic_no,name,page_hash,page_hash_missing_at&order=lic_no')
+    lawyers = sb_get_all('moj_lawyers?select=lic_no,name,old_name,page_hash,page_hash_missing_at&order=lic_no')
     by_triple, by_num, by_hash = build_index(lawyers)
     print(f'  名冊 {len(lawyers):,} 位（已有雜湊 {len(by_hash):,}）')
 
     print('[2/3] 比對...')
     now_iso = datetime.now(timezone.utc).isoformat()
-    done_ids, stat, review = [], defaultdict(int), []
+    done_ids, stat, review, renamed = [], defaultdict(int), [], []
     new_recs, sess, throttle = [], mdp.new_session(), mdp.Throttle(1.0)
     seen_hash = {}
 
@@ -174,9 +178,20 @@ def main(dry_run=False, allow_new=True):
             continue
         seen_hash[hid] = h
         row, reason = match(h, by_triple, by_num)
+        extra = {}
         if reason == 'variant':
             stat['姓名用字不同（以證號對應，名冊姓名不改）'] += 1
             reason = 'ok'
+        elif reason == 'name_mismatch':
+            # 改名：官網詳細頁寫「現名 (舊名 : …)」，舊名裡有名冊上的姓名才算同一人
+            st, f, note, _ = mdp.fetch_detail_retry(h['id_no'], sess, throttle)
+            new_name, old_names = mdp.page_name(f) if st == 'ok' else (None, [])
+            if (new_name and lic_triple(f.get('lic_no')) == lic_triple(row['lic_no'])
+                    and row.get('name') in old_names):
+                extra = {'name': new_name, 'old_name': '、'.join(old_names)}
+                stat['改名（名冊姓名換成現名）'] += 1
+                renamed.append(f'{row["lic_no"]}：{row["name"]} → {new_name}')
+                reason = 'ok'
 
         if reason == 'ok':
             holder = by_hash.get(hid)
@@ -184,12 +199,12 @@ def main(dry_run=False, allow_new=True):
                 stat['雜湊已掛在別人身上'] += 1
                 review.append((h['lic_no'], f'雜湊已屬 {holder["lic_no"]}'))
                 continue
-            if (row.get('page_hash') or '').lower() == hid and not row.get('page_hash_missing_at'):
+            if (row.get('page_hash') or '').lower() == hid and not row.get('page_hash_missing_at') and not extra:
                 stat['已有相同雜湊'] += 1
                 done_ids.append(h['id'])
                 continue
             changed = bool(row.get('page_hash')) and row['page_hash'].lower() != hid
-            if dry_run or patch_lawyer(row['lic_no'], {'page_hash': h['id_no'], 'page_hash_missing_at': None}):
+            if dry_run or patch_lawyer(row['lic_no'], {'page_hash': h['id_no'], 'page_hash_missing_at': None, **extra}):
                 stat['雜湊重發（改寫新值）' if changed else '寫入雜湊'] += 1
                 if changed:
                     review.append((row['lic_no'], '雜湊重發：舊值已覆蓋'))
@@ -240,6 +255,10 @@ def main(dry_run=False, allow_new=True):
     for k, v in sorted(stat.items(), key=lambda kv: -kv[1]):
         print(f'  {k}: {v}')
     print(f'  標記已處理: {len(done_ids)} 筆；留在佇列: {len(pending) - len(done_ids)} 筆')
+    if renamed:
+        print('\n改名（名冊姓名換成現名、舊名存 old_name）：')
+        for ln in renamed:
+            print(f'  - {ln}')
     if review:
         print('\n需人工確認（證號）：')
         for lic, why in review[:50]:
