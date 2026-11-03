@@ -496,6 +496,10 @@
 
 - **新增 migration 前先看目錄最大編號**（曾發生兩個 session 同時開 029 撞號）
 - 套用方式：`supabase db query --linked -f supabase/migrations/xxx.sql`（CLI 已 link）
+- **新增會寫資料的函式（refresh_*、重建、快照）要在同一個 migration 收權限**：
+  `REVOKE EXECUTE ON FUNCTION f(...) FROM PUBLIC, anon, authenticated; GRANT EXECUTE ... TO service_role;`。
+  Supabase 對新函式預設明確 GRANT anon／authenticated，只寫 GRANT service_role 或只 REVOKE public 都收不掉；
+  前端公開金鑰在公開 repo 裡，任何人都能呼叫（mig 256 已一次收回全部 refresh_*）。讀取用 RPC 照舊 GRANT anon, authenticated
 
 ## 使用者偏好
 
