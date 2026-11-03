@@ -1271,7 +1271,7 @@
           <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
             <option value="">全部案由種類</option>
           </select>
-          <!-- 子類（mig 255）：只有已細分的種類才顯示，目前＝損害賠償 -->
+          <!-- 子類（mig 255／257）：只有已細分的種類才顯示，目前＝民事 12 種（旅遊除外） -->
           <select id="fmSubSel" onchange="loadFirmMap()" style="min-width:190px;display:none;" title="依判決書原始案由的關鍵字細分">
             <option value="">全部子類</option>
           </select>
@@ -1323,7 +1323,7 @@
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
         <br>※ 案量為<strong>去重口徑</strong>（同一判決同所多人共同署名只計 1 件，素材 2021/01 起，mig 189）——排名按去重值排序，名目（律師人次）與重複率見滑鼠提示。<strong>例外</strong>：選了「案由種類」時為名目口徑（案由層無去重素材）；去重資料未回填完成時亦暫以名目呈現。
-        <br>※ 選「損害賠償」可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故），先比主題再比程序，交通事故的再審仍算交通事故。約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目、全國口徑（mig 255）。
+        <br>※ 選民事案由種類可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故、「確認本票債權不存在」歸特別法的票據），先比主題再比程序，交通事故的再審仍算交通事故。損害賠償約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目、全國口徑（mig 255／257）。
         <strong>注意</strong>：子類靠法院在案由後加註，加註是近年才普及——「交通」2021 年全年只標了約 300 件、2025 年約 7,200 件；「侵害配偶權」幾乎全是 2026 年起才有。早年同類案件多半落在「未標明類型」，所以子類的逐年增減主要反映加註普及、不是市場變化，比較事務所請優先看最近一年。
       </div>
       <div class="grid-2">
@@ -13301,7 +13301,7 @@ let _fmLoaded = false;
 function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMap(); }
 
 let _fmGroups = [];  // cause_group_list 快取（Phase B 案由種類）
-let _fmSubs = [];    // cause_sub_group_list 快取（mig 255 子類，目前只有損害賠償）
+let _fmSubs = [];    // cause_sub_group_list 快取（mig 255／257 子類，民事 12 種）
 let _fmSeq = 0;      // 快速連切下拉時，只渲染最後一次查詢的結果
 
 async function initFirmMap() {
@@ -18161,7 +18161,9 @@ async function csDrillRank() {
     barColor: 'rgba(200,160,60,0.55)',
   });
 }
-// 桶內原始案由明細（固定近 5 年滾動，不隨上方年度切換）
+// 桶內案由明細（固定近 5 年滾動，不隨上方年度切換）
+// mig 257：民事 12 種（旅遊除外）有子類（cause_group_map.sub_group）→ 先列子類彙總，點列展開該子類的原始寫法，
+// 原始寫法前 40 大收進可展開區塊；無子類的種類（刑事／家事／行政…）維持原始寫法表。
 async function csDrillCauses(grp) {
   const body = document.getElementById('csDrillCauses');
   if (!body) return;
@@ -18173,47 +18175,116 @@ async function csDrillCauses(grp) {
       _cgcCache[grp] = data;
     }
     const d = _cgcCache[grp];
+    const total = Number(d.total);
     const top = d.top_causes || [];
+    const subs = Array.isArray(d.sub_groups) ? d.sub_groups : [];
     const topSum = top.reduce((s, t) => s + Number(t[1]), 0);
-    const rest = Number(d.total) - topSum;
+    const rest = total - topSum;
     const isFallback = grp.startsWith('其他');
-    body.innerHTML = `
-      ${isFallback ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+    const pct = n => (n / total * 100).toFixed(1) + '%';
+    const fallbackNote = isFallback ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
         「${escHtml(grp)}」是分類的<strong>剩餘桶</strong>——關鍵字比對不到具名種類的${escHtml(d.cat || '')}案由都歸入此類，
-        內容異質（件數大、集中度低是分類方式造成的），解讀市場訊號請以下方明細為準。</div>` : ''}
-      <div style="margin-bottom:10px;font-size:0.85rem;">
-        近 5 年判決件數 <strong style="color:var(--gold);">${Number(d.total).toLocaleString()}</strong>
-        ・涵蓋 <strong>${Number(d.distinct_causes).toLocaleString()}</strong> 種案由字串（顯示前 ${top.length} 大）
-      </div>
-      <div class="table-wrap" style="max-height:56vh;overflow-y:auto;">
+        內容異質（件數大、集中度低是分類方式造成的）${subs.length
+          ? '；下方子類是把這個桶再依主題拆開，解讀市場訊號請看子類、不要看桶的總數'
+          : '，解讀市場訊號請以下方明細為準'}。</div>` : '';
+    const rawTable = `<div class="table-wrap" style="max-height:${subs.length ? 40 : 56}vh;overflow-y:auto;">
         <table>
-          <thead><tr><th style="width:40px;">#</th><th>案由</th>
+          <thead><tr><th style="width:40px;">#</th><th>案由（原始寫法）</th>
             <th style="text-align:right;">件數</th><th style="text-align:right;">佔比</th></tr></thead>
           <tbody>
             ${top.map((t, idx) => `<tr>
               <td style="color:var(--text-muted);">${idx + 1}</td>
               <td>${escHtml(t[0])}</td>
               <td style="text-align:right;color:var(--gold);font-weight:600;">${Number(t[1]).toLocaleString()}</td>
-              <td style="text-align:right;">${(Number(t[1]) / Number(d.total) * 100).toFixed(1)}%</td>
+              <td style="text-align:right;">${pct(Number(t[1]))}</td>
             </tr>`).join('')}
             ${rest > 0 ? `<tr>
               <td></td>
               <td style="color:var(--text-muted);">…其餘 ${(Number(d.distinct_causes) - top.length).toLocaleString()} 種案由合計</td>
               <td style="text-align:right;color:var(--text-muted);">${rest.toLocaleString()}</td>
-              <td style="text-align:right;color:var(--text-muted);">${(rest / Number(d.total) * 100).toFixed(1)}%</td>
+              <td style="text-align:right;color:var(--text-muted);">${pct(rest)}</td>
             </tr>` : ''}
           </tbody>
         </table>
+      </div>`;
+    const caliberNote = '※ 件數為近 5 年公開裁判書的律師端加總（一案多位律師會重複計），與供需表「判決件數」同口徑；明細固定為近 5 年滾動視窗，不隨上方年度切換。';
+    if (!subs.length) {
+      body.innerHTML = `${fallbackNote}
+        <div style="margin-bottom:10px;font-size:0.85rem;">
+          近 5 年判決件數 <strong style="color:var(--gold);">${total.toLocaleString()}</strong>
+          ・涵蓋 <strong>${Number(d.distinct_causes).toLocaleString()}</strong> 種案由字串（顯示前 ${top.length} 大）
+        </div>
+        ${rawTable}
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
+          ${caliberNote} 「等」結尾的案由是裁判書原始寫法（一案多請求），未與主案由合併。
+        </div>`;
+      return;
+    }
+    const subRows = subs.map((s, i) => {
+      const n = Number(s.n), k = Number(s.k), stop = s.top || [];
+      const shown = stop.reduce((a, t) => a + Number(t[1]), 0);
+      const more = k - stop.length, moreN = n - shown;
+      const muted = /^(未標明|其他)/.test(s.g) || s.g === '再審及程序事件';
+      const cell = 'padding:2px 6px;border:0;';
+      return `<tr onclick="csSubToggle(${i})" style="cursor:pointer;${muted ? 'color:var(--text-muted);' : ''}" title="點擊展開此子類的原始寫法">
+          <td style="color:var(--text-muted);">${i + 1}</td>
+          <td><span id="csSubCaret_${i}" style="display:inline-block;width:1em;color:var(--text-muted);">&#9656;</span>${escHtml(s.g)}</td>
+          <td style="text-align:right;color:var(--gold);font-weight:600;">${n.toLocaleString()}</td>
+          <td style="text-align:right;">${pct(n)}</td>
+          <td style="text-align:right;color:var(--text-muted);">${k.toLocaleString()}</td>
+        </tr>
+        <tr id="csSubDetail_${i}" style="display:none;background:var(--bg-hover,rgba(255,255,255,0.03));">
+          <td></td>
+          <td colspan="4" style="padding:6px 10px 10px;">
+            <table style="width:100%;font-size:0.78rem;">
+              <tbody>
+                ${stop.map(t => `<tr><td style="${cell}">${escHtml(t[0])}</td>
+                  <td style="${cell}text-align:right;white-space:nowrap;">${Number(t[1]).toLocaleString()}</td>
+                  <td style="${cell}text-align:right;color:var(--text-muted);white-space:nowrap;">${(Number(t[1]) / n * 100).toFixed(1)}%</td></tr>`).join('')}
+                ${more > 0 ? `<tr><td style="${cell}color:var(--text-muted);">…其餘 ${more.toLocaleString()} 種寫法合計</td>
+                  <td style="${cell}text-align:right;color:var(--text-muted);">${moreN.toLocaleString()}</td>
+                  <td style="${cell}text-align:right;color:var(--text-muted);">${(moreN / n * 100).toFixed(1)}%</td></tr>` : ''}
+              </tbody>
+            </table>
+          </td>
+        </tr>`;
+    }).join('');
+    const dmgNote = grp === '損害賠償'
+      ? ' 約 8 成件數的案由只寫「損害賠償」或「侵權行為損害賠償」，看不出類型，歸「未標明類型」；「(交通)」「(侵害配偶身分法益)」等加註是法院近年才普及（交通 2021 年約 300 件→2025 年約 7,200 件），子類的逐年變化不等於市場變化。'
+      : '';
+    body.innerHTML = `${fallbackNote}
+      <div style="margin-bottom:10px;font-size:0.85rem;">
+        近 5 年判決件數 <strong style="color:var(--gold);">${total.toLocaleString()}</strong>
+        ・整併為 <strong>${subs.length}</strong> 個子類（原始寫法 <strong>${Number(d.distinct_causes).toLocaleString()}</strong> 種，點子類可展開）
       </div>
+      <div class="table-wrap" style="max-height:56vh;overflow-y:auto;">
+        <table>
+          <thead><tr><th style="width:40px;">#</th><th>子類</th>
+            <th style="text-align:right;">件數</th><th style="text-align:right;">佔比</th>
+            <th style="text-align:right;">寫法數</th></tr></thead>
+          <tbody>${subRows}</tbody>
+        </table>
+      </div>
+      <details style="margin-top:8px;">
+        <summary style="cursor:pointer;font-size:0.78rem;color:var(--text-muted);">原始寫法前 ${top.length} 大（未整併）</summary>
+        ${rawTable}
+      </details>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
-        ※ 件數為近 5 年公開裁判書的律師端加總（一案多位律師會重複計），與供需表「判決件數」同口徑；
-        明細固定為近 5 年滾動視窗，不隨上方年度切換。
-        「等」結尾的案由是裁判書原始寫法（一案多請求），未與主案由合併。
+        ※ 子類依裁判書原始案由的<strong>關鍵字</strong>歸類（mig 255／257）：先比主題再比程序，「請求…」「…等」「再審之訴」「(簡判)」這類寫法差異不影響歸類；
+        只剩程序字樣、看不出主題的歸「再審及程序事件」。${dmgNote}
+        ${caliberNote}
       </div>`;
   } catch (e) {
     body.innerHTML = '<div class="empty-state"><div class="msg">載入失敗，請稍後再試</div></div>';
   }
 }
+window.csSubToggle = function(i) {
+  const row = document.getElementById('csSubDetail_' + i), caret = document.getElementById('csSubCaret_' + i);
+  if (!row) return;
+  const open = row.style.display === 'none';
+  row.style.display = open ? '' : 'none';
+  if (caret) caret.innerHTML = open ? '&#9662;' : '&#9656;';
+};
 function closeCauseGroupModal() {
   document.getElementById('causeGroupModal').style.display = 'none';
 }
