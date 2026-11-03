@@ -1271,7 +1271,7 @@
           <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
             <option value="">全部案由種類</option>
           </select>
-          <!-- 子類（mig 255／257）：只有已細分的種類才顯示，目前＝民事 12 種（旅遊除外） -->
+          <!-- 子類（mig 255／257／259）：只有已細分的種類才顯示＝民事 12 種、刑事全部 41 種、家事 13 種、行政、其他（旅遊與家事小種類除外） -->
           <select id="fmSubSel" onchange="loadFirmMap()" style="min-width:190px;display:none;" title="依判決書原始案由的關鍵字細分">
             <option value="">全部子類</option>
           </select>
@@ -1323,7 +1323,7 @@
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
         <br>※ 案量為<strong>去重口徑</strong>（同一判決同所多人共同署名只計 1 件，素材 2021/01 起，mig 189）——排名按去重值排序，名目（律師人次）與重複率見滑鼠提示。<strong>例外</strong>：選了「案由種類」時為名目口徑（案由層無去重素材）；去重資料未回填完成時亦暫以名目呈現。
-        <br>※ 選民事案由種類可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故、「確認本票債權不存在」歸特別法的票據），先比主題再比程序，交通事故的再審仍算交通事故。損害賠償約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目口徑（mig 255／257）。
+        <br>※ 選案由種類後可再選<strong>子類</strong>（民事、刑事、家事、行政都有）：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故、「加重詐欺等」歸加重詐欺、「酌定未成年子女權利義務行使負擔」歸親權酌定）。民事與家事先比主題再比程序；刑事先比程序（附帶民訴、再審、羈押、執行與沒收）再比罪名——本案判決的案由幾乎只寫罪名，所以多數罪名只分得出「本案」與程序。損害賠償約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目口徑（mig 255／257／259）。
         <strong>注意</strong>：子類靠法院在案由後加註，加註是近年才普及——「交通」2021 年全年只標了約 300 件、2025 年約 7,200 件；「侵害配偶權」幾乎全是 2026 年起才有。早年同類案件多半落在「未標明類型」，所以子類的逐年增減主要反映加註普及、不是市場變化，比較事務所請優先看最近一年。
         <br>※ 選了案由種類或子類仍可再選<strong>法院</strong>（mig 258）：近 5 年的種類排名讀法院層統計；選了年度或子類時改為即時計算，大法院約需 2–5 秒。法院只到 38 個機關層級，簡易庭的案件併在所屬地方法院，不能單選簡易庭。
       </div>
@@ -13302,7 +13302,7 @@ let _fmLoaded = false;
 function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMap(); }
 
 let _fmGroups = [];  // cause_group_list 快取（Phase B 案由種類）
-let _fmSubs = [];    // cause_sub_group_list 快取（mig 255／257 子類，民事 12 種）
+let _fmSubs = [];    // cause_sub_group_list 快取（mig 255／257／259 子類：民事 12 種、刑事 41 種、家事 13 種、行政、其他）
 let _fmSeq = 0;      // 快速連切下拉時，只渲染最後一次查詢的結果
 
 async function initFirmMap() {
@@ -18165,8 +18165,8 @@ async function csDrillRank() {
   });
 }
 // 桶內案由明細（固定近 5 年滾動，不隨上方年度切換）
-// mig 257：民事 12 種（旅遊除外）有子類（cause_group_map.sub_group）→ 先列子類彙總，點列展開該子類的原始寫法，
-// 原始寫法前 40 大收進可展開區塊；無子類的種類（刑事／家事／行政…）維持原始寫法表。
+// mig 257／259：有子類的種類（民事 12 種、刑事 41 種、家事 13 種、行政、其他；cause_group_map.sub_group）→ 先列子類彙總，
+// 點列展開該子類的原始寫法，原始寫法前 40 大收進可展開區塊；無子類的小種類（旅遊、分別財產制、懲戒…）維持原始寫法表。
 async function csDrillCauses(grp) {
   const body = document.getElementById('csDrillCauses');
   if (!body) return;
@@ -18183,10 +18183,15 @@ async function csDrillCauses(grp) {
     const subs = Array.isArray(d.sub_groups) ? d.sub_groups : [];
     const topSum = top.reduce((s, t) => s + Number(t[1]), 0);
     const rest = total - topSum;
-    const isFallback = grp.startsWith('其他');
+    const cat = d.cat || '';
+    const isOtherCat = cat === '其他' && grp === '其他';
+    const isFallback = !isOtherCat && grp.startsWith('其他');
     const pct = n => (n / total * 100).toFixed(1) + '%';
-    const fallbackNote = isFallback ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
-        「${escHtml(grp)}」是分類的<strong>剩餘桶</strong>——關鍵字比對不到具名種類的${escHtml(d.cat || '')}案由都歸入此類，
+    const fallbackNote = isOtherCat ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+        「其他」是<strong>案類無法判定</strong>的裁判——憲法法庭與大法庭聲請、督促程序（支付命令）、以及沒標到案類的行政／民事／刑事裁判混在一起；
+        下方子類只做領域粗分（六成以上其實是行政事件），正本清源要回上游重新判定案類，這裡先讓人看得出桶裡是什麼。</div>`
+      : isFallback ? `<div style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-hover,rgba(255,255,255,0.04));border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+        「${escHtml(grp)}」是分類的<strong>剩餘桶</strong>——關鍵字比對不到具名種類的${escHtml(cat)}案由都歸入此類，
         內容異質（件數大、集中度低是分類方式造成的）${subs.length
           ? '；下方子類是把這個桶再依主題拆開，解讀市場訊號請看子類、不要看桶的總數'
           : '，解讀市場訊號請以下方明細為準'}。</div>` : '';
@@ -18227,7 +18232,7 @@ async function csDrillCauses(grp) {
       const n = Number(s.n), k = Number(s.k), stop = s.top || [];
       const shown = stop.reduce((a, t) => a + Number(t[1]), 0);
       const more = k - stop.length, moreN = n - shown;
-      const muted = /^(未標明|其他)/.test(s.g) || s.g === '再審及程序事件';
+      const muted = /^(未標明|其他)/.test(s.g) || /程序|^再審|^羈押|^刑之執行|^閱卷|^自訴|^訴訟救助|^憲法審查|^執行與保全|^行政執行|^外國裁判認可/.test(s.g);
       const cell = 'padding:2px 6px;border:0;';
       return `<tr onclick="csSubToggle(${i})" style="cursor:pointer;${muted ? 'color:var(--text-muted);' : ''}" title="點擊展開此子類的原始寫法">
           <td style="color:var(--text-muted);">${i + 1}</td>
@@ -18252,6 +18257,12 @@ async function csDrillCauses(grp) {
           </td>
         </tr>`;
     }).join('');
+    const catRule = (cat === '刑事' || cat === '少年')
+      ? '刑事先比程序（附帶民訴、再審、羈押、執行與沒收）再比罪名：本案判決的案由幾乎只寫罪名（「詐欺等」「毒品危害防制條例」，「等」表示另有他罪併案），所以多數罪名只分得出「本案」與程序類；「(本案)」「(一般)」「(未標明罪名)」都是本案判決。'
+      : cat === '家事' ? '家事先比事件主題（分割遺產、扶養費、親權…）再比程序；「訴訟救助」「確定訴訟費用額」這類純程序裁定在「其他家事」佔了近六成。'
+      : cat === '行政' ? '行政依法規名稱與事務領域歸類（租稅、人事、土地、環境…）；「有關○○事務」是法院登錄的概括案由，只能歸到領域。'
+      : cat === '其他' ? '這一桶的子類只分領域（憲法審查、督促程序、行政／民事／刑事），不是細類。'
+      : '民事先比主題再比程序，交通事故的再審仍算交通事故；只剩程序字樣、看不出主題的歸「再審及程序事件」。';
     const dmgNote = grp === '損害賠償'
       ? ' 約 8 成件數的案由只寫「損害賠償」或「侵權行為損害賠償」，看不出類型，歸「未標明類型」；「(交通)」「(侵害配偶身分法益)」等加註是法院近年才普及（交通 2021 年約 300 件→2025 年約 7,200 件），子類的逐年變化不等於市場變化。'
       : '';
@@ -18273,8 +18284,8 @@ async function csDrillCauses(grp) {
         ${rawTable}
       </details>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
-        ※ 子類依裁判書原始案由的<strong>關鍵字</strong>歸類（mig 255／257）：先比主題再比程序，「請求…」「…等」「再審之訴」「(簡判)」這類寫法差異不影響歸類；
-        只剩程序字樣、看不出主題的歸「再審及程序事件」。${dmgNote}
+        ※ 子類依裁判書原始案由的<strong>關鍵字</strong>歸類（mig 255／257／259），「請求…」「…等」「(簡判)」這類寫法差異不影響歸類。
+        ${catRule}${dmgNote}
         ${caliberNote}
       </div>`;
   } catch (e) {
