@@ -1323,8 +1323,9 @@
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
         <br>※ 案量為<strong>去重口徑</strong>（同一判決同所多人共同署名只計 1 件，素材 2021/01 起，mig 189）——排名按去重值排序，名目（律師人次）與重複率見滑鼠提示。<strong>例外</strong>：選了「案由種類」時為名目口徑（案由層無去重素材）；去重資料未回填完成時亦暫以名目呈現。
-        <br>※ 選民事案由種類可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故、「確認本票債權不存在」歸特別法的票據），先比主題再比程序，交通事故的再審仍算交通事故。損害賠償約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目、全國口徑（mig 255／257）。
+        <br>※ 選民事案由種類可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故、「確認本票債權不存在」歸特別法的票據），先比主題再比程序，交通事故的再審仍算交通事故。損害賠償約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目口徑（mig 255／257）。
         <strong>注意</strong>：子類靠法院在案由後加註，加註是近年才普及——「交通」2021 年全年只標了約 300 件、2025 年約 7,200 件；「侵害配偶權」幾乎全是 2026 年起才有。早年同類案件多半落在「未標明類型」，所以子類的逐年增減主要反映加註普及、不是市場變化，比較事務所請優先看最近一年。
+        <br>※ 選了案由種類或子類仍可再選<strong>法院</strong>（mig 258）：近 5 年的種類排名讀法院層統計；選了年度或子類時改為即時計算，大法院約需 2–5 秒。法院只到 38 個機關層級，簡易庭的案件併在所屬地方法院，不能單選簡易庭。
       </div>
       <div class="grid-2">
         <div class="card">
@@ -13381,8 +13382,6 @@ async function loadFirmMap() {
   document.getElementById('fmKpiCasesSub').textContent = year ? `${year} 年` : '近 5 年';
   document.getElementById('fmCasesTh').textContent = year ? `出庭數(${year})` : '出庭數(近5年)';
 
-  // 選了案由種類 → 走 Phase B firm_cause_ranking（全國口徑，法院篩選不適用）
-  document.getElementById('fmCourtSel').disabled = !!group;
   let rows, error;
   if (!group && !cat && !court && !year) {
     // 預設組合走快取表（mig 178，日更），秒回；快取空時 fallback RPC 現算
@@ -13392,7 +13391,11 @@ async function loadFirmMap() {
       ({ data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: null, p_court: null, p_year: null }).range(0, 999));
     }
   } else {
-    ({ data: rows, error } = group && sub
+    // 選了案由種類：有選法院 → firm_cause_court_ranking（mig 258；近 5 年讀法院層表，選年度／子類時即時算）；
+    // 沒選法院 → 全國口徑（子類 firm_cause_sub_ranking、種類 firm_cause_ranking）
+    ({ data: rows, error } = group && court
+      ? await db.rpc('firm_cause_court_ranking', { p_group: group, p_court: court, p_sub: sub, p_year: year, p_limit: 1000 }).range(0, 999)
+      : group && sub
       ? await db.rpc('firm_cause_sub_ranking', { p_group: group, p_sub: sub, p_limit: 1000, p_year: year }).range(0, 999)
       : group
       ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000, p_year: year }).range(0, 999)
