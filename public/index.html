@@ -1233,7 +1233,7 @@
         </div>
         <div style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1.2fr);gap:16px;margin-top:12px;">
           <div>
-            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">六型態分布（點型態列出該型態事務所）</div>
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">主案源分布（v3 雙軸，點類別列出事務所）</div>
             <div class="chart-container" style="height:230px;"><canvas id="isTypeChart"></canvas></div>
             <div id="isTypeList" style="font-size:0.78rem;line-height:1.9;max-height:180px;overflow-y:auto;margin-top:6px;"></div>
           </div>
@@ -1247,13 +1247,13 @@
           <div id="isSuccChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
         </div>
         <div style="margin-top:14px;">
-          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">型態別體質（5 人以上所，中位數）</div>
+          <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">主案源別體質（5 人以上所，中位數）</div>
           <div class="table-wrap"><table>
-            <thead><tr><th>型態</th><th style="text-align:right;">家數</th><th style="text-align:right;">所營收中位(萬/年)</th><th style="text-align:right;">人均營收(萬)</th><th style="text-align:right;">年人均案量</th><th style="text-align:right;">有廣告碼</th></tr></thead>
+            <thead><tr><th>主案源</th><th style="text-align:right;">家數</th><th style="text-align:right;">所營收中位(萬/年)</th><th style="text-align:right;">人均營收(萬)</th><th style="text-align:right;">年人均案量</th><th style="text-align:right;">有廣告碼</th></tr></thead>
             <tbody id="isTypeTable"></tbody>
           </table></div>
         </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑：營收=訴訟行情公式＋可觀測非訟訊號推估（企業非訟型真實非訟收入不可見故低估）；案量為<strong>去重口徑</strong>（同判決同所共同署名只計 1 件，2021/01 起合計，mig 186）；掛名=署名重複率×top1 集中度判定，接班為分析文字啟發式抽取，僅呈現聚合；資料集 firm_analysis_facts 隨分析批次重灌。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">口徑：營收=訴訟行情公式＋可觀測非訟訊號推估（企業非訟業務的真實非訟收入不可見故低估）；案量為<strong>去重口徑</strong>（同判決同所共同署名只計 1 件，2021/01 起合計，mig 186）；掛名=署名重複率×top1 集中度判定，接班為分析文字啟發式抽取，僅呈現聚合；資料集 firm_analysis_facts 隨分析批次重灌。</div>
       </div>
       <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；ids/loader 不變） -->
       <div class="card" style="margin-bottom:16px;">
@@ -3006,9 +3006,9 @@
         <div style="font-size:0.8rem;line-height:1.8;margin-top:10px;" id="drRecap"></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#127919; B2C 行銷型全解剖 — 喆律的同型態對手池</div>
+        <div class="card-title">&#127919; 線上行銷所全解剖 — 喆律的同案源對手池</div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:8px;">
-          <div class="kpi-card"><div class="kpi-label">B2C 行銷型（5人+）</div><div class="kpi-value" id="drB2cN">-</div><div class="kpi-sub" id="drB2cNSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">線上行銷主案源（5人+）</div><div class="kpi-value" id="drB2cN">-</div><div class="kpi-sub" id="drB2cNSub">-</div></div>
           <div class="kpi-card"><div class="kpi-label">合計推估營收</div><div class="kpi-value" id="drB2cRev">-</div><div class="kpi-sub">/年</div></div>
           <div class="kpi-card"><div class="kpi-label">人均營收中位</div><div class="kpi-value" id="drB2cPc">-</div><div class="kpi-sub" id="drB2cPcSub">-</div></div>
           <div class="kpi-card"><div class="kpi-label">官網有廣告追蹤碼</div><div class="kpi-value" style="color:var(--gold);" id="drB2cAds">-</div><div class="kpi-sub">FB / Google Ads / LINE / Yahoo / TikTok</div></div>
@@ -3027,7 +3027,7 @@
         </table></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128142; 精品專業型利基變現 — 高單價路徑</div>
+        <div class="card-title">&#128142; 精品專業利基變現 — 高單價路徑</div>
         <div style="display:grid;grid-template-columns:minmax(280px,1fr) minmax(280px,1fr);gap:16px;margin-top:8px;">
           <div>
             <div style="font-size:0.82rem;font-weight:600;margin-bottom:6px;">利基分群 × 人均營收中位（萬/年）<span style="font-weight:400;color:var(--text-muted);font-size:0.72rem;">　點長條篩選右表</span></div>
@@ -13047,8 +13047,8 @@ async function loadIndustryStructure() {
     const succ = top.filter(r => r.succession_risk === 1);
     document.getElementById('isKpiSucc').textContent = succ.length + ' 家';
 
-    // 六型態分布（點 bar 列清單）
-    const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
+    // v3 主案源分布（點 bar 列清單）
+    const TYPES = ['在地口碑', '線上行銷', '企業關係', '前司法官招牌', '制度派案', '政府批量', '民間批量', '同業協作'];  // v3 主案源（2026-11-03）
     const cnt = TYPES.map(t => data.filter(r => r.type === t).length);
     if (chartInstances['isTypeChart']) chartInstances['isTypeChart'].destroy();
     const tctx = document.getElementById('isTypeChart')?.getContext('2d');
@@ -13170,18 +13170,19 @@ async function loadDeepReportOnce() {
     document.getElementById('drKpiSucc').textContent = top.filter(r => r.succession_risk === 1).length + ' 家';
     const adsTop = top.filter(hasAds).length;
     document.getElementById('drKpiAds').textContent = adsTop + ' 家';
-    const TYPES = ['傳統轉介型', '精品專業型', 'B2C行銷型', '企業非訟型', '機構標案型', '一人綜合型'];
-    const tShare = TYPES.map(t => `${t.replace('型', '')} ${Math.round(100 * top.filter(r => r.type === t).length / top.length)}%`).join('、');
+    const TYPES = ['在地口碑', '線上行銷', '企業關係', '前司法官招牌', '制度派案', '政府批量', '民間批量', '同業協作'];  // v3 主案源（2026-11-03）
+    const tShare = TYPES.map(t => `${t} ${Math.round(100 * top.filter(r => r.type === t).length / top.length)}%`).join('、');
+    const big30 = top.filter(r => (r.lawyer_count || 0) >= 30), big30E = big30.filter(r => r.practice_tag === '企業非訟');
     const exj = top.filter(r => (r.ex_judicial_n || 0) > 0);
     const concKnown = top.filter(r => r.concentration && r.concentration !== '不明');
     const concPct = b => concKnown.length ? Math.round(100 * concKnown.filter(r => r.concentration === b).length / concKnown.length) : 0;
     document.getElementById('drRecap').innerHTML =
-      `型態組成（5 人以上 ${top.length} 家）：${tShare}。規模化幾乎只發生在企業非訟（30 人以上 12 家中佔 8 家）；` +
+      `主案源組成（5 人以上 ${top.length} 家）：${tShare}。規模化集中在企業非訟業務（30 人以上 ${big30.length} 家中佔 ${big30E.length} 家）；` +
       `掛名制度約 ${concPct('掛名制度')}%（協作型大所 ${concPct('協作型大所')}%、真集中 ${concPct('真集中')}%、分散 ${concPct('分散/非掛名')}%——署名重複率×top1 集中度判定）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
       `官網掛廣告追蹤碼（FB/Google Ads/LINE/Yahoo/TikTok）的 ${adsTop} 家，佔 5 人以上所 ${Math.round(100 * adsTop / top.length)}%——有追蹤碼不等於正在投放，是「曾建置投放基礎」的上限口徑。`;
 
     // --- B2C 全解剖 ---
-    const b2c = top.filter(r => r.type === 'B2C行銷型');
+    const b2c = top.filter(r => r.type === '線上行銷');
     _drB2c = b2c.map(r => ({
       ...r,
       rev: _drRev(r),
@@ -13192,12 +13193,12 @@ async function loadDeepReportOnce() {
     }));
     const withRev = _drB2c.filter(r => r.rev != null);
     document.getElementById('drB2cN').textContent = b2c.length + ' 家';
-    document.getElementById('drB2cNSub').textContent = `全樣本 ${data.filter(r => r.type === 'B2C行銷型').length} 家`;
+    document.getElementById('drB2cNSub').textContent = `全樣本 ${data.filter(r => r.type === '線上行銷').length} 家`;
     document.getElementById('drB2cRev').textContent = (withRev.reduce((s, r) => s + r.rev, 0) / 10000).toFixed(1) + ' 億';
     const pcMed = _drMed(withRev.map(r => r.percap));
-    const refMed = _drMed(top.filter(r => r.type === '傳統轉介型' && _drRev(r) != null).map(r => _drRev(r) / Math.max(r.lawyer_count || 1, 1)));
+    const refMed = _drMed(top.filter(r => r.type === '在地口碑' && _drRev(r) != null).map(r => _drRev(r) / Math.max(r.lawyer_count || 1, 1)));
     document.getElementById('drB2cPc').textContent = Math.round(pcMed) + ' 萬';
-    document.getElementById('drB2cPcSub').textContent = `傳統轉介中位 ${Math.round(refMed)} 萬`;
+    document.getElementById('drB2cPcSub').textContent = `在地口碑中位 ${Math.round(refMed)} 萬`;
     document.getElementById('drB2cAds').textContent = _drB2c.filter(r => r.ads > 0).length + ' 家';
 
     // 散點：量產 vs 賺錢
@@ -13240,7 +13241,7 @@ async function loadDeepReportOnce() {
     renderDrB2cTable();
 
     // --- 精品利基 ---
-    const prem = top.filter(r => r.type === '精品專業型');
+    const prem = top.filter(r => r.practice_tag === '精品專業');
     const KW = { '刑': '刑事辯護', '家事': '家事', '商務': '商務/公司', '不動產': '不動產', '勞': '勞資', '智慧財產': 'IP', '專利': 'IP', '醫': '醫療', '工程': '工程', '金融': '金融', '稅': '稅務', '海': '海商' };
     const buckets = {};
     prem.forEach(r => {
