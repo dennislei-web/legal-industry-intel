@@ -20,6 +20,7 @@ refresh_judge_judgment_stats() 彙總成 judge_judgment_stats 供前端 view 使
   python judgment_stats.py pairamtfill 202101 202606 # 逐案層回填（mig 170：同方共同列名 pair＋民事標的金額；只傳兩張新表）
   python judgment_stats.py groupfill 202101 202504  # 所級去重素材回填（mig 186：同判決律師集合；只傳 lawyer_group_month_stats）
   python judgment_stats.py doctypefill 199601 202605 # 判決/裁定回填（強制重解、只傳 judge/lawyer 月表）
+  python judgment_stats.py causemap-resync [--dry-run] [--no-refresh]  # 案由分類規則改版後，全部鍵用現行規則重算（不重解月包）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full p7zip-rar）。
 """
@@ -36,7 +37,7 @@ from datetime import date
 import requests
 from dotenv import load_dotenv
 
-from cause_map import norm_cause, map_judgment
+from cause_map import norm_cause, map_judgment, resolve_judgment
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
@@ -254,6 +255,12 @@ RE_JUDGE_NAME_NOISE = re.compile(r'上訴|抗告|附表|附錄|主文|原告|被
 # 字別 → 案類（粗分）。JID 內含裁判類別碼，但月包檔名/ID 較可靠的是全文首行。
 CAT_BY_DOCNAME = [('刑事', '刑事'), ('民事', '民事'), ('行政', '行政'),
                   ('家事', '家事'), ('少年', '少年'), ('懲戒', '懲戒')]
+# 首行抓不到案類時的備援：JID 第 4 碼＝裁判類別（achieve 樣本 5.7 萬件實測：M＝刑事、V＝民事（家事也是 V，靠字別先攔）、
+# A＝行政、U＝最高法院民事新碼；憲法法庭／懲戒法院的碼不在表內→仍是 '其他'，交給 cause_map.resolve_judgment 依案由推回）。
+# 首行比對前先去掉所有空白：舊判決首行常是「最　高　行　政　法　院　判　決」這種全形空白隔字，
+# 2026-11 盤點因此落到「其他＋未知法院」的近 60 月有 1.8 萬件（1998 年起每年 2～4 千件）。
+CAT_BY_JID = {'M': '刑事', 'V': '民事', 'U': '民事', 'A': '行政'}
+RE_WS = re.compile(r'\s+')
 
 # 家事案件的全文開頭一律寫「民事判決/裁定」（含少家法院），只能靠字別（JCASE）辨識。
 # 實測 2020-10：字別含婚/家/繼/親/監宣等 = 1,757/87,563 件（全文開頭只抓得到 13 件）。
@@ -596,15 +603,19 @@ def extract_judges(jfull):
     return names
 
 
-def classify(jfull_head, jcase):
+def classify(jfull_head, jcase, jid=''):
     jc = jcase or ''
     if any(k in jc for k in FAM_JCASE_KEYS):
         return '家事'
     if '少' in jc:
         return '少年'
+    head = RE_WS.sub('', jfull_head or '')
     for kw, cat in CAT_BY_DOCNAME:
-        if kw in jfull_head:
+        if kw in head:
             return cat
+    code = (jid or '')[3:4]
+    if code in CAT_BY_JID:
+        return CAT_BY_JID[code]
     return '其他'
 
 
@@ -612,9 +623,10 @@ def doctype_of(jfull_head):
     """判決/裁定拆分：文件類型寫在首行法院名之後（「民事判決」「刑事裁定」…）。
     先驗「裁定」：更正判決之裁定等首行後段會提到「判決」，反之罕見。
     非判決/裁定者（支付命令、宣示筆錄外的處分命令等）歸「其他」。"""
-    if '裁定' in jfull_head:
+    head = RE_WS.sub('', jfull_head or '')
+    if '裁定' in head:
         return '裁定'
-    if '判決' in jfull_head:
+    if '判決' in head:
         return '判決'
     return '其他'
 
@@ -742,10 +754,12 @@ def parse(yyyymm):
             if not jfull:
                 continue
             head = jfull[:60]
-            mc = RE_COURT.search(head.strip())
+            # 法院名／案類／判決裁定都先去空白再比（舊判決首行全形空白隔字）
+            head_c = RE_WS.sub('', head)
+            mc = RE_COURT.search(head_c)
             court = normalize_court(mc.group(1)) if mc else '未知法院'
             jcase = (doc.get('JCASE') or '').strip()
-            cat = classify(head, jcase)
+            cat = classify(head_c, jcase, doc.get('JID') or '')
             dt = doctype_of(head)
             if jcase:
                 ccagg[(court, jcase)] += 1
@@ -968,8 +982,9 @@ def sync_cause_map(cause_keys):
     rows = []
     for ck in cause_keys:
         cat, _, cause = ck.partition('|')
-        rows.append({'ck': ck, 'cat': cat, 'cause': cause,
-                     'cause_group': map_judgment(cat, cause)})
+        # 案類判不出的鍵（'其他|…'）在這裡依案由推回案類：cat 欄寫推回的案類、ck 前綴不動
+        rcat, grp = resolve_judgment(cat, cause)
+        rows.append({'ck': ck, 'cat': rcat, 'cause': cause, 'cause_group': grp})
     for i in range(0, len(rows), 500):
         r = requests.post(f'{SUPABASE_URL}/rest/v1/cause_group_map?on_conflict=ck',
                           json=rows[i:i + 500],
@@ -979,6 +994,45 @@ def sync_cause_map(cause_keys):
         if r.status_code not in (200, 201, 204):
             raise RuntimeError(f'cause_group_map 上傳失敗 {r.status_code}: {r.text[:200]}')
     print(f'  cause_group_map 同步 {len(rows)} 鍵')
+
+
+def resync_cause_map(dry_run=False):
+    """分類規則改版後，把 cause_group_map 全部鍵用現行 resolve_judgment 重算，只回寫 cat／cause_group 有變的鍵
+    （不重解月包；sub_group 是 generated column 會跟著重算）。PostgREST 每頁最多 1000 列，用 offset 逐頁撈。
+    回傳 (總鍵數, 變動列)。"""
+    rows, offset = [], 0
+    while True:
+        r = requests.get(f'{SUPABASE_URL}/rest/v1/cause_group_map',
+                         params={'select': 'ck,cat,cause,cause_group', 'order': 'ck', 'limit': 1000, 'offset': offset},
+                         headers=HEADERS_SB, timeout=120, verify=False)
+        r.raise_for_status()
+        page = r.json()
+        rows.extend(page)
+        if len(page) < 1000:
+            break
+        offset += 1000
+    changed, moves = [], defaultdict(int)
+    for row in rows:
+        cat0, _, cause = row['ck'].partition('|')
+        cat, grp = resolve_judgment(cat0, cause)
+        if cat != row['cat'] or grp != row['cause_group']:
+            changed.append({'ck': row['ck'], 'cat': cat, 'cause': cause, 'cause_group': grp})
+            moves[(row['cat'], row['cause_group'], cat, grp)] += 1
+    print(f'  cause_group_map 共 {len(rows)} 鍵，現行規則重算後 {len(changed)} 鍵的案類／種類有變')
+    for (c0, g0, c1, g1), n in sorted(moves.items(), key=lambda x: -x[1])[:40]:
+        print(f'    {n:>6}  {c0}|{g0} -> {c1}|{g1}')
+    if dry_run:
+        return len(rows), changed
+    for i in range(0, len(changed), 500):
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/cause_group_map?on_conflict=ck',
+                          json=changed[i:i + 500],
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json',
+                                   'Prefer': 'resolution=merge-duplicates,return=minimal'},
+                          timeout=120, verify=False)
+        if r.status_code not in (200, 201, 204):
+            raise RuntimeError(f'cause_group_map 回寫失敗 {r.status_code}: {r.text[:200]}')
+    print(f'  已回寫 {len(changed)} 鍵')
+    return len(rows), changed
 
 
 def upload(yyyymm, tables=None):
@@ -1536,6 +1590,13 @@ if __name__ == '__main__':
         if failed:
             print(f'最終失敗月份: {failed}')
             sys.exit(1)
+    elif cmd == 'causemap-resync':
+        # 案由分類規則（cause_map.py）改版後：全部鍵用現行規則重算並回寫，再重跑案由 refresh 鏈
+        # （lawyer_cause_stats／cause_group_causes／年度／法院／子類表）。--dry-run 只印變動彙總；--no-refresh 不重跑鏈。
+        dry = '--dry-run' in sys.argv
+        total, changed = resync_cause_map(dry_run=dry)
+        if not dry and changed and '--no-refresh' not in sys.argv:
+            _call_rpc('refresh_lawyer_cause_stats')
     elif cmd == 'reclassify':
         # 分類邏輯改版後強制重跑：刪 agg 快取、無視已上傳紀錄，逐月重新 download+parse+upload
         for ym in month_range(sys.argv[2], sys.argv[3]):
