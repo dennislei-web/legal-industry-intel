@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from judgment_stats import (  # noqa: E402
     WORK_DIR, RE_COURT, normalize_court, classify,
     extract_lawyers_sided, download, extract_month, remove_extract_dir,
-    LAWYER_ROLES, _party_label, PARTY_CAMP,
+    LAWYER_ROLES, _party_label, PARTY_CAMP, RE_NAME_LAWYER, RE_BAD_NAME, RE_ROLE_TOKEN,
 )
 
 # 公司/法人判定（kind: corp=營利企業, org=非營利法人）
@@ -149,6 +149,70 @@ def extract_corp_parties(jfull):
     return [(nm, k, tc, ac) for nm, (k, tc, ac) in out.items()]
 
 
+# 2026-11-03 消債修正：消費者債務清理的裁定，債務人是「聲請人」（攻方 P），
+# 債權銀行常直接標「債權人」，PARTY_CAMP 也歸攻方 P → 按造別配對會把債權銀行
+# 配給債務人的律師，銀行被誤算成債務人律師的「企業客戶」。
+# 這類案件改用「當事人區塊」配對：公司只配給緊接在它底下、下一個當事人標籤之前列名的律師。
+RE_DEBTOR_ON_P = re.compile(r'(聲請人|抗告人|再抗告人|異議人|聲明異議人)即債務人')
+
+
+def debtor_on_p_case(head, jcase):
+    if '消債' in (jcase or ''):
+        return True
+    return bool(RE_DEBTOR_ON_P.search(re.sub(r'[\s　]', '', head)))
+
+
+def block_lawyers_by_company(head):
+    """{company_norm: [律師]}：只收同一當事人區塊內（公司行之後、下一個當事人標籤之前）的律師。
+    律師行的切法貼齊 judgment_stats.extract_lawyers_sided（剝角色字樣、續行純律師名）。"""
+    out = {}
+    cur = []                      # 目前區塊內的公司
+    in_law = False
+
+    def add(seg):
+        for m in RE_NAME_LAWYER.finditer(seg):
+            n = re.sub(r'[\s　]', '', m.group(1))
+            if 2 <= len(n) <= 4 and not RE_BAD_NAME.search(n):
+                for c in cur:
+                    if n not in out[c]:
+                        out[c].append(n)
+
+    for line in head.splitlines():
+        flat = re.sub(r'[\s　]', '', line)
+        if not flat:
+            continue
+        has_role = any(k in flat for k in LAWYER_ROLES)
+        lbl, _camp = _party_label(flat)
+        if lbl and not has_role:
+            cur = []              # 新的當事人標籤 → 新區塊
+            in_law = False
+        bare_agent = (not has_role and '代理人' in flat
+                      and '法定代理人' not in flat and '送達代收' not in flat)
+        if has_role or bare_agent:
+            last = None
+            for m in RE_ROLE_TOKEN.finditer(line):
+                last = m
+            add(line[last.end():] if last else line)
+            in_law = True
+            continue
+        if in_law:
+            stripped = re.sub(r'[（(][^）)]*[）)]?', '', line)
+            leftover = re.sub(r'[\s　]', '', RE_NAME_LAWYER.sub('', stripped))
+            if RE_NAME_LAWYER.search(stripped) and not leftover:
+                add(stripped)
+                continue
+            in_law = False
+        if RE_SKIP_LINE.search(flat):
+            continue
+        nm_raw, _tc = strip_party_labels(flat)
+        nm = norm_company(nm_raw)
+        kind = company_kind(nm)
+        if kind and 5 <= len(nm) <= 60 and is_valid_company(nm, kind):
+            out.setdefault(nm, [])
+            cur.append(nm)
+    return out
+
+
 def parse_corp(yyyymm):
     """解析該月已解壓目錄（無則先解壓 RAR）→ {ym}_corp.json"""
     out_path = os.path.join(WORK_DIR, f'{yyyymm}_corp.json')
@@ -191,10 +255,12 @@ def parse_corp(yyyymm):
             by_camp = defaultdict(list)
             for lname, lcamp in sided.items():
                 by_camp[lcamp].append(lname)
+            blockmode = debtor_on_p_case(head, doc.get('JCASE') or '')
+            blk = block_lawyers_by_company(head) if blockmode else None
             for nm, kind, true_camp, assoc_camp in corps:
                 li = litigant[(nm, kind)]
                 li['n'] += 1
-                lws = by_camp.get(assoc_camp, [])
+                lws = blk.get(nm, []) if blockmode else by_camp.get(assoc_camp, [])
                 if lws:
                     li['repr'] += 1
                 for lname in lws:
