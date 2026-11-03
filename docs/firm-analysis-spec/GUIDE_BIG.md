@@ -62,7 +62,8 @@ cd C:\projects\legal-industry-intel\scripts\_batch408\v2 && python upload_one.py
 - **查無就寫「查無」**，禁止編造。`name_ambiguous=true` 者案量是同名合併值，引用要標註。
 - **WebSearch**：大所可用，**最多 2 次**，用於確認案源、創所年份、所長／合夥人結構、重大案件或前司法官身分。結果必須與 dossier 名冊姓名核對。
 - **具名負面紀錄**：律師的懲戒、刑案、民事被訴等，一律不得寫進正文；只在 notes 寫「疑似負面紀錄待主 session 核實：關鍵字＋來源網域」。
-- **v3**：雙軸標籤、案源判讀四級證據、委任口徑件數與人均門檻，一律照 FORMAT.md 與 REVENUE_RULES.md 的 v3 條文。
+- **v3**：雙軸標籤、案源判讀四級證據、委任口徑件數與人均門檻，一律照 FORMAT.md 與 REVENUE_RULES.md 的 v3 條文（含第 5 節 R1–R5）。
+- **2026-11-04 追加**：所長例外（所名即律師全名＋名冊／一人所唯一在籍）、共同列名雙向重算與前受僱／跨所／所名異寫三分法、同名異所合併、窗內轉入律師加註，一律照 GUIDE.md「判斷規則」同名條文。
 
 ## 禁令
 不動 `public/index.html`、不 git、不跑 Ad Library、不查 DB、不 WebFetch（官網已預抓）、不重複讀已 cat 過的檔。
