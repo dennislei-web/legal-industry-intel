@@ -1271,6 +1271,10 @@
           <select id="fmGroupSel" onchange="loadFirmMap()" style="min-width:180px;">
             <option value="">全部案由種類</option>
           </select>
+          <!-- 子類（mig 255）：只有已細分的種類才顯示，目前＝損害賠償 -->
+          <select id="fmSubSel" onchange="loadFirmMap()" style="min-width:190px;display:none;" title="依判決書原始案由的關鍵字細分">
+            <option value="">全部子類</option>
+          </select>
           <select id="fmCourtSel" onchange="loadFirmMap()" style="min-width:240px;">
             <option value="">全部法院</option>
           </select>
@@ -1319,6 +1323,8 @@
         事務所歸屬以姓名唯一對應為準（同名不計入），分所已按名稱正規化合併。
         案量按<strong>現任名冊</strong>回溯歸屬——轉入律師帶入其過往案量、已離所者不計。
         <br>※ 案量為<strong>去重口徑</strong>（同一判決同所多人共同署名只計 1 件，素材 2021/01 起，mig 189）——排名按去重值排序，名目（律師人次）與重複率見滑鼠提示。<strong>例外</strong>：選了「案由種類」時為名目口徑（案由層無去重素材）；去重資料未回填完成時亦暫以名目呈現。
+        <br>※ 選「損害賠償」可再選<strong>子類</strong>：依判決書原始案由的關鍵字歸類（例：「侵權行為損害賠償(交通)」歸交通事故），先比主題再比程序，交通事故的再審仍算交通事故。約 8 成件數的案由只寫「損害賠償」「侵權行為損害賠償」，看不出類型，歸「未標明類型」。子類同為名目、全國口徑（mig 255）。
+        <strong>注意</strong>：子類靠法院在案由後加註，加註是近年才普及——「交通」2021 年全年只標了約 300 件、2025 年約 7,200 件；「侵害配偶權」幾乎全是 2026 年起才有。早年同類案件多半落在「未標明類型」，所以子類的逐年增減主要反映加註普及、不是市場變化，比較事務所請優先看最近一年。
       </div>
       <div class="grid-2">
         <div class="card">
@@ -13295,15 +13301,22 @@ let _fmLoaded = false;
 function loadFirmMapOnce() { if (_fmLoaded) return; _fmLoaded = true; initFirmMap(); }
 
 let _fmGroups = [];  // cause_group_list 快取（Phase B 案由種類）
+let _fmSubs = [];    // cause_sub_group_list 快取（mig 255 子類，目前只有損害賠償）
+let _fmSeq = 0;      // 快速連切下拉時，只渲染最後一次查詢的結果
 
 async function initFirmMap() {
-  // 排行先開（預設組合走 firm_map_default_cache 快取表，秒回），三個下拉並行載入不擋渲染
+  // 排行先開（預設組合走 firm_map_default_cache 快取表，秒回），下拉並行載入不擋渲染
   loadFirmMap();
-  const [courtsRes, groupsRes, yrsRes] = await Promise.allSettled([
+  const [courtsRes, groupsRes, yrsRes, subsRes] = await Promise.allSettled([
     db.rpc('lms_court_list').range(0, 199),
     db.rpc('cause_group_list').range(0, 499),
     db.rpc('lms_year_list'),
+    db.rpc('cause_sub_group_list'),
   ]);
+  try {
+    _fmSubs = (subsRes.status === 'fulfilled' ? subsRes.value.data : null) || [];
+    renderFmSubOptions();
+  } catch (e) { console.log('cause_sub_group_list error:', e); }
   try {
     const courts = courtsRes.status === 'fulfilled' ? courtsRes.value.data : null;
     const sel = document.getElementById('fmCourtSel');
@@ -13339,13 +13352,29 @@ function renderFmGroupOptions() {
   if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
+// 子類下拉跟著案由種類連動：有細分的種類才顯示；換到別的種類自動清回「全部子類」
+function renderFmSubOptions() {
+  const group = document.getElementById('fmGroupSel').value;
+  const sel = document.getElementById('fmSubSel');
+  const keep = sel.value;
+  const list = group ? _fmSubs.filter(s => s.cause_group === group) : [];
+  sel.style.display = list.length ? '' : 'none';
+  sel.innerHTML = '<option value="">全部子類</option>' +
+    list.map(s => `<option value="${escHtml(s.sub_group)}">${escHtml(s.sub_group)} (${Number(s.cases).toLocaleString()})</option>`).join('');
+  if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
 async function loadFirmMap() {
+  // 先依上游選擇重繪下拉（案類→種類→子類）再讀值，避免拿已被清掉的舊選項去查
+  renderFmGroupOptions();
+  renderFmSubOptions();
+  const seq = ++_fmSeq;
   const cat = document.getElementById('fmCatSel').value || null;
   const group = document.getElementById('fmGroupSel').value || null;
+  const sub = group ? (document.getElementById('fmSubSel').value || null) : null;
   const court = document.getElementById('fmCourtSel').value || null;
   const year = Number(document.getElementById('fmYearSel').value) || null;
   const body = document.getElementById('fmTableBody');
-  renderFmGroupOptions();
   body.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
 
   // 年度標籤連動（KPI 副標＋排行榜表頭）
@@ -13363,10 +13392,13 @@ async function loadFirmMap() {
       ({ data: rows, error } = await db.rpc('firm_court_ranking', { p_cat: null, p_court: null, p_year: null }).range(0, 999));
     }
   } else {
-    ({ data: rows, error } = group
+    ({ data: rows, error } = group && sub
+      ? await db.rpc('firm_cause_sub_ranking', { p_group: group, p_sub: sub, p_limit: 1000, p_year: year }).range(0, 999)
+      : group
       ? await db.rpc('firm_cause_ranking', { p_group: group, p_limit: 1000, p_year: year }).range(0, 999)
       : await db.rpc('firm_court_ranking', { p_cat: cat, p_court: court, p_year: year }).range(0, 999));
   }
+  if (seq !== _fmSeq) return;  // 已有更新的查詢在跑，丟掉這次結果
   if (error || !rows?.length) {
     console.log('firm_court_ranking error:', error);
     body.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">無資料</div></td></tr>';
