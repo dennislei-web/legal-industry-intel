@@ -169,11 +169,34 @@ def parse_rev_sec6(sec6):
     return None
 
 
+# v2 型態 → v3 主案源（過渡期對照；精品專業／企業非訟另記在 practice_tag）
+V2_TO_V3 = {'B2C行銷型': '線上行銷', '機構標案型': '政府批量', '企業非訟型': '企業關係',
+            '傳統轉介型': '在地口碑', '精品專業型': '在地口碑', '一人綜合型': '在地口碑'}
+V2_PRACTICE = {'企業非訟型': '企業非訟', '精品專業型': '精品專業'}
+V3_TYPES = {'線上行銷', '制度派案', '政府批量', '民間批量', '企業關係', '前司法官招牌', '同業協作', '在地口碑'}
+
+
+def size_band(n):
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        return ''
+    return '一人' if n <= 1 else '2–5 人' if n <= 5 else '6–20 人' if n <= 20 else '21 人以上'
+
+
 def extract(a):
     f = {}
-    # 型態：**【X型】**
-    m = re.search(r'【(B2C行銷型|傳統轉介型|機構標案型|企業非訟型|精品專業型|一人綜合型)】', a)
-    f['type'] = m.group(1) if m else ''
+    # 型態：v3 速讀標頭 **【案源：主案源（＋次案源）｜業務：…｜規模：…】**；舊 v2 **【X型】** 對照成主案源
+    m = re.search(r'【案源：\s*([^（(｜|】\s]+)', a)
+    if m:
+        f['type'] = m.group(1)
+        m2 = re.search(r'【案源：[^】]*?[（(]＋?([^）)]+)[）)]', a)
+        f['acq2'] = m2.group(1).replace('＋', '').strip() if m2 else ''
+    else:
+        m = re.search(r'【(B2C行銷型|傳統轉介型|機構標案型|企業非訟型|精品專業型|一人綜合型)】', a)
+        f['type'] = V2_TO_V3.get(m.group(1), '') if m else ''
+        f['acq2'] = ''
+        f['v2_type'] = m.group(1) if m else ''
     # 30秒速讀規模行（分段容錯：位後可帶括號、件數前可有「約/署名合計」等）
     scale_line = ''
     m = re.search(r'[^\n]*規模與案量[^\n]*', a)
@@ -272,7 +295,11 @@ def main():
         f = extract(a)
         lj = ljson.get(nm, {})
         if not f['type']:
-            f['type'] = lj.get('type', '')
+            lt = lj.get('type', '')
+            f['type'] = lt if lt in V3_TYPES else V2_TO_V3.get(lt, '')
+        acq2 = lj.get('acq2', '') if lj.get('type', '') in V3_TYPES else ''
+        f['acq2'] = (f.get('acq2') or acq2 or '').strip('-').strip()
+        f['practice_tag'] = lj.get('practice_tag', '') or V2_PRACTICE.get(f.get('v2_type') or lj.get('type', ''), '') or ('綜合訴訟' if f['type'] else '')
         if not f['type']:
             miss['type'] += 1
         if f['roster_n'] == '':
@@ -337,6 +364,9 @@ def main():
             'indep_seats': indep.get(nm, 0),
             'awards_n': awards.get(nm, 0),
             'tagline': lj.get('tagline', ''),
+            'acq2': f['acq2'],
+            'practice_tag': f['practice_tag'],
+            'size_band': size_band(c.get('lawyer_count', '')),
         })
     cols = list(out[0].keys())
     dst = os.path.join(ROOT, 'v2', 'facts.tsv')
