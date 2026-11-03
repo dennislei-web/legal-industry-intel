@@ -9,6 +9,7 @@
   python firm_google_places.py --limit 5   # pilot
   python firm_google_places.py             # 全量（跳過已有 place_id 者）
   python firm_google_places.py --force     # 全量重抓
+  python firm_google_places.py --names-file list.txt   # 指定清單（含無官網所）
 """
 import os, sys, json, time, argparse, winreg
 import urllib3
@@ -55,11 +56,15 @@ def sb_get_all(path, params):
         start += 1000
     return rows
 
-def targets(force=False):
-    firms = sb_get_all("/rest/v1/firm_websites",
-                       {"verified": "eq.true", "website_url": "not.is.null",
-                        "select": "firm_name"})
-    names = sorted({f["firm_name"] for f in firms})
+def targets(force=False, names_file=None):
+    if names_file:  # 指定清單（無官網的所也能補抓；2026-11-03 v3 行銷訊號補掃）
+        with open(names_file, encoding="utf-8-sig") as f:
+            names = sorted({ln.strip() for ln in f if ln.strip()})
+    else:
+        firms = sb_get_all("/rest/v1/firm_websites",
+                           {"verified": "eq.true", "website_url": "not.is.null",
+                            "select": "firm_name"})
+        names = sorted({f["firm_name"] for f in firms})
     cache = sb_get_all("/rest/v1/moj_firm_stats_cache",
                        {"select": "firm_name,main_region"})
     region = {c["firm_name"]: (c.get("main_region") or "") for c in cache}
@@ -112,9 +117,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--names-file", default=None, help="每行一個所名；不限有官網")
     args = ap.parse_args()
 
-    tg = targets(force=args.force)
+    tg = targets(force=args.force, names_file=args.names_file)
     if args.limit:
         tg = tg[: args.limit]
     print("targets:", len(tg))
