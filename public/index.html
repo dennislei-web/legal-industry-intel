@@ -1513,12 +1513,12 @@
       </div>
     </div>
 
-    <!-- 領域律師版圖（IA 重整 P3-3，mig 182）：任選案由種類看 法院常勝軍＋律師名單（原家事律師版圖泛化） -->
+    <!-- 領域律師版圖（IA 重整 P3-3，mig 182；2026-11-04 整併：種類×年度×法院 一組篩選 → 一份名單，mig 262） -->
     <div id="tab-domain-lawyers" class="domain-subpanel" style="display:none;">
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#9878;&#65039; 領域律師版圖 — 任選訴訟領域看法院常勝軍與律師名單</div>
+        <div class="card-title">&#9878;&#65039; 領域律師版圖 — 選種類、年度、法院，看該範圍的律師名單</div>
         <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;">
-          原「家事律師版圖」泛化：79 個案由種類（同案由供需的分組）任選。案量以公開裁判書抽取＝下限估計、同名律師合併（標「同名多筆」者不歸事務所）。
+          79 個案由種類（同案由供需的分組）任選。案量以公開裁判書抽取＝下限估計、同名律師合併（標「同名多筆」者不歸事務所）。
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
           <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
@@ -1526,49 +1526,36 @@
         </div>
         <div class="search-bar" style="margin-bottom:0;">
           <select id="dlGroupSelect" onchange="dlGroupChange()" style="min-width:240px;"></select>
-          <select id="dlYearSelect" onchange="dlYearChange()" style="min-width:180px;">
+          <select id="dlYearSelect" onchange="dlReload()" style="min-width:170px;">
             <option value="">全部年度（近 5 年滾動）</option>
           </select>
-          <span style="font-size:0.72rem;color:var(--text-muted);">年度套用於四塊指標磚與律師名單；法院視角固定近 5 年</span>
+          <select id="dlCourtSelect" onchange="dlReload()" style="min-width:260px;">
+            <option value="">全國（所有法院）</option>
+          </select>
         </div>
       </div>
       <div class="kpi-grid" id="dlKpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
-        <div class="kpi-card"><div class="kpi-label">領域判決件數</div><div class="kpi-value" id="dlKpiTotal">-</div><div class="kpi-sub" id="dlKpiTotalSub">近 5 年滾動</div></div>
-        <div class="kpi-card"><div class="kpi-label">供給律師數</div><div class="kpi-value" id="dlKpiLawyers" style="color:var(--blue);">-</div><div class="kpi-sub" id="dlKpiLawyersSub">近 5 年有出庭</div></div>
-        <div class="kpi-card"><div class="kpi-label">領域量最大律師</div><div class="kpi-value" id="dlKpiTop" style="color:var(--gold);font-size:1.3rem;">-</div><div class="kpi-sub" id="dlKpiTopSub">-</div></div>
-        <div class="kpi-card"><div class="kpi-label">喆律該領域案量</div><div class="kpi-value" id="dlKpiZhelu" style="color:var(--green);">-</div><div class="kpi-sub" id="dlKpiZheluSub">近 5 年・<span id="dlKpiZheluN">-</span> 位律師</div></div>
+        <div class="kpi-card"><div class="kpi-label">判決件數</div><div class="kpi-value" id="dlKpiTotal">-</div><div class="kpi-sub" id="dlKpiTotalSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">有出庭律師數</div><div class="kpi-value" id="dlKpiLawyers" style="color:var(--blue);">-</div><div class="kpi-sub" id="dlKpiLawyersSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">件數最多律師</div><div class="kpi-value" id="dlKpiTop" style="color:var(--gold);font-size:1.3rem;">-</div><div class="kpi-sub" id="dlKpiTopSub">-</div></div>
+        <div class="kpi-card"><div class="kpi-label">喆律案量</div><div class="kpi-value" id="dlKpiZhelu" style="color:var(--green);">-</div><div class="kpi-sub" id="dlKpiZheluSub">-・<span id="dlKpiZheluN">-</span> 位律師</div></div>
       </div>
       <div class="card">
-        <div class="card-title">&#127963;&#65039; 法院視角 — 各法院的領域常勝軍</div>
-        <div class="search-bar">
-          <select id="dlCourtSelect" onchange="dlCourtChange()" style="min-width:260px;">
-            <option value="">選擇法院...</option>
-          </select>
-        </div>
-        <div class="table-wrap" style="max-height:420px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th style="text-align:right;">該法院件數</th></tr></thead>
-            <tbody id="dlCourtBody"><tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr></tbody>
-          </table>
-        </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">法院視角固定近 5 年滾動視窗（不隨年度下拉切換），顯示前 100 名。</div>
-      </div>
-      <div class="card">
-        <div class="card-title">&#128203; 領域律師名單 <span id="dlListMeta" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
+        <div class="card-title">&#128203; 律師名單 <span id="dlListMeta" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
         <div class="search-bar">
           <input type="text" id="dlSearch" placeholder="於名單內搜尋姓名或事務所..." oninput="dlRenderList()">
         </div>
-        <div class="table-wrap" style="max-height:560px;overflow-y:auto;">
+        <div class="table-wrap" style="max-height:640px;overflow-y:auto;">
           <table>
-            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th style="text-align:right;">件數</th><th style="text-align:right;" title="該領域件數 ÷ 該律師同期全部出庭件數">專注度</th></tr></thead>
+            <thead><tr><th>#</th><th>律師</th><th>事務所</th><th style="text-align:right;">件數</th><th style="text-align:right;" title="該領域件數 ÷ 該律師同範圍（同法院或全國、同期間）全部出庭件數">專注度</th></tr></thead>
             <tbody id="dlListBody"><tr><td colspan="5" class="loading">載入中</td></tr></tbody>
           </table>
         </div>
-        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">顯示 TOP 250（搜尋亦於此範圍內）；「專注度」＝該領域件數佔該律師同期全部出庭件數比例。</div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">顯示 TOP 250（搜尋亦於此範圍內）；「專注度」＝該領域件數佔該律師同範圍（同法院或全國、同期間）全部出庭件數比例。選了法院又選年度時為即時計算，大法院約 1 秒。</div>
       </div>
       <div class="card" style="margin-top:16px;">
         <div style="font-size:0.75rem;color:var(--text-muted);line-height:1.7;">
-          ※ 案件量以「訴訟代理人/辯護人 ○○○律師」自公開裁判書抽取（案由層自 2021-05 起、滾動 60 月），裁定與不公開裁判不計，數字為下限估計、僅供相對比較；
+          ※ 案件量以「訴訟代理人/辯護人 ○○○律師」自公開裁判書抽取（案由層資料 1996 年起；「全部年度」＝滾動 60 月），裁定與不公開裁判不計，數字為下限估計、僅供相對比較；
           一案多位律師各自計數。事務所歸屬以法務部名冊姓名唯一對應為準，同名多筆律師不歸屬。
           種類分組與「案由供需」一致（mapping 單一真實源 cause_map.py）；「其他○○」為剩餘桶，解讀前建議先到案由供需點開明細。
         </div>
@@ -13059,18 +13046,18 @@ function renderFamTable() {
 }
 
 // ============================================================
-// DOMAIN-LAWYERS 領域律師版圖（IA 重整 P3-3，mig 182；原「家事律師版圖」泛化）
-// 資料源：全國名單/年度=cause_top_lawyers / lawyer_cause_year_stats（mig 093/098）、
-//   法院視角=lawyer_cause_court_stats（mig 182，47.6 萬列——一律 server-side 篩選，嚴禁拉全量）
+// DOMAIN-LAWYERS 領域律師版圖（IA 重整 P3-3，mig 182；2026-11-04 整併為「種類×年度×法院 → 一份名單」，mig 262）
+// 資料源：單一 RPC cause_lawyer_list（四條路徑：lawyer_cause_stats／lawyer_cause_year_stats／
+//   lawyer_cause_court_stats／lawyer_month_stats 即時算）一次回 KPI＋TOP 250（事務所已歸戶）；
+//   法院下拉＝cause_court_list（該種類有紀錄的法院，標近 5 年件數）
 // ============================================================
 let _dlLoaded = false;
 let _dlGroups = [];        // cause_group_list：[{cat, cause_group}]
-let _dlSupply = {};        // cause_supply_stats：group → {total_cases, lawyers}
+let _dlSupply = {};        // cause_supply_stats：group → {total_cases, lawyers}（種類下拉標近 5 年件數）
 let _dlCat = '民事';       // 當前案類 chip
-let _dlListRows = [];      // 名單快取（當前 group×year）
-let _dlFirmMap = {};       // 名單律師 → 事務所（lawyers_combined 唯一名歸戶；'AMBIG'=同名多筆）
-let _dlReq = 0;            // 名單／四磚請求序號：快速切換年度時，晚到的舊回應一律丟棄
-let _dlGroupReq = 0;       // 法院下拉請求序號：快速切換種類時同理
+let _dlListRows = [];      // 名單快取（當前篩選）
+let _dlReq = 0;            // 名單請求序號：快速切換時，晚到的舊回應一律丟棄
+let _dlCourtReq = 0;       // 法院下拉請求序號：快速切換種類時同理
 let _dlMaxYr = null, _dlPartial = '';  // 最新年與其部分年標註（如「1-8 月」，取自 lawyer_month_stats 最新月）
 window._dlPresetCat = null;  // 外部入口預選案類（如專業法庭家事導向卡）
 
@@ -13129,131 +13116,71 @@ function dlSelectCat(cat) {
   dlGroupChange();
 }
 
+// 種類變更：重抓法院下拉（該種類有紀錄的法院），原選的法院還在就保留，再載名單
 async function dlGroupChange() {
   const g = document.getElementById('dlGroupSelect').value;
   if (!g) return;
-  // 法院下拉（RPC 直查物化表）；帶序號，快速切換種類時晚到的舊回應丟棄
-  const gseq = ++_dlGroupReq;
+  const cseq = ++_dlCourtReq;
   const sel = document.getElementById('dlCourtSelect');
   const prev = sel.value;
-  sel.innerHTML = '<option value="">選擇法院...</option>';
-  db.rpc('cause_court_list', { p_group: g }).then(({ data }) => {
-    if (gseq !== _dlGroupReq) return;
-    (data || []).forEach(r => {
-      const opt = document.createElement('option');
-      opt.value = r.court_name;
-      opt.textContent = `${r.court_name}（${Number(r.total).toLocaleString()} 件・${r.lawyers} 位）`;
-      sel.appendChild(opt);
-    });
-    if (prev && (data || []).some(r => r.court_name === prev)) { sel.value = prev; }
-    dlCourtChange();
-  });
-  // 四磚＋名單由年度下拉決定（全部年度=近 5 年滾動／指定年）
-  dlYearChange();
+  const { data } = await db.rpc('cause_court_list', { p_group: g });
+  if (cseq !== _dlCourtReq) return;
+  const courts = data || [];
+  sel.innerHTML = '<option value="">全國（所有法院）</option>' + courts.map(r =>
+    `<option value="${escHtml(r.court_name)}">${escHtml(r.court_name)}（近 5 年 ${Number(r.total).toLocaleString()} 件）</option>`).join('');
+  sel.value = courts.some(r => r.court_name === prev) ? prev : '';
+  dlReload();
 }
 
-// 年度標籤：最新年為部分年時標到幾月；inline=true 用「，」接（避免標題「（2026 年（1-8 月））」雙層括號）
+// 年度標籤：最新年為部分年時標到幾月；inline=true 用空格接（名單標題用，避免雙層括號）
 function dlYearLabel(y, inline) {
   const p = (y === _dlMaxYr && _dlPartial) ? _dlPartial : '';
-  return `${y} 年` + (p ? (inline ? `，${p}` : `（${p}）`) : '');
+  return `${y} 年` + (p ? (inline ? ` ${p}` : `（${p}）`) : '');
+}
+// 篩選範圍文字（磚下小字與名單標題）
+function dlScopeLabel(yr, court, inline) {
+  return `${yr ? dlYearLabel(yr, inline) : '近 5 年滾動'}・${court || '全國'}`;
 }
 
-// 四磚（判決件數／供給律師數／喆律案量；TOP1 磚由名單結果填，見 dlRenderTop）
-//   全部年度：cause_supply_stats 現成 map＋物化表喆律 like 查詢（原邏輯）
-//   指定年：cause_group_year_kpi（mig 261）單發；seq 不符＝使用者已再切換，丟棄
-async function dlUpdateKpis(g, yr, seq) {
-  const el = id => document.getElementById(id);
-  const fmt = v => v == null ? '-' : Number(v).toLocaleString();
-  const setZhelu = (cases, n, label) => {
-    el('dlKpiZhelu').textContent = fmt(cases);
-    el('dlKpiZheluSub').innerHTML = `${label}・<span id="dlKpiZheluN">${n == null ? '-' : n}</span> 位律師`;
-  };
-  if (yr == null) {
-    const sup = _dlSupply[g] || {};
-    el('dlKpiTotal').textContent = fmt(sup.total_cases || 0);
-    el('dlKpiLawyers').textContent = fmt(sup.lawyers || 0);
-    el('dlKpiTotalSub').textContent = '近 5 年滾動';
-    el('dlKpiLawyersSub').textContent = '近 5 年有出庭';
-    const { data } = await db.from('lawyer_cause_court_stats').select('name,case_count')
-      .eq('cause_group', g).like('firm_name', '%喆律%');
-    if (seq !== _dlReq) return;
-    const rows = data || [];
-    setZhelu(rows.reduce((s, r) => s + r.case_count, 0), new Set(rows.map(r => r.name)).size, '近 5 年');
-    return;
-  }
-  const label = dlYearLabel(yr);
-  el('dlKpiTotalSub').textContent = label;
-  el('dlKpiLawyersSub').textContent = `${label}有出庭`;
-  const { data, error } = await db.rpc('cause_group_year_kpi', { p_group: g, p_year: yr });
-  if (seq !== _dlReq) return;
-  if (error) console.log('cause_group_year_kpi error:', error);
-  const r = (!error && data && data[0]) || null;
-  el('dlKpiTotal').textContent = fmt(r?.total_cases);
-  el('dlKpiLawyers').textContent = fmt(r?.lawyers);
-  setZhelu(r?.zhelu_cases, r?.zhelu_lawyers, label);
-}
-
-// 名單：cause_top_lawyers 單發（p_year null=近5年滾動／給年=該年；SECURITY DEFINER，share 兩模式都有）
-//   請求序號 _dlReq：快速連點兩個年份時，已快取的年回得快、未快取的年要多查事務所回得慢，
-//   沒有序號時晚到的舊回應會蓋掉畫面（2026-11-04 實測：下拉 2007、畫面卻是 2010）
-async function dlYearChange() {
+// 名單＋四磚：單發 cause_lawyer_list（mig 262）；seq 不符＝使用者已再切換，丟棄
+//   請求序號的由來：快速連點兩個年份時，晚到的舊回應會蓋掉畫面（2026-11-04 實測：下拉 2007、畫面卻是 2010）
+async function dlReload() {
   const g = document.getElementById('dlGroupSelect').value;
   const y = document.getElementById('dlYearSelect').value;
+  const court = document.getElementById('dlCourtSelect').value || null;
   if (!g) return;
   const yr = y ? parseInt(y, 10) : null;
   const seq = ++_dlReq;
-  const tbody = document.getElementById('dlListBody');
-  tbody.innerHTML = '<tr><td colspan="5" class="loading">載入中</td></tr>';
-  dlUpdateKpis(g, yr, seq);   // 三磚獨立更新，不等名單
+  const el = id => document.getElementById(id);
+  const scope = dlScopeLabel(yr, court, false);
+  const tbody = el('dlListBody');
+  tbody.innerHTML = `<tr><td colspan="5" class="loading">載入中${court && yr ? '（法院×年度即時計算）' : ''}</td></tr>`;
+  el('dlKpiTotalSub').textContent = scope;
+  el('dlKpiLawyersSub').textContent = scope;
+  el('dlListMeta').textContent = `（${dlScopeLabel(yr, court, true)}）`;
   try {
-    const { data, error } = await db.rpc('cause_top_lawyers', { p_group: g, p_limit: 250, p_year: yr });
+    const { data, error } = await db.rpc('cause_lawyer_list', { p_group: g, p_year: yr, p_court: court, p_limit: 250 });
     if (seq !== _dlReq) return;
     if (error) throw error;
-    const rows = data || [];
+    const d = data || {};
+    const rows = d.rows || [];
     _dlListRows = rows;
-    // 先用 RPC 結果更新標題、TOP1 磚與名單（事務所欄暫顯示 …），補完事務所再重繪
-    document.getElementById('dlListMeta').textContent = yr ? `（${dlYearLabel(yr, true)}）` : '（近 5 年滾動）';
-    dlRenderTop(rows);
-    dlRenderList();
-    await dlEnsureFirms(rows.map(r => r.name));
-    if (seq !== _dlReq) return;
-    dlRenderTop(rows);
+    const fmt = v => v == null ? '-' : Number(v).toLocaleString();
+    el('dlKpiTotal').textContent = fmt(d.total_cases);
+    el('dlKpiLawyers').textContent = fmt(d.lawyers);
+    el('dlKpiZhelu').textContent = fmt(d.zhelu_cases);
+    el('dlKpiZheluSub').innerHTML = `${escHtml(scope)}・<span id="dlKpiZheluN">${d.zhelu_lawyers == null ? '-' : d.zhelu_lawyers}</span> 位律師`;
+    if (rows.length) {
+      el('dlKpiTop').innerHTML = lawyerLink(rows[0].name, 'color:inherit;');
+      el('dlKpiTopSub').innerHTML = `${fmt(rows[0].cases)} 件${rows[0].firm_name ? '・' + firmLink(rows[0].firm_name, 'color:inherit;') : ''}`;
+    } else {
+      el('dlKpiTop').textContent = '-';
+      el('dlKpiTopSub').textContent = '-';
+    }
     dlRenderList();
   } catch (e) {
     if (seq === _dlReq) tbody.innerHTML = `<tr><td colspan="5" class="loading">載入失敗：${escHtml(e.message || '')}</td></tr>`;
   }
-}
-
-// TOP1 磚（事務所尚未載入時只顯示件數）
-function dlRenderTop(rows) {
-  if (!rows.length) {
-    document.getElementById('dlKpiTop').textContent = '-';
-    document.getElementById('dlKpiTopSub').textContent = '-';
-    return;
-  }
-  document.getElementById('dlKpiTop').innerHTML = lawyerLink(rows[0].name, 'color:inherit;');
-  const f = _dlFirmMap[rows[0].name];
-  document.getElementById('dlKpiTopSub').innerHTML =
-    `${Number(rows[0].cases).toLocaleString()} 件${f && f !== 'AMBIG' ? '・' + firmLink(f, 'color:inherit;') : ''}`;
-}
-
-// 名單事務所欄：lawyers_combined 唯一名歸戶（同 firm_cause_ranking 口徑）；分批 in() 防 URL 過長，批次平行發
-async function dlEnsureFirms(names) {
-  const need = [...new Set(names)].filter(n => !(n in _dlFirmMap));
-  const batches = [];
-  for (let i = 0; i < need.length; i += 100) batches.push(need.slice(i, i + 100));
-  await Promise.all(batches.map(async batch => {
-    const { data } = await db.from('lawyers_combined').select('name,firm_name').in('name', batch);
-    const seen = {};
-    (data || []).forEach(r => {
-      if (!seen[r.name]) seen[r.name] = new Set();
-      if (r.firm_name) seen[r.name].add(r.firm_name);
-    });
-    batch.forEach(n => {
-      const s = seen[n];
-      _dlFirmMap[n] = !s || !s.size ? '' : (s.size > 1 ? 'AMBIG' : [...s][0]);
-    });
-  }));
 }
 
 function dlRenderList() {
@@ -13261,13 +13188,11 @@ function dlRenderList() {
   if (!tbody) return;
   const q = (document.getElementById('dlSearch')?.value || '').trim();
   let rows = _dlListRows;
-  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (_dlFirmMap[r.name] || '').includes(q));
+  if (q) rows = rows.filter(r => (r.name || '').includes(q) || (r.firm_name || '').includes(q));
   tbody.innerHTML = rows.length ? rows.map(r => {
-    const loaded = r.name in _dlFirmMap;
-    const f = _dlFirmMap[r.name] || '';
-    const zhelu = isZheluFirm(f);
-    const firmCellTxt = !loaded ? '<span style="color:var(--text-muted);">…</span>'
-      : (f === 'AMBIG' ? '<span style="color:var(--text-muted);">同名多筆</span>' : (f ? firmLink(f) : '-'));
+    const zhelu = isZheluFirm(r.firm_name);
+    const firmCellTxt = r.firm_name ? firmLink(r.firm_name)
+      : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
     return `<tr${zhelu ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
       <td style="color:var(--text-muted);">${r.rank}</td>
       <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
@@ -13276,33 +13201,6 @@ function dlRenderList() {
       <td style="text-align:right;">${r.share != null ? Math.round(r.share * 100) + '%' : '-'}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="5" class="empty-state"><div class="msg">無符合條件的律師</div></td></tr>';
-}
-
-// 法院常勝軍：RPC 單發 TOP 100（固定近 5 年滾動視窗）
-async function dlCourtChange() {
-  const g = document.getElementById('dlGroupSelect').value;
-  const court = document.getElementById('dlCourtSelect').value;
-  const tbody = document.getElementById('dlCourtBody');
-  if (!court) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="msg">請先選擇法院</div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = '<tr><td colspan="4" class="loading">載入中</td></tr>';
-  const { data, error } = await db.rpc('cause_court_top_lawyers', { p_group: g, p_court: court, p_limit: 100 });
-  if (error) {
-    tbody.innerHTML = `<tr><td colspan="4" class="loading">載入失敗：${escHtml(error.message)}</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = (data || []).map(r => {
-    const zhelu = isZheluFirm(r.firm_name);
-    const firm = r.firm_name ? firmLink(r.firm_name) : (r.firm_ambiguous ? '<span style="color:var(--text-muted);">同名多筆</span>' : '-');
-    return `<tr${zhelu ? ' style="background:rgba(46,160,67,0.08);"' : ''}>
-      <td style="color:var(--text-muted);">${r.rank}</td>
-      <td>${lawyerLink(r.name, 'font-weight:700;')}${zhelu ? ' <span class="badge badge-green">喆律</span>' : ''}</td>
-      <td style="font-size:0.85rem;">${firm}</td>
-      <td style="text-align:right;font-weight:600;color:var(--gold);">${Number(r.cases).toLocaleString()}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="4" class="empty-state"><div class="msg">該法院無資料</div></td></tr>';
 }
 
 const isZheluFirm = f => !!f && f.includes('喆律');
