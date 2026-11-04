@@ -1506,6 +1506,7 @@
           <strong>委任率</strong>＝終結案件微資料中「任一造有律師代理（含法扶）」比例（最新完整年，民事/家事訴訟檔）——
           委任率低＋件數大＝律師尚未滲透的市場；委任率高＋集中度低＝競爭紅海。
           覆蓋率天花板：民訴案由分類與官方對照約 82%；家事僅覆蓋「訴訟」檔（保護令等非訟事件無代理欄），佔比僅供結構參考。
+          委任率「-」＝該類在訴訟檔無代理紀錄（監護宣告、保護令、暫時處分等非訟性質事件代理欄歷年皆空），不採計、不進合計。
           市場面兩欄來自終結案件微資料（民事訴訟檔，最新完整年；3 年變化為完整年對完整年），
           <strong>僅民事有市場對照</strong>——刑事/家事的官方分組與判決書案由分組口徑不同，不硬對。
           集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
@@ -18206,14 +18207,17 @@ const _csRepCache = {}; // file_type → cause_rep_yearly 列（mig 099）
 const CS_REP_FT = { '民事': '民事訴訟', '家事': '家事訴訟' }; // 刑事辯護口徑不同，第一版不做
 
 // 某種類的委任率（最新完整年優先，否則最新部分年）；回 null＝無資料
+// noRep：該年代理欄全空（監護宣告／保護令／暫時處分等非訟性質事件混在訴訟檔，2021 起歷年 0 件有律師）
+// ＝無代理紀錄而非真的沒人請律師 → rate 給 null，表內印「-」、不進合計與平均（2026-11-04 修假零）
 function csRepRate(ft, group) {
   const rows = (_csRepCache[ft] || []).filter(r => r.cause_group === group); // 依年遞增
   if (!rows.length) return null;
   const full = rows.filter(r => r.months >= 12);
   const pick = full.length ? full[full.length - 1] : rows[rows.length - 1];
   const repped = pick.n_both + pick.n_p_only + pick.n_d_only;
-  return { y: pick.y, partial: pick.months < 12, n: pick.n_total,
-           rate: pick.n_total ? repped / pick.n_total : null };
+  const noRep = repped === 0;
+  return { y: pick.y, partial: pick.months < 12, n: pick.n_total, noRep,
+           rate: (pick.n_total && !noRep) ? repped / pick.n_total : null };
 }
 
 async function loadCauseSupply(cat) {
@@ -18242,10 +18246,13 @@ async function loadCauseSupply(cat) {
     let repCell = '';
     if (ft) {
       const rr = csRepRate(ft, r.cause_group);
+      const noRepTitle = rr && rr.noRep
+        ? `${rr.y} 年${rr.partial ? '（部分年）' : ''}終結 ${rr.n.toLocaleString()} 件，代理欄全空＝無代理紀錄（非訟性質事件），不採計`
+        : '訴訟檔無此類別';
       repCell = (rr && rr.rate != null)
         ? `<td style="text-align:right;color:${rr.rate < 0.2 ? 'var(--green)' : 'var(--text)'};"
              title="${rr.y} 年${rr.partial ? '（部分年）' : ''}終結 ${rr.n.toLocaleString()} 件，任一造有律師比例">${(rr.rate * 100).toFixed(1)}%</td>`
-        : '<td style="text-align:right;color:var(--text-muted);">-</td>';
+        : `<td style="text-align:right;color:var(--text-muted);" title="${noRepTitle}">-</td>`;
     }
     let mktCells = '';
     if (showMkt) {
@@ -18364,6 +18371,13 @@ async function csDrillRep(grp) {
     if (!rows.length) {
       box.innerHTML = `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px;">
         此類別無委任資料——終結案件微資料只有民事/家事「訴訟」檔有原被告代理欄（保護令等非訟事件不在檔內）。</div>`;
+      return;
+    }
+    // 代理欄歷年全空（非訟性質事件混在訴訟檔）：不印 0.0% 的假委任率（2026-11-04）
+    if (rows.every(r => r.n_both + r.n_p_only + r.n_d_only === 0)) {
+      const nAll = rows.reduce((s, r) => s + r.n_total, 0);
+      box.innerHTML = `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px;">
+        此類別 ${rows[0].y}–${rows[rows.length - 1].y} 年在${escHtml(ft)}檔共 ${nAll.toLocaleString()} 件，代理欄歷年皆空（非訟性質事件無代理紀錄），委任率不採計。</div>`;
       return;
     }
     const pct = (n, d) => d ? (n / d * 100).toFixed(1) + '%' : '-';
