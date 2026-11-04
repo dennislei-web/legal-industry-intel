@@ -1516,9 +1516,9 @@
     <!-- 領域律師版圖（IA 重整 P3-3，mig 182；2026-11-04 整併：種類×年度×法院 一組篩選 → 一份名單，mig 262） -->
     <div id="tab-domain-lawyers" class="domain-subpanel" style="display:none;">
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#9878;&#65039; 領域律師版圖 — 選種類、年度、法院，看該範圍的律師名單</div>
+        <div class="card-title">&#9878;&#65039; 領域律師版圖 — 選案類、種類、年度、法院（都可選全部），看該範圍的律師名單</div>
         <div style="font-size:0.78rem;color:var(--text-muted);margin:6px 0 10px;">
-          79 個案由種類（同案由供需的分組）任選。案量以公開裁判書抽取＝下限估計、同名律師合併（標「同名多筆」者不歸事務所）。
+          案類與種類都可選「全部」；79 個案由種類同案由供需的分組。案量以公開裁判書抽取＝下限估計、同名律師合併（標「同名多筆」者不歸事務所）。
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
           <span style="font-size:0.72rem;color:var(--text-muted);">案類：</span>
@@ -13046,18 +13046,18 @@ function renderFamTable() {
 }
 
 // ============================================================
-// DOMAIN-LAWYERS 領域律師版圖（IA 重整 P3-3，mig 182；2026-11-04 整併為「種類×年度×法院 → 一份名單」，mig 262）
+// DOMAIN-LAWYERS 領域律師版圖（IA 重整 P3-3，mig 182；2026-11-04 整併為「案類×種類×年度×法院 → 一份名單」，mig 262/263）
 // 資料源：單一 RPC cause_lawyer_list（四條路徑：lawyer_cause_stats／lawyer_cause_year_stats／
 //   lawyer_cause_court_stats／lawyer_month_stats 即時算）一次回 KPI＋TOP 250（事務所已歸戶）；
-//   法院下拉＝cause_court_list（該種類有紀錄的法院，標近 5 年件數）
+//   案類／種類都可選「全部」（p_cat／p_group 給 null）；法院下拉＝cause_court_list（該範圍有紀錄的法院，標近 5 年件數）
 // ============================================================
 let _dlLoaded = false;
 let _dlGroups = [];        // cause_group_list：[{cat, cause_group}]
 let _dlSupply = {};        // cause_supply_stats：group → {total_cases, lawyers}（種類下拉標近 5 年件數）
-let _dlCat = '民事';       // 當前案類 chip
+let _dlCat = '民事';       // 當前案類 chip（''＝全部案類）
 let _dlListRows = [];      // 名單快取（當前篩選）
 let _dlReq = 0;            // 名單請求序號：快速切換時，晚到的舊回應一律丟棄
-let _dlCourtReq = 0;       // 法院下拉請求序號：快速切換種類時同理
+let _dlCourtReq = 0;       // 法院下拉請求序號：快速切換案類／種類時同理
 let _dlMaxYr = null, _dlPartial = '';  // 最新年與其部分年標註（如「1-8 月」，取自 lawyer_month_stats 最新月）
 window._dlPresetCat = null;  // 外部入口預選案類（如專業法庭家事導向卡）
 
@@ -13098,32 +13098,40 @@ async function initDomainLawyers() {
   } catch (e) { console.log('domain lawyers init error:', e); }
 }
 
-// 案類 chips ＋ 種類下拉（按供給件數排序，剩餘桶「其他○○」「特別法」沉底，同案由供需慣例）
+// 案類 chips（「全部」在最前）＋ 種類下拉（首項「全部種類」；全部案類時以 optgroup 分案類列全部種類；
+//   種類按供給件數排序，剩餘桶「其他○○」「特別法」沉底，同案由供需慣例）
 const dlIsResidual = g => /^其他/.test(g) || g === '特別法';
 const DL_CAT_ORDER = ['民事', '刑事', '家事', '行政', '少年', '懲戒', '其他'];
 function dlSelectCat(cat) {
-  _dlCat = cat;
+  _dlCat = cat || '';
   const dlCatOrd = c => { const i = DL_CAT_ORDER.indexOf(c); return i < 0 ? 98 : i; };
   const cats = [...new Set(_dlGroups.map(g => g.cat))].sort((a, b) => dlCatOrd(a) - dlCatOrd(b));
-  document.getElementById('dlCatChips').innerHTML = cats.map(c =>
-    `<button class="chip${c === cat ? ' active' : ''}" onclick="dlSelectCat('${c}')">${escHtml(c)}</button>`).join('');
-  const groups = _dlGroups.filter(g => g.cat === cat)
-    .map(g => g.cause_group)
-    .sort((a, b) => (dlIsResidual(a) - dlIsResidual(b)) || ((_dlSupply[b]?.total_cases || 0) - (_dlSupply[a]?.total_cases || 0)));
+  const chip = (c, label) => `<button class="chip${c === _dlCat ? ' active' : ''}" onclick="dlSelectCat('${c}')">${escHtml(label)}</button>`;
+  document.getElementById('dlCatChips').innerHTML = chip('', '全部') + cats.map(c => chip(c, c)).join('');
+  const sortGroups = arr => arr.sort((a, b) => (dlIsResidual(a) - dlIsResidual(b)) || ((_dlSupply[b]?.total_cases || 0) - (_dlSupply[a]?.total_cases || 0)));
+  const groupsOf = c => sortGroups([...new Set(_dlGroups.filter(g => g.cat === c).map(g => g.cause_group))]);
+  const fmt = n => Number(n || 0).toLocaleString();
+  const sumOf = gs => gs.reduce((s, g) => s + (_dlSupply[g]?.total_cases || 0), 0);
+  const opt = g => `<option value="${escHtml(g)}">${escHtml(g)}（${fmt(_dlSupply[g]?.total_cases)} 件）</option>`;
   const sel = document.getElementById('dlGroupSelect');
-  sel.innerHTML = groups.map(g =>
-    `<option value="${escHtml(g)}">${escHtml(g)}（${Number(_dlSupply[g]?.total_cases || 0).toLocaleString()} 件）</option>`).join('');
+  if (_dlCat) {
+    const gs = groupsOf(_dlCat);
+    sel.innerHTML = `<option value="">全部種類（${escHtml(_dlCat)}，${fmt(sumOf(gs))} 件）</option>` + gs.map(opt).join('');
+  } else {
+    const allGs = [...new Set(_dlGroups.map(g => g.cause_group))];
+    sel.innerHTML = `<option value="">全部案類（${fmt(sumOf(allGs))} 件）</option>` +
+      cats.map(c => `<optgroup label="${escHtml(c)}">${groupsOf(c).map(opt).join('')}</optgroup>`).join('');
+  }
   dlGroupChange();
 }
 
-// 種類變更：重抓法院下拉（該種類有紀錄的法院），原選的法院還在就保留，再載名單
+// 案類／種類變更：重抓法院下拉（該範圍有紀錄的法院），原選的法院還在就保留，再載名單
 async function dlGroupChange() {
-  const g = document.getElementById('dlGroupSelect').value;
-  if (!g) return;
+  const g = document.getElementById('dlGroupSelect').value || null;
   const cseq = ++_dlCourtReq;
   const sel = document.getElementById('dlCourtSelect');
-  const prev = sel.value;
-  const { data } = await db.rpc('cause_court_list', { p_group: g });
+  const { data } = await db.rpc('cause_court_list', { p_group: g, p_cat: _dlCat || null });
+  const prev = sel.value;   // 回應到時再讀當下值：使用者在等待期間改的法院不會被蓋回
   if (cseq !== _dlCourtReq) return;
   const courts = data || [];
   sel.innerHTML = '<option value="">全國（所有法院）</option>' + courts.map(r =>
@@ -13142,24 +13150,25 @@ function dlScopeLabel(yr, court, inline) {
   return `${yr ? dlYearLabel(yr, inline) : '近 5 年滾動'}・${court || '全國'}`;
 }
 
-// 名單＋四磚：單發 cause_lawyer_list（mig 262）；seq 不符＝使用者已再切換，丟棄
+// 名單＋四磚：單發 cause_lawyer_list（mig 262/263）；seq 不符＝使用者已再切換，丟棄
 //   請求序號的由來：快速連點兩個年份時，晚到的舊回應會蓋掉畫面（2026-11-04 實測：下拉 2007、畫面卻是 2010）
 async function dlReload() {
-  const g = document.getElementById('dlGroupSelect').value;
+  const g = document.getElementById('dlGroupSelect').value || null;
+  const cat = _dlCat || null;
   const y = document.getElementById('dlYearSelect').value;
   const court = document.getElementById('dlCourtSelect').value || null;
-  if (!g) return;
   const yr = y ? parseInt(y, 10) : null;
   const seq = ++_dlReq;
   const el = id => document.getElementById(id);
   const scope = dlScopeLabel(yr, court, false);
+  const typeLabel = g || (cat ? `${cat}・全部種類` : '全部案類');
   const tbody = el('dlListBody');
   tbody.innerHTML = `<tr><td colspan="5" class="loading">載入中${court && yr ? '（法院×年度即時計算）' : ''}</td></tr>`;
   el('dlKpiTotalSub').textContent = scope;
   el('dlKpiLawyersSub').textContent = scope;
-  el('dlListMeta').textContent = `（${dlScopeLabel(yr, court, true)}）`;
+  el('dlListMeta').textContent = `（${typeLabel}・${dlScopeLabel(yr, court, true)}）`;
   try {
-    const { data, error } = await db.rpc('cause_lawyer_list', { p_group: g, p_year: yr, p_court: court, p_limit: 250 });
+    const { data, error } = await db.rpc('cause_lawyer_list', { p_group: g, p_cat: cat, p_year: yr, p_court: court, p_limit: 250 });
     if (seq !== _dlReq) return;
     if (error) throw error;
     const d = data || {};
