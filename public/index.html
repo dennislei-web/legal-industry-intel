@@ -6142,28 +6142,36 @@ const FIRM_LEADERS = {
   '鍾欣紘': '益承法律事務所｜主持律師',
   // top300 無官網補跑（2026-08-29，52 家）
   '徐立信': '立詳法律事務所｜主持律師',
-  '王仲軒、魏正棻': '詮善聯合法律事務所｜主持律師',
+  '王仲軒': '詮善聯合法律事務所｜主持律師',
+  '魏正棻': '詮善聯合法律事務所｜主持律師',
   '裘佩恩': '碩恩法律事務所｜主持律師',
-  '謝文明、紀育泓': '彗聖律師事務所｜主持律師',
+  '謝文明': '彗聖律師事務所｜主持律師',
+  '紀育泓': '彗聖律師事務所｜主持律師',
   '李文中': '中華國際聯合法律事務所｜主持律師',
-  '宋明政、葉婉玉': '探理法律事務所｜主持律師',
+  '宋明政': '探理法律事務所｜主持律師',
+  '葉婉玉': '探理法律事務所｜主持律師',
   '蔡順雄': '正雅法律事務所｜主持律師',
   '江惠民': '惠民法律事務所｜主持律師',
-  '許惠祐、蕭仰歸、高明哲': '十方法律事務所｜主持律師',
+  '許惠祐': '十方法律事務所｜主持律師',
+  '蕭仰歸': '十方法律事務所｜主持律師',
+  '高明哲': '十方法律事務所｜主持律師',
   '張進豐': '進豐聯合法律事務所｜主持律師',
   '李永裕': '李永裕律師事務所｜主持律師',
   '賴頡': '徵頡法律事務所｜主持律師',
   '林世勳': '育誠法律事務所｜主持律師',
-  '洪濬詠（主持律師）、張晉豪（台北主持律師）': '証毅法律事務所｜主持律師',
+  '洪濬詠': '証毅法律事務所｜主持律師',
+  '張晉豪': '証毅法律事務所｜台北主持律師',
   '焦仁和': '信和國際法律事務所｜主持律師',
   '徐志明': '華亞協和法律事務所｜創辦人／主持律師',
   '沈靖家': '奧司頓法律事務所｜主持律師',
   '陳彥彰': '理威法律事務所｜主持律師',
-  '陳忠儀（推定主持：彰化律師公會登錄本所＋使用所網域個人信箱＋最資深且案量第一）': '碩成國際法律事務所｜主持律師',
-  '張清雄（所長，官網與高雄律師公會佐證；2001 年起執業，現任高雄律師公會理事）': '詠智聯合律師事務所｜主持律師',
-  '陳筱屏（台北所主持，官網佐證）、林盛煌（台中所主持，官網佐證）': '博新法律事務所｜主持律師',
+  '陳忠儀': '碩成國際法律事務所｜主持律師（推定）',  // 彰化律師公會登錄本所＋使用所網域個人信箱＋最資深且案量第一
+  '張清雄': '詠智聯合律師事務所｜所長',  // 官網與高雄律師公會佐證
+  '陳筱屏': '博新法律事務所｜台北所主持律師',
+  '林盛煌': '博新法律事務所｜台中所主持律師',
   '涂芳田': '衛理聯合律師事務所｜主持律師',
-  '陳宜新、廖駿豪': '鼎暉聯合法律事務所｜主持律師',
+  '陳宜新': '鼎暉聯合法律事務所｜主持律師',
+  '廖駿豪': '鼎暉聯合法律事務所｜主持律師',
   '陳明欽': '元禾法律事務所｜主持律師',
   // top300 補跑（2026-08-29，3 家）
   '黃煒迪': '瑟法國際法律事務所｜主持律師',
@@ -6416,10 +6424,8 @@ const FIRM_LEADERS = {
   '彭韻婷': '匯信英倫法律事務所｜所長',
   '呂維凱': '呂維凱律師事務所｜所長',
   '曾慶崇': '永信律師事務所｜所長',
-  '潘辛柏': '法沅法律事務所｜所長',
   '林仕文': '縝策法律事務所｜所長',
   '林振煌': '縱橫法律事務所｜所長',
-  '葉庭瑜': '葉庭瑜律師事務所｜所長',
   '王國泰': '証理律師事務所｜所長',
   '楊政達': '証達法律事務所｜所長',
   '陳瑋博': '達合法律事務所｜所長',
@@ -7459,12 +7465,37 @@ function ensureLawyerFlags() {
   }
   return _lawyerFlagsLoading;
 }
+// 同名律師姓名（lawyers_with_stats.name_ambiguous）：所長白名單／前台標註以姓名為鍵，這些人必須事務所相符才算所長
+let AMBIGUOUS_NAMES = null;
+let _ambNamesLoading = null;
+function ensureAmbiguousNames() {
+  if (!_ambNamesLoading) {
+    _ambNamesLoading = (async () => {
+      const set = new Set();
+      try {
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await db.from('lawyers_with_stats')
+            .select('name').eq('name_ambiguous', true).range(from, from + 999);
+          if (error) throw error;
+          (data || []).forEach(r => set.add(r.name));
+          if (!data || data.length < 1000) break;
+        }
+        AMBIGUOUS_NAMES = set;
+      } catch (e) {
+        console.log('ambiguous names load error:', e);
+        _ambNamesLoading = null; // 載入失敗允許下次重試；未載入時退回舊行為（只看姓名）
+      }
+    })();
+  }
+  return _ambNamesLoading;
+}
 let SOLO_FIRM_MAP = null;   // firm_key -> 唯一律師姓名
 let _soloFirmLoading = null;
 function ensureSoloFirms() {
   if (!_soloFirmLoading) {
     _soloFirmLoading = (async () => {
       const map = new Map();
+      const pAmb = ensureAmbiguousNames(); // leaderInfo 的同名判定（與一人所表同時載）
       try {
         // moj_solo_firm_lawyers 3,800 列 → fetchAllPagesParallel 兩波平行（舊版 4 趟串行，curl 實測
         // 1.4～2 秒 → 0.45～0.9 秒，偶有離群）；prefetchPages=5 涵蓋 5,000 列；view 以 firm_key GROUP BY，firm_key 即唯一鍵。
@@ -7473,6 +7504,7 @@ function ensureSoloFirms() {
           .order('firm_key', { ascending: true }).range(from, to), { prefetchPages: 5 });
         rows.forEach(r => map.set(r.firm_key, r.name));
         SOLO_FIRM_MAP = map;
+        await pAmb;
       } catch (e) {
         console.log('solo firm map load error:', e);
         _soloFirmLoading = null; // 載入失敗允許下次重試
@@ -7491,6 +7523,7 @@ function ensureLeaderOverrides() {
   if (!_leaderOvLoading) {
     _leaderOvLoading = (async () => {
       const map = new Map();
+      const pAmb = ensureAmbiguousNames(); // 事務所彈窗律師清單的同名判定
       try {
         for (let from = 0; ; from += 1000) {
           const { data, error } = await db.from('firm_leader_overrides')
@@ -7500,6 +7533,7 @@ function ensureLeaderOverrides() {
           if (!data || data.length < 1000) break;
         }
         LEADER_OVERRIDES = map;
+        await pAmb;
       } catch (e) {
         console.log('leader overrides load error:', e);
         _leaderOvLoading = null; // 載入失敗允許下次重試
@@ -7527,11 +7561,26 @@ async function unmarkFirmLeader(name, firmName) {
   showFirmDetail(firmName);
 }
 
+// 「事務所｜頭銜」是否屬於 firmName（與 getFirmLeaders 同一套 prefix 規則，含分所）
+function leaderFirmMatch(info, firmName) {
+  const leaderFirm = (info || '').split('｜')[0];
+  return !!leaderFirm && !!firmName &&
+    (leaderFirm === firmName || firmName.startsWith(leaderFirm) || leaderFirm.startsWith(firmName));
+}
+// 白名單／前台標註以姓名為鍵：有同名律師者必須事務所相符才算，避免把別所的同名者標成所長；
+// 姓名唯一者維持只看姓名（所長本人登記在不同所名時仍會標，例如李文平登記於同址的臺灣平鼎）
+function leaderForFirm(info, name, firmName) {
+  if (!info) return null;
+  if (!firmName || leaderFirmMatch(info, firmName)) return info;
+  return (AMBIGUOUS_NAMES && AMBIGUOUS_NAMES.has(name)) ? null : info;
+}
+
 // 統一入口：回傳「事務所｜頭銜」或 null；需先 ensureSoloFirms()（未載入時僅回白名單）
 function leaderInfo(name, firmName) {
-  const ov = LEADER_OVERRIDES && LEADER_OVERRIDES.get(name);
+  const ov = leaderForFirm(LEADER_OVERRIDES && LEADER_OVERRIDES.get(name), name, firmName);
   if (ov) return ov;
-  if (FIRM_LEADERS[name]) return FIRM_LEADERS[name];
+  const wl = leaderForFirm(FIRM_LEADERS[name], name, firmName);
+  if (wl) return wl;
   if (!SOLO_FIRM_MAP || !name || !firmName) return null; // 個人姓名登錄也可能在 map（mig 106），不再限定含「事務所」
   return SOLO_FIRM_MAP.get(soloFirmKey(firmName)) === name ? `${firmName}｜所長` : null;
 }
@@ -8347,7 +8396,8 @@ async function showFirmDetail(firmName) {
               && (/事務所/.test(firmName) || firmName === allLawyers[0].name || firmName === allLawyers[0].name + '律師'))
               ? allLawyers[0].name : null;
             // 手動標註（前台 override 優先於硬編碼白名單）
-            const manualLeader = n => (LEADER_OVERRIDES && LEADER_OVERRIDES.get(n)) || FIRM_LEADERS[n] || null;
+            const manualLeader = n => leaderForFirm(LEADER_OVERRIDES && LEADER_OVERRIDES.get(n), n, firmName)
+              || leaderForFirm(FIRM_LEADERS[n], n, firmName);
             return [...allLawyers].sort((a, b) => {
             const aL = (manualLeader(a.name) || a.name === soloName) ? 0 : 1;
             const bL = (manualLeader(b.name) || b.name === soloName) ? 0 : 1;
