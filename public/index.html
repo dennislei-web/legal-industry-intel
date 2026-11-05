@@ -3055,6 +3055,16 @@
         <div class="card-title">&#127970; 校友聚集去向（同一去處 2 人以上）</div>
         <div id="alumniClusters"></div>
       </div>
+      <div class="card" id="alumniCandCard" style="margin-bottom:16px;display:none;border-color:var(--orange);">
+        <div class="card-title">&#9888;&#65039; 待補校友候選 <span id="alumniCandCount" style="font-weight:400;color:var(--text-muted);font-size:0.78rem;"></span></div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin:-8px 0 10px;line-height:1.5;">法務部名冊異動中原登錄「喆律」、現已不在喆律名冊、且尚未列入校友名單的律師。每週同步只回寫既有校友的現職，不會自動新增人，請確認後填入新增表單。</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>姓名</th><th>最近異動日</th><th>異動後事務所</th><th>證號</th><th></th></tr></thead>
+            <tbody id="alumniCandBody"></tbody>
+          </table>
+        </div>
+      </div>
       <div class="search-bar">
         <input type="text" id="alumniSearch" placeholder="搜尋姓名、事務所或部門..." oninput="renderAlumniTable()">
         <select id="alumniCat" onchange="renderAlumniTable()"></select>
@@ -11578,6 +11588,63 @@ async function loadAlumni() {
   _alumniRows = data;
   renderAlumniSummary();
   renderAlumniTable();
+  loadAlumniCandidates();
+}
+
+// 待補校友候選：名冊異動（moj_lawyer_changes）old_office 以「喆律」開頭、按姓名取最近一次，
+// 排除已在校友名單的姓名，也排除現行名冊 office_normalized 仍以「喆律」開頭的人（轉合署／分所互轉仍是喆律）。
+// 每週 moj_alumni_refresh 只回寫既有列現職不新增人，此卡補這個缺口；兩表 RLS 皆開放登入者讀取。
+let _alumniCandRows = null;
+async function loadAlumniCandidates() {
+  if (!document.getElementById('alumniCandCard')) return;
+  try {
+    const [chg, cur] = await Promise.all([
+      db.from('moj_lawyer_changes').select('name,lic_no,new_office,changed_at')
+        .like('old_office', '喆律%').order('changed_at', { ascending: false }).order('id', { ascending: false }).range(0, 999),
+      db.from('moj_lawyers').select('name,lic_no').like('office_normalized', '喆律%').range(0, 999),
+    ]);
+    if (chg.error) throw chg.error;
+    if (cur.error) throw cur.error;
+    const known = new Set((_alumniRows || []).map(r => r.name));
+    const stillName = new Set(), stillLic = new Set();
+    (cur.data || []).forEach(r => { if (r.name) stillName.add(r.name); if (r.lic_no) stillLic.add(r.lic_no); });
+    const byName = new Map();   // 已按 changed_at desc 排序，首見即最近一次異動
+    (chg.data || []).forEach(r => {
+      if (!r.name || byName.has(r.name)) return;
+      if (known.has(r.name) || stillName.has(r.name) || (r.lic_no && stillLic.has(r.lic_no))) return;
+      byName.set(r.name, r);
+    });
+    _alumniCandRows = [...byName.values()];
+  } catch (e) {
+    console.warn('待補校友候選載入失敗:', e);
+    _alumniCandRows = [];
+  }
+  renderAlumniCandidates();
+}
+
+function renderAlumniCandidates() {
+  const card = document.getElementById('alumniCandCard');
+  const rows = _alumniCandRows || [];
+  if (!card) return;
+  if (!rows.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('alumniCandCount').textContent = `${rows.length} 位`;
+  document.getElementById('alumniCandBody').innerHTML = rows.map(r => `<tr>
+      <td style="white-space:nowrap;">${lawyerLink(r.name, 'font-weight:700;')}</td>
+      <td style="white-space:nowrap;">${escHtml((r.changed_at || '').slice(0, 10))}</td>
+      <td>${r.new_office ? firmLink(r.new_office) : '<span style="color:var(--text-muted)">未提供</span>'}</td>
+      <td style="white-space:nowrap;font-size:0.78rem;color:var(--text-muted);">${escHtml(r.lic_no || '—')}</td>
+      <td style="white-space:nowrap;"><button onclick="alumniFillAdd('${_nameArg(r.name)}')" style="padding:5px 12px;background:var(--ghost-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:inherit;font-size:0.78rem;">填入新增表單</button></td>
+    </tr>`).join('');
+}
+
+// 候選列 → 展開新增表單並帶入姓名，其餘欄位（到離職日、所別、部門、去向）留給 admin 填
+function alumniFillAdd(name) {
+  toggleAlumniAddForm(true);
+  const inp = document.getElementById('alumniAddName');
+  inp.value = name;
+  inp.focus();
+  document.getElementById('alumniAddCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function alumniSetCat(c) {
