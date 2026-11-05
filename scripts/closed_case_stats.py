@@ -27,6 +27,10 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   被告層：4 辯護及代理（選任律師辯護[-法律扶助]/公設辯護人辯護/義務律師辯護/空）
   聚合：defendant_rep=任一被告「選任律師辯護」開頭的案件數（=有委任律師口徑），
         plaintiff_rep=自訴人有律師件數，defense=被告層辯護分布（被告數計）
+  刑事案由×委任（migration 264，案由供需「刑事」頁）：每被告主罪名經 map_criminal_supply()
+        對到供給面種類，計被告人次 × 辯護型態 → closed_case_cause_rep_stats（file_type=刑事訴訟：
+        n_p_only=選任律師自費、n_d_only=選任-法律扶助、n_public=公設、n_duty=義務、n_none=無）；
+        同時把「罪名條號→供給面種類」upsert 進 crime_supply_map（市場欄 RPC 用）
 
 產出：closed_case_month_stats（月×法院×檔型：委任率/終結情形分布/標的金額）
 
@@ -38,6 +42,8 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   python closed_case_stats.py backfill-causes   # 回填 cause 表缺的月份（整月重跑，全部 upsert 冪等）
   python closed_case_stats.py backfill-amount   # 回填標的金額×委任表缺的月份（整月重跑，upsert 冪等）
   python closed_case_stats.py backfill-rep      # 回填案由×委任表缺的月份（整月重跑，upsert 冪等）
+  python closed_case_stats.py backfill-rep-crim # 回填案由×委任表缺「刑事訴訟」列的月份（mig 264；整月重跑）
+  python closed_case_stats.py dry 202605        # 只下載解析不上傳：印刑事委任率摘要＋耗時（估回填時間用）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full）。
 """
@@ -54,7 +60,7 @@ from collections import defaultdict, Counter
 import requests
 from dotenv import load_dotenv
 
-from cause_map import norm_cause, map_cause, map_criminal, map_judgment
+from cause_map import norm_cause, map_cause, map_criminal_supply, map_judgment
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'), override=False)
 if sys.platform == 'win32':
@@ -201,12 +207,14 @@ def parse_nonlit_line(line):
 CONVICT_OUTCOMES = ('有期徒刑', '拘役', '罰金', '無期徒刑', '死刑')
 
 
-def parse_criminal_file(lines, a, add_cause):
+def parse_criminal_file(lines, a, add_cause, add_rep=None):
     """解析單一地院刑事訴訟檔（階層式），聚合進 a，回傳跳過列數
-    add_cause(cause, group, convicted)：每被告第一個罪名層列（主要罪名）叫一次"""
+    add_cause(cause, group, convicted)：每被告第一個罪名層列（主要罪名）叫一次
+    add_rep(cause, group, supply_group, defense)：同一時點再叫一次，帶該被告的辯護欄值（mig 264）"""
     skipped = 0
     cur = None  # 當前有效案件 {'hired':bool,'self_rep':bool,'outcome':str}
     want_crime = False  # 目前被告尚未取得主要罪名
+    cur_def = '無'  # 目前被告的辯護欄值（1! 列），等 1.1! 主罪名出現時一起記
 
     def flush():
         nonlocal cur
@@ -242,9 +250,12 @@ def parse_criminal_file(lines, a, add_cause):
             if val.startswith('選任律師辯護'):
                 cur['hired'] = True
             want_crime = True
+            cur_def = val
         elif c[0] == '1.1' and cur is not None and want_crime and len(c) > 9:
-            cause, group = map_criminal(c[1], c[2], c[3])
+            cause, group, sgroup = map_criminal_supply(c[1], c[2], c[3])
             add_cause(cause, group, c[9].strip() in CONVICT_OUTCOMES)
+            if add_rep:
+                add_rep(cause, group, sgroup, cur_def)
             want_crime = False
     flush()
     return skipped
@@ -254,16 +265,20 @@ def run_month(yyyymm, fileset_id):
     print(f'=== {yyyymm}（fileSetId {fileset_id}）===')
     arc = os.path.join(WORK_DIR, f'{yyyymm}.7z')
     ext = os.path.join(WORK_DIR, yyyymm)
-    r = requests.get(f'{OPENDATA}/api/FilesetLists/{fileset_id}/file',
-                     timeout=600, verify=False)
-    r.raise_for_status()
-    with open(arc, 'wb') as f:
-        f.write(r.content)
-    print(f'  下載 {len(r.content) / 1e6:.1f} MB')
-    if os.path.isdir(ext):
-        shutil.rmtree(ext)
-    subprocess.run([SEVENZ, 'x', '-y', arc, f'-o{ext}'],
-                   check=True, capture_output=True)
+    t0 = time.time()
+    if DRY and os.path.isdir(ext):
+        print('  （dry：沿用已解壓目錄，不重新下載）')
+    else:
+        r = requests.get(f'{OPENDATA}/api/FilesetLists/{fileset_id}/file',
+                         timeout=600, verify=False)
+        r.raise_for_status()
+        with open(arc, 'wb') as f:
+            f.write(r.content)
+        print(f'  下載 {len(r.content) / 1e6:.1f} MB')
+        if os.path.isdir(ext):
+            shutil.rmtree(ext)
+        subprocess.run([SEVENZ, 'x', '-y', arc, f'-o{ext}'],
+                       check=True, capture_output=True)
 
     agg = defaultdict(lambda: {'total': 0, 'p': 0, 'd': 0, 'both': 0,
                                'outcomes': Counter(), 'amt': 0.0, 'amt_n': 0,
@@ -277,12 +292,29 @@ def run_month(yyyymm, fileset_id):
     # 案由種類×委任情形交叉（migration 099）：(ft, group) → [total, both, p_only, d_only, none]
     # group 用 map_judgment()——跟供給面 lawyer_cause_stats 同一把尺（家事＝非訟細項優先），
     # 與 cagg/nagg 的 map_cause() 民事同規則、家事分桶不同
-    repagg = defaultdict(lambda: [0, 0, 0, 0, 0])
+    # 刑事列（mig 264）另兩格 [.., public, duty]：n_total=被告人次、p_only=選任自費、d_only=選任-法扶、
+    # both=0、none=無／其他；種類＝map_criminal_supply() 的供給面標籤（條號級對照）
+    repagg = defaultdict(lambda: [0, 0, 0, 0, 0, 0, 0])
+    # 罪名條號 → (罪章／特別法名, 供給面種類)，每月 upsert 進 crime_supply_map（市場欄 RPC join 用）
+    mapagg = {}
 
     def add_cause(court, ft, cause, group, convicted=False):
         for k, d in ((( court, ft, group), cagg), ((ft, cause, group), nagg)):
             d[k][0] += 1
             d[k][1] += convicted
+
+    def add_crim_rep(cause, group, sgroup, defense):
+        mapagg[cause] = (group, sgroup)
+        rp = repagg[('刑事訴訟', sgroup)]
+        rp[0] += 1
+        if defense.startswith('選任律師辯護'):
+            rp[3 if '法律扶助' in defense else 2] += 1
+        elif defense.startswith('公設辯護人'):
+            rp[5] += 1
+        elif defense.startswith('義務律師'):
+            rp[6] += 1
+        else:
+            rp[4] += 1
 
     skipped = 0
     # 刑事訴訟檔（僅地院版式）
@@ -295,7 +327,8 @@ def run_month(yyyymm, fileset_id):
             continue
         skipped += parse_criminal_file(
             lines, agg[(court, '刑事訴訟')],
-            lambda cause, group, conv, _c=court: add_cause(_c, '刑事訴訟', cause, group, conv))
+            lambda cause, group, conv, _c=court: add_cause(_c, '刑事訴訟', cause, group, conv),
+            add_crim_rep)
     for ft in FILE_TYPES:
         for path in glob.glob(os.path.join(ext, '**', f'*.{ft}.txt'), recursive=True):
             court = norm_court(os.path.basename(os.path.dirname(path)))
@@ -344,6 +377,22 @@ def run_month(yyyymm, fileset_id):
                         skipped += 1
                     continue
                 add_cause(court, ft, cause, map_cause(ft, cause))
+
+    if DRY:
+        print(f'  解析完成，耗時 {time.time() - t0:.0f} 秒（含下載解壓）')
+        crim = {k[1]: v for k, v in repagg.items() if k[0] == '刑事訴訟'}
+        tot = sum(v[0] for v in crim.values())
+        print(f'  刑事 被告人次 {tot:,}，供給面種類 {len(crim)} 組，罪名鍵 {len(mapagg)} 個')
+        for g, v in sorted(crim.items(), key=lambda kv: -kv[1][0])[:15]:
+            print(f'    {g:<8} n={v[0]:>7,} 選任含法扶={(v[2] + v[3]) / v[0] * 100:5.1f}%'
+                  f'（自費 {v[2]:,} 法扶 {v[3]:,}）公設 {v[5]:,} 義務 {v[6]:,} 無 {v[4]:,}')
+        dv = Counter()
+        for (_court, ft), a in agg.items():
+            if ft == '刑事訴訟':
+                dv.update(a['defense'])
+        print('  被告層辯護欄值分布：', dict(dv.most_common(12)))
+        print('  對照樣本：', [(k, v[1]) for k, v in list(mapagg.items())[:8]])
+        return
 
     # 殘缺月包防呆（202511 曾被官方重傳成僅離島+簡易庭的殘缺版）：正常月包民事訴訟
     # 覆蓋 20+ 法院，低於門檻代表包不完整，中止上傳避免 upsert 蓋掉既有完整資料
@@ -406,7 +455,7 @@ def run_month(yyyymm, fileset_id):
     # 案由種類×委任情形交叉（migration 099）
     rep_rows = [{'yyyymm': yyyymm, 'file_type': k[0], 'cause_group': k[1],
                  'n_total': v[0], 'n_both': v[1], 'n_p_only': v[2],
-                 'n_d_only': v[3], 'n_none': v[4]}
+                 'n_d_only': v[3], 'n_none': v[4], 'n_public': v[5], 'n_duty': v[6]}
                 for k, v in repagg.items()]
     if rep_rows:
         url = f'{SUPABASE_URL}/rest/v1/closed_case_cause_rep_stats?on_conflict=yyyymm,file_type,cause_group'
@@ -416,6 +465,18 @@ def run_month(yyyymm, fileset_id):
         if resp.status_code not in (200, 201, 204):
             raise RuntimeError(f'closed_case_cause_rep_stats 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
     print(f'  案由×委任上傳 OK（{len(rep_rows)} 列）')
+
+    # 罪名條號 → 供給面種類對照（migration 264 crime_supply_map）：每月順帶 upsert，新法名自動補
+    map_rows = [{'cause': k, 'cause_group': v[0], 'supply_group': v[1]} for k, v in mapagg.items()]
+    if map_rows:
+        url = f'{SUPABASE_URL}/rest/v1/crime_supply_map?on_conflict=cause'
+        headers = {**HEADERS_SB, 'Content-Type': 'application/json',
+                   'Prefer': 'resolution=merge-duplicates,return=minimal'}
+        for i in range(0, len(map_rows), 2000):
+            resp = requests.post(url, headers=headers, json=map_rows[i:i + 2000], timeout=120)
+            if resp.status_code not in (200, 201, 204):
+                raise RuntimeError(f'crime_supply_map 上傳失敗 HTTP {resp.status_code}: {resp.text[:300]}')
+    print(f'  罪名對照 upsert OK（{len(map_rows)} 鍵）')
     # 清理磁碟
     os.remove(arc)
     shutil.rmtree(ext, ignore_errors=True)
@@ -425,12 +486,17 @@ def run_month(yyyymm, fileset_id):
 # 模式
 # ============================================================
 
+DRY = False  # dry 模式：只下載解析、印刑事委任率摘要，不上傳、不清理解壓目錄
+
+
 def main():
+    global DRY
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'auto'
     requests.packages.urllib3.disable_warnings()
     datasets = list_datasets()
     print(f'API 月包清單：{min(datasets)} ~ {max(datasets)}（{len(datasets)} 個月）')
-    if cmd == 'run':
+    if cmd in ('run', 'dry'):
+        DRY = cmd == 'dry'
         ym = sys.argv[2]
         if ym not in datasets:
             raise RuntimeError(f'{ym} 不在 API 清單中')
@@ -484,6 +550,20 @@ def main():
         print(f'待回填案由×委任 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
         for ym in todo:
             run_month(ym, datasets[ym])
+            time.sleep(1)
+    elif cmd == 'backfill-rep-crim':
+        # 回填案由×委任表缺「刑事訴訟」列的月份（mig 264；重跑整月，民事/家事列 upsert 冪等覆蓋）
+        r = requests.post(f'{SUPABASE_URL}/rest/v1/rpc/closed_case_rep_months',
+                          headers={**HEADERS_SB, 'Content-Type': 'application/json'},
+                          json={'p_file_type': '刑事訴訟'}, timeout=60)
+        r.raise_for_status()
+        have = set(r.json() or [])
+        todo = sorted(set(datasets) - have)
+        print(f'待回填刑事案由×委任 {len(todo)} 個月：{todo[:5]}...{todo[-3:]}' if todo else '無缺月')
+        t0 = time.time()
+        for i, ym in enumerate(todo, 1):
+            run_month(ym, datasets[ym])
+            print(f'  進度 {i}/{len(todo)}，累計 {(time.time() - t0) / 60:.1f} 分')
             time.sleep(1)
     elif cmd == 'backfill-amount':
         # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）。

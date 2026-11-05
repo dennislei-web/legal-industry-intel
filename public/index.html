@@ -1493,8 +1493,8 @@
               <th style="text-align:right;">供給律師數</th>
               <th style="text-align:right;">常態承辦律師</th>
               <th style="text-align:right;">Top10 集中度</th>
-              <th style="text-align:right;" class="cs-rep-col">委任率</th>
-              <th style="text-align:right;" class="cs-mkt-col">市場終結件數/年</th>
+              <th style="text-align:right;" class="cs-rep-col" id="csRepHead">委任率</th>
+              <th style="text-align:right;" class="cs-mkt-col" id="csMktHead">市場終結件數/年</th>
               <th style="text-align:right;" class="cs-mkt-col">市場 3 年變化</th>
             </tr></thead>
             <tbody id="csTableBody"><tr><td colspan="8" class="loading">載入中</td></tr></tbody>
@@ -1503,12 +1503,14 @@
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
           ※ <strong>點任一列可下鑽：TOP 律師/事務所（可切年度）、委任分布、案由明細</strong>（「其他民法」等剩餘桶尤其建議先看明細再解讀）。
           供給面（判決件數/律師數/集中度）來自近 5 年公開裁判書案由（下限估計；常態承辦=該類近 5 年 ≥12 件）。
-          <strong>委任率</strong>＝終結案件微資料中「任一造有律師代理（含法扶）」比例（最新完整年，民事/家事訴訟檔）——
+          <strong>委任率</strong>＝終結案件微資料中有律師的比例（最新完整年）：民事/家事訴訟檔＝「任一造有律師代理（含法扶）」÷ 終結案件；
+          刑事訴訟檔＝「被告選任律師辯護（含法扶）」÷ 地院終結被告人次（公設辯護人／義務律師是法院指定、不算委任，下鑽可見；強制辯護罪名公設比例天然偏高）——
           委任率低＋件數大＝律師尚未滲透的市場；委任率高＋集中度低＝競爭紅海。
           覆蓋率天花板：民訴案由分類與官方對照約 82%；家事僅覆蓋「訴訟」檔（保護令等非訟事件無代理欄），佔比僅供結構參考。
-          委任率「-」＝該類在訴訟檔無代理紀錄（監護宣告、保護令、暫時處分等非訟性質事件代理欄歷年皆空），不採計、不進合計。
-          市場面兩欄來自終結案件微資料（民事訴訟檔，最新完整年；3 年變化為完整年對完整年），
-          <strong>僅民事有市場對照</strong>——刑事/家事的官方分組與判決書案由分組口徑不同，不硬對。
+          委任率「-」＝該類在微資料無代理／辯護紀錄（家事：監護宣告、保護令、暫時處分等非訟性質事件代理欄歷年皆空），不採計、不進合計。
+          市場面兩欄來自終結案件微資料（最新完整年；3 年變化為完整年對完整年）：民事＝民事訴訟檔案件數（官方 13 類與判決書案由同一把尺）；
+          刑事＝地院終結被告人次，每被告取主罪名、罪名條號經對照表對到本表種類（殺人罪章 §276 歸過失致死、§344 歸重利；家暴傷害等少數天生對不上，不硬修）。
+          <strong>家事無市場對照</strong>——家事訴訟檔分組與判決書案由分組口徑不同、非訟檔覆蓋僅約 16%，不硬對。
           集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
         </div>
       </div>
@@ -18146,7 +18148,7 @@ async function renderRmActive() {
 }
 
 // ===== 案由供需（Phase B cause_supply_stats × Phase A cause_group_yearly）=====
-let _csLoaded = false, _csMarket = null;
+let _csLoaded = false, _csMarket = {};
 function loadCauseSupplyOnce() { if (_csLoaded) return; _csLoaded = true; initCauseSupply(); }
 
 // 訴訟市場：市場趨勢 / 地區供需 / 案由供需 收攏為子分頁（builder 不動，各自 lazy-load 一次）
@@ -18181,16 +18183,20 @@ async function initCauseSupply() {
     };
   });
   try {
-    // 市場面（Phase A 終結微資料，民事訴訟檔）
-    const { data } = await db.rpc('cause_group_yearly', { p_file_type: '民事訴訟' });
-    _csMarket = data || [];
-  } catch (e) { _csMarket = []; }
+    // 市場面（終結微資料）：民事＝cause_group_yearly 民事訴訟檔（官方 13 類與供給面同尺）；
+    // 刑事＝cause_group_yearly_crim（地院被告人次，罪名條號經 crime_supply_map 對到供給面種類，mig 264）
+    const [civ, crim] = await Promise.all([
+      db.rpc('cause_group_yearly', { p_file_type: '民事訴訟' }),
+      db.rpc('cause_group_yearly_crim'),
+    ]);
+    _csMarket = { '民事': civ.data || [], '刑事': crim.data || [] };
+  } catch (e) { _csMarket = {}; }
   loadCauseSupply('民事');
 }
 
-// 最新完整年件數 + 3 年變化（完整年對完整年）
-function csMarketCols(group) {
-  const rows = _csMarket || [];
+// 最新完整年件數 + 3 年變化（完整年對完整年）；cat＝民事／刑事（各自的市場序列）
+function csMarketCols(cat, group) {
+  const rows = (_csMarket && _csMarket[cat]) || [];
   const monthsByYear = {};
   rows.forEach(r => { monthsByYear[r.y] = Math.max(monthsByYear[r.y] || 0, r.months); });
   const fullYears = Object.keys(monthsByYear).filter(y => monthsByYear[y] >= 12).sort();
@@ -18204,7 +18210,9 @@ function csMarketCols(group) {
 
 let _csRows = [], _csCat = '民事';
 const _csRepCache = {}; // file_type → cause_rep_yearly 列（mig 099）
-const CS_REP_FT = { '民事': '民事訴訟', '家事': '家事訴訟' }; // 刑事辯護口徑不同，第一版不做
+// 刑事列（mig 264）：n_total＝被告人次、n_p_only＝選任自費、n_d_only＝選任-法扶、n_public／n_duty＝公設／義務；
+// repped 公式 n_both+n_p_only+n_d_only 對刑事剛好＝選任含法扶（雷 2026-11-05 拍板的主欄口徑）
+const CS_REP_FT = { '民事': '民事訴訟', '家事': '家事訴訟', '刑事': '刑事訴訟' };
 
 // 某種類的委任率（最新完整年優先，否則最新部分年）；回 null＝無資料
 // noRep：該年代理欄全空（監護宣告／保護令／暫時處分等非訟性質事件混在訴訟檔，2021 起歷年 0 件有律師）
@@ -18239,24 +18247,34 @@ async function loadCauseSupply(cat) {
   rows.sort((a, b) => (isBucket(a.cause_group) ? 1 : 0) - (isBucket(b.cause_group) ? 1 : 0)
     || Number(b.total_cases) - Number(a.total_cases));
   _csRows = rows;
-  const showMkt = cat === '民事';
+  const isCrim = cat === '刑事';
+  const showMkt = cat === '民事' || isCrim; // 家事：訴訟檔分組與供給面不同尺、非訟檔覆蓋 16%，無市場對照
+  const unit = isCrim ? '被告人次' : '件';
   document.querySelectorAll('.cs-mkt-col').forEach(el => { el.style.display = showMkt ? '' : 'none'; });
   document.querySelectorAll('.cs-rep-col').forEach(el => { el.style.display = ft ? '' : 'none'; });
+  const mktHead = document.getElementById('csMktHead');
+  if (mktHead) mktHead.textContent = isCrim ? '市場終結被告人次/年' : '市場終結件數/年';
+  const repHead = document.getElementById('csRepHead');
+  if (repHead) repHead.title = isCrim
+    ? '地院終結被告中「選任律師辯護（含法扶）」比例；公設／義務律師為法院指定不計，點列下鑽可看'
+    : '終結案件中任一造有律師代理（含法扶）比例';
   body.innerHTML = rows.map((r, i) => {
     let repCell = '';
     if (ft) {
       const rr = csRepRate(ft, r.cause_group);
+      const yTxt = rr ? `${rr.y} 年${rr.partial ? '（部分年）' : ''}終結 ${rr.n.toLocaleString()} ${unit}` : '';
       const noRepTitle = rr && rr.noRep
-        ? `${rr.y} 年${rr.partial ? '（部分年）' : ''}終結 ${rr.n.toLocaleString()} 件，代理欄全空＝無代理紀錄（非訟性質事件），不採計`
-        : '訴訟檔無此類別';
+        ? (isCrim ? `${yTxt}，無選任律師辯護紀錄，不採計`
+                  : `${yTxt}，代理欄全空＝無代理紀錄（非訟性質事件），不採計`)
+        : (isCrim ? '微資料無此種類' : '訴訟檔無此類別');
       repCell = (rr && rr.rate != null)
         ? `<td style="text-align:right;color:${rr.rate < 0.2 ? 'var(--green)' : 'var(--text)'};"
-             title="${rr.y} 年${rr.partial ? '（部分年）' : ''}終結 ${rr.n.toLocaleString()} 件，任一造有律師比例">${(rr.rate * 100).toFixed(1)}%</td>`
+             title="${yTxt}，${isCrim ? '被告選任律師辯護（含法扶）比例' : '任一造有律師比例'}">${(rr.rate * 100).toFixed(1)}%</td>`
         : `<td style="text-align:right;color:var(--text-muted);" title="${noRepTitle}">-</td>`;
     }
     let mktCells = '';
     if (showMkt) {
-      const m = csMarketCols(r.cause_group);
+      const m = csMarketCols(cat, r.cause_group);
       mktCells = (m && m.nl) ? `<td style="text-align:right;">${m.nl.toLocaleString()}</td>
         <td style="text-align:right;color:${m.chg >= 0 ? 'var(--red)' : 'var(--green)'};">${m.chg === null ? '-' : (m.chg >= 0 ? '+' : '') + m.chg.toFixed(1) + '%'}</td>`
         : '<td style="text-align:right;">-</td><td style="text-align:right;">-</td>';
@@ -18271,11 +18289,11 @@ async function loadCauseSupply(cat) {
       ${repCell}
       ${mktCells}
     </tr>`;
-  }).join('') + csSummaryRows(rows, ft, showMkt);
+  }).join('') + csSummaryRows(rows, ft, showMkt, cat);
 }
 
 // 表尾「合計」＋「每類平均」兩列（2026-10-02）。律師數跨類重複（一人可辦多類），合計不可加 → 只給平均
-function csSummaryRows(rows, ft, showMkt) {
+function csSummaryRows(rows, ft, showMkt, cat) {
   const k = rows.length;
   const sum = f => rows.reduce((s, r) => s + Number(f(r) || 0), 0);
   const fmt = v => Math.round(v).toLocaleString();
@@ -18292,7 +18310,7 @@ function csSummaryRows(rows, ft, showMkt) {
   }
   let mktSumTds = '', mktAvgTds = '';
   if (showMkt) {
-    const ms = rows.map(r => csMarketCols(r.cause_group)).filter(m => m && m.nl);
+    const ms = rows.map(r => csMarketCols(cat, r.cause_group)).filter(m => m && m.nl);
     const nl = ms.reduce((s, m) => s + m.nl, 0), nb = ms.reduce((s, m) => s + (m.nb || 0), 0);
     const chgTd = c => `<td style="text-align:right;color:${c >= 0 ? 'var(--red)' : 'var(--green)'};">${c == null ? '-' : (c >= 0 ? '+' : '') + c.toFixed(1) + '%'}</td>`;
     const chgs = ms.filter(m => m.chg != null);
@@ -18355,11 +18373,12 @@ async function csDrill(i) {
   csDrillRep(grp);
   csDrillCauses(grp);
 }
-// 委任分布（mig 099 cause_rep_yearly；僅民事/家事訴訟檔有原被告代理欄）
+// 委任分布（mig 099 cause_rep_yearly：民事/家事訴訟檔原被告代理欄；mig 264 刑事訴訟檔被告辯護欄）
 async function csDrillRep(grp) {
   const box = document.getElementById('csDrillRep');
   const ft = CS_REP_FT[_csCat];
-  if (!box || !ft) return; // 刑事：辯護人口徑不同，第一版不做
+  if (!box || !ft) return;
+  const isCrim = _csCat === '刑事';
   try {
     if (!_csRepCache[ft]) {
       const { data, error } = await db.rpc('cause_rep_yearly', { p_file_type: ft });
@@ -18370,17 +18389,45 @@ async function csDrillRep(grp) {
     if (grp !== _csDrillGrp) return;
     if (!rows.length) {
       box.innerHTML = `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px;">
-        此類別無委任資料——終結案件微資料只有民事/家事「訴訟」檔有原被告代理欄（保護令等非訟事件不在檔內）。</div>`;
+        ${isCrim ? '此種類在刑事訴訟檔無被告人次（罪名條號對照後沒有落到這一類，或回填尚未完成）。'
+                 : '此類別無委任資料——終結案件微資料只有民事/家事「訴訟」檔有原被告代理欄（保護令等非訟事件不在檔內）。'}</div>`;
       return;
     }
-    // 代理欄歷年全空（非訟性質事件混在訴訟檔）：不印 0.0% 的假委任率（2026-11-04）
+    // 代理欄歷年全空（家事：非訟性質事件混在訴訟檔）：不印 0.0% 的假委任率（2026-11-04）
     if (rows.every(r => r.n_both + r.n_p_only + r.n_d_only === 0)) {
       const nAll = rows.reduce((s, r) => s + r.n_total, 0);
       box.innerHTML = `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:14px;">
-        此類別 ${rows[0].y}–${rows[rows.length - 1].y} 年在${escHtml(ft)}檔共 ${nAll.toLocaleString()} 件，代理欄歷年皆空（非訟性質事件無代理紀錄），委任率不採計。</div>`;
+        此類別 ${rows[0].y}–${rows[rows.length - 1].y} 年在${escHtml(ft)}檔共 ${nAll.toLocaleString()} ${isCrim ? '被告人次' : '件'}，
+        ${isCrim ? '歷年皆無選任律師辯護紀錄' : '代理欄歷年皆空（非訟性質事件無代理紀錄）'}，委任率不採計。</div>`;
       return;
     }
-    const pct = (n, d) => d ? (n / d * 100).toFixed(1) + '%' : '-';
+    const pct = (n, d) => d ? ((n || 0) / d * 100).toFixed(1) + '%' : '-';
+    if (isCrim) {
+      box.innerHTML = `
+      <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">&#9878;&#65039; 辯護分布（地院終結被告人次，刑事訴訟檔）</div>
+      <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
+        <table>
+          <thead><tr><th>年</th><th style="text-align:right;">被告人次</th>
+            <th style="text-align:right;">選任律師(含法扶)</th><th style="text-align:right;">自費選任</th>
+            <th style="text-align:right;">法扶</th><th style="text-align:right;">公設</th>
+            <th style="text-align:right;">義務</th><th style="text-align:right;">無</th></tr></thead>
+          <tbody>${rows.slice().reverse().map(r => `<tr>
+              <td>${r.y}${r.months < 12 ? ` <span style="color:var(--text-muted);font-size:0.7rem;">(${r.months}個月)</span>` : ''}</td>
+              <td style="text-align:right;">${r.n_total.toLocaleString()}</td>
+              <td style="text-align:right;color:var(--gold);font-weight:600;">${pct(r.n_p_only + r.n_d_only, r.n_total)}</td>
+              <td style="text-align:right;">${pct(r.n_p_only, r.n_total)}</td>
+              <td style="text-align:right;">${pct(r.n_d_only, r.n_total)}</td>
+              <td style="text-align:right;">${pct(r.n_public, r.n_total)}</td>
+              <td style="text-align:right;">${pct(r.n_duty, r.n_total)}</td>
+              <td style="text-align:right;color:var(--text-muted);">${pct(r.n_none, r.n_total)}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-muted);margin:6px 0 14px;">
+        ※ 口徑＝地院終結被告人次（每被告取主罪名，罪名條號經對照表對到本表種類）；委任率只算選任律師（含法律扶助）。
+        公設辯護人／義務律師是法院指定、不反映當事人委任，另列參考；強制辯護罪名（最輕本刑 3 年以上等）公設比例天然偏高。</div>`;
+      return;
+    }
     box.innerHTML = `
       <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">&#9878;&#65039; 委任分布（終結案件，${escHtml(ft)}檔）</div>
       <div class="table-wrap" style="max-height:220px;overflow-y:auto;">
