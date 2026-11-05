@@ -2095,7 +2095,7 @@
       <!-- ==== 市場規模拆解（bottom-up 量×委任率×行情，mig 114 market_assumptions 可調參數）==== -->
       <div id="vt-market" style="display:none;">
         <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;">
-          由下而上（bottom-up）把各法律服務市場拆成「<strong>量（官方統計）× 委任率 × 單價（行情假設）</strong>」推估年規模，並與「官方產值」頁的普查錨點（110 年 409 億）互相對帳。信心分級：<span class="ms-badge ms-a">A 官方金額</span><span class="ms-badge ms-b">B 法定費率</span><span class="ms-badge ms-c">C 行情推估</span>。<strong>行情數字（含刑事委任率）都可以直接改</strong>——改完按該卡「儲存」寫回資料庫（全站共用、跨裝置一致），「還原預設」可回到本站初始假設。
+          由下而上（bottom-up）把各法律服務市場拆成「<strong>量（官方統計）× 委任率 × 單價（行情假設）</strong>」推估年規模，並與「官方產值」頁的普查錨點（110 年 409 億）互相對帳。信心分級：<span class="ms-badge ms-a">A 官方金額</span><span class="ms-badge ms-b">B 法定費率</span><span class="ms-badge ms-c">C 行情推估</span>。<strong>行情數字（含樣本不足線的委任率）都可以直接改</strong>——改完按該卡「儲存」寫回資料庫（全站共用、跨裝置一致），「還原預設」可回到本站初始假設。
         </div>
         <div class="kpi-grid" id="msKpis" style="grid-template-columns:repeat(auto-fit,minmax(165px,1fr));margin-bottom:10px;"></div>
         <div id="msCaliberStrip" style="margin-bottom:16px;"></div>
@@ -2119,7 +2119,7 @@
           <div id="msRecon" style="font-size:0.82rem;line-height:1.9;"><div class="loading">載入中</div></div>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-          ※ 訴訟量＝business_line_yearly 最新完整年（隨終結檔月更自動刷新）；民事/家事委任率＝終結案件微資料實測（樣本 ≥1,000 件才採用，不足以可調假設代入並標「推估」）；刑事無案由級委任率統計，一律為可調假設。量體類參數（TIPO 申請量、登記棟數、公證件數等）為年更手動值，也可在卡內直接修正後儲存。政府標案為官方決標金額（A 級），因與非訟/法顧收入重疊，僅列對照、不計入合計。
+          ※ 訴訟量＝business_line_yearly 最新完整年（隨終結檔月更自動刷新）；委任率＝終結案件微資料實測：民事/家事＝任一造有律師代理（含法扶）÷ 終結案件；刑事＝被告選任律師（自費＋法扶）÷ 地院終結被告人次，公設辯護人與義務律師不計入。民/刑同一套規則——樣本 ≥1,000 才採用，不足以可調假設代入並標「推估」。刑事線由供給面種類（詐欺、毒品、洗錢防制法、公共危險…）按件數加權合併到業務線（對照見 mig 265）。量體類參數（TIPO 申請量、登記棟數、公證件數等）為年更手動值，也可在卡內直接修正後儲存。政府標案為官方決標金額（A 級），因與非訟/法顧收入重疊，僅列對照、不計入合計。
         </div>
       </div><!-- /vt-market -->
     </div>
@@ -15149,10 +15149,12 @@ function msLitRows() {
   const pc = _msV('lit_laf_share_civ'), pk = _msV('lit_laf_share_cri'), lf = _msV('lit_laf_fee');
   return ((_msLines && _msLines.lines) || []).map(x => {
     const nCiv = +x.n_civ || 0, nCri = +x.n_cri || 0, n = nCiv + nCri;
+    // 實測口徑（mig 265）：民/家事＝任一造有律師（含法扶）÷ 案件；刑事＝選任律師（自費＋法扶）÷ 被告人次，公設／義務另帶回供 tooltip
     const measured = x.rep_total >= MS_REP_MIN ? x.rep_lawyer / x.rep_total : null;
     const ra = _msV('lit_rate_' + x.line);
     const rate = measured != null
-      ? { lo: measured, hi: measured, mid: measured, measured: true, sample: +x.rep_total }
+      ? { lo: measured, hi: measured, mid: measured, measured: true, sample: +x.rep_total,
+          pub: +x.rep_public || 0, duty: +x.rep_duty || 0, unit: nCri && !nCiv ? '被告人次' : (nCiv && nCri ? '件／人次' : '件') }
       : { lo: ra.lo / 100, hi: ra.hi / 100, mid: ra.mid / 100, measured: false };
     const fee = _msV('lit_fee_' + x.line);
     const pLo = n ? (nCiv * pc.lo + nCri * pk.lo) / n / 100 : 0;
@@ -15262,10 +15264,12 @@ function renderMarket() {
   // --- 訴訟卡 ---
   document.getElementById('msLitDesc').innerHTML =
     '量＝' + escHtml(String(_msLines.year || '-')) + ' 年地院訴訟終結（民/家事＝案件、刑事＝被告人次）；委任率標 <span class="ms-badge ms-b">實測</span> 者來自 ' +
-    escHtml(String(_msLines.rep_year || '-')) + ' 年終結案件微資料（任一造有律師、含法扶），標 <span class="ms-badge ms-c">推估</span> 者可直接修改；法扶件以法扶酬金計價（參數見表下）。';
+    escHtml(String(_msLines.rep_year || '-')) + ' 年終結案件微資料（民/家事＝任一造有律師代理、含法扶；刑事＝被告選任律師含法扶 ÷ 被告人次，公設／義務辯護不計），樣本不足 ' + MS_REP_MIN.toLocaleString() + ' 者標 <span class="ms-badge ms-c">推估</span> 並可直接修改；法扶件以法扶酬金計價（參數見表下）。';
   document.getElementById('msLitBody').innerHTML = L.map((r, i) => {
+    const rateTip = '樣本 ' + (r.rate.sample || 0).toLocaleString() + ' ' + (r.rate.unit || '件') +
+      ((r.rate.pub || r.rate.duty) ? '；另公設辯護 ' + (r.rate.pub / r.rate.sample * 100).toFixed(1) + '%／義務律師 ' + (r.rate.duty / r.rate.sample * 100).toFixed(1) + '% 不計入委任率' : '');
     const rateCell = r.rate.measured
-      ? (r.rate.mid * 100).toFixed(1) + '%<span class="ms-badge ms-b" title="樣本 ' + r.rate.sample.toLocaleString() + ' 件">實測</span>'
+      ? (r.rate.mid * 100).toFixed(1) + '%<span class="ms-badge ms-b" title="' + escHtml(rateTip) + '">實測</span>'
       : _msIn('lit_rate_' + r.line, 'low', _msAssump['lit_rate_' + r.line].low, '1') + '–' +
         _msIn('lit_rate_' + r.line, 'high', _msAssump['lit_rate_' + r.line].high, '1') + '%<span class="ms-badge ms-c">推估</span>';
     return '<tr><td>' + escHtml(r.line) + '</td>' +
