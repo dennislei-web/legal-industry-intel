@@ -93,6 +93,14 @@ Deno.serve(async (req: Request) => {
         .eq('id', user_id);
 
       if (error) return errorResponse(error.message);
+
+      // 停用／啟用要同步到 auth：否則 is_active 只是個旗標，被停用的人照樣能登入（2026-11-05 修）
+      if (is_active !== undefined) {
+        const { error: banErr } = await serviceClient.auth.admin.updateUserById(user_id, {
+          ban_duration: is_active ? 'none' : '876000h',   // 100 年＝永久；'none' 解除
+        });
+        if (banErr) return errorResponse('profile 已更新，但封鎖登入失敗：' + banErr.message);
+      }
       return jsonResponse({ success: true });
     }
 

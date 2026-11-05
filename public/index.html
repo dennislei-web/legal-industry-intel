@@ -182,6 +182,9 @@
     .user-badge { font-size: 0.8rem; color: var(--text-muted); }
     .btn-logout { padding: 6px 14px; font-size: 0.8rem; background: var(--ghost-bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
     .btn-logout:hover { background: var(--red-dim); color: var(--red); border-color: var(--red); }
+    /* 視角預覽下拉（仿喆律儀表板 view-as；只 admin 看得到） */
+    .view-as-select { padding: 6px 10px; font-size: 0.8rem; background: var(--ghost-bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-family: inherit; max-width: 200px; }
+    .view-as-select.previewing { color: var(--gold-light); border-color: var(--gold); }
 
     /* ===================== TABS ===================== */
     .tabs-bar {
@@ -350,6 +353,8 @@
       #gsInput { width: 110px; } #gsInput:focus { width: 160px; } #gsResults { width: 280px; }
       .user-badge { display: none; }
       .btn-logout { padding: 6px 10px; font-size: 0.75rem; }
+      .view-as-select { max-width: 110px; padding: 6px 6px; font-size: 0.72rem; }
+      body.has-viewas .header-brand .name { display: none; }   /* 手機上 admin 多了視角下拉，站名讓位（圖示保留），否則站名被擠成直排 */
       .theme-toggle { width: 32px; height: 32px; font-size: 1rem; }
 
       .tabs-bar { padding: 6px 12px 0; -webkit-overflow-scrolling: touch; }
@@ -911,6 +916,7 @@
           <input id="gsInput" type="text" placeholder="&#128269; 搜律師/法官/事務所…" autocomplete="off" oninput="gsOnInput()" onfocus="gsOnFocus()">
           <div id="gsResults"></div>
         </div>
+        <select id="viewAsSel" class="view-as-select" style="display:none;" onchange="onViewAsChange(this.value)" title="視角預覽：只模擬畫面上看得到的分頁與按鈕，不影響真實資料權限"></select>
         <button class="btn-logout" onclick="showChangePassword()" title="修改密碼" style="font-size:0.75rem;">&#128273; 改密碼</button>
         <button class="theme-toggle" onclick="toggleTheme()" title="切換主題">&#9790;</button>
         <button class="btn-logout" onclick="handleLogout()">登出</button>
@@ -4425,7 +4431,60 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // STATE
 // ============================================================
 let currentUser = null;
-let isAdmin = false;
+let isAdmin = false;        // 套用視角後的生效值：所有「admin 才看得到」的分頁／按鈕都看這個
+let realIsAdmin = false;    // 真實角色（user_profiles.role === 'admin'）
+
+// ============================================================
+// 視角預覽（仿喆律儀表板 shared/view-as.js）
+//   admin 可在頁首下拉切成「一般使用者」或某個帳號的視角，看對方登入後的畫面長什麼樣。
+//   只模擬前端權限（分頁／按鈕顯示）；資料仍以真實帳號的 RLS 為準。
+//   狀態存 localStorage，重新整理後沿用；切換時整頁重載讓所有依 isAdmin 繪製的地方重算；登出清掉。
+// ============================================================
+const VIEWAS_KEY = 'intelViewAs';
+function getViewAs() {
+  try { return JSON.parse(localStorage.getItem(VIEWAS_KEY) || 'null'); } catch (e) { return null; }
+}
+function setViewAs(v) {
+  try { if (v) localStorage.setItem(VIEWAS_KEY, JSON.stringify(v)); else localStorage.removeItem(VIEWAS_KEY); } catch (e) {}
+}
+// 視角套用後的生效 isAdmin：非 admin 永遠是自己；admin 依所選視角決定
+function effectiveIsAdmin() {
+  if (!realIsAdmin) return false;
+  const v = getViewAs();
+  return !v || v.role === 'admin';
+}
+let viewAsUsers = [];
+async function installViewAsSelector() {
+  const sel = document.getElementById('viewAsSel');
+  if (!sel || !realIsAdmin) return;
+  // 帳號清單：admin 讀得到全部 user_profiles（mig 269）
+  const { data } = await db.from('user_profiles').select('id,email,display_name,role,is_active').order('display_name');
+  viewAsUsers = (data || []).filter(u => u.id !== currentUser.id && u.is_active !== false);
+  const admins = viewAsUsers.filter(u => u.role === 'admin');
+  const users = viewAsUsers.filter(u => u.role !== 'admin');
+  const opt = (u, icon) => `<option value="as:${u.id}">${icon} ${escHtml(u.display_name || u.email)}</option>`;
+  let html = '<optgroup label="角色視角">'
+    + '<option value="real">&#128273; 真實視角（管理員）</option>'
+    + '<option value="user">&#128100; 一般使用者</option></optgroup>';
+  if (admins.length) html += '<optgroup label="管理員帳號">' + admins.map(u => opt(u, '&#128272;')).join('') + '</optgroup>';
+  if (users.length) html += '<optgroup label="一般使用者帳號">' + users.map(u => opt(u, '&#128100;')).join('') + '</optgroup>';
+  sel.innerHTML = html;
+  const cur = getViewAs();
+  sel.value = !cur ? 'real' : (cur.mode === 'as' ? 'as:' + cur.id : 'user');
+  if (sel.selectedIndex < 0) { sel.value = 'real'; setViewAs(null); }   // 帳號已刪或停用 → 退回真實視角
+  sel.classList.toggle('previewing', sel.value !== 'real');
+  sel.style.display = '';
+  document.body.classList.add('has-viewas');
+}
+function onViewAsChange(val) {
+  if (val === 'real') setViewAs(null);
+  else if (val === 'user') setViewAs({ mode: 'role', role: 'user', label: '一般使用者' });
+  else {
+    const u = viewAsUsers.find(x => 'as:' + x.id === val);
+    setViewAs(u ? { mode: 'as', id: u.id, role: u.role, label: u.display_name || u.email } : null);
+  }
+  location.reload();   // 上次停留的頁面由 navState 回復；喆律戰情／adminOnly 分頁在一般使用者視角下自動落回可見分頁
+}
 let chartInstances = {};
 const PAGE_SIZE = 50;
 
@@ -4538,6 +4597,10 @@ async function handleLogin() {
 async function handleLogout() {
   await db.auth.signOut();
   currentUser = null;
+  setViewAs(null);
+  const vaSel = document.getElementById('viewAsSel');
+  if (vaSel) vaSel.style.display = 'none';
+  document.body.classList.remove('has-viewas');
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('dashboard').style.display = 'none';
 }
@@ -4559,13 +4622,21 @@ async function showDashboard() {
   document.getElementById('userBadge').textContent = currentUser.email;
 
   // 背景非同步載入（不阻塞畫面）
-  db.from('user_profiles').select('role').eq('id', currentUser.id).single().then(({ data: profile }) => {
-    isAdmin = profile?.role === 'admin';
+  db.from('user_profiles').select('role,is_active').eq('id', currentUser.id).single().then(({ data: profile }) => {
+    if (profile && profile.is_active === false) {
+      // 帳號管理頁已停用的帳號：Edge Function 會同步封鎖登入，這裡是前端再擋一層
+      alert('此帳號已停用，請聯絡管理員。');
+      handleLogout();
+      return;
+    }
+    realIsAdmin = profile?.role === 'admin';
+    isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false
     document.getElementById('navBtn_zhelu').style.display = isAdmin ? '' : 'none';
     if (isAdmin) {
       // 重繪子頁列，讓 adminOnly tab（帳號管理等）浮現；上次停在喆律戰情則直接回復
       showSection(navState.section === 'zhelu' ? 'zhelu' : currentSection);
     }
+    if (realIsAdmin) installViewAsSelector();
   });
   ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
   ensureLeaderOverrides(); // 前台標註所長對照表（mig 061，同上背景載）
@@ -12386,8 +12457,9 @@ function renderAdminUsers() {
         </select>`}
       </td>
       <td style="text-align:center;">
-        ${isSelf ? statusBadge : `<button class="btn btn-ghost btn-sm" style="font-size:0.75rem;padding:2px 8px;color:${u.is_active ? 'var(--green)' : 'var(--red)'};"
-          onclick="toggleUserActive('${u.id}', ${!u.is_active})">${u.is_active ? '啟用' : '停用'}</button>`}
+        ${statusBadge}${isSelf ? '' : ` <button class="btn btn-ghost btn-sm" style="font-size:0.72rem;padding:2px 8px;margin-left:6px;color:${u.is_active ? 'var(--red)' : 'var(--green)'};"
+          title="${u.is_active ? '停用這個帳號（同時封鎖登入）' : '重新啟用這個帳號'}"
+          onclick="toggleUserActive('${u.id}', ${!u.is_active})">${u.is_active ? '停用' : '啟用'}</button>`}
       </td>
       <td style="text-align:center;font-size:0.82rem;color:var(--text-muted);">${created}</td>
       <td style="text-align:center;">
