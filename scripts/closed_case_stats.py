@@ -43,6 +43,8 @@ court_name 用月包資料夾名（地院與 judge_month_stats 格式一致）�
   python closed_case_stats.py backfill-amount   # 回填標的金額×委任表缺的月份（整月重跑，upsert 冪等）
   python closed_case_stats.py backfill-rep      # 回填案由×委任表缺的月份（整月重跑，upsert 冪等）
   python closed_case_stats.py backfill-rep-crim # 回填案由×委任表缺「刑事訴訟」列的月份（mig 264；整月重跑）
+  python closed_case_stats.py rerun 202101 202608 # 分類規則改版後強制重跑一段月份（含首尾；全部 upsert 冪等，
+                                                #   crime_supply_map 對照順帶更新；每月約 3 秒＋上傳）
   python closed_case_stats.py dry 202605        # 只下載解析不上傳：印刑事委任率摘要＋耗時（估回填時間用）
 
 需要 7z 可執行檔（本機 scoop 已裝；GitHub Actions 需 apt install p7zip-full）。
@@ -565,6 +567,34 @@ def main():
             run_month(ym, datasets[ym])
             print(f'  進度 {i}/{len(todo)}，累計 {(time.time() - t0) / 60:.1f} 分')
             time.sleep(1)
+    elif cmd == 'rerun':
+        # 分類規則改版後（cause_map.py 條號覆寫／標題規則）強制重跑一段月份：無視 DB 已有，
+        # 整月 download+parse+upsert（closed_case_cause_rep_stats 既有鍵覆蓋、新種類新增、
+        # crime_supply_map 對照同步更新）。種類只會多不會少（§284 從傷害拆出，傷害列仍有 §277），
+        # 所以不需先刪舊列。2026-11-05 首用：§284 過失傷害獨立成種類。
+        lo, hi = sys.argv[2], sys.argv[3]
+        todo = sorted(ym for ym in datasets if lo <= ym <= hi)
+        print(f'強制重跑 {len(todo)} 個月：{todo[:3]}...{todo[-3:]}' if todo else '範圍內無月包')
+        t0 = time.time()
+        failed = []
+        for i, ym in enumerate(todo, 1):
+            # 暫時性失敗（PostgREST 503 PGRST002 schema cache 查不到＝DB 有長鎖在跑、連線中斷）退避重試三次，
+            # 仍失敗才記下、不中斷整批（2026-11-05 首跑撞上 refresh_lawyer_cause_stats 鎖表，38 個月連續 503）
+            for attempt in range(1, 4):
+                try:
+                    run_month(ym, datasets[ym])
+                    break
+                except Exception as e:
+                    print(f'  {ym} 第 {attempt} 次失敗：{str(e)[:160]}')
+                    if attempt == 3:
+                        failed.append(ym)
+                    else:
+                        time.sleep(30 * attempt)
+            print(f'  進度 {i}/{len(todo)}，累計 {(time.time() - t0) / 60:.1f} 分')
+            time.sleep(1)
+        if failed:
+            print(f'失敗月份：{failed}')
+            sys.exit(1)
     elif cmd == 'backfill-amount':
         # 回填標的金額×委任表缺的月份（重跑整月，全部 upsert 冪等）。
         # 「已有」的判準＝該月已有高等法院金額列——高院金額欄位置與地院差一欄，
