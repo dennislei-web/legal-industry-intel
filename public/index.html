@@ -932,7 +932,7 @@
     <button class="nav-btn" id="navBtn_jstat" onclick="showSection('jstat')">&#128202; 司法統計</button>
     <button class="nav-btn" id="navBtn_industry" onclick="showSection('industry')">&#128269; 產業分析</button>
     <button class="nav-btn" id="navBtn_zhelu" onclick="showSection('zhelu')" style="display:none;">&#128737;&#65039; 喆律戰情</button>
-    <button class="nav-btn" id="navBtn_system" onclick="showSection('system')">&#9881;&#65039; 系統</button>
+    <button class="nav-btn" id="navBtn_system" onclick="showSection('system')" style="display:none;">&#9881;&#65039; 系統</button>
   </div>
   <!-- 第二層：所選區塊的子頁 -->
   <div class="tabs-bar" id="subTabsBar"></div>
@@ -4621,6 +4621,10 @@ async function showDashboard() {
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('userBadge').textContent = currentUser.email;
 
+  // 上次停留的區塊（要在下面 showSection 覆寫 navState 之前先記下；喆律戰情／系統是 admin-only，要等 profile 載入才回復）
+  const savedSec = navState.section;
+  const ADMIN_SECTIONS = ['zhelu', 'system'];
+
   // 背景非同步載入（不阻塞畫面）
   db.from('user_profiles').select('role,is_active').eq('id', currentUser.id).single().then(({ data: profile }) => {
     if (profile && profile.is_active === false) {
@@ -4632,18 +4636,18 @@ async function showDashboard() {
     realIsAdmin = profile?.role === 'admin';
     isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false
     document.getElementById('navBtn_zhelu').style.display = isAdmin ? '' : 'none';
+    document.getElementById('navBtn_system').style.display = isAdmin ? '' : 'none';   // 系統區（資料來源／帳號管理）只給 admin
     if (isAdmin) {
-      // 重繪子頁列，讓 adminOnly tab（帳號管理等）浮現；上次停在喆律戰情則直接回復
-      showSection(navState.section === 'zhelu' ? 'zhelu' : currentSection);
+      // 重繪子頁列，讓 adminOnly tab（帳號管理等）浮現；上次停在喆律戰情／系統則直接回復
+      showSection(ADMIN_SECTIONS.includes(savedSec) ? savedSec : currentSection);
     }
     if (realIsAdmin) installViewAsSelector();
   });
   ensureSoloFirms(); // 一人所所長對照表（背景載，用到的地方會再 await）
   ensureLeaderOverrides(); // 前台標註所長對照表（mig 061，同上背景載）
 
-  // 初始化導覽：回復上次停留的區塊；喆律戰情（admin-only）需等 profile 載入後才可見，不在此回復
-  const savedSec = navState.section;
-  showSection(savedSec && savedSec !== 'zhelu' && document.getElementById('navBtn_' + savedSec) ? savedSec : 'lawyer');
+  // 初始化導覽：回復上次停留的區塊；喆律戰情／系統（admin-only）需等 profile 載入後才可見，不在此回復
+  showSection(savedSec && !ADMIN_SECTIONS.includes(savedSec) && document.getElementById('navBtn_' + savedSec) ? savedSec : 'lawyer');
 
   // 輕量 KPI 先載入，重量圖表延後
   loadOverviewFast();
@@ -4718,7 +4722,7 @@ const SECTIONS = {
     { tab: 'salary', label: '法律產業薪資分析', adminOnly: true },
   ],
   system: [
-    { tab: 'sources', label: '資料來源' },
+    { tab: 'sources', label: '資料來源', adminOnly: true },
     { tab: 'admin', label: '帳號管理', adminOnly: true },
   ],
 };
