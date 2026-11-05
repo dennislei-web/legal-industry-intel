@@ -229,7 +229,8 @@ AS $$
   WHERE p_sub IS NOT NULL;
 $$;
 
--- 子類下拉清單（mig 255 同簽名、同排序：具名子類依件數排，程序事件與未標明殿後）
+-- 子類下拉清單（mig 255 同簽名；排序沿用 259 最後一版：具名子類依件數排，19 種程序類殿後、
+--   「未標明」「其他」開頭的最後——首版 268 誤用 255 的兩個名稱，上線 20 分鐘內補正）
 CREATE OR REPLACE FUNCTION cause_sub_group_list()
 RETURNS TABLE (cause_group text, sub_group text, cases bigint, lawyers int)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -238,7 +239,10 @@ SET statement_timeout = '30s'
 AS $$
   SELECT l.cause_group, l.sub_group, l.cases, l.lawyers
   FROM firm_map_sub_list l
-  ORDER BY 1, CASE l.sub_group WHEN '未標明類型' THEN 2 WHEN '再審及程序事件' THEN 1 ELSE 0 END, 3 DESC;
+  ORDER BY 1,
+           CASE WHEN l.sub_group IN ('再審及程序事件', '再審、非常上訴與大法庭', '羈押、具保與強制處分', '刑之執行、沒收與扣押物', '其他聲請與程序', '羈押、具保與限制出境', '自訴、交付審判與訴訟參與', '閱卷、錄音與其他聲請', '訴訟救助、訴訟費用與裁判費（程序）', '程序事件（停止執行、假處分、訴訟救助、費用）', '程序事件', '督促程序（支付命令、公示催告）', '憲法審查與大法庭聲請', '律師酬金核定（程序）', '保全程序（假扣押、假處分、定暫時狀態）', '執行與保全爭議', '行政執行爭議', '程序監理人與特別代理人（含報酬）', '外國裁判認可與其他聲請') THEN 1
+                WHEN l.sub_group ~ '^(未標明|其他)' THEN 2 ELSE 0 END,
+           3 DESC;
 $$;
 
 GRANT EXECUTE ON FUNCTION firm_cause_court_ranking(text, text, text, int, int) TO anon, authenticated, service_role;
