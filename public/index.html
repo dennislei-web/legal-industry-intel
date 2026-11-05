@@ -1514,9 +1514,11 @@
           委任率低＋件數大＝律師尚未滲透的市場；委任率高＋集中度低＝競爭紅海。
           覆蓋率天花板：民訴案由分類與官方對照約 82%；家事僅覆蓋「訴訟」檔（保護令等非訟事件無代理欄），佔比僅供結構參考。
           委任率「-」＝該類在微資料無代理／辯護紀錄（家事：監護宣告、保護令、暫時處分等非訟性質事件代理欄歷年皆空），不採計、不進合計。
-          市場面兩欄來自終結案件微資料（最新完整年；3 年變化為完整年對完整年）：民事＝民事訴訟檔案件數（官方 13 類與判決書案由同一把尺）；
-          刑事＝地院終結被告人次，每被告取主罪名、罪名條號經對照表對到本表種類（殺人罪章 §276 歸過失致死、傷害罪章 §284 歸過失傷害、§344 歸重利；家暴傷害等少數天生對不上，不硬修）。
-          <strong>家事無市場對照</strong>——家事訴訟檔分組與判決書案由分組口徑不同、非訟檔覆蓋僅約 16%，不硬對。
+          市場面兩欄（最新完整年；3 年變化為完整年對完整年；游標停在數字上可見年份）：民事＝終結案件微資料民事訴訟檔案件數（官方 13 類與判決書案由同一把尺）；
+          刑事＝微資料地院終結被告人次，每被告取主罪名、罪名條號經對照表對到本表種類（殺人罪章 §276 歸過失致死、傷害罪章 §284 歸過失傷害、§344 歸重利；家暴傷害等少數天生對不上，不硬修）；
+          <strong>家事＝司法院《司法統計年報》地方法院章</strong>：非訟類＝家事非訟事件新收件數按事件別（表 38，與本表種類同名對照）；
+          訴訟類年報只分婚姻／親子／其他三類（表 23，終結件數，地院一審＋二審），本表把婚姻訴訟放在「離婚」列、親子訴訟放在「親子關係」列、其他家事訴訟放在「繼承訴訟」列，帶 ※ 的數字是<strong>類別總量</strong>而非該種類本身（婚姻無效及確認、夫妻財產、其他家事三列因此不重複列）；
+          年報每年 5 月出版後手動補一年——微資料的家事訴訟／非訟檔只覆蓋官方量的兩成上下且逐年膨脹，不拿來充數。
           集中度高＋市場成長＝寡占成長型市場；集中度低＋市場成長＝分散成長（進入機會）。
         </div>
       </div>
@@ -3746,7 +3748,7 @@
                     <div id="jstat_familyProcedureDesc" class="desc-grid"></div>
                 </div>
                 <div class="chart-card full">
-                    <div class="chart-title">② 家事非訟事件細項歷年趨勢（2020-2024）</div>
+                    <div class="chart-title">② 家事非訟事件細項歷年趨勢（2020-2025）</div>
                     <div class="chart-container"><canvas id="jstat_chartFamilyNonLitTrend"></canvas></div>
                 </div>
                 <div class="chart-card full">
@@ -18330,15 +18332,55 @@ async function initCauseSupply() {
     };
   });
   try {
-    // 市場面（終結微資料）：民事＝cause_group_yearly 民事訴訟檔（官方 13 類與供給面同尺）；
-    // 刑事＝cause_group_yearly_crim（地院被告人次，罪名條號經 crime_supply_map 對到供給面種類，mig 264）
-    const [civ, crim] = await Promise.all([
+    // 市場面：民事＝cause_group_yearly 民事訴訟檔（終結微資料，官方 13 類與供給面同尺）；
+    // 刑事＝cause_group_yearly_crim（微資料地院終結被告人次，罪名條號經 crime_supply_map 對到供給面種類，mig 264）；
+    // 家事＝司法統計年報家事非訟事件新收件數按事件別（csFamilyMarketRows，2026-11-05）
+    const [civ, crim, fam] = await Promise.all([
       db.rpc('cause_group_yearly', { p_file_type: '民事訴訟' }),
       db.rpc('cause_group_yearly_crim'),
+      csFamilyMarketRows(),
     ]);
-    _csMarket = { '民事': civ.data || [], '刑事': crim.data || [] };
+    _csMarket = { '民事': civ.data || [], '刑事': crim.data || [], '家事': fam };
   } catch (e) { _csMarket = {}; }
   loadCauseSupply('民事');
+}
+
+// 家事市場序列（2026-11-05）：終結微資料的家事訴訟／非訟檔只覆蓋官方量的兩成上下且逐年膨脹
+// （非訟檔 2021 年 1.3 萬件→2025 年 3.5 萬件，官方同期約 11.6 萬→14 萬），件數與 3 年變化都不能當市場看，
+// 改讀司法院《司法統計年報》地方法院章（data/judicial_stats.json，年報每年 5 月出版後手動補一年）：
+//   非訟＝family_non_lit_yearly：家事非訟事件「新收」件數按事件別（年報表 38）。事件別與供給面 FAMNONLIT 種類同名
+//     （cause_map.py 本來就對齊官方標籤），直接對；年報 0 視為缺值（2024 年履行勸告／精神衛生法兩項為 0）。
+//   訴訟＝family_lit_yearly：家事訴訟事件「終結」件數（年報表 23，地院一審＋二審），年報只分婚姻訴訟／親子訴訟／
+//     其他家事訴訟三類、沒有離婚或繼承細項 → 婚姻訴訟掛「離婚」列、親子訴訟掛「親子關係」列、其他家事訴訟掛
+//     「繼承訴訟」列，格子帶 ※ 並在 title 說明是類別總量；婚姻無效及確認／夫妻財產／其他家事列留「-」不重複計。
+// 回傳格式與 cause_group_yearly 同（y／cause_group／n／months）＋ verb（新收／終結）＋ approx（類別總量說明）。
+const CS_FAM_LIT_MAP = {
+  '婚姻訴訟': ['離婚', '年報「婚姻訴訟」終結件數（地院一審＋二審；含離婚、婚姻無效／撤銷、確認婚姻等，年報不再細分）'],
+  '親子訴訟': ['親子關係', '年報「親子訴訟」終結件數（地院一審＋二審；含確認親子、否認子女、認領等）'],
+  '其他家事訴訟': ['繼承訴訟', '年報「其他家事訴訟」終結件數（地院一審＋二審；含分割遺產等繼承訴訟、夫妻財產、扶養等，年報不再細分）'],
+};
+const CS_FAM_MERGED = {
+  '婚姻無效及確認': '年報併在「婚姻訴訟」，數字見「離婚」列',
+  '夫妻財產': '年報（推定）併在「其他家事訴訟」，數字見「繼承訴訟」列',
+  '其他家事': '供給面剩餘桶；年報訴訟類數字見「離婚」「親子關係」「繼承訴訟」三列',
+};
+async function csFamilyMarketRows() {
+  try {
+    const j = await (await fetch('data/judicial_stats.json?v=' + Date.now())).json();
+    const rows = [];
+    (j.family_non_lit_yearly || []).forEach(d => {
+      Object.entries(d.categories || {}).forEach(([g, n]) => {
+        if (Number(n) > 0) rows.push({ y: String(d.year_ad), cause_group: g, n: Number(n), months: 12, verb: '新收' });
+      });
+    });
+    (j.family_lit_yearly || []).forEach(d => {
+      Object.entries(d.categories || {}).forEach(([g, n]) => {
+        const m = CS_FAM_LIT_MAP[g];
+        if (m && Number(n) > 0) rows.push({ y: String(d.year_ad), cause_group: m[0], n: Number(n), months: 12, verb: '終結', approx: m[1] });
+      });
+    });
+    return rows;
+  } catch (e) { return []; }
 }
 
 // 最新完整年件數 + 3 年變化（完整年對完整年）；cat＝民事／刑事（各自的市場序列）
@@ -18352,7 +18394,9 @@ function csMarketCols(cat, group) {
   const base = fullYears[Math.max(0, fullYears.length - 4)];
   const get = y => rows.filter(r => r.y === y && r.cause_group === group).reduce((s, r) => s + r.n, 0);
   const nl = get(latest), nb = get(base);
-  return { nl, nb: base !== latest ? nb : 0, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null };
+  const tag = rows.find(r => r.y === latest && r.cause_group === group) || {}; // 家事列帶 verb／approx（csFamilyMarketRows）
+  return { nl, nb: base !== latest ? nb : 0, chg: (nb && base !== latest) ? (nl - nb) / nb * 100 : null, latest, base,
+           verb: tag.verb || null, approx: tag.approx || null };
 }
 
 let _csRows = [], _csCat = '民事';
@@ -18394,13 +18438,20 @@ async function loadCauseSupply(cat) {
   rows.sort((a, b) => (isBucket(a.cause_group) ? 1 : 0) - (isBucket(b.cause_group) ? 1 : 0)
     || Number(b.total_cases) - Number(a.total_cases));
   _csRows = rows;
-  const isCrim = cat === '刑事';
-  const showMkt = cat === '民事' || isCrim; // 家事：訴訟檔分組與供給面不同尺、非訟檔覆蓋 16%，無市場對照
+  const isCrim = cat === '刑事', isFam = cat === '家事';
+  const showMkt = true; // 三案類都有市場序列（家事＝年報非訟細項新收件數，2026-11-05 補；見 csFamilyMarketRows）
   const unit = isCrim ? '被告人次' : '件';
+  const mktVerb = isFam ? '新收' : '終結';
   document.querySelectorAll('.cs-mkt-col').forEach(el => { el.style.display = showMkt ? '' : 'none'; });
   document.querySelectorAll('.cs-rep-col').forEach(el => { el.style.display = ft ? '' : 'none'; });
   const mktHead = document.getElementById('csMktHead');
-  if (mktHead) mktHead.textContent = isCrim ? '市場終結被告人次/年' : '市場終結件數/年';
+  if (mktHead) {
+    mktHead.textContent = isCrim ? '市場終結被告人次/年' : isFam ? '市場新收件數/年' : '市場終結件數/年';
+    mktHead.title = isFam
+      ? '司法院司法統計年報：非訟類＝家事非訟事件新收件數按事件別（與本表種類同名）；訴訟類年報只分婚姻／親子／其他三類（終結件數），掛在離婚／親子關係／繼承訴訟列、帶 ※'
+      : isCrim ? '終結案件微資料：地院終結被告人次（每被告取主罪名，條號經對照表對到本表種類）'
+      : '終結案件微資料：民事訴訟檔終結案件數（官方 13 類與本表種類同尺）';
+  }
   const repHead = document.getElementById('csRepHead');
   if (repHead) repHead.title = isCrim
     ? '地院終結被告中「選任律師辯護（含法扶）」比例；公設／義務律師為法院指定不計，點列下鑽可看'
@@ -18422,9 +18473,13 @@ async function loadCauseSupply(cat) {
     let mktCells = '';
     if (showMkt) {
       const m = csMarketCols(cat, r.cause_group);
-      mktCells = (m && m.nl) ? `<td style="text-align:right;">${m.nl.toLocaleString()}</td>
-        <td style="text-align:right;color:${m.chg >= 0 ? 'var(--red)' : 'var(--green)'};">${m.chg === null ? '-' : (m.chg >= 0 ? '+' : '') + m.chg.toFixed(1) + '%'}</td>`
-        : '<td style="text-align:right;">-</td><td style="text-align:right;">-</td>';
+      const verb = (m && m.verb) || mktVerb;
+      const mTitle = m && m.nl ? `${m.latest} 年${verb} ${m.nl.toLocaleString()} ${unit}${m.chg === null ? '' : `；${m.base}→${m.latest} 年 ${m.nb.toLocaleString()}→${m.nl.toLocaleString()}`}${m.approx ? '。※ ' + m.approx : ''}` : '';
+      const noMktTitle = isFam ? (CS_FAM_MERGED[r.cause_group] || '年報無此事件別') : isCrim ? '微資料無此種類' : '微資料民事訴訟檔無此類別';
+      const approxMark = m && m.approx ? '<span style="font-size:0.7rem;color:var(--text-muted);" title="類別總量，非本種類本身，見提示">※</span>' : '';
+      mktCells = (m && m.nl) ? `<td style="text-align:right;${m.approx ? 'color:var(--text-muted);' : ''}" title="${mTitle}">${m.nl.toLocaleString()}${approxMark}</td>
+        <td style="text-align:right;color:${m.chg >= 0 ? 'var(--red)' : 'var(--green)'};" title="${mTitle}">${m.chg === null ? '-' : (m.chg >= 0 ? '+' : '') + m.chg.toFixed(1) + '%'}${approxMark}</td>`
+        : `<td style="text-align:right;color:var(--text-muted);" title="${noMktTitle}">-</td><td style="text-align:right;color:var(--text-muted);" title="${noMktTitle}">-</td>`;
     }
     const bucket = isBucket(r.cause_group);
     return `<tr style="cursor:pointer;${bucket ? 'opacity:0.62;' : ''}" onclick="csDrill(${i})" title="點擊下鑽：TOP 律師/事務所、委任分布、案由明細">
