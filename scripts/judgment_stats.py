@@ -1318,6 +1318,15 @@ def refresh_stats():
         if rpc == 'clean_judge_name_truncations' and not ok:
             cleaned = False
     results.extend(refresh_firm_dedup())
+    # 事務所版圖預彙總＋預設快取（mig 266）：要等新月份與去重 cache 都刷完再重建，
+    # 不然版圖的近 5 年視窗與 dup 數字會停在上一個月（下一次週五名冊週掃才補刷）
+    print('  呼叫 refresh_firm_map_cache() ...')
+    t0 = time.time()
+    ok, detail = _call_rpc('refresh_firm_map_cache', marker=('firm_map_default_cache', 'refreshed_at'),
+                           wait_max=660, tries=2)
+    secs = time.time() - t0
+    print(f'  {"OK" if ok else "失敗"}（{secs:.0f}s）{detail}')
+    results.append(('refresh_firm_map_cache', 'ok' if ok else 'fail', detail, secs))
     return results
 
 

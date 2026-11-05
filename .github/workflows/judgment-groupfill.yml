@@ -106,6 +106,12 @@ jobs:
                           print(f'refresh {ym} {rpc}: HTTP {r.status_code} {r.text[:120]}')
               m += 1
               if m > 12: y, m = y + 1, 1
+          # 去重 cache 全刷完 → 重建事務所版圖預彙總＋預設快取（mig 266），dup 數字才會跟上
+          r = requests.post(f'{url}/rest/v1/rpc/refresh_firm_map_cache', json={},
+                            headers={**H, 'Content-Type': 'application/json'}, timeout=600)
+          print('refresh_firm_map_cache: HTTP', r.status_code, '' if r.ok else r.text[:120])
+          if not r.ok:
+              bad.append('refresh_firm_map_cache')
           print('缺 lawyer_group_court 的月份:', missing or '無 ✅')
           print('refresh 失敗的月份:', bad or '無 ✅')
           if missing or bad:
