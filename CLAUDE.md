@@ -80,7 +80,7 @@
   完整性（沒有完成標記，靠的是進出都改名：解壓見上、刪除見下一條）：不走這兩個函數留下的半套目錄分辨不出來，
   懷疑時手動刪掉該目錄再重跑。
   ⚠️ **還有兩支沒改**（不在本 repo 的 git 裡，2026-10-02 盤點）：主 checkout 未入 git 的 `scripts/achievement_stats.py`
-  （每月 20 日 `achievement_monthly.bat` 排程）、bullying-intel 的 `scripts/bullying_mine.py`（`judgment_derivs_monthly.py`
+  （`achievement_monthly.bat` 排程，見下方「appeal／achievement 月更」）、bullying-intel 的 `scripts/bullying_mine.py`（`judgment_derivs_monthly.py`
   月更呼叫）——同一個工作目錄、仍是「`<月份>/` 存在就跳過解壓、直接解到 `<月份>/`」的舊寫法，它們留下的半套目錄
   已改的 8 支照樣會沿用。終結案件月包三支（`closed_case_stats`／`lawyer_case_amount`／`big_amount_cases`）各用各的
   工作目錄、每次都重新下載並先刪舊目錄再解，沒有這個問題
@@ -282,8 +282,10 @@
 - **facts 快照月更（2026-10-02）**：`firm_analysis_facts`（「產業結構分析」「產業深度報告」直讀，PK=firm）是
   `facts_extract.py` 產 `facts.tsv`、`upload_facts.py` 寫入的快照，資料窗＝`dedup_months`。原本沒有排程
   （9/01 產完就停在 65 個月、月表進新月份也不會動），現在是本機排程 `judgment-derivs-monthly`
-  （`scripts/judgment_derivs_monthly.py`，每月最後一天 10:00；2026-10-02 由 21 日挪過來，排在雲端月更
-  17／20／23／27 日四次嘗試之後）的步驟 9，排在管線尾端。
+  （每日 11:00 觸發 `scripts/judgment_derivs_daily.py` 自判：月表最新月前進了、或 28 日起本月還沒跑過，才真的跑
+  `judgment_derivs_monthly.py`；2026-11-06 由「每月最後一天 10:00」改成每日——雷晚上關機，月更型觸發開機後
+  不一定補跑，10/31 首跑就漏了。與 law010 判決比對共用 `.judgment_work/pipeline.lock` 互斥；`--check` 看判定、
+  `--force-next` 讓下一次排程強制跑）的步驟 9，排在管線尾端。
   - 只能本機跑：要讀 `scripts/_batch408/leaders/*.json`（不在版控——`_batch408` 只有 v2 這兩支腳本進 git，
     其餘是本機工作檔；repo 是公開的，別把整個目錄加進去）。
   - 不看目標月，每次照 `firm_dedup_totals` 當下的全窗重產，所以月表比排程日晚到的月份下一次執行就補上；
@@ -292,6 +294,17 @@
   - launcher 寫完會核對 `firm_dedup_totals` 的最新月有沒有跟上 `lawyer_month_stats`；落後記 ❌
     （＝雲端月更的 refresh 鏈沒把新月份刷進去重 cache，facts 只能停在舊窗）→ 先
     `python judgment_stats.py refresh`，再重跑 facts。
+- **appeal／achievement 月更改每日自判（2026-11-06）**：本機排程 `appeal-stats-monthly`（每日 11:45）、
+  `achievement-stats-monthly`（每日 12:00）改跑 `scripts/stats_monthly_daily.py appeal|achievement`：20 日起看各自 log
+  （`appeal_monthly.log` 段內有 `月增量完成：`／`無新月份可補`；`achievement_monthly.log` 有 `===== done`）本月沒成功才
+  `cmd /c` 原 .bat，否則秒退不留痕；achievement 先等 appeal 今天跑完（照舊 appeal 先）；本月失敗 3 次後停；
+  `--check`／`--force`／`--force-next` 同 derivs launcher。兩支 .bat 與 `achievement_stats.py`／`highvalue_stats.py`／
+  `corp_reps.py` 仍是主 checkout 未入 git 的本機檔（repo 公開，.bat 含 Cloudflare account id）。原「每月 20 日 04:00／04:40」
+  的月更型觸發，雷晚上關機後開機補跑不穩定（10/20 有補、10/31 與 11/5 沒補）。
+- **月包快取互斥鎖 `scripts/pipeline_lock.py`**：`.judgment_work/pipeline.lock`（JSON pid/owner/started_at；O_EXCL 建立；
+  pid 不在或超過 12 小時當殘留自動清；等不到回 False）。四支會動月包的排程都 import 它：本 repo 的
+  `judgment_derivs_daily.py`、`stats_monthly_daily.py`；lawyer-dashboard-clean 的 `sync_judgment_match_daily.py`、
+  `jmatch_refresh_poller.py`（那邊有一份同內容副本，只差預設路徑那行；改協定要兩邊一起改）。
   - `upload_facts.py` 是一次 upsert（`on_conflict=firm`、單一請求＝單一交易、每列帶同一個 `refreshed_at`），
     **不再先 DELETE 全表**（舊版中途失敗時兩個頁面會讀到空表）；DB 有而 TSV 沒有的欄位保留原值。
     寫入前防呆，任一成立就不寫、exit 1：列數比現行少超過 5%／要刪的舊列超過現行 5%／任一欄由有值變空的所
