@@ -1,8 +1,13 @@
-name: 爬取法務部律師資料
+# 2026-11-06 起只留手動備援（workflow_dispatch），每週排程已搬到本機 Windows 排程 moj-detail-sweep-weekly
+# （每週五 09:30，scripts/moj_detail_sweep_weekly.py 第一步跑 moj_lawyer_scraper.py，收尾一併刷 refresh RPC）。
+# 原因：GitHub runner（海外 IP）連 lawyerbc.moj.gov.tw 不穩——
+#   2026-11-01 排程：/Home/GuildCounter 重試 5 次仍 [Errno 101] Network is unreachable，整支紅燈；
+#   2026-11-06 手動重跑：人數有寫入，但 /Guild/Info 回 HTTP 200 卻沒有表格（解析 0 列）而紅燈；
+#   本機同一頁 17 列正常、版面沒改。moj_lawyer_scraper.py 已加「頁面有效性」檢查（缺預期標記＝暫時性失敗、退避重試）。
+# 本機漏跑時可在這裡手動 Run workflow 補一次（industry_stats／law_firms 寫入冪等）；也省 GitHub Actions 分鐘數。
+name: 爬取法務部律師資料（手動備援）
 
 on:
-  schedule:
-    - cron: '0 18 * * 0'  # 每週日 UTC 18:00 = 台灣週一凌晨 2:00
   workflow_dispatch: {}
 
 jobs:

@@ -44,3 +44,6 @@ scripts/judgment_derivs_monthly.log
 # appeal／achievement 月更 .bat 的本機 log（appeal-stats-monthly／achievement-stats-monthly 排程；狀態檔 _*_monthly_state.json 由 scripts/_*.json 擋）
 scripts/appeal_monthly.log
 scripts/achievement_monthly.log
+
+# 司法院官方案件統計月更 launcher 本機 log
+scripts/judicial_official_stats_monthly.log

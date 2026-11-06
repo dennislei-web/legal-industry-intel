@@ -8,6 +8,10 @@
   /                   - 首頁「事務所及公會資料更新截止日：民國115年10月29日」（取代 lyinfosd/notice/upDate）
 
 個別律師查詢需人工驗證碼，不在本程式範圍（見 docs/moj-site-redesign-2026-10.md）。
+
+排程：2026-11-06 起由本機 Windows 排程 moj-detail-sweep-weekly（每週五 09:30，launcher
+moj_detail_sweep_weekly.py 的第一步）執行；.github/workflows/scrape-moj-lawyers.yml 只留手動備援
+（runner 海外 IP 連 lawyerbc 不穩：2026-11-01 Network unreachable、11-06 Guild/Info 回空殼頁）。
 """
 import json
 import re
@@ -57,27 +61,51 @@ def guild_id(name):
     return _REGION_TO_ID.get(n.replace('律師公會', ''))
 
 
-# GitHub runner 偶發連不到 lawyerbc（Errno 101 Network is unreachable，2026-08-23、08-30
-# 兩次週更都是首次連線就死）→ 連線類錯誤退避重試
+# GitHub runner 偶發連不到 lawyerbc（Errno 101 Network is unreachable，2026-08-23、08-30、
+# 2026-11-01 三次週更都是首次連線就死）→ 連線類錯誤退避重試。
+# 另一種失敗是 HTTP 200 但內容不是預期頁：約 805 bytes 的「Error」頁、或沒有表格的空殼頁
+# （2026-11-06 手動重跑 Guild/Info 解析 0 列即此），舊碼把它當成功頁去解析 → 直接紅燈。
+# 2026-11-06 起改由本機每週 launcher（moj_detail_sweep_weekly.py）跑，GitHub workflow 只留手動備援。
 RETRY_DELAYS = [15, 30, 60, 120]
+TRANSIENT_HTTP = {408, 429, 500, 502, 503, 504}
 
 
-def _get_html(path):
-    """帶退避重試的 GET；連線類錯誤才重試，HTTP 4xx/5xx 直接拋"""
+class InvalidPageError(RuntimeError):
+    """HTTP 200 但頁面沒有預期標記（錯誤頁／空殼頁），視為暫時性失敗"""
+
+
+def _page_title(html):
+    t = BeautifulSoup(html, 'html.parser').title
+    return t.get_text(strip=True)[:60] if t else ''
+
+
+def _get_html(path, must_have=None):
+    """帶退避重試的 GET。
+
+    must_have：頁面必須含有的 CSS selector（GuildCounter 要有 .guild-counter-card、
+    Guild/Info 要有 tr.guild-row）；200 但找不到 → 視為暫時性失敗，和連線錯誤、5xx／429
+    走同一套退避重試，重試仍失敗才拋錯。其餘 4xx 直接拋。
+    """
     last_err = None
     for attempt in range(len(RETRY_DELAYS) + 1):
         try:
             resp = requests.get(f'{BASE_URL}{path}', headers=HEADERS, timeout=30)
+            if resp.status_code in TRANSIENT_HTTP:
+                raise InvalidPageError(f'HTTP {resp.status_code}（{len(resp.content)} bytes）')
             resp.raise_for_status()
             resp.encoding = 'utf-8'
-            return resp.text
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            html = resp.text
+            if must_have and not BeautifulSoup(html, 'html.parser').select_one(must_have):
+                raise InvalidPageError(
+                    f'HTTP 200 但找不到 {must_have}（{len(html)} bytes，title={_page_title(html)!r}）')
+            return html
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, InvalidPageError) as e:
             last_err = e
             if attempt < len(RETRY_DELAYS):
                 wait = RETRY_DELAYS[attempt]
-                log(f'  ! 連線失敗 ({attempt + 1}/{len(RETRY_DELAYS) + 1})，{wait} 秒後重試: {e}')
+                log(f'  ! 取頁失敗 {path} ({attempt + 1}/{len(RETRY_DELAYS) + 1})，{wait} 秒後重試: {e}')
                 time.sleep(wait)
-    raise RuntimeError(f'連線 {path} 重試 {len(RETRY_DELAYS) + 1} 次仍失敗: {last_err}')
+    raise RuntimeError(f'取頁 {path} 重試 {len(RETRY_DELAYS) + 1} 次仍失敗: {last_err}')
 
 
 def parse_guild_counter(html):
@@ -97,7 +125,7 @@ def parse_guild_counter(html):
 def fetch_guild_summary():
     """取得各律師公會會員人數統計"""
     log('取得各公會會員統計（/Home/GuildCounter）...')
-    guilds = parse_guild_counter(_get_html('/Home/GuildCounter'))
+    guilds = parse_guild_counter(_get_html('/Home/GuildCounter', must_have='.guild-counter-card'))
     # 版面防呆：改版前後都是 16 個地方公會；數量差太多代表 HTML 結構又變了，寧可紅燈也不寫錯數字
     if len(guilds) < 14 or any(g['count'] <= 0 for g in guilds):
         raise RuntimeError(f'GuildCounter 解析結果異常：{len(guilds)} 個公會，請檢查版面是否改了')
@@ -135,7 +163,7 @@ def parse_guild_info(html):
 def fetch_guild_info():
     """取得各律師公會聯絡資訊"""
     log('取得各公會聯絡資訊（/Guild/Info）...')
-    info = parse_guild_info(_get_html('/Guild/Info'))
+    info = parse_guild_info(_get_html('/Guild/Info', must_have='tr.guild-row'))
     if len(info) < 14:
         raise RuntimeError(f'Guild/Info 解析結果異常：{len(info)} 列，請檢查版面是否改了')
     unknown = [g['name'] for g in info if not g['id']]
@@ -251,8 +279,11 @@ def main():
 
         org_count = save_guild_info_as_firms(sb, guild_info)
 
-        # 3. 取得更新日期
-        update_date = fetch_update_date()
+        # 3. 取得更新日期（只記 log；資料都已寫入，首頁抓不到不算失敗）
+        try:
+            update_date = fetch_update_date()
+        except Exception as e:  # noqa: BLE001
+            update_date = f'（首頁取不到：{e}）'
         log(f'法務部資料更新日期: {update_date}')
 
         total_found = len(guilds) + len(guild_info)

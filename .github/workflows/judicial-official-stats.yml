@@ -1,8 +1,13 @@
-name: 司法院官方案件統計（每月全量更新）
+# 2026-11-06 起只留手動備援（workflow_dispatch），每月排程已搬到本機 Windows 排程 judicial-official-stats-monthly
+# （每日 10:30 觸發，scripts/judicial_official_stats_monthly.py 自判「≥5 日且本月未跑」才跑 run 並 PATCH last_scraped_at；
+#   每日觸發是因為雷晚上關機、月更型排程漏跑不會補跑）。
+# 原因：GitHub runner（海外 IP）連 opendata.judicial.gov.tw 被擋——
+#   2026-11-05 排程、11-06 手動重跑連兩天 connect timeout（DoH 解析到的 IP 一樣連不上）；
+#   本機對同一個 IP 0.07 秒即通，11-06 本機手動跑過一次成功。
+# 本機漏跑時可在這裡手動 Run workflow 補一次（全量 upsert 冪等）；也省 GitHub Actions 分鐘數。
+name: 司法院官方案件統計（手動備援）
 
 on:
-  schedule:
-    - cron: '0 20 4 * *'  # 每月 4 日 UTC 20:00 = 台灣 5 日凌晨 4:00（來源不定期修訂，全量 upsert 冪等）
   workflow_dispatch:
 
 jobs:
