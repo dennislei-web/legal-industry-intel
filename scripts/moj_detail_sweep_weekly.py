@@ -9,16 +9,23 @@
   .github/workflows/moj-detail-sweep.yml 留著只供手動觸發。
 
 步驟（任一步失敗→記錄後繼續，最後 exit 1；log 看「❌」）：
+  0. moj_lawyer_scraper.py   公會人數→industry_stats（情報站唯一回看到上線日的週序列）、公會聯絡資訊→law_firms；
+                              幾十秒。放最前面：就算後面 4 小時的 sweep 出事，週序列也不會斷。
+                              2026-11-06 起由本機跑：GitHub runner 2026-11-01 連 lawyerbc Network unreachable、
+                              11-06 手動重跑 /Guild/Info 回 200 但沒有表格（本機同頁 17 列正常）；
+                              .github/workflows/scrape-moj-lawyers.yml 只留手動備援。
   1. moj_harvest_ingest.py   先吃掉這週同仁收成的新雜湊（新律師核對詳細頁才插入）
   2. moj_detail_sweep.py     全量逐頁比對（≤1 req/s，約 13,600 頁 ≈ 4 小時）
   3. moj_alumni_refresh.py   校友去向（zhelu_alumni）照剛刷新的名冊回寫，只讀 DB、幾秒鐘
   4. refresh RPC              refresh_firm_stats_cache／refresh_lawyer_stats／refresh_firm_map_cache／
                               refresh_ex_judicial_lawyers（新進律師若是退場法官／檢察官，轉任名單要跟上）
-                              （同 .github/scripts/refresh-rpcs.sh：5xx／逾時重試 3 次、4xx 不重試）
+                              （同 .github/scripts/refresh-rpcs.sh：5xx／逾時重試 3 次、4xx 不重試；
+                              scrape-moj-lawyers 原本收尾刷的 firm_stats／lawyer_stats 也包含在內）
   2026-11 起取代已刪除的 moj-office-refresh／moj-licno-scan／alumni-refresh 三條 workflow。
 
 log：scripts/moj_detail_sweep_weekly.log（追加；含異動摘要的律師姓名 → 已 gitignore，不可 commit）
-最後一行固定是 `[launcher] ingest_rc=… sweep_rc=… alumni_rc=… refresh_ok=N/4`，每日巡檢擷取。
+最後一行固定是 `[launcher] guild_rc=… ingest_rc=… sweep_rc=… alumni_rc=… refresh_ok=N/4`，每日巡檢擷取
+（2026-11-06 以前沒有 guild_rc；2026-11-02 以前沒有 alumni_rc、是 N/3）。
 
 用法：
   python moj_detail_sweep_weekly.py           # 正式跑
@@ -119,15 +126,17 @@ def main():
     log(f'MOJ 詳細頁每週掃描開始（PY={PY}）')
     env = env_of(os.path.join(HERE, '.env'))
 
+    guild_rc = run('公會人數統計', ['moj_lawyer_scraper.py'], timeout=20 * 60)
     ingest_rc = run('收成 ingest', ['moj_harvest_ingest.py'], timeout=2 * 3600)
     sweep_args = ['moj_detail_sweep.py'] + (['--limit', limit] if limit else [])
     sweep_rc = run('詳細頁 sweep', sweep_args, timeout=8 * 3600)
     alumni_rc = run('校友去向同步', ['moj_alumni_refresh.py'], timeout=10 * 60)
     refresh_ok = sum(call_rpc(n, env) for n in REFRESH_RPCS)
 
-    log(f'[launcher] ingest_rc={ingest_rc} sweep_rc={sweep_rc} alumni_rc={alumni_rc} '
+    log(f'[launcher] guild_rc={guild_rc} ingest_rc={ingest_rc} sweep_rc={sweep_rc} alumni_rc={alumni_rc} '
         f'refresh_ok={refresh_ok}/{len(REFRESH_RPCS)}')
-    sys.exit(0 if ingest_rc == sweep_rc == alumni_rc == 0 and refresh_ok == len(REFRESH_RPCS) else 1)
+    sys.exit(0 if guild_rc == ingest_rc == sweep_rc == alumni_rc == 0 and refresh_ok == len(REFRESH_RPCS)
+             else 1)
 
 
 if __name__ == '__main__':

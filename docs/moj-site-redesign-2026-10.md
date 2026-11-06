@@ -119,3 +119,21 @@
 - sweep：2,571 頁全 200、0 個 404、0 雜湊不符、0 連線失敗，44 分鐘；真實異動＝事務所 8 筆＋懲戒 1 筆（異動追蹤表實寫 firm_change 8、new_lawyer 6）；清除 10/29 誤標除名候選 356 筆。
 - **姓名不同 8 筆全是同一人**：異體字（勲／勳、姸／妍、澐／芸）或官網查詢結果少一個字（罕用字／造字顯示不出）→ ingest 放寬為「證號唯一對上＋姓氏相同＋只差一字」即採證號對應，名冊姓名不改（身分由 sweep 核對詳細頁證號把關）。
 - 計數修正：懲戒欄舊 HTML 換新站純文字（這批 13 位）不再算進「異動」。
+
+## 公會人數週更與司法院月統計搬本機排程（2026-11-06）
+
+改版後仍留在 GitHub runner 的兩支排程爬蟲也接連連不上政府站，一併搬到本機 Windows 排程；兩支 workflow 只留 `workflow_dispatch` 手動備援（本機漏跑時到 GitHub 按一次補，寫入皆冪等），同時省 Actions 分鐘數。
+
+| 項目 | 原排程 | 症狀 | 現在 |
+|---|---|---|---|
+| `scripts/moj_lawyer_scraper.py`：16 公會人數→`industry_stats`（情報站唯一回看到上線日的週序列：全國合計列 `region` 為 NULL、唯一鍵擋不住，所以每跑一次多一列）、公會聯絡資訊→`law_firms` | `scrape-moj-lawyers.yml` 每週一 02:00 | 2026-11-01 排程 runner 連 lawyerbc `[Errno 101] Network is unreachable`；11-06 手動重跑人數有寫入、但 `/Guild/Info` 回 HTTP 200 卻沒有表格（解析 0 列）而紅燈；本機同一頁 17 列正常、版面沒改 | 掛進本機每週 launcher `moj_detail_sweep_weekly.py` **第 0 步**（排程 `moj-detail-sweep-weekly` 週五 09:30；放最前面是為了就算後面 4 小時 sweep 出事週序列也不斷），launcher 收尾行改為 `[launcher] guild_rc=… ingest_rc=… sweep_rc=… alumni_rc=… refresh_ok=N/4`。`_get_html(path, must_have)` 加「頁面有效性」檢查：呼叫端傳必要標記（GuildCounter `.guild-counter-card`、Guild/Info `tr.guild-row`），200 但缺標記＝暫時性失敗，與連線錯誤、5xx／429 走同一套退避重試（15／30／60／120 秒），重試仍失敗才拋；首頁更新截止日抓不到只記 log、不再讓整支紅燈 |
+| `scripts/judicial_official_stats.py`：司法院開放平臺 18.7 MB 月檔→`court_case_stats` 全量 upsert（約 43 萬列） | `judicial-official-stats.yml` 每月 5 日 04:00 | 11-05 排程、11-06 手動重跑連兩天 connect timeout（runner 海外 IP 被擋，DoH 解析到的 IP 一樣連不上）；本機同一個 IP 0.07 秒即通 | 新 launcher `scripts/judicial_official_stats_monthly.py`＋本機排程 `judicial-official-stats-monthly`：**每日 10:30 觸發**（雷晚上關機、WakeToRun 叫不醒，月更型 CalendarTrigger 漏跑後不補跑、每日型會補），腳本自判「今天 ≥5 日且 `data_sources.last_scraped_at`（台灣時間）不在本月」才跑 `judicial_official_stats.py run`，成功才 PATCH `last_scraped_at`（同原 workflow 最後一步；失敗不 PATCH，隔天自動重試到成功或月底）。log `scripts/judicial_official_stats_monthly.log`，收尾行 `[launcher] action=skip reason=…` 或 `action=run run_rc=… patch_ok=0|1`；`--check` 只印判斷、`--force` 手動強跑 |
+
+排程設定比照 `moj-detail-sweep-weekly`：pythonw、工作目錄 `scripts`、StartWhenAvailable、WakeToRun、IgnoreNew、逾時 2 小時（週更那支 10 小時）。每日巡檢 skill `daily-sync-patrol` 的 SKILL.md 已同步改（新增排程、新 log、launcher 行新欄位、兩支 workflow 不再查排程 run）。
+
+### 驗收（2026-11-06 上午，本機 `Start-ScheduledTask` 實跑）
+
+- `moj-detail-sweep-weekly` 08:33 觸發：公會步驟 0.2 分鐘 rc=0——`industry_stats` 2026-11 全國合計多一列（13,597 人，created_at 08:33）、16 筆 `law_firms` 公會列 `updated_at` 更新、`scrape_logs` success found=33；launcher 接著照常跑 ingest（佇列 0）→ sweep（約 4 小時）。同日 09:30 的正常觸發因實例還在跑被 IgnoreNew 略過，等同本週只跑一次。
+- `judicial-official-stats-monthly` 第一次 08:36 觸發：`last_scraped_at` 已是本月（08:16 同仁手動跑） → `action=skip reason=本月已跑`，Last Result 0。
+- `judicial-official-stats-monthly` 第二次 08:37 觸發（先把 `last_scraped_at` 暫清為 NULL 以走完整路徑）：download → parse → 431,928 列 upsert 共 7.7 分鐘 rc=0，`PATCH last_scraped_at` HTTP 204，收尾行 `[launcher] action=run run_rc=0 patch_ok=1`，Last Result 0；`court_case_stats` 總列數 431,928 不變、`last_scraped_at`＝08:44。同日 10:30 的正常觸發會再走一次 skip。
+- 合併本 PR 前，主 checkout 停在分支 `chore/move-moj-judicial-scrapers-local`（本機排程跑的是這份工作樹的新碼）；合併後 `git checkout main && git pull` 即可。
