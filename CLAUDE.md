@@ -282,8 +282,10 @@
 - **facts 快照月更（2026-10-02）**：`firm_analysis_facts`（「產業結構分析」「產業深度報告」直讀，PK=firm）是
   `facts_extract.py` 產 `facts.tsv`、`upload_facts.py` 寫入的快照，資料窗＝`dedup_months`。原本沒有排程
   （9/01 產完就停在 65 個月、月表進新月份也不會動），現在是本機排程 `judgment-derivs-monthly`
-  （`scripts/judgment_derivs_monthly.py`，每月最後一天 10:00；2026-10-02 由 21 日挪過來，排在雲端月更
-  17／20／23／27 日四次嘗試之後）的步驟 9，排在管線尾端。
+  （每日 11:00 觸發 `scripts/judgment_derivs_daily.py` 自判：月表最新月前進了、或 28 日起本月還沒跑過，才真的跑
+  `judgment_derivs_monthly.py`；2026-11-06 由「每月最後一天 10:00」改成每日——雷晚上關機，月更型觸發開機後
+  不一定補跑，10/31 首跑就漏了。與 law010 判決比對共用 `.judgment_work/pipeline.lock` 互斥；`--check` 看判定、
+  `--force-next` 讓下一次排程強制跑）的步驟 9，排在管線尾端。
   - 只能本機跑：要讀 `scripts/_batch408/leaders/*.json`（不在版控——`_batch408` 只有 v2 這兩支腳本進 git，
     其餘是本機工作檔；repo 是公開的，別把整個目錄加進去）。
   - 不看目標月，每次照 `firm_dedup_totals` 當下的全窗重產，所以月表比排程日晚到的月份下一次執行就補上；

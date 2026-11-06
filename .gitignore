@@ -37,3 +37,6 @@ scripts/.moj_harvest_work/
 
 # MOJ 每週掃描本機 log（異動摘要含律師姓名，不可 commit）
 scripts/moj_detail_sweep_weekly.log
+
+# 裁判書衍生管線本機 log（judgment-derivs-monthly 排程；狀態檔 _judgment_derivs_state.json 由 scripts/_*.json 擋）
+scripts/judgment_derivs_monthly.log
