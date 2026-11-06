@@ -14,7 +14,7 @@
      勞資名單（勞檢裁罰每日在變）、facts（標案金額）等不吃新月份的步驟也要每月刷一次
   2. 本月對同一個 T 已失敗 3 次 → 不再自動重試（第 3 次失敗的 [launcher] 行會寫明），等人看 log
   真的跑：等 DNS 就緒（開機補跑時網路還沒好）→ 取月包快取互斥鎖（law010 判決比對第一步也會
-  collect 月包，兩者不可同時跑；鎖檔 .judgment_work/pipeline.lock）→ 子行程跑 judgment_derivs_monthly.py
+  collect 月包，兩者不可同時跑；鎖檔 .judgment_work/pipeline.lock，協定見 pipeline_lock.py）→ 子行程跑 judgment_derivs_monthly.py
   → 成功記 last_ok；失敗記 fails 計數，明天再試。
 
 用法：
@@ -40,16 +40,15 @@ import urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import judgment_derivs_monthly as monthly  # noqa: E402  共用 rest_get／log／ENV_LII
+from pipeline_lock import acquire_lock, release_lock  # noqa: E402  月包快取互斥鎖（四支排程共用）
 
 STATE = os.path.join(HERE, '_judgment_derivs_state.json')
-LOCK = os.path.join(HERE, '.judgment_work', 'pipeline.lock')
 MONTHLY = os.path.join(HERE, 'judgment_derivs_monthly.py')
 PY = sys.executable.replace('pythonw.exe', 'python.exe')
 NO_WIN = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 FALLBACK_DAY = 28        # 月表沒前進時，這天起本月還沒跑過就跑一輪
 MAX_FAILS = 3            # 同一目標月、同一個月內最多自動重試次數
 LOCK_WAIT_MIN = 60       # 等 law010 釋放月包快取鎖的上限
-LOCK_STALE_H = 12        # 鎖檔超過這麼久一律當殘留
 RUN_TIMEOUT = 7 * 3600   # 排程 ExecutionTimeLimit 是 8 小時
 
 
@@ -84,55 +83,6 @@ def wait_network(host, tries=10, wait=30):
         except socket.gaierror:
             time.sleep(wait)
     return False
-
-
-def pid_alive(pid):
-    try:
-        out = subprocess.run(['tasklist', '/FI', f'PID eq {int(pid)}', '/NH', '/FO', 'CSV'],
-                             capture_output=True, text=True, timeout=30, creationflags=NO_WIN).stdout
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return True  # 查不出來就當它還活著，寧可多等
-    return f'"{int(pid)}"' in out
-
-
-def acquire_lock(owner, wait_min):
-    """.judgment_work/pipeline.lock：O_EXCL 原子建立；持有者行程已不在或鎖太舊就清掉重取。"""
-    os.makedirs(os.path.dirname(LOCK), exist_ok=True)
-    deadline = time.time() + wait_min * 60
-    announced = False
-    while time.time() < deadline:
-        try:
-            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            holder = read_json(LOCK) or {}
-            try:
-                age_h = (time.time() - os.path.getmtime(LOCK)) / 3600
-            except OSError:
-                age_h = 0
-            if not holder.get('pid') or age_h > LOCK_STALE_H or not pid_alive(holder['pid']):
-                try:
-                    os.remove(LOCK)
-                except OSError:
-                    pass
-                time.sleep(1)
-                continue
-            if not announced:
-                log(f'月包快取鎖被 {holder.get("owner", "?")}（pid {holder["pid"]}）佔用，最多等 {wait_min} 分鐘')
-                announced = True
-            time.sleep(30)
-            continue
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
-            json.dump({'pid': os.getpid(), 'owner': owner, 'started_at': now_iso()}, f)
-        return True
-    return False
-
-
-def release_lock():
-    try:
-        if (read_json(LOCK) or {}).get('pid') == os.getpid():
-            os.remove(LOCK)
-    except OSError:
-        pass
 
 
 def latest_month():
@@ -216,7 +166,7 @@ def main():
     if action == 'skip':
         return 0   # 本月已完成：不留痕
 
-    if not acquire_lock('judgment_derivs_daily', LOCK_WAIT_MIN):
+    if not acquire_lock('judgment_derivs_daily', LOCK_WAIT_MIN, log=log):
         log(f'❌ 等月包快取鎖 {LOCK_WAIT_MIN} 分鐘仍被佔用，本次放棄（明天排程再試）')
         return 1
     try:
