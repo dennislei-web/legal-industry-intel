@@ -646,6 +646,10 @@
   **log 公開**：腳本只印期別與段數，不印人名所名。排程 `.github/workflows/industry-watch-report.yml` 每日 UTC 02:00 跑 auto。
 - 前端 `tab-watch`（`loadWatchOnce`／`_iw`／`iwRender*`）：頻率切換＋閱讀／比較（任兩期指標逐項 A−B）／趨勢（單一指標 Chart.js）。測試殼可用 `window.__iwOverride` 餵列。
 - 週報在法務部掃描沒跑的週（電腦關機）數字會偏少；2026-10-23～10-31 改版停擺與首輪補登已寫進報告口徑段。
+- **AI 解讀（mig 274，2026-11-10）**：`interpretation` jsonb（headline／insights[{title,body}]／zhelu／actions／watch／data_cautions）＋`interp_model`＋`interpreted_at`。
+  產一期時若有 `ANTHROPIC_API_KEY`（環境變數 → scripts/.env → `ANTHROPIC_KEY_FILE` 指的 .env）就呼叫 `claude-opus-5-5`（effort high、structured outputs、`fallbacks: "default"`），
+  輸入＝本期 highlights／sections／metrics＋同頻率前 8 期 metrics；系統提示寫死產業背景與口徑陷阱（`INTERP_SYSTEM`，改背景數字要同步）。失敗只印警告、規則報告照寫；
+  `auto` 會順手補最近 3 期缺的解讀；`interpret [--cadence] [--force]` 手動補／重寫。GitHub 排程要 repo secret `ANTHROPIC_API_KEY`，沒設就只產規則報告。每份約輸入 5k／輸出 3k tokens。
 
 ## 法律產業薪資分析（喆律戰情最後一個 tab，admin-only，mig 247，2026-10-11）
 

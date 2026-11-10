@@ -2456,6 +2456,13 @@
         .iw-grp td{font-weight:600;color:var(--gold);padding-top:10px;}
         .iw-meta{font-size:0.74rem;color:var(--text-muted);}
         .iw-chartbox{position:relative;height:300px;margin-top:10px;}
+        .iw-ai{background:var(--ghost-bg);border:1px solid var(--gold);border-radius:10px;padding:14px 16px;margin:12px 0;}
+        .iw-ai-tag{font-size:0.7rem;color:var(--gold);letter-spacing:1px;margin-bottom:4px;}
+        .iw-ai-head{font-size:0.98rem;font-weight:700;line-height:1.6;margin-bottom:6px;}
+        .iw-ai-sub{font-size:0.8rem;font-weight:600;color:var(--gold);margin:12px 0 4px;}
+        .iw-ai-item{font-size:0.83rem;line-height:1.75;margin:6px 0;}
+        .iw-ai-item b{display:block;}
+        .iw-ai ul{margin:2px 0;padding-left:20px;font-size:0.83rem;line-height:1.75;}
       </style>
       <div class="card" style="margin-top:16px;border:1px solid var(--gold);">
         <div class="card-title">&#128274; 產業觀察 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
@@ -16250,7 +16257,7 @@ async function loadWatchOnce() {
   const { data, error } = await (window.__iwOverride
     ? Promise.resolve({ data: window.__iwOverride, error: null })
     : db.from('industry_watch_reports')
-        .select('id,cadence,period_key,period_start,period_end,title,summary,highlights,sections,metrics,generated_at')
+        .select('id,cadence,period_key,period_start,period_end,title,summary,highlights,sections,metrics,generated_at,interpretation,interp_model,interpreted_at')
         .order('period_end', { ascending: false }).order('id', { ascending: false }).range(0, 999));
   if (error) { _iw.loaded = false; body.innerHTML = `<div class="iw-note">讀取失敗：${escHtml(error.message || '')}</div>`; return; }
   _iw.rows = data || [];
@@ -16328,8 +16335,27 @@ function iwRenderRead(body, list) {
     </div>
     <div style="font-size:1.05rem;font-weight:700;">${escHtml(r.title)}</div>
     <div class="iw-meta">期間 ${r.period_start}～${r.period_end}・產出 ${escHtml(gen)}</div>
-    <div class="iw-hl"><b>本期重點</b><ul>${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>
+    ${iwInterpHtml(r)}
+    <div class="iw-hl" style="border-color:var(--border);"><b>本期數字重點</b><ul>${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>
     ${(r.sections || []).map(iwSectionHtml).join('')}`;
+}
+
+// AI 解讀（Claude 依本期＋同頻率前 8 期數字撰寫；沒有就不顯示）
+function iwInterpHtml(r) {
+  const it = r.interpretation;
+  if (!it) return '<div class="iw-note" style="margin-top:10px;">本期尚無 AI 解讀（下一次排程會補上）。</div>';
+  const list = (title, arr) => (arr && arr.length) ? `<div class="iw-ai-sub">${title}</div><ul>${arr.map(x => `<li>${escHtml(x)}</li>`).join('')}</ul>` : '';
+  const when = r.interpreted_at ? new Date(r.interpreted_at).toLocaleDateString('zh-TW') : '';
+  return `<div class="iw-ai">
+    <div class="iw-ai-tag">AI 解讀・${escHtml(r.interp_model || 'Claude')}・${escHtml(when)}</div>
+    <div class="iw-ai-head">${escHtml(it.headline || '')}</div>
+    ${(it.insights || []).length ? '<div class="iw-ai-sub">產業含意</div>' + it.insights.map(x => `<div class="iw-ai-item"><b>${escHtml(x.title || '')}</b><div>${escHtml(x.body || '')}</div></div>`).join('') : ''}
+    ${list('對喆律的影響', it.zhelu)}
+    ${list('建議動作', it.actions)}
+    ${list('下一期觀察', it.watch)}
+    ${list('資料注意事項', it.data_cautions)}
+    <div class="iw-note">由 Claude 依本期與前幾期數字撰寫，判讀僅供參考；數字以下方各段為準。</div>
+  </div>`;
 }
 
 function iwMetricKeys(rows) {
@@ -16354,7 +16380,7 @@ function iwRenderCompare(body, list) {
       rows += `<tr><td>${escHtml(ma.label || mb.label || k)}</td><td class="num">${iwFmt(ma.value, unit)}</td><td class="num">${iwFmt(mb.value, unit)}</td><td class="num">${iwDelta(ma.value, mb.value, unit) || '—'}</td></tr>`;
     });
   });
-  const hl = r => `<div style="flex:1 1 300px;min-width:0;"><div style="font-weight:600;font-size:0.84rem;">${escHtml(r.title)}</div><ul style="margin:4px 0;padding-left:20px;font-size:0.8rem;line-height:1.7;">${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>`;
+  const hl = r => `<div style="flex:1 1 300px;min-width:0;"><div style="font-weight:600;font-size:0.84rem;">${escHtml(r.title)}</div>${r.interpretation && r.interpretation.headline ? `<div style="font-size:0.82rem;margin:4px 0;color:var(--gold);">AI：${escHtml(r.interpretation.headline)}</div>` : ''}<ul style="margin:4px 0;padding-left:20px;font-size:0.8rem;line-height:1.7;">${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>`;
   body.innerHTML = `
     <div class="iw-bar">
       <span class="iw-meta">A</span><select class="iw-sel" onchange="_iw.a=this.value;iwRender()">${iwOpts(list, A.id)}</select>

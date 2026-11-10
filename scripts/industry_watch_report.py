@@ -9,6 +9,8 @@
   python scripts/industry_watch_report.py quarterly [--period 2026-Q3]  [--force]
   python scripts/industry_watch_report.py yearly  [--period 2026]       [--force]
   python scripts/industry_watch_report.py backfill            # 一次補齊 2026-07-27 起所有已完成期間
+  python scripts/industry_watch_report.py interpret [--cadence monthly] [--force]   # 幫已存在的報告補（重寫）AI 解讀
+  （有 ANTHROPIC_API_KEY 時，每產一期會順手呼叫 Claude 寫「AI 解讀」；--no-ai 關掉）
 
 期間與產出日：
   每週＝週六～週五（接在週五本機法務部掃描之後），週六起產出，period_key＝週五日期
@@ -405,6 +407,120 @@ def build_report(cadence, start, end, r, prev, turnover):
             'sections': S, 'metrics': M}
 
 
+# ───────────────────────── AI 解讀（Claude） ─────────────────────────
+INTERP_MODEL = 'claude-opus-5-5'
+INTERP_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'headline': {'type': 'string'},
+        'insights': {'type': 'array', 'items': {
+            'type': 'object',
+            'properties': {'title': {'type': 'string'}, 'body': {'type': 'string'}},
+            'required': ['title', 'body'], 'additionalProperties': False}},
+        'zhelu': {'type': 'array', 'items': {'type': 'string'}},
+        'actions': {'type': 'array', 'items': {'type': 'string'}},
+        'watch': {'type': 'array', 'items': {'type': 'string'}},
+        'data_cautions': {'type': 'array', 'items': {'type': 'string'}},
+    },
+    'required': ['headline', 'insights', 'zhelu', 'actions', 'watch', 'data_cautions'],
+    'additionalProperties': False,
+}
+INTERP_SYSTEM = """你是喆律法律事務所主持律師的產業策略分析師。你會收到一份「台灣法律產業觀察」定期報告的數字（本期＋同頻率前幾期），要寫出數字背後的含意。
+
+讀者：喆律主持律師，以經營者視角看報告，要的是「這代表什麼、對我們有什麼影響、該做什麼」，不是把數字再念一次。
+
+背景（判讀時可以引用，但不要當成本期數字）：
+- 台灣約 5,500 家事務所、所內律師約 1.16 萬人；單人所約 68%，20 人以上約 30 家，前 10 大只佔約 6%，市場極度分散。新增律師約六成在台北。
+- 2 人以上律所律師離職率（名冊口徑）年化約 14%，是下限，校正後約 18–20%；10–29 人中型所流動最高。
+- 民事訴訟委任率隨標的金額上升（1–10 萬約 4.5%、100 萬以上過半）；家事委任率基線高。
+- 喆律：約 68 位律師的量產型事務所，主力家事、消債、刑事等可標準化案件，靠線上行銷獲客，人均案量遠高於傳統大所；裁判書所級去重案量全國前 5。
+- 「案量高但不做行銷」的事務所，主要案源約四分之三是在地口碑；靠線上行銷的極少，這是喆律的差異化能力。
+- 前司法官開設的中型精品所是近年明顯趨勢。
+
+資料口徑（一定要遵守）：
+- 律師異動自 2026-07-27 起才可靠。2026-10-23～10-29 法務部官網改版、異動偵測停擺；10-30／10-31 新架構首輪掃描一次補登（10-31 單日新進 175 位、新設所大增）。涵蓋這段的期間，新進律師與新設事務所數字含累積補登，不能解讀成真實增量。
+- 週報數字小，單週 ±幾筆的變化多半是雜訊；百分比變化在基數很小時（例如上週 4 筆）沒有意義，不要拿來下結論。
+- 裁判書案量只算公開裁判書（下限）、按現任名冊回溯；月份是期間往前推 2 個月。
+- 公會人數是週更序列，跨會重複計入，看趨勢不看絕對數。
+- 名單裡的人名與所名都是公開登錄資料；具名討論時只陳述異動事實，不推測個人動機或負面評價。
+
+寫作規則：
+- 全部用繁體中文；百分點也寫成 %，不要用 pt／pp。不要自創縮寫。
+- 每一點都要扣回報告裡的具體數字或名單（寫出數字），不可以引用報告沒有的數字，也不可以捏造事實；背景資料只能當參照。
+- 先分辨「真實變化」和「資料假象／雜訊」。資料不足以下結論時直接說不足，不要硬湊洞察。
+- 與前幾期比較時，看方向是否持續（連續幾期上升／下降），不要只看單期差額。
+- 欄位：headline＝一句話總結本期最重要的事（30–60 字）；insights＝3–5 點產業含意，每點有標題與 2–4 句說明；zhelu＝2–4 點對喆律的影響（招募、留才、競爭、業務線、獲客）；actions＝2–4 個具體可執行的建議動作（誰、做什麼，能做的人選或對象就寫出來）；watch＝1–3 個下一期要盯的訊號；data_cautions＝0–3 點本期要小心的資料問題（沒有就空陣列）。
+- 簡潔：整份解讀約 500–900 字。"""
+
+
+def load_anthropic_key():
+    """ANTHROPIC_API_KEY：環境變數 → scripts/.env → ANTHROPIC_KEY_FILE 指定的 .env；都沒有回 None（只做規則報告）"""
+    if os.environ.get('ANTHROPIC_API_KEY', '').strip():
+        return os.environ['ANTHROPIC_API_KEY'].strip()
+    for path in (os.path.join(HERE, '.env'), os.environ.get('ANTHROPIC_KEY_FILE', '')):
+        if path and os.path.exists(path):
+            with open(path, encoding='utf-8-sig') as f:
+                for line in f:
+                    if line.strip().startswith('ANTHROPIC_API_KEY='):
+                        v = line.split('=', 1)[1].strip().strip('"').strip("'")
+                        if v:
+                            return v
+    return None
+
+
+def history_for(cadence, end, n=8):
+    rows = http('GET', f'/rest/v1/industry_watch_reports?select=period_key,metrics&cadence=eq.{cadence}'
+                       f'&period_end=lt.{end.isoformat()}&order=period_end.desc&limit={n}') or []
+    out = []
+    for r in reversed(rows):
+        out.append({'period': r['period_key'],
+                    'metrics': {k: v.get('value') for k, v in (r.get('metrics') or {}).items()}})
+    return out
+
+
+def interpret(cadence, start, end, rep, history):
+    key = load_anthropic_key()
+    if not key:
+        return None
+    import anthropic                       # 只有要解讀時才需要這個套件
+    client = anthropic.Anthropic(api_key=key, max_retries=3)
+    payload = {
+        'report_type': CADENCE_LABEL[cadence], 'period': f'{start.isoformat()}～{end.isoformat()}', 'title': rep['title'],
+        'highlights': rep['highlights'], 'sections': rep['sections'],
+        'metrics': {k: {'label': v['label'], 'value': v['value'], 'unit': v['unit']} for k, v in rep['metrics'].items()},
+        'previous_periods_same_cadence': history,
+    }
+    msg = ('以下是本期報告與同頻率前幾期的指標（JSON）。請依系統說明寫出解讀。\n\n'
+           + json.dumps(payload, ensure_ascii=False))
+    try:
+        resp = client.beta.messages.create(
+            model=INTERP_MODEL, max_tokens=16000,
+            system=INTERP_SYSTEM,
+            messages=[{'role': 'user', 'content': msg}],
+            output_config={'effort': 'high', 'format': {'type': 'json_schema', 'schema': INTERP_SCHEMA}},
+            betas=['server-side-fallback-2026-07-01'], fallbacks='default',
+        )
+    except anthropic.APIStatusError as e:
+        print(f'  ⚠️ 解讀失敗 HTTP {e.status_code}（報告照常寫入，之後可用 interpret 模式補）')
+        return None
+    except anthropic.APIConnectionError:
+        print('  ⚠️ 解讀失敗：連不上 API（報告照常寫入）')
+        return None
+    if resp.stop_reason != 'end_turn':
+        print(f'  ⚠️ 解讀未完成 stop_reason={resp.stop_reason}')
+        return None
+    text = next((b.text for b in resp.content if b.type == 'text'), '')
+    try:
+        data = json.loads(text)
+    except ValueError:
+        print('  ⚠️ 解讀回傳不是合法 JSON')
+        return None
+    u = resp.usage
+    print(f'  🧠 解讀完成（輸入 {u.input_tokens} / 輸出 {u.output_tokens} tokens）')
+    return {'interpretation': data, 'interp_model': resp.model,
+            'interpreted_at': dt.datetime.now(dt.timezone.utc).isoformat()}
+
+
 # ───────────────────────── 主流程 ─────────────────────────
 def existing_keys(cadence):
     rows = http('GET', f'/rest/v1/industry_watch_reports?select=period_key&cadence=eq.{cadence}') or []
@@ -417,7 +533,7 @@ def prev_report(cadence, start):
     return rows[0] if rows else None
 
 
-def generate(cadence, start, end, today):
+def generate(cadence, start, end, today, use_ai=True):
     key = key_of(cadence, start, end)
     raw = http('POST', '/rest/v1/rpc/industry_watch_metrics', {'p_start': start.isoformat(), 'p_end': end.isoformat()})
     turnover = turnover_now() if cadence != 'weekly' and (today - end).days <= 31 else None
@@ -428,19 +544,58 @@ def generate(cadence, start, end, today):
     http('POST', '/rest/v1/industry_watch_reports?on_conflict=cadence,period_key', row,
          {'Prefer': 'resolution=merge-duplicates,return=minimal'})
     print(f'  ✅ {cadence} {key}：{len(rep["sections"])} 段、{len(rep["metrics"])} 項指標')
+    if use_ai:
+        ai = interpret(cadence, start, end, rep, history_for(cadence, end))
+        if ai:
+            http('PATCH', f'/rest/v1/industry_watch_reports?cadence=eq.{cadence}&period_key=eq.{key}', ai,
+                 {'Prefer': 'return=minimal'})
+
+
+def interpret_existing(cadence, force, recent=None):
+    """幫已存在的報告補（或重寫）AI 解讀，舊→新；recent＝只看最近 N 期"""
+    sel = 'period_key,period_start,period_end,title,highlights,sections,metrics,interpretation'
+    rows = http('GET', f'/rest/v1/industry_watch_reports?select={sel}&cadence=eq.{cadence}&order=period_end.asc') or []
+    if recent:
+        rows = rows[-recent:]
+    n = 0
+    for r in rows:
+        if r.get('interpretation') and not force:
+            continue
+        start, end = dt.date.fromisoformat(r['period_start']), dt.date.fromisoformat(r['period_end'])
+        rep = {k: r[k] for k in ('title', 'highlights', 'sections', 'metrics')}
+        print(f'  {cadence} {r["period_key"]}')
+        ai = interpret(cadence, start, end, rep, history_for(cadence, end))
+        if ai:
+            http('PATCH', f'/rest/v1/industry_watch_reports?cadence=eq.{cadence}&period_key=eq.{r["period_key"]}', ai,
+                 {'Prefer': 'return=minimal'})
+            n += 1
+    return n
 
 
 def main():
     global URL, KEY
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['auto', 'backfill', 'weekly', 'monthly', 'quarterly', 'yearly'])
+    ap.add_argument('mode', choices=['auto', 'backfill', 'interpret', 'weekly', 'monthly', 'quarterly', 'yearly'])
     ap.add_argument('--period')
-    ap.add_argument('--force', action='store_true', help='不檢查產出日、已存在也重產')
+    ap.add_argument('--force', action='store_true', help='不檢查產出日、已存在也重產（interpret 模式＝已有解讀也重寫）')
+    ap.add_argument('--no-ai', action='store_true', help='只產規則報告，不呼叫 Claude 解讀')
+    ap.add_argument('--cadence', help='interpret 模式只處理這個頻率')
     ap.add_argument('--today', help='測試用，假裝今天是這天')
     a = ap.parse_args()
     URL, KEY = load_env()
     today = dt.date.fromisoformat(a.today) if a.today else (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=8)).date()
+    use_ai = not a.no_ai
+    if use_ai and not load_anthropic_key():
+        print('（沒有 ANTHROPIC_API_KEY，本次只產規則報告、不寫 AI 解讀）')
+        use_ai = False
     fails = 0
+
+    if a.mode == 'interpret':
+        if not use_ai:
+            sys.exit('interpret 模式需要 ANTHROPIC_API_KEY')
+        for cad in ([a.cadence] if a.cadence else ['weekly', 'monthly', 'quarterly', 'yearly']):
+            print(f'{CADENCE_LABEL[cad]}：補解讀 {interpret_existing(cad, a.force)} 份')
+        return
 
     if a.mode in ('auto', 'backfill'):
         for cad in ('weekly', 'monthly', 'quarterly', 'yearly'):
@@ -452,10 +607,14 @@ def main():
             print(f'{CADENCE_LABEL[cad]}：已到產出日 {len(periods)} 期、待產 {len(todo)} 期')
             for s, e in todo:              # 舊→新，比較基準才會是剛產好的前一期
                 try:
-                    generate(cad, s, e, today)
+                    generate(cad, s, e, today, use_ai)
                 except Exception as ex:  # noqa: BLE001
                     fails += 1
                     print(f'  ❌ {cad} {key_of(cad, s, e)}：{ex}')
+            if use_ai and a.mode == 'auto':   # 之前解讀失敗或當時沒金鑰的最近幾期，順手補上
+                k = interpret_existing(cad, False, recent=3)
+                if k:
+                    print(f'  補解讀 {k} 份')
     else:
         cad = a.mode
         if a.period:
@@ -467,7 +626,7 @@ def main():
             s, e = ps[-1]
         if not a.force and ready_date(cad, e) > today:
             sys.exit(f'{key_of(cad, s, e)} 還沒到產出日 {ready_date(cad, e)}；確定要提前產請加 --force')
-        generate(cad, s, e, today)
+        generate(cad, s, e, today, use_ai)
     if fails:
         sys.exit(1)
 
