@@ -649,7 +649,10 @@
 - **AI 解讀（mig 274，2026-11-10）**：`interpretation` jsonb（headline／insights[{title,body}]／zhelu／actions／watch／data_cautions）＋`interp_model`＋`interpreted_at`。
   產一期時若有 `ANTHROPIC_API_KEY`（環境變數 → scripts/.env → `ANTHROPIC_KEY_FILE` 指的 .env）就呼叫 `claude-opus-5-5`（effort high、structured outputs、`fallbacks: "default"`），
   輸入＝本期 highlights／sections／metrics＋同頻率前 8 期 metrics；系統提示寫死產業背景與口徑陷阱（`INTERP_SYSTEM`，改背景數字要同步）。失敗只印警告、規則報告照寫；
-  `auto` 會順手補最近 3 期缺的解讀；`interpret [--cadence] [--force]` 手動補／重寫。GitHub 排程要 repo secret `ANTHROPIC_API_KEY`，沒設就只產規則報告。每份約輸入 5k／輸出 3k tokens。
+  `auto` 會順手補最近 3 期缺的解讀；`interpret [--cadence] [--force]` 手動補／重寫。每份約輸入 5k／輸出 3k tokens。
+  **金鑰不放 GitHub（2026-11-10 使用者決定）**：GitHub 排程只產規則報告；解讀由本機 Windows 排程 `industry-watch-daily`（每日 11:15，pythonw 跑
+  `scripts/industry_watch_local.py` → `industry_watch_report.py auto`，網路探測＋失敗重試一次，log `scripts/industry_watch_local.log` 末行 `[launcher] rc=…`）寫入；
+  本機金鑰路徑放 scripts/.env 的 `ANTHROPIC_KEY_FILE`（指到 lawyer-dashboard-clean 的 .env）。關機那天解讀延後到下次開機的排程補。
 
 ## 法律產業薪資分析（喆律戰情最後一個 tab，admin-only，mig 247，2026-10-11）
 

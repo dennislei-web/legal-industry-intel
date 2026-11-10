@@ -453,18 +453,28 @@ INTERP_SYSTEM = """你是喆律法律事務所主持律師的產業策略分析�
 - 簡潔：整份解讀約 500–900 字。"""
 
 
+def _env_value(path, name):
+    if path and os.path.exists(path):
+        with open(path, encoding='utf-8-sig') as f:
+            for line in f:
+                if line.strip().startswith(name + '='):
+                    v = line.split('=', 1)[1].strip().strip('"').strip("'")
+                    if v:
+                        return v
+    return None
+
+
 def load_anthropic_key():
-    """ANTHROPIC_API_KEY：環境變數 → scripts/.env → ANTHROPIC_KEY_FILE 指定的 .env；都沒有回 None（只做規則報告）"""
+    """ANTHROPIC_API_KEY：環境變數 → scripts/.env → ANTHROPIC_KEY_FILE 指定的 .env
+    （ANTHROPIC_KEY_FILE 可放環境變數或 scripts/.env，本機排程用後者指到 lawyer-dashboard 的 .env）；都沒有回 None（只做規則報告）"""
     if os.environ.get('ANTHROPIC_API_KEY', '').strip():
         return os.environ['ANTHROPIC_API_KEY'].strip()
-    for path in (os.path.join(HERE, '.env'), os.environ.get('ANTHROPIC_KEY_FILE', '')):
-        if path and os.path.exists(path):
-            with open(path, encoding='utf-8-sig') as f:
-                for line in f:
-                    if line.strip().startswith('ANTHROPIC_API_KEY='):
-                        v = line.split('=', 1)[1].strip().strip('"').strip("'")
-                        if v:
-                            return v
+    local_env = os.path.join(HERE, '.env')
+    key_file = os.environ.get('ANTHROPIC_KEY_FILE', '').strip() or _env_value(local_env, 'ANTHROPIC_KEY_FILE')
+    for path in (local_env, key_file):
+        v = _env_value(path, 'ANTHROPIC_API_KEY')
+        if v:
+            return v
     return None
 
 

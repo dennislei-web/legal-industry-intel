@@ -47,3 +47,6 @@ scripts/achievement_monthly.log
 
 # 司法院官方案件統計月更 launcher 本機 log
 scripts/judicial_official_stats_monthly.log
+
+# 產業觀察 AI 解讀本機 launcher log（含人名異動，不進公開 repo）
+scripts/industry_watch_local.log
