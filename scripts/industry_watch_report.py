@@ -408,7 +408,23 @@ def build_report(cadence, start, end, r, prev, turnover):
 
 
 # ───────────────────────── AI 解讀（Claude） ─────────────────────────
-INTERP_MODEL = 'claude-opus-5-5'
+INTERP_MODEL = 'claude-opus-5-5'          # 週報（2026-11-10 使用者指定）
+INTERP_FABLE_FALLBACK = 'claude-fable-5-2'  # 月／季／年報＝當時最新的 Fable；查不到模型清單時用這個
+_latest_fable = None
+
+
+def interp_model_for(cadence, client):
+    """週報固定 Opus 5.5；月報、季報、年報用執行當下最新的 Fable（Models API 依 created_at 取最新 claude-fable-*）"""
+    global _latest_fable
+    if cadence == 'weekly':
+        return INTERP_MODEL
+    if _latest_fable is None:
+        try:
+            fables = [m for m in client.models.list(limit=100) if m.id.startswith('claude-fable-')]
+            _latest_fable = max(fables, key=lambda m: m.created_at).id if fables else INTERP_FABLE_FALLBACK
+        except Exception:  # noqa: BLE001
+            _latest_fable = INTERP_FABLE_FALLBACK
+    return _latest_fable
 INTERP_SCHEMA = {
     'type': 'object',
     'properties': {
@@ -502,14 +518,21 @@ def interpret(cadence, start, end, rep, history):
     }
     msg = ('以下是本期報告與同頻率前幾期的指標（JSON）。請依系統說明寫出解讀。\n\n'
            + json.dumps(payload, ensure_ascii=False))
+    model = interp_model_for(cadence, client)
+    base = dict(model=model, max_tokens=32000, system=INTERP_SYSTEM,
+                messages=[{'role': 'user', 'content': msg}],
+                output_config={'effort': 'high', 'format': {'type': 'json_schema', 'schema': INTERP_SCHEMA}})
+
+    def call(with_fallback):
+        extra = {'betas': ['server-side-fallback-2026-07-01'], 'fallbacks': 'default'} if with_fallback else {}
+        with client.beta.messages.stream(**base, **extra) as stream:   # Fable 單次可能跑數分鐘，用串流避免逾時
+            return stream.get_final_message()
+
     try:
-        resp = client.beta.messages.create(
-            model=INTERP_MODEL, max_tokens=16000,
-            system=INTERP_SYSTEM,
-            messages=[{'role': 'user', 'content': msg}],
-            output_config={'effort': 'high', 'format': {'type': 'json_schema', 'schema': INTERP_SCHEMA}},
-            betas=['server-side-fallback-2026-07-01'], fallbacks='default',
-        )
+        try:
+            resp = call(True)
+        except anthropic.BadRequestError:
+            resp = call(False)          # 新模型若不收 fallbacks 參數，退回不帶
     except anthropic.APIStatusError as e:
         print(f'  ⚠️ 解讀失敗 HTTP {e.status_code}（報告照常寫入，之後可用 interpret 模式補）')
         return None
