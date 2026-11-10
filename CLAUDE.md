@@ -635,6 +635,18 @@
 - Skill `/legal-research` — 法律產業深度研究助手（查 DB、分析事務所、討論產業趨勢）
 - `ANTHROPIC_API_KEY` 僅用於 `generate-insights.yml` workflow（AI 市場分析，已改為前端 Edge Function 觸發）
 
+## 產業觀察定期報告（喆律戰情第一個 tab，admin-only，mig 273，2026-11-10）
+
+- 表 `industry_watch_reports`（cadence weekly/monthly/quarterly/yearly × period_key 唯一；RLS＝`is_intel_admin()`）：
+  `highlights`（重點句）／`sections`（`{heading, note?, bullets?, table?:{cols,rows}}`）／`metrics`（`{key:{label,value,unit,group}}`，前端比較與趨勢只讀這裡）／`raw`（原始數字）。
+- `industry_watch_metrics(p_start, p_end)`：一個期間的原始數字（service_role 限定）。異動截到 2026-07-27 起；跨所移動沿用 mig 083 `flow_firm_key`／`flow_is_firm`；
+  裁判書與委任率月份＝**期間整段往前推 2 個月**（月報 10 月看 8 月），每期固定錯開才能比較。
+- 產生器 `scripts/industry_watch_report.py`（純標準庫、內文由數字規則產生不呼叫 LLM、比較基準＝同頻率前一期）：`auto`（只補最近三期缺的）／`backfill`／`weekly|monthly|quarterly|yearly [--period] [--force]`。
+  產出日：週報週六起（週六～週五，period_key＝週五）、月報次月 20 日、季報季後次月 20 日、年報次年 1/20。離職率只在期間結束 31 天內記錄（`firm_turnover_stats()` 是 7/27 起累積值）。
+  **log 公開**：腳本只印期別與段數，不印人名所名。排程 `.github/workflows/industry-watch-report.yml` 每日 UTC 02:00 跑 auto。
+- 前端 `tab-watch`（`loadWatchOnce`／`_iw`／`iwRender*`）：頻率切換＋閱讀／比較（任兩期指標逐項 A−B）／趨勢（單一指標 Chart.js）。測試殼可用 `window.__iwOverride` 餵列。
+- 週報在法務部掃描沒跑的週（電腦關機）數字會偏少；2026-10-23～10-31 改版停擺與首輪補登已寫進報告口徑段。
+
 ## 法律產業薪資分析（喆律戰情最後一個 tab，admin-only，mig 247，2026-10-11）
 
 - 口徑並列不混算：站內名冊年資（即時）／已發布調查（長表種子）／面試筆記市場帶（admin）；官方統計、法定俸給、喆律人資池級**尚未接入**（頁尾有待辦）。

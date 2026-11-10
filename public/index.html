@@ -2433,6 +2433,49 @@
 
 
 
+    <!-- ==================== TAB: WATCH（產業觀察定期報告；admin 限定，mig 273，scripts/industry_watch_report.py） ==================== -->
+    <div id="tab-watch" class="tab-content">
+      <style>
+        .iw-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px;}
+        .iw-seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+        .iw-seg button{background:transparent;border:none;color:var(--text-muted);padding:6px 12px;font-size:0.8rem;cursor:pointer;white-space:nowrap;}
+        .iw-seg button+button{border-left:1px solid var(--border);}
+        .iw-seg button.on{background:var(--blue);color:#fff;}
+        .iw-sel{background:var(--ghost-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:0.8rem;max-width:100%;}
+        .iw-hl{background:var(--ghost-bg);border:1px solid var(--gold);border-radius:10px;padding:12px 16px;margin:10px 0 14px;}
+        .iw-hl ul{margin:6px 0 0;padding-left:20px;line-height:1.8;font-size:0.86rem;}
+        .iw-sec{margin:16px 0 0;}
+        .iw-sec h4{font-size:0.9rem;margin:0 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+        .iw-sec ul{margin:4px 0;padding-left:20px;line-height:1.75;font-size:0.82rem;}
+        .iw-note{font-size:0.74rem;color:var(--text-muted);margin:4px 0;line-height:1.6;}
+        .iw-twrap{overflow-x:auto;max-height:420px;overflow-y:auto;}
+        .iw-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+        .iw-table th,.iw-table td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+        .iw-table th{color:var(--text-muted);font-weight:600;font-size:0.74rem;white-space:nowrap;position:sticky;top:0;background:var(--card-bg, var(--bg));}
+        .iw-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .iw-grp td{font-weight:600;color:var(--gold);padding-top:10px;}
+        .iw-meta{font-size:0.74rem;color:var(--text-muted);}
+        .iw-chartbox{position:relative;height:300px;margin-top:10px;}
+      </style>
+      <div class="card" style="margin-top:16px;border:1px solid var(--gold);">
+        <div class="card-title">&#128274; 產業觀察 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.7;">
+          每週、每月、每季、每年自動產出一份台灣法律產業觀察報告並留存。<strong>週報</strong>看轉所、團隊出走、新設熄燈、喆律進出（週六產出，接在週五法務部掃描之後）；
+          <strong>月報</strong>另加事務所規模結構、裁判書案量排名、委任率、離職率（次月 20 日產出）；<strong>季報、年報</strong>是同樣指標的長期間版本，另附待人工檢查清單（季後次月 20 日、次年 1 月 20 日產出）。
+          「比較」可任選兩期逐項對照，「趨勢」看單一指標歷期變化。報告內文由數字規則自動產生，比較基準是同頻率的前一期。
+        </div>
+        <div class="iw-bar">
+          <div class="iw-seg" id="iwCadSeg"></div>
+          <div class="iw-seg" id="iwModeSeg">
+            <button data-m="read" class="on" onclick="iwSetMode('read')">閱讀</button>
+            <button data-m="compare" onclick="iwSetMode('compare')">比較</button>
+            <button data-m="trend" onclick="iwSetMode('trend')">趨勢</button>
+          </div>
+        </div>
+        <div id="iwBody"><div class="iw-note">載入中…</div></div>
+      </div>
+    </div>
+
     <!-- ==================== TAB: SALARY（法律產業薪資分析；admin 限定，mig 247／248／249／250） ==================== -->
     <div id="tab-salary" class="tab-content">
       <style>
@@ -4716,6 +4759,7 @@ const SECTIONS = {
     { tab: 'nonlit', label: '商標專利', group: '鄰接市場與人力' },
   ],
   zhelu: [
+    { tab: 'watch', label: '產業觀察', adminOnly: true },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
     { tab: 'law010', label: '010 合作律師', adminOnly: true },
     { tab: 'deepreport', label: '產業深度報告', adminOnly: true },
@@ -4796,6 +4840,7 @@ function showTab(tab) {
   if (tab === 'nlwatch' && isAdmin) loadNlWatchlist();
   if (tab === 'fieldnotes' && isAdmin) loadFieldNotes();
   if (tab === 'salary' && isAdmin) loadSalaryOnce();
+  if (tab === 'watch' && isAdmin) loadWatchOnce();
   if (tab === 'domain') initDomainTab();
   if (tab === 'overview') loadLawyerRankCardsOnce();
   if (tab === 'lawyers') loadLawyers();
@@ -16190,6 +16235,162 @@ window.salToggleDetails = function(el) {
   toggleFf(el);
   requestAnimationFrame(() => Object.values(_salCharts).forEach(c => { try { c.resize(); c.draw(); } catch (e) {} }));
 };
+
+// ==================== 產業觀察（定期報告留存＋比較；admin，mig 273） ====================
+// 資料：industry_watch_reports（scripts/industry_watch_report.py 每日 auto 補產）；RLS＝is_intel_admin()
+const IW_CAD = [['weekly', '每週'], ['monthly', '每月'], ['quarterly', '每季'], ['yearly', '每年']];
+let _iw = { loaded: false, rows: [], cad: 'weekly', mode: 'read', sel: null, a: null, b: null, metric: null, chart: null };
+try { const s = JSON.parse(localStorage.getItem('iwState') || '{}'); if (s.cad) _iw.cad = s.cad; if (s.mode) _iw.mode = s.mode; } catch (e) {}
+function iwSave() { try { localStorage.setItem('iwState', JSON.stringify({ cad: _iw.cad, mode: _iw.mode })); } catch (e) {} }
+
+async function loadWatchOnce() {
+  if (_iw.loaded) return;
+  _iw.loaded = true;
+  const body = document.getElementById('iwBody');
+  const { data, error } = await (window.__iwOverride
+    ? Promise.resolve({ data: window.__iwOverride, error: null })
+    : db.from('industry_watch_reports')
+        .select('id,cadence,period_key,period_start,period_end,title,summary,highlights,sections,metrics,generated_at')
+        .order('period_end', { ascending: false }).order('id', { ascending: false }).range(0, 999));
+  if (error) { _iw.loaded = false; body.innerHTML = `<div class="iw-note">讀取失敗：${escHtml(error.message || '')}</div>`; return; }
+  _iw.rows = data || [];
+  iwRenderCad();
+  iwSetMode(_iw.mode);
+}
+
+function iwList(cad) { return _iw.rows.filter(r => r.cadence === (cad || _iw.cad)); }   // 新→舊
+
+function iwRenderCad() {
+  document.getElementById('iwCadSeg').innerHTML = IW_CAD.map(([k, l]) =>
+    `<button class="${k === _iw.cad ? 'on' : ''}" onclick="iwSetCad('${k}')">${l}（${iwList(k).length}）</button>`).join('');
+}
+function iwSetCad(c) { _iw.cad = c; _iw.sel = _iw.a = _iw.b = null; iwSave(); iwRenderCad(); iwRender(); }
+function iwSetMode(m) {
+  _iw.mode = m; iwSave();
+  document.querySelectorAll('#iwModeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  iwRender();
+}
+
+function iwFmt(v, unit) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'number') return (Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1)) + (unit || '');
+  return escHtml(String(v));
+}
+function iwDelta(a, b, unit) {
+  if (typeof a !== 'number' || typeof b !== 'number') return '';
+  const d = a - b;
+  const s = (d > 0 ? '+' : '') + (Number.isInteger(d) ? d.toLocaleString() : d.toFixed(1)) + (unit === '%' ? '%' : '');
+  const pct = (b && unit !== '%' && unit !== '名' && Number.isInteger(a)) ? `（${d / b > 0 ? '+' : ''}${(d / b * 100).toFixed(0)}%）` : '';
+  return s + pct;
+}
+function iwOpts(list, cur) {
+  return list.map(r => `<option value="${r.id}" ${String(r.id) === String(cur) ? 'selected' : ''}>${escHtml(r.title)}</option>`).join('');
+}
+function iwEmpty() {
+  const next = { weekly: '每週六', monthly: '每月 20 日', quarterly: '每季結束後次月 20 日', yearly: '每年 1 月 20 日' }[_iw.cad];
+  return `<div class="iw-note">這個頻率還沒有報告。下一份會在${next}自動產出。</div>`;
+}
+
+function iwRender() {
+  const body = document.getElementById('iwBody');
+  if (!_iw.loaded) return;
+  if (_iw.chart) { _iw.chart.destroy(); _iw.chart = null; }
+  const list = iwList();
+  if (!list.length) { body.innerHTML = iwEmpty(); return; }
+  if (_iw.mode === 'read') return iwRenderRead(body, list);
+  if (_iw.mode === 'compare') return iwRenderCompare(body, list);
+  return iwRenderTrend(body, list);
+}
+
+function iwSectionHtml(s) {
+  let h = `<div class="iw-sec"><h4>${escHtml(s.heading || '')}</h4>`;
+  if (s.note) h += `<div class="iw-note">${escHtml(s.note)}</div>`;
+  if (s.bullets && s.bullets.length) h += '<ul>' + s.bullets.map(b => `<li>${escHtml(b)}</li>`).join('') + '</ul>';
+  if (s.table && s.table.rows && s.table.rows.length) {
+    h += '<div class="iw-twrap"><table class="iw-table"><thead><tr>' + s.table.cols.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr></thead><tbody>' +
+      s.table.rows.map(r => '<tr>' + r.map(c => `<td class="${typeof c === 'number' ? 'num' : ''}">${typeof c === 'number' ? c.toLocaleString() : escHtml(c == null ? '—' : String(c))}</td>`).join('') + '</tr>').join('') +
+      '</tbody></table></div>';
+  }
+  return h + '</div>';
+}
+
+function iwRenderRead(body, list) {
+  const r = list.find(x => String(x.id) === String(_iw.sel)) || list[0];
+  _iw.sel = r.id;
+  const idx = list.indexOf(r);
+  const gen = r.generated_at ? new Date(r.generated_at).toLocaleString('zh-TW', { hour12: false }) : '';
+  body.innerHTML = `
+    <div class="iw-bar">
+      <select class="iw-sel" onchange="_iw.sel=this.value;iwRender()">${iwOpts(list, r.id)}</select>
+      <button class="tab-btn" ${idx >= list.length - 1 ? 'disabled' : ''} onclick="_iw.sel='${list[idx + 1] ? list[idx + 1].id : ''}';iwRender()">← 前一期</button>
+      <button class="tab-btn" ${idx <= 0 ? 'disabled' : ''} onclick="_iw.sel='${list[idx - 1] ? list[idx - 1].id : ''}';iwRender()">後一期 →</button>
+      ${list[idx + 1] ? `<button class="tab-btn" onclick="_iw.a='${r.id}';_iw.b='${list[idx + 1].id}';iwSetMode('compare')">和前一期比較</button>` : ''}
+    </div>
+    <div style="font-size:1.05rem;font-weight:700;">${escHtml(r.title)}</div>
+    <div class="iw-meta">期間 ${r.period_start}～${r.period_end}・產出 ${escHtml(gen)}</div>
+    <div class="iw-hl"><b>本期重點</b><ul>${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>
+    ${(r.sections || []).map(iwSectionHtml).join('')}`;
+}
+
+function iwMetricKeys(rows) {
+  const keys = [], seen = new Set();
+  rows.forEach(r => Object.keys(r.metrics || {}).forEach(k => { if (!seen.has(k)) { seen.add(k); keys.push(k); } }));
+  return keys;
+}
+
+function iwRenderCompare(body, list) {
+  if (!list.find(x => String(x.id) === String(_iw.a))) _iw.a = list[0].id;
+  if (!list.find(x => String(x.id) === String(_iw.b))) _iw.b = (list[1] || list[0]).id;
+  const A = list.find(x => String(x.id) === String(_iw.a)), B = list.find(x => String(x.id) === String(_iw.b));
+  const keys = iwMetricKeys([A, B]);
+  const groups = {};
+  keys.forEach(k => { const m = (A.metrics || {})[k] || (B.metrics || {})[k]; (groups[m.group || '其他'] = groups[m.group || '其他'] || []).push(k); });
+  let rows = '';
+  Object.entries(groups).forEach(([g, ks]) => {
+    rows += `<tr class="iw-grp"><td colspan="4">${escHtml(g)}</td></tr>`;
+    ks.forEach(k => {
+      const ma = (A.metrics || {})[k] || {}, mb = (B.metrics || {})[k] || {};
+      const unit = ma.unit || mb.unit || '';
+      rows += `<tr><td>${escHtml(ma.label || mb.label || k)}</td><td class="num">${iwFmt(ma.value, unit)}</td><td class="num">${iwFmt(mb.value, unit)}</td><td class="num">${iwDelta(ma.value, mb.value, unit) || '—'}</td></tr>`;
+    });
+  });
+  const hl = r => `<div style="flex:1 1 300px;min-width:0;"><div style="font-weight:600;font-size:0.84rem;">${escHtml(r.title)}</div><ul style="margin:4px 0;padding-left:20px;font-size:0.8rem;line-height:1.7;">${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>`;
+  body.innerHTML = `
+    <div class="iw-bar">
+      <span class="iw-meta">A</span><select class="iw-sel" onchange="_iw.a=this.value;iwRender()">${iwOpts(list, A.id)}</select>
+      <span class="iw-meta">對照 B</span><select class="iw-sel" onchange="_iw.b=this.value;iwRender()">${iwOpts(list, B.id)}</select>
+    </div>
+    <div class="iw-twrap" style="max-height:none;"><table class="iw-table">
+      <thead><tr><th>指標</th><th class="num">A</th><th class="num">B</th><th class="num">A − B</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="iw-note">「—」＝該期沒有這項（週報不含月快照與裁判書；離職率只在期間剛結束時記錄）。裁判書月份＝期間往前推 2 個月。</div>
+    <div class="iw-hl" style="display:flex;flex-wrap:wrap;gap:16px;">${hl(A)}${hl(B)}</div>`;
+}
+
+function iwRenderTrend(body, list) {
+  const asc = list.slice().reverse();
+  const keys = iwMetricKeys(asc).filter(k => asc.some(r => typeof ((r.metrics || {})[k] || {}).value === 'number'));
+  if (!keys.includes(_iw.metric)) _iw.metric = keys.includes('firm_to_firm') ? 'firm_to_firm' : keys[0];
+  const lab = k => { const r = asc.find(x => (x.metrics || {})[k]); return r ? r.metrics[k].label : k; };
+  const unit = (asc.find(x => (x.metrics || {})[_iw.metric]) || { metrics: { [_iw.metric]: {} } }).metrics[_iw.metric].unit || '';
+  const pts = asc.map(r => ({ x: r.period_key, y: typeof ((r.metrics || {})[_iw.metric] || {}).value === 'number' ? r.metrics[_iw.metric].value : null }));
+  body.innerHTML = `
+    <div class="iw-bar"><span class="iw-meta">指標</span>
+      <select class="iw-sel" onchange="_iw.metric=this.value;iwRender()">${keys.map(k => `<option value="${k}" ${k === _iw.metric ? 'selected' : ''}>${escHtml(lab(k))}</option>`).join('')}</select></div>
+    <div class="iw-chartbox"><canvas id="iwChart"></canvas></div>
+    <div class="iw-twrap" style="margin-top:10px;"><table class="iw-table"><thead><tr><th>期間</th><th class="num">${escHtml(lab(_iw.metric))}</th><th class="num">較前期</th></tr></thead><tbody>
+      ${pts.map((p, i) => `<tr><td>${escHtml(p.x)}</td><td class="num">${iwFmt(p.y, unit)}</td><td class="num">${i ? (iwDelta(p.y, pts[i - 1].y, unit) || '—') : '—'}</td></tr>`).reverse().join('')}
+    </tbody></table></div>`;
+  const css = getComputedStyle(document.documentElement);
+  const blue = css.getPropertyValue('--blue').trim() || '#4f8ef7';
+  const muted = css.getPropertyValue('--text-muted').trim() || '#888';
+  const grid = css.getPropertyValue('--border').trim() || '#333';
+  _iw.chart = new Chart(document.getElementById('iwChart'), {
+    type: _iw.cad === 'weekly' ? 'line' : 'bar',
+    data: { labels: pts.map(p => p.x), datasets: [{ label: lab(_iw.metric), data: pts.map(p => p.y), borderColor: blue, backgroundColor: blue, tension: 0.2, spanGaps: true, pointRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: muted, maxRotation: 60, autoSkip: true }, grid: { color: grid } }, y: { ticks: { color: muted }, grid: { color: grid } } } },
+  });
+}
 
 async function loadSalaryOnce() {
   if (_salLoaded) return;

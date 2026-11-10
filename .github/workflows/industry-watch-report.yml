@@ -1,0 +1,27 @@
+name: 產業觀察定期報告（週／月／季／年）
+
+# 每天跑一次 auto：補產所有「已到產出日、但還沒有報告」的最近幾期（重跑不會重產已存在的期別）
+#   週報＝週六起（週五本機法務部掃描之後）、月報＝次月 20 日起、季報＝季後次月 20 日起、年報＝次年 1 月 20 日起
+# 報告寫進 industry_watch_reports（admin-only），前端 喆律戰情＞產業觀察。
+# repo 公開、log 公開：腳本只印期別與段數，不印人名／所名。
+on:
+  schedule:
+    - cron: '0 2 * * *'   # UTC 02:00 = 台灣 10:00（GitHub 排程常晚數小時，auto 模式不在意）
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 產出到期的報告
+        working-directory: scripts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PYTHONIOENCODING: utf-8
+        run: python industry_watch_report.py auto
