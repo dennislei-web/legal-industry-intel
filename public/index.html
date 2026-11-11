@@ -4671,6 +4671,7 @@ async function handleLogin() {
 async function handleLogout() {
   await db.auth.signOut();
   currentUser = null;
+  _dashShownFor = null;
   setViewAs(null);
   const vaSel = document.getElementById('viewAsSel');
   if (vaSel) vaSel.style.display = 'none';
@@ -4689,7 +4690,13 @@ db.auth.onAuthStateChange((event, session) => {
 // ============================================================
 // DASHBOARD INIT
 // ============================================================
+// 同一帳號只跑一次。supabase-js 的 onAuthStateChange 不只登入時觸發：開頁（INITIAL_SESSION）、
+// 每次切回這個分頁（SIGNED_IN）、token 每小時更新（TOKEN_REFRESHED）都會來，舊版每次都整個儀表板重抓一遍
+// （2026-11-11 edge log：同一帳號 69 分鐘內重載 47 次；開頁本身也因 init＋INITIAL_SESSION 跑兩遍）。
+let _dashShownFor = null;
 async function showDashboard() {
+  if (!currentUser || _dashShownFor === currentUser.id) return;
+  _dashShownFor = currentUser.id;
   // 先顯示畫面，不等資料載完
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
