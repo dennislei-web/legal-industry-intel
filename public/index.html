@@ -1205,6 +1205,28 @@
         </details>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">來源＝LINE 官方帳號公開主頁（page.line.me）每日擷取；只有<strong>認證帳號（藍盾）</strong>有公開主頁與好友數，未認證帳號只能確認「有開」。公開好友數＝LINE 的<strong>累計加入次數</strong>（使用者封鎖後不會扣除），所以日增＝<strong>毛新增</strong>，不是淨增；封鎖數與真正淨增只有帳號擁有者後台（Insight API）看得到。同所多帳號（例：喆律各品牌）合計。帳號名冊＝事務所官網 LINE 連結＋競品追蹤表＋搜尋發現，非全市場普查。</div>
       </div>
+      <!-- 領域專門所（admin；mig 279 firm_area_cases＋mig 280 firm_area_specialists） -->
+      <div class="card" id="foSpecCard" style="margin-bottom:16px;display:none;">
+        <div class="card-title">&#128274; 領域專門所 — 裁判書實際案量集中在哪些事務所</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <div class="sub-tabs" id="foSpecAreas" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+          <select id="foSpecSort" onchange="loadFoSpec()" style="margin-left:auto;background:var(--bg-card,#1a2233);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.78rem;">
+            <option value="share">依佔比排序</option>
+            <option value="cases">依件數排序</option>
+          </select>
+          <select id="foSpecMin" onchange="loadFoSpec()" style="background:var(--bg-card,#1a2233);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:0.78rem;">
+            <option value="30">至少 30 件</option>
+            <option value="100">至少 100 件</option>
+            <option value="300">至少 300 件</option>
+          </select>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="foSpecNote">載入中…</div>
+        <div id="foSpecList" style="overflow-x:auto;"><div class="loading">載入中</div></div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">
+          件數＝該所律師近五年在裁判書出現的該領域案件數（律師依姓名歸所，同名多人不計，故為<b>下限</b>）；佔比＝該領域件數 ÷ 該所可歸類案量（不含無法細分的一般民事）。
+          「官網」欄是規則從官網標題、選單、小標判定的主打領域，綜合所常一次抓到多個。裁判書只看得到訴訟：公司商務、智慧財產、金融證券、稅務的顧問、申請、交易類工作不會出現在這裡。點所名可看該所的「官網對照」。
+        </div>
+      </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#9878;&#65039; 法檢轉任 — 前法官/前檢察官聚集的事務所</div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="exJudFirmNote">載入中…</div>
@@ -4687,6 +4709,7 @@ async function showDashboard() {
     }
     realIsAdmin = profile?.role === 'admin';
     isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false
+    if (isAdmin && typeof _foLoaded !== 'undefined' && _foLoaded) initFoSpec();   // 事務所總覽若已先載入（當時還不知道是 admin），補顯示領域專門所
     document.getElementById('navBtn_zhelu').style.display = isAdmin ? '' : 'none';
     document.getElementById('navBtn_system').style.display = isAdmin ? '' : 'none';   // 系統區（資料來源／帳號管理）只給 admin
     if (isAdmin) {
@@ -5793,6 +5816,7 @@ function loadFirmOverviewOnce() {
   loadFoFlowSnapshot();
   loadFoTurnover();       // 律師離職率（年化，mig 242）
   loadFoLine();          // LINE 官方帳號 TOP 10＋趨勢（mig 241）
+  initFoSpec();          // 領域專門所（admin；mig 279／280）
   initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
   loadFoIndep();
   loadFoGov();
@@ -8211,6 +8235,8 @@ async function showFirmDetail(firmName) {
   _currentFirmName = firmName;
   const fieldTabBtn = document.getElementById('firmTab_field');
   if (fieldTabBtn) fieldTabBtn.style.display = isAdmin ? '' : 'none';  // 田野筆記 tab 僅 admin（資料本身另有 RLS）
+  const siteTabBtn = document.getElementById('firmTab_site');
+  if (siteTabBtn) siteTabBtn.style.display = isAdmin ? '' : 'none';    // 官網對照 tab 僅 admin（firm_site_facts／firm_area_cases 另有 RLS）
   // Reset tabs to overview
   document.querySelectorAll('#firmModal .tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('firmTab_overview')?.classList.add('active');
@@ -9124,7 +9150,171 @@ function switchFirmTab(tab) {
     loadFirmAnalysis(_currentFirmName);
   } else if (tab === 'field') {
     loadFirmFieldNotes(_currentFirmName);
+  } else if (tab === 'site') {
+    loadFirmSiteCompare(_currentFirmName);
   }
+}
+
+// ============================================================
+// 官網對照（admin）：官網主打領域 vs 裁判書實際案量＋進線管道＋團隊揭露
+//   firm_site_facts（mig 278，extract_site_facts.py 每月規則抽取）
+//   firm_area_cases（mig 279，refresh_firm_area_cases() 每月重算）
+// ============================================================
+const SITE_UNCLASSIFIED = ['一般民事', '其他', '醫療'];            // 不進佔比分母（醫療案由對照沒對上）
+const SITE_NONLIT = ['公司商務', '智慧財產', '金融證券', '稅務'];  // 主要工作是非訟，裁判書看不到
+const SITE_MIN_TOTAL = 50;                                        // 可歸類案量低於此不算佔比
+
+async function loadFirmSiteCompare(firmName) {
+  const body = document.getElementById('firmModalBody');
+  body.innerHTML = '<div class="loading">載入官網對照...</div>';
+  const [fr, cr] = await Promise.all([
+    db.from('firm_site_facts').select('*').eq('firm_name', firmName).maybeSingle(),
+    db.from('firm_area_cases').select('area, cases, lawyers').eq('firm_name', firmName),
+  ]);
+  if (firmName !== _currentFirmName) return;
+  if (fr.error || cr.error) {
+    body.innerHTML = `<div style="color:var(--red);">載入失敗：${escHtml((fr.error || cr.error).message || '')}</div>`;
+    return;
+  }
+  const f = fr.data, rows = cr.data || [];
+  const num = n => Number(n || 0).toLocaleString();
+  const muted = t => `<span style="color:var(--text-muted);">${t}</span>`;
+  const caseMap = {}; rows.forEach(r => { caseMap[r.area] = r; });
+  const total = rows.filter(r => !SITE_UNCLASSIFIED.includes(r.area)).reduce((a, r) => a + r.cases, 0);
+  const unclassified = rows.filter(r => SITE_UNCLASSIFIED.includes(r.area)).reduce((a, r) => a + r.cases, 0);
+  const focus = (f && f.focus_areas) || [], mentioned = (f && f.mentioned_areas) || [];
+  const enough = total >= SITE_MIN_TOTAL;
+
+  const areas = [...new Set([...focus, ...rows.map(r => r.area).filter(a => !SITE_UNCLASSIFIED.includes(a))])];
+  const list = areas.map(a => {
+    const c = caseMap[a] ? caseMap[a].cases : 0;
+    const share = total ? c * 100 / total : 0;
+    const isFocus = focus.includes(a);
+    let verdict = '';
+    if (f && focus.length && enough) {
+      if (isFocus && share < 3) {
+        verdict = SITE_NONLIT.includes(a)
+          ? muted('主打，但非訟工作裁判書看不到')
+          : '<span style="color:var(--orange);">主打但幾乎沒案量</span>';
+      } else if (!isFocus && share >= 15) {
+        verdict = '<span style="color:var(--gold);">案量大但官網沒主打</span>';
+      } else if (isFocus && share >= 15) {
+        verdict = '<span style="color:var(--green);">主打且有案量</span>';
+      }
+    }
+    return { a, c, share, isFocus, verdict, lawyers: caseMap[a] ? caseMap[a].lawyers : 0 };
+  }).sort((x, y) => y.c - x.c || (y.isFocus - x.isFocus));
+
+  const siteCell = r => (!f || !focus.length) ? muted('—')
+    : r.isFocus ? '<span style="color:var(--blue);font-weight:600;">主打</span>'
+    : mentioned.includes(r.a) ? muted('內文提到') : muted('沒提到');
+  const bar = r => enough
+    ? `<div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;"><div style="width:70px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;"><div style="width:${Math.min(100, r.share).toFixed(0)}%;height:100%;background:rgba(74,144,217,0.7);"></div></div><span style="min-width:44px;text-align:right;">${r.share.toFixed(1)}%</span></div>`
+    : muted('—');
+
+  const header = f
+    ? `<div style="font-size:0.85rem;margin-bottom:4px;">官網：<a href="${escHtml(f.website_url)}" target="_blank" rel="noopener" style="color:var(--blue);">${escHtml(f.website_url)}</a></div>
+       <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px;">抽取日期 ${escHtml(String(f.extracted_at || '').slice(0, 10))}・讀了 ${f.page_count || 0} 頁・${focus.length ? `主打領域判定依據：${escHtml(f.focus_basis || '不明')}` : '<span style="color:var(--orange);">官網沒抽到主打領域（頁面太少或以圖片、腳本呈現），以下不做主打判讀</span>'}。若這個網址不是這間所的官網，以下官網欄位都不可信。</div>
+       ${f.tagline ? `<div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;padding:8px 10px;border-left:3px solid var(--border);">${escHtml(f.tagline.slice(0, 160))}</div>` : ''}`
+    : `<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">這間所沒有官網抽取資料（沒有驗證通過的官網，或官網連不上），以下只有裁判書案量。</div>`;
+
+  const table = list.length ? `
+    <table style="width:100%;font-size:0.84rem;">
+      <thead><tr>
+        <th style="text-align:left;">領域</th><th style="text-align:left;">官網</th>
+        <th style="text-align:right;">近五年案量</th><th style="text-align:right;">佔可歸類案量</th><th style="text-align:left;padding-left:12px;">判讀</th>
+      </tr></thead>
+      <tbody>${list.map(r => `<tr>
+        <td>${escHtml(r.a)}</td><td>${siteCell(r)}</td>
+        <td style="text-align:right;">${r.c ? num(r.c) + ' 件' : muted('0')}</td>
+        <td style="text-align:right;">${bar(r)}</td>
+        <td style="padding-left:12px;font-size:0.78rem;">${r.verdict}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : `<div style="color:var(--text-muted);font-size:0.85rem;">沒有可歸類的裁判書案量，也沒有官網主打領域。</div>`;
+
+  const caseNote = `可歸類案量 ${num(total)} 件${unclassified ? `，另有 ${num(unclassified)} 件無法細分（一般民事等），不列入佔比` : ''}。`
+    + (enough ? '' : `可歸類案量不到 ${SITE_MIN_TOTAL} 件，不計算佔比與判讀。`)
+    + ' 律師依姓名歸所、同名多人不計，案量是下限；裁判書只看得到訴訟。';
+
+  const chip = (on, label, href) => `<span style="display:inline-block;padding:3px 9px;margin:0 6px 6px 0;border-radius:12px;font-size:0.76rem;border:1px solid var(--border);${on ? 'color:var(--green);border-color:rgba(76,175,130,0.5);' : 'color:var(--text-muted);opacity:0.6;'}">${on ? '有' : '無'}　${on && href ? `<a href="${escHtml(href)}" target="_blank" rel="noopener" style="color:inherit;">${label}</a>` : label}</span>`;
+  const names = arr => (arr && arr.length) ? arr.map(n => lawyerLink(n)).join('、') : muted('無');
+
+  const channels = !f ? '' : `
+    <div style="font-weight:600;margin:18px 0 8px;">進線管道</div>
+    <div>
+      ${chip(f.has_line, 'LINE', f.line_url)}${chip(f.has_form, '聯絡表單')}${chip(f.has_booking, '線上預約')}${chip(f.free_consult, '免費諮詢')}${chip(f.fee_disclosed, '公開收費金額')}${chip(!!f.fb_url, 'Facebook', f.fb_url)}${chip(!!f.ig_url, 'Instagram', f.ig_url)}${chip(!!f.yt_url, 'YouTube', f.yt_url)}
+    </div>
+    ${(f.phones && f.phones.length) ? `<div style="font-size:0.8rem;color:var(--text-muted);">電話：${f.phones.slice(0, 4).map(escHtml).join('、')}</div>` : ''}
+    ${f.fee_snippet ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px;">收費原文：${escHtml(f.fee_snippet.slice(0, 140))}</div>` : ''}`;
+
+  const team = !f ? '' : `
+    <div style="font-weight:600;margin:18px 0 8px;">團隊揭露</div>
+    <div style="font-size:0.84rem;line-height:1.8;">
+      名冊 ${f.roster_total == null ? '—' : f.roster_total} 人，官網找得到姓名的 ${f.roster_listed == null ? '—' : f.roster_listed} 人${f.has_bio ? '，有學經歷介紹' : ''}${f.ex_judicial ? '，提到前法官／檢察官背景' : ''}。
+      ${(f.unlisted_names && f.unlisted_names.length) ? `<div>名冊有、官網沒列：${names(f.unlisted_names)}</div>` : ''}
+      ${(f.extra_names && f.extra_names.length) ? `<div>官網有、名冊不在本所：${names(f.extra_names)} ${muted('（規則抓取，可能含雜訊）')}</div>` : ''}
+      ${f.ex_judicial_snippet ? `<div style="font-size:0.78rem;color:var(--text-muted);">原文：${escHtml(f.ex_judicial_snippet.slice(0, 120))}</div>` : ''}
+    </div>`;
+
+  const siteMeta = !f ? '' : `
+    <div style="font-weight:600;margin:18px 0 8px;">網站本身</div>
+    <div style="font-size:0.84rem;line-height:1.8;">
+      架站平台：${f.platform ? escHtml(f.platform) : muted('不明')}　版權年份：${f.copyright_year || muted('—')}　頁面最新日期：${f.latest_content_date || muted('—')}　其他語言：${(f.langs && f.langs.length) ? f.langs.map(escHtml).join('、') : muted('無')}　分所：${f.has_branches ? '有提到' : muted('沒提到')}
+    </div>`;
+
+  body.innerHTML = `
+    ${header}
+    <div style="font-weight:600;margin-bottom:8px;">官網說的 vs 裁判書做的</div>
+    ${table}
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">${caseNote}</div>
+    ${channels}${team}${siteMeta}`;
+}
+
+// 事務所總覽＞領域專門所（admin）
+const FO_SPEC_AREAS = ['家事', '刑事', '不動產', '債務執行', '勞動', '行政', '工程', '車禍交通', '智慧財產', '公司商務', '金融證券', '稅務', '性平', '消費保險', '科技個資'];
+let _foSpecArea = '勞動', _foSpecSeq = 0, _foSpecInit = false;
+function initFoSpec() {
+  const card = document.getElementById('foSpecCard');
+  if (!card || !isAdmin || _foSpecInit) return;
+  _foSpecInit = true;
+  card.style.display = '';
+  document.getElementById('foSpecAreas').innerHTML = FO_SPEC_AREAS.map(a =>
+    `<button class="sub-tab-btn${a === _foSpecArea ? ' active' : ''}" data-area="${a}" onclick="setFoSpecArea('${a}')">${a}</button>`).join('');
+  loadFoSpec();
+}
+function setFoSpecArea(a) {
+  _foSpecArea = a;
+  document.querySelectorAll('#foSpecAreas .sub-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.area === a));
+  loadFoSpec();
+}
+async function loadFoSpec() {
+  const box = document.getElementById('foSpecList'), note = document.getElementById('foSpecNote');
+  const seq = ++_foSpecSeq, area = _foSpecArea;
+  const sort = document.getElementById('foSpecSort').value, min = +document.getElementById('foSpecMin').value;
+  box.innerHTML = '<div class="loading">載入中</div>';
+  const { data, error } = await db.rpc('firm_area_specialists', { p_area: area, p_sort: sort, p_min_cases: min, p_limit: 60 });
+  if (seq !== _foSpecSeq) return;   // 連點時只留最後一次
+  if (error) { box.innerHTML = `<div style="color:var(--red);font-size:0.85rem;">載入失敗：${escHtml(error.message || '')}</div>`; note.textContent = ''; return; }
+  const rows = data || [];
+  if (!rows.length) { box.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">沒有符合條件的事務所。</div>'; note.textContent = ''; return; }
+  const withSite = rows.filter(r => r.has_site), focus = withSite.filter(r => r.is_focus);
+  note.textContent = `${area}：列出前 ${rows.length} 間（${sort === 'cases' ? '依件數' : '依佔比'}、至少 ${min} 件）。其中 ${withSite.length} 間抽得到官網主打領域：${focus.length} 間主打${area}、${withSite.length - focus.length} 間沒主打；其餘 ${rows.length - withSite.length} 間沒有官網或抽不出主打。`
+    + (SITE_NONLIT.includes(area) ? ' 這個領域多數工作是非訟，件數只反映訴訟部分。' : '');
+  const siteCell = r => !r.has_site ? '<span style="color:var(--text-muted);">無資料</span>'
+    : r.is_focus ? '<span style="color:var(--blue);font-weight:600;">主打</span>'
+    : '<span style="color:var(--gold);">沒主打</span>';
+  box.innerHTML = `<table style="width:100%;font-size:0.84rem;">
+    <thead><tr><th style="text-align:right;width:36px;">#</th><th style="text-align:left;">事務所</th>
+      <th style="text-align:right;">${escHtml(area)}件數</th><th style="text-align:right;">佔可歸類案量</th>
+      <th style="text-align:right;">有${escHtml(area)}案的律師</th><th style="text-align:left;padding-left:12px;">官網</th></tr></thead>
+    <tbody>${rows.map((r, i) => `<tr>
+      <td style="text-align:right;color:var(--text-muted);">${i + 1}</td>
+      <td>${firmCell(r.firm_name)}</td>
+      <td style="text-align:right;">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;"><div style="width:70px;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;"><div style="width:${Math.min(100, Number(r.share) || 0).toFixed(0)}%;height:100%;background:rgba(74,144,217,0.7);"></div></div><span style="min-width:44px;text-align:right;">${r.share == null ? '—' : Number(r.share).toFixed(1) + '%'}</span></div></td>
+      <td style="text-align:right;">${r.area_lawyers}</td>
+      <td style="padding-left:12px;">${siteCell(r)}</td>
+    </tr>`).join('')}</tbody></table>`;
 }
 
 async function loadFirmResearch(firmName) {
@@ -21263,6 +21453,7 @@ async function showCourtDetail(name) {
       <button class="tab-btn active" onclick="switchFirmTab('overview')" id="firmTab_overview">概覽</button>
       <button class="tab-btn" onclick="switchFirmTab('research')" id="firmTab_research">研究</button>
       <button class="tab-btn" onclick="switchFirmTab('analysis')" id="firmTab_analysis">AI 分析</button>
+      <button class="tab-btn" onclick="switchFirmTab('site')" id="firmTab_site" style="display:none;" title="官網主打 vs 裁判書實際案量（admin）">&#128274; 官網對照</button>
       <button class="tab-btn" onclick="switchFirmTab('field')" id="firmTab_field" style="display:none;" title="合夥人訪談田野筆記（admin）">&#128274; 田野筆記</button>
     </div>
     <div class="modal-body" id="firmModalBody">
