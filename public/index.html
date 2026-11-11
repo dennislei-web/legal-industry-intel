@@ -9133,7 +9133,8 @@ async function loadFirmResearch(firmName) {
   // firm_profiles 與 firm_websites 同時發出（舊版串行兩趟）
   const [{ data: profile }, { data: fw }] = await Promise.all([
     db.from('firm_profiles').select('*').eq('firm_name', firmName).maybeSingle(),
-    db.from('firm_websites').select('website_url, website_title, description').eq('firm_name', firmName).maybeSingle(),
+    // 只取驗證通過的：被複驗下架或判定為同名錯配的網址仍留在表裡備查，不能顯示
+    db.from('firm_websites').select('website_url, website_title, description').eq('firm_name', firmName).eq('verified', true).maybeSingle(),
   ]);
   if (firmName !== _currentFirmName) return; // 等待期間已切到別的所
 

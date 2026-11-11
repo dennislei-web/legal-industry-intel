@@ -19,7 +19,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, unquote, quote
 from utils import get_supabase, log
-from website_verify import load_blocklist, host_blocked, homepage_of, verify_firm_website
+from website_verify import (load_blocklist, host_blocked, homepage_of, verify_firm_website,
+                            assess_website, firm_key)
 
 BATCH_SIZE = int(os.environ.get('BATCH_SIZE', '0'))  # 0 = 全部
 SCRAPE_DELAY = float(os.environ.get('SCRAPE_DELAY', '1.8'))  # 秒
@@ -251,9 +252,12 @@ def score_candidate(url, title, description, firm_name, blocklist=None):
     return score
 
 
-def find_firm_website(firm_name, blocklist, taken_urls):
+def find_firm_website(firm_name, blocklist, taken_urls, lawyers=None):
     """搜尋事務所官網：多輪 query 評分排序後，逐一「首頁含所名」驗證，
-    通過才回傳（URL 一律正規化為網域首頁；已被他所占用的首頁跳過）"""
+    再要求名冊佐證（站上有本所律師姓名／登記的地址電話信箱／標題即本所）。
+    有佐證 → 回傳（URL 一律正規化為網域首頁；已被他所占用的首頁跳過）
+    只有所名、沒佐證 → 回傳並帶 pending=True（同名的會計師／專利商標事務所、
+    日本與中國同名律所就是卡在這一關），由呼叫端存成待審而非驗證通過"""
     clean = firm_name.strip()
     queries = [
         f'{clean} 官網',
@@ -279,6 +283,7 @@ def find_firm_website(firm_name, blocklist, taken_urls):
 
     # 寫入前驗證：取前 3 名候選，逐一抓網域首頁確認含所名
     tried_homes = set()
+    weak = None  # 只有所名、沒有名冊佐證的第一個候選
     for score, cand in all_candidates[:3]:
         if score < 25:
             break  # 低分不驗，避免誤判
@@ -291,13 +296,21 @@ def find_firm_website(firm_name, blocklist, taken_urls):
             continue
         if final_home in taken_urls:
             continue  # 同一首頁已配給別家 = 錯配/共用落地頁
-        return {
+        result = {
             'website_url': final_home,
             'website_title': (title or cand['title'] or '')[:200],
             'description': (cand['description'] or '')[:500],
             'score': score,
         }
-    return None
+        a = assess_website(final_home, firm_name, lawyers or [], blocklist)
+        if a['evidence']:
+            result['evidence'] = a['evidence']
+            result['hit_url'] = a['hit_url']
+            result['hit_count'] = len(a['signals'])
+            return result
+        if weak is None:
+            weak = dict(result, pending=True)
+    return weak
 
 
 def sync_moj_firms_to_table(sb):
@@ -413,8 +426,24 @@ def main():
         return
 
     found = 0
+    pending = 0
     errors = 0
     t0 = time.time()
+
+    # 名冊（寫入前驗證的佐證來源）：{事務所名去空白: [{name,email,tel,address}]}
+    roster = {}
+    rs = 0
+    while True:
+        r = (sb.table('moj_lawyers').select('lic_no,name,office_normalized,email,tel,address')
+               .not_.is_('office_normalized', 'null').order('lic_no').range(rs, rs + 999).execute())
+        for row in (r.data or []):
+            key = firm_key(row.get('office_normalized'))
+            if key:
+                roster.setdefault(key, []).append(row)
+        if not r.data or len(r.data) < 1000:
+            break
+        rs += 1000
+    log(f'名冊載入：{len(roster)} 間事務所')
 
     global DDG_FAIL_STREAK
     cooldowns = 0
@@ -455,7 +484,8 @@ def main():
         name = firm['firm_name']
         try:
             streak_before = DDG_FAIL_STREAK
-            result = find_firm_website(name, blocklist, taken_urls)
+            lawyers = roster.get(name.replace(' ', ''), [])
+            result = find_firm_website(name, blocklist, taken_urls, lawyers)
             if result is None and DDG_FAIL_STREAK > streak_before:
                 # 搜尋是「失敗」不是「查無」→ 不標 scraped，留給之後的輪次重試
                 time.sleep(SCRAPE_DELAY)
@@ -465,10 +495,25 @@ def main():
                 update['website_url'] = result['website_url']
                 update['website_title'] = result['website_title']
                 update['description'] = result['description']
-                update['verified'] = True
-                update['verified_at'] = 'now()'
-                taken_urls.add(result['website_url'])
-                found += 1
+                update['roster_total'] = len(lawyers)
+                if result.get('pending'):
+                    # 只有所名、沒有名冊佐證：存網址但不算驗證通過，進人工審核佇列
+                    # （不加進 taken_urls、不計入命中；前端與 moj_firm_statistics() 只認 verified）
+                    update['verified'] = False
+                    update['verified_at'] = 'now()'
+                    update['roster_match'] = 'firm_only'
+                    update['review_status'] = 'pending'
+                    update['review_note'] = '搜尋寫入前驗證：只有所名、無名冊佐證'
+                    update['reviewed_at'] = 'now()'
+                    pending += 1
+                else:
+                    update['verified'] = True
+                    update['verified_at'] = 'now()'
+                    update['roster_match'] = result['evidence']
+                    update['roster_hit_count'] = result['hit_count']
+                    update['roster_hit_url'] = (result['hit_url'] or '')[:500] or None
+                    taken_urls.add(result['website_url'])
+                    found += 1
                 if idx % 20 == 0 or idx == 1:
                     log(f'  [{idx}/{total}] ✓ {name} → {result["website_url"][:70]} (score={result["score"]})')
             else:
@@ -495,7 +540,8 @@ def main():
 
     elapsed = time.time() - t0
     log(f'\n=== 完成 ===')
-    log(f'處理: {total} 間，找到: {found} ({found/total*100:.1f}%)，錯誤: {errors}')
+    log(f'處理: {total} 間，找到: {found} ({found/total*100:.1f}%)，'
+        f'只有所名待審: {pending}，錯誤: {errors}')
     log(f'耗時: {elapsed/60:.1f} 分鐘')
 
 

@@ -3,9 +3,10 @@
 
 對 firm_websites 所有「有網址」的列（已驗證的，以及先前被本腳本自動下架的）：
   1. 抓首頁 → health_status：ok / name_missing / http_error / unreachable / blocked
-  2. 連得上的，再比對法務部名冊上該所律師姓名：首頁沒命中就順著站內
-     「團隊／律師／關於」類連結最多再抓 MAX_SUBPAGES 頁
-     → roster_match：lawyer_name / firm_only / none
+  2. 連得上的，再找名冊佐證（website_verify.assess_website）：首頁沒命中就順著站內
+     「團隊／律師／關於／聯絡」類連結最多再抓 MAX_SUBPAGES 頁
+     → roster_match：lawyer_name（站上有名冊律師姓名）/ contact（地址、電話、信箱吻合）
+       / title（首頁標題即本所）/ firm_only（只有所名＝審核佇列）/ none
   3. 連續失敗 UNVERIFY_STREAK 次（預設 3）→ verified=false（網址保留）；
      之後恢復正常會自動轉回 verified=true（只限本腳本自己下架的）
 
@@ -19,22 +20,17 @@
   WORKERS=8          平行數
   MAX_SUBPAGES=5     每所最多追幾個站內子頁找律師姓名
 """
-import html as html_mod
 import os
-import re
-import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from urllib.parse import urljoin, urlparse
 
 import requests
 from dotenv import load_dotenv
 
-from website_verify import (VERIFY_HEADERS, _decode_html, host_blocked,
-                            homepage_of, name_in_text, name_keys, page_text)
+from website_verify import assess_website, firm_key
 
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8')
@@ -51,17 +47,8 @@ UNVERIFY_STREAK = int(os.environ.get('UNVERIFY_STREAK', '3') or 3)
 WORKERS = int(os.environ.get('WORKERS', '8') or 8)
 MAX_SUBPAGES = int(os.environ.get('MAX_SUBPAGES', '5') or 5)
 
-# 與 moj_firm_statistics() 的 firm_key 同一條規則：截到第一個「法律／律師事務所」
-FIRM_KEY_RE = re.compile(r'^(.+?(?:法律|律師)事務所).*$')
 # 疑似擋爬蟲的狀態碼：不算失敗、不累計 streak
 BLOCKED_CODES = {401, 403, 429, 503}
-# 站內子頁：連結文字或網址像「團隊／律師介紹／關於」的優先
-TEAM_HINT_RE = re.compile(
-    r'團隊|律師|成員|關於|簡介|介紹|顧問|主持|about|team|lawyer|attorney|member|people|profile|staff',
-    re.I)
-LINK_RE = re.compile(r'<a\b[^>]*?href\s*=\s*["\']([^"\'#]+)["\'][^>]*>(.*?)</a>', re.S | re.I)
-TAG_RE = re.compile(r'<[^>]+>')
-_META_SEP = b'\n===CURLMETA==='
 
 
 def log(msg):
@@ -111,129 +98,51 @@ def _retry(fn, tries=4):
         time.sleep(15 * (i + 1))
 
 
-# ---------- 抓頁 ----------
-def fetch(url, timeout=20):
-    """回 (status, html, final_url)。status=0＝DNS／連線／逾時。
-    走系統 curl：requests 管不到 DNS 逾時（這台機器 getaddrinfo 卡死過）。
-    -k：憑證過期的站仍算活著（瀏覽器會警告，但站還在）。"""
-    try:
-        cmd = ['curl', '-s', '-L', '-k', '--compressed', '-m', str(timeout), '--max-redirs', '5', url,
-               '-w', _META_SEP.decode() + '%{url_effective} %{http_code}']
-        for k, v in VERIFY_HEADERS.items():
-            cmd += ['-H', f'{k}: {v}']
-        r = subprocess.run(cmd, capture_output=True, timeout=timeout + 10)
-        raw = r.stdout
-        idx = raw.rfind(_META_SEP)
-        if idx == -1:
-            return 0, None, url
-        meta = raw[idx + len(_META_SEP):].decode('utf-8', 'replace').strip()
-        final_url, _, code = meta.rpartition(' ')
-        status = int(code) if code.isdigit() else 0
-        body = raw[:idx]
-        html = _decode_html(body) if body else None
-        return status, html, (final_url or url)
-    except Exception:
-        return 0, None, url
-
-
-def team_links(html, base_url):
-    """站內連結中，像團隊／律師介紹頁的，去重後回前 MAX_SUBPAGES 個"""
-    host = urlparse(base_url).netloc.lower().removeprefix('www.')
-    seen, hinted, others = set(), [], []
-    for href, inner in LINK_RE.findall(html):
-        href = href.strip()
-        if href.lower().startswith(('mailto:', 'tel:', 'javascript:', 'line:')):
-            continue
-        full = urljoin(base_url, href)
-        p = urlparse(full)
-        if p.scheme not in ('http', 'https'):
-            continue
-        if p.netloc.lower().removeprefix('www.') != host:
-            continue
-        if re.search(r'\.(jpg|jpeg|png|gif|pdf|zip|docx?|xlsx?|mp4)$', p.path, re.I):
-            continue
-        key = (p.path.rstrip('/'), p.query)
-        if key in seen or key == ('', ''):
-            continue
-        seen.add(key)
-        text = html_mod.unescape(TAG_RE.sub('', inner))
-        (hinted if TEAM_HINT_RE.search(text) or TEAM_HINT_RE.search(p.path) else others).append(full)
-    return hinted[:MAX_SUBPAGES]
-
-
-def roster_hits(names, text):
-    return sum(1 for n in names if n in text)
-
-
 # ---------- 單所檢查 ----------
 def check(row, roster, blocklist):
-    """回 dict：health_status / health_http_status / roster_match / roster_hit_count / roster_hit_url"""
+    """回 dict：health_status / health_http_status / roster_match / roster_hit_count / roster_total / roster_hit_url
+    判定邏輯在 website_verify.assess_website（與搜尋腳本寫入前驗證共用）"""
     firm = row['firm_name']
-    url = row['website_url']
-    names = roster.get(firm.replace(' ', ''), [])
+    lawyers = roster.get(firm.replace(' ', ''), [])
     out = {'health_status': None, 'health_http_status': None, 'roster_match': 'none',
-           'roster_hit_count': 0, 'roster_total': len(names), 'roster_hit_url': None}
-
-    home = homepage_of(url)
-    if not home:
-        out['health_status'] = 'unreachable'
-        return out
-    status, html, final_url = fetch(home)
+           'roster_hit_count': 0, 'roster_total': len(lawyers), 'roster_hit_url': None}
+    a = assess_website(row['website_url'], firm, lawyers, blocklist, max_subpages=MAX_SUBPAGES)
+    status = a['status']
     out['health_http_status'] = status
     if status == 0:
         out['health_status'] = 'unreachable'
-        return out
-    if status in BLOCKED_CODES:
+    elif status in BLOCKED_CODES:
         out['health_status'] = 'blocked'
-        return out
-    if status >= 400 or not html:
+    elif status >= 400 or not a['final_home']:
         out['health_status'] = 'http_error'
-        return out
-    final_home = homepage_of(final_url) or home
-    if host_blocked(urlparse(final_home).netloc.lower(), blocklist):
+    elif a['blocked_host']:
         # 轉址到黃頁／平台／外國網域＝網域已易主或被收走
         out['health_status'] = 'name_missing'
-        return out
-
-    text = page_text(html)
-    firm_ok = name_in_text(name_keys(firm), text)
-    out['health_status'] = 'ok' if firm_ok else 'name_missing'
-
-    # 名冊律師姓名比對：首頁 → 團隊類子頁
-    hits, hit_url = roster_hits(names, text), final_home
-    if names and hits == 0:
-        for link in team_links(html, final_url):
-            s2, h2, _ = fetch(link, timeout=15)
-            if s2 >= 400 or s2 == 0 or not h2:
-                continue
-            n = roster_hits(names, page_text(h2))
-            if n > hits:
-                hits, hit_url = n, link
-            if hits:
-                break
-    if hits:
-        out.update(roster_match='lawyer_name', roster_hit_count=hits, roster_hit_url=hit_url[:500])
-        # 首頁排版讓所名比對落空，但站上找得到本所律師 → 視為本所官網
-        out['health_status'] = 'ok'
-    elif firm_ok:
-        out['roster_match'] = 'firm_only'
+    else:
+        ev = a['evidence']
+        # 站上找得到本所律師或聯絡資料 → 即使首頁排版讓所名比對落空，也視為本所官網
+        out['health_status'] = 'ok' if (a['firm_ok'] or ev in ('lawyer_name', 'contact')) else 'name_missing'
+        if ev:
+            out['roster_match'] = ev            # lawyer_name / contact / title
+        elif a['firm_ok']:
+            out['roster_match'] = 'firm_only'   # 只有所名、沒有任何佐證 → 審核佇列
+        out['roster_hit_count'] = len(a['signals'])
+        out['roster_hit_url'] = (a['hit_url'] or '')[:500] or None
     return out
 
 
 def load_roster():
-    """{事務所名（去空白）: [律師姓名...]}，姓名至少 2 字"""
+    """{事務所名（去空白）: [{name,email,tel,address}...]}"""
     rows = rest_get_all('moj_lawyers',
-                        {'select': 'lic_no,name,office_normalized', 'office_normalized': 'not.is.null'},
+                        {'select': 'lic_no,name,office_normalized,email,tel,address',
+                         'office_normalized': 'not.is.null'},
                         'lic_no.asc')
-    roster = defaultdict(set)
+    roster = defaultdict(list)
     for r in rows:
-        office = (r.get('office_normalized') or '').strip()
-        name = (r.get('name') or '').strip()
-        if not office or len(name) < 2 or '?' in name:  # 名冊罕用字會匯出成 ?，不能拿來比對
-            continue
-        m = FIRM_KEY_RE.match(office)
-        roster[(m.group(1) if m else office).replace(' ', '')].add(name)
-    return {k: sorted(v) for k, v in roster.items()}
+        key = firm_key(r.get('office_normalized'))
+        if key:
+            roster[key].append(r)
+    return dict(roster)
 
 
 def main():
