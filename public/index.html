@@ -5219,13 +5219,17 @@ async function loadDemographicCharts() {
   const seniorityColor = 'rgba(201,168,76,0.65)';  // 金
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
 
-  // moj_lawyers 13,500+ 列（PostgREST 每回應上限 1000）→ fetchAllPagesParallel 兩波平行抓齊
-  // （舊版逐頁串行 14 趟 round-trip，curl 實測 4～9 秒 → 平行 0.6～1.6 秒）。prefetchPages=16 涵蓋
-  // 16,000 列（現 13,585）。order 用主鍵 id：各頁排序穩定、跨頁不重複不漏列。失敗回空陣列（沿用舊版靜默語意）。
-  const allRows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_lawyers')
-    .select('birth_year, sex, lic_no', withCount ? { count: 'exact' } : {})
-    .order('id', { ascending: true }).range(from, to), { prefetchPages: 16 })
-    .catch(e => { console.warn('moj_lawyers 人口統計載入失敗:', e); return []; });
+  // 2026-11-11：改由 moj_demographics()（mig 281）在資料庫端彙總，一次請求回傳原始值直方圖。
+  // 舊版把 moj_lawyers 13,800 列分 16 頁同時抓回來在瀏覽器數，是開頁時最大的一批請求
+  // （16 個請求在 2 核心資料庫上互搶，edge log 實測每個 0.8～1.2 秒）。
+  let demo = null;
+  try {
+    const { data, error } = await db.rpc('moj_demographics');
+    if (error) throw error;
+    demo = data;
+  } catch (e) { console.warn('moj_demographics 載入失敗:', e); }
+  demo = demo || {};
+  const birthYears = demo.birth_years || {}, licYears = demo.lic_years || {};
 
   const chartOpts = (indexAxis) => ({
     responsive: true, maintainAspectRatio: false, indexAxis,
@@ -5238,7 +5242,7 @@ async function loadDemographicCharts() {
 
   // === 性別分布 ===
   const genderCounts = {};
-  allRows.forEach(r => { if (r.sex) genderCounts[r.sex] = (genderCounts[r.sex] || 0) + 1; });
+  (demo.gender || []).forEach(g => { genderCounts[g.sex] = g.n; });
   if (chartInstances.gender) chartInstances.gender.destroy();
   chartInstances.gender = new Chart(document.getElementById('chartGender').getContext('2d'), {
     type: 'doughnut',
@@ -5252,19 +5256,19 @@ async function loadDemographicCharts() {
   // === 年齡分布 ===
   const currentYear = new Date().getFullYear();
   const ageBuckets = { '25以下': 0, '26-30': 0, '31-35': 0, '36-40': 0, '41-45': 0, '46-50': 0, '51-55': 0, '56-60': 0, '61-65': 0, '66+': 0 };
-  allRows.forEach(r => {
-    if (!r.birth_year || r.birth_year >= 200) return;
-    const age = currentYear - (1911 + r.birth_year);
-    if (age <= 25) ageBuckets['25以下']++;
-    else if (age <= 30) ageBuckets['26-30']++;
-    else if (age <= 35) ageBuckets['31-35']++;
-    else if (age <= 40) ageBuckets['36-40']++;
-    else if (age <= 45) ageBuckets['41-45']++;
-    else if (age <= 50) ageBuckets['46-50']++;
-    else if (age <= 55) ageBuckets['51-55']++;
-    else if (age <= 60) ageBuckets['56-60']++;
-    else if (age <= 65) ageBuckets['61-65']++;
-    else ageBuckets['66+']++;
+  Object.entries(birthYears).forEach(([by, n]) => {
+    const age = currentYear - (1911 + Number(by));
+    if (age < 20) return;   // 出生年登錄錯誤（例：民國 197 年）不計；舊版會誤算進「25以下」
+    if (age <= 25) ageBuckets['25以下'] += n;
+    else if (age <= 30) ageBuckets['26-30'] += n;
+    else if (age <= 35) ageBuckets['31-35'] += n;
+    else if (age <= 40) ageBuckets['36-40'] += n;
+    else if (age <= 45) ageBuckets['41-45'] += n;
+    else if (age <= 50) ageBuckets['46-50'] += n;
+    else if (age <= 55) ageBuckets['51-55'] += n;
+    else if (age <= 60) ageBuckets['56-60'] += n;
+    else if (age <= 65) ageBuckets['61-65'] += n;
+    else ageBuckets['66+'] += n;
   });
   if (chartInstances.age) chartInstances.age.destroy();
   chartInstances.age = new Chart(document.getElementById('chartAge').getContext('2d'), {
@@ -5276,19 +5280,16 @@ async function loadDemographicCharts() {
   // === 年資分布 ===
   const currentRocYear = currentYear - 1911;
   const senBuckets = { '1年以下': 0, '1-3': 0, '4-5': 0, '6-10': 0, '11-15': 0, '16-20': 0, '21-30': 0, '30+': 0 };
-  allRows.forEach(r => {
-    if (!r.lic_no) return;
-    const m = r.lic_no.match(/^\(?(\d+)\)?/);
-    if (!m) return;
-    const yrs = currentRocYear - parseInt(m[1]);
-    if (yrs < 1) senBuckets['1年以下']++;
-    else if (yrs <= 3) senBuckets['1-3']++;
-    else if (yrs <= 5) senBuckets['4-5']++;
-    else if (yrs <= 10) senBuckets['6-10']++;
-    else if (yrs <= 15) senBuckets['11-15']++;
-    else if (yrs <= 20) senBuckets['16-20']++;
-    else if (yrs <= 30) senBuckets['21-30']++;
-    else senBuckets['30+']++;
+  Object.entries(licYears).forEach(([ly, n]) => {
+    const yrs = currentRocYear - Number(ly);
+    if (yrs < 1) senBuckets['1年以下'] += n;
+    else if (yrs <= 3) senBuckets['1-3'] += n;
+    else if (yrs <= 5) senBuckets['4-5'] += n;
+    else if (yrs <= 10) senBuckets['6-10'] += n;
+    else if (yrs <= 15) senBuckets['11-15'] += n;
+    else if (yrs <= 20) senBuckets['16-20'] += n;
+    else if (yrs <= 30) senBuckets['21-30'] += n;
+    else senBuckets['30+'] += n;
   });
   if (chartInstances.seniority) chartInstances.seniority.destroy();
   chartInstances.seniority = new Chart(document.getElementById('chartSeniority').getContext('2d'), {
@@ -5349,18 +5350,21 @@ async function loadLawyerFirmSizeDist() {
   } catch (e) { tbl.innerHTML = rankFailMsg(e); note.textContent = ''; }
 }
 
-async function loadFirmSizeChart() {
+async function loadFirmSizeChart(officesP) {
   const txtColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#8899aa';
   const firmColor = 'rgba(155,126,216,0.65)'; // 紫
 
-  // 用 cache 表而非 RPC（慢 ~8s）；6,200+ 列 → fetchAllPagesParallel 兩波平行抓齊
-  // （舊版逐頁串行 7 趟 round-trip，curl 實測 1.8～3.9 秒 → 平行 0.6～0.9 秒）。prefetchPages=8 涵蓋 8,000 列（現 6,261）。
-  // order 加 firm_name（主鍵）當 tiebreaker：同人數多所各頁排序才穩定。失敗回空陣列 → 下方顯示無資料。
-  const allFirms = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_firm_stats_cache')
-    .select('firm_name, lawyer_count, main_region', withCount ? { count: 'exact' } : {})
-    .order('lawyer_count', { ascending: false }).order('firm_name', { ascending: true })
-    .range(from, to), { prefetchPages: 8 })
-    .catch(e => { console.error('firm cache error:', e); return []; });
+  // 事務所總覽同時會跑 loadOffices()（整張 moj_firm_stats_cache，已依人數排序）→ 直接等它、共用同一份資料，
+  // 不再自己平行抓 8 頁同一張表（2026-11-11）。loadOffices 被別的載入作廢而沒資料時才退回自己抓。
+  try { await (officesP || loadOffices()); } catch (e) { console.warn('loadOffices（規模圖共用）失敗:', e); }
+  let allFirms = allOffices;
+  if (!allFirms.length) {
+    allFirms = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_firm_stats_cache')
+      .select('firm_name, lawyer_count, main_region', withCount ? { count: 'exact' } : {})
+      .order('lawyer_count', { ascending: false }).order('firm_name', { ascending: true })
+      .range(from, to), { prefetchPages: 8 })
+      .catch(e => { console.error('firm cache error:', e); return []; });
+  }
   if (!allFirms.length) {
     document.getElementById('topFirmsList').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:12px;">無事務所資料</div>';
     return;
@@ -5808,8 +5812,9 @@ let _foLoaded = false;
 function loadFirmOverviewOnce() {
   if (_foLoaded) return;
   _foLoaded = true;
-  loadOffices().then(loadExJudFirmChart);  // KPI 群元素已移到本頁；聯集 merge 完成後畫法檢轉任圖
-  loadFirmSizeChart();    // 規模分布圖＋律師人數 TOP 10（自舊總覽移入）
+  const officesP = loadOffices();
+  officesP.then(loadExJudFirmChart);  // KPI 群元素已移到本頁；聯集 merge 完成後畫法檢轉任圖
+  loadFirmSizeChart(officesP);        // 規模分布圖＋律師人數 TOP 10（共用 loadOffices 的資料，不另抓）
   loadFirmSizeTrend();    // 事務所家數月快照趨勢（mig 195 firm_size_trend）
   loadIndustryStructure(); // 產業結構分析（AI 分析 398 家，firm_analysis_facts）
   loadFirmMapOnce();      // 事務所版圖（自 產業分析＞訴訟市場 移入，loader 原封沿用）
@@ -7628,13 +7633,10 @@ function ensureAmbiguousNames() {
     _ambNamesLoading = (async () => {
       const set = new Set();
       try {
-        for (let from = 0; ; from += 1000) {
-          const { data, error } = await db.from('lawyers_with_stats')
-            .select('name').eq('name_ambiguous', true).range(from, from + 999);
-          if (error) throw error;
-          (data || []).forEach(r => set.add(r.name));
-          if (!data || data.length < 1000) break;
-        }
+        // mig 281：資料庫端一次回傳姓名陣列（舊版對 lawyers_with_stats 逐頁抓，每次開頁都跑、單次 2～4 秒）
+        const { data, error } = await db.rpc('ambiguous_lawyer_names');
+        if (error) throw error;
+        (data || []).forEach(n => set.add(n));
         AMBIGUOUS_NAMES = set;
       } catch (e) {
         console.log('ambiguous names load error:', e);
@@ -7652,12 +7654,10 @@ function ensureSoloFirms() {
       const map = new Map();
       const pAmb = ensureAmbiguousNames(); // leaderInfo 的同名判定（與一人所表同時載）
       try {
-        // moj_solo_firm_lawyers 3,800 列 → fetchAllPagesParallel 兩波平行（舊版 4 趟串行，curl 實測
-        // 1.4～2 秒 → 0.45～0.9 秒，偶有離群）；prefetchPages=5 涵蓋 5,000 列；view 以 firm_key GROUP BY，firm_key 即唯一鍵。
-        const rows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_solo_firm_lawyers')
-          .select('firm_key,name', withCount ? { count: 'exact' } : {})
-          .order('firm_key', { ascending: true }).range(from, to), { prefetchPages: 5 });
-        rows.forEach(r => map.set(r.firm_key, r.name));
+        // mig 281：solo_firm_map() 一次回傳 {firm_key: 姓名}（舊版對 view 平行抓 5 頁，每次開頁都跑）
+        const { data, error } = await db.rpc('solo_firm_map');
+        if (error) throw error;
+        Object.entries(data || {}).forEach(([k, v]) => map.set(k, v));
         SOLO_FIRM_MAP = map;
         await pAmb;
       } catch (e) {
@@ -8047,12 +8047,14 @@ async function loadOffices() {
 }
 
 async function loadOfficeAgeSeniority() {
-  // moj_lawyers 13,500+ 列 → fetchAllPagesParallel 兩波平行（舊版 14 趟串行 round-trip，curl 實測 4～9 秒
-  // → 平行 0.6～1.6 秒）；prefetchPages=16 涵蓋 16,000 列；order 用主鍵 id；失敗回空陣列（沿用舊版靜默語意）。
-  const rows = await fetchAllPagesParallel((from, to, withCount) => db.from('moj_lawyers')
-    .select('name, birth_year, lic_no, office_normalized', withCount ? { count: 'exact' } : {})
-    .order('id', { ascending: true }).range(from, to), { prefetchPages: 16 })
-    .catch(e => { console.warn('moj_lawyers 年齡年資載入失敗:', e); return []; });
+  // mig 281：moj_lawyers_slim() 一次回傳整份名冊的四個欄位（每列 [姓名, 出生年, 證號, 事務所]）。
+  // 舊版平行抓 16 頁 moj_lawyers，和律師總覽的人口統計是開頁時最大的兩批請求。失敗回空陣列（沿用舊版靜默語意）。
+  let rows = [];
+  try {
+    const { data, error } = await db.rpc('moj_lawyers_slim');
+    if (error) throw error;
+    rows = (data || []).map(a => ({ name: a[0], birth_year: a[1], lic_no: a[2], office_normalized: a[3] }));
+  } catch (e) { console.warn('moj_lawyers 年齡年資載入失敗:', e); }
   const currentYear = new Date().getFullYear();
   const currentRocYear = currentYear - 1911;
 
