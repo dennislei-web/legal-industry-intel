@@ -1,0 +1,54 @@
+name: 官網每週複驗
+
+# 已驗證官網的健康檢查＋名冊律師姓名比對（mig 275）。
+# 只抓各所自己的網站，不經搜尋引擎，所以不會像「搜尋事務所官網」的重掃那樣被 DDG 封 runner。
+# 連續 3 次（＝3 週）失敗才自動下架，站方暫時當機不會被洗掉。
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'  # 每週日 UTC 19:00 = 台灣週一凌晨 3:00（GitHub 排程常延遲數小時，屬正常）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只印結果不寫 DB'
+        required: false
+        default: 'false'
+      limit:
+        description: '只跑前 N 筆（0 = 全部）'
+        required: false
+        default: '0'
+
+concurrency:
+  group: recheck-firm-websites
+  cancel-in-progress: false
+
+jobs:
+  recheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: 複驗官網
+        id: recheck
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+        working-directory: scripts
+        run: python -u recheck_firm_websites.py
+
+      - name: 有下架或恢復 → 重建事務所快取（前端「有官網」卡讀快取）
+        if: ${{ steps.recheck.outputs.changed != '' && steps.recheck.outputs.changed != '0' && github.event.inputs.dry_run != 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: bash .github/scripts/refresh-rpcs.sh refresh_firm_stats_cache
