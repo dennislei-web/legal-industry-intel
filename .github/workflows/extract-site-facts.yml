@@ -1,0 +1,41 @@
+name: 官網結構化抽取（每月）
+
+# 對驗證通過的事務所官網重抓文字快照，抽定位／團隊揭露／進線管道（mig 278）。
+# 只抓各所自己的網站，不經搜尋引擎。每月一次即可：官網內容變動慢，
+# 快照留著是為了之後比對「這個月誰改了定位、誰從官網消失」。
+
+on:
+  schedule:
+    - cron: '0 18 1 * *'  # 每月 1 日 UTC 18:00 = 台灣 2 日凌晨 2:00
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '只跑前 N 間（0 = 全部）'
+        required: false
+        default: '0'
+
+concurrency:
+  group: extract-site-facts
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests python-dotenv
+
+      - name: 抽取
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+        working-directory: scripts
+        run: python -u extract_site_facts.py
