@@ -39,3 +39,10 @@ jobs:
           LIMIT: ${{ github.event.inputs.limit || '0' }}
         working-directory: scripts
         run: python -u extract_site_facts.py
+
+      - name: 重算各所各領域實際案量（官網主打 vs 裁判書的對照基礎，mig 279）
+        if: ${{ !cancelled() }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: bash .github/scripts/refresh-rpcs.sh refresh_firm_area_cases
