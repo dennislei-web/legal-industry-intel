@@ -222,8 +222,9 @@ def parse_case(key, recs):
         'job_number': job_number,
         'title': g('採購資料:標案名稱') or rec['brief'].get('title'),
         'category': g('採購資料:標的分類'),
-        'procurement_method': g('採購資料:招標方式'),
-        'award_method': g('採購資料:決標方式'),
+        # 決標公告/定期彙送把這兩欄放在「已公告資料」區塊，「採購資料」區塊通常沒有
+        'procurement_method': g('採購資料:招標方式') or g('已公告資料:招標方式'),
+        'award_method': g('採購資料:決標方式') or g('已公告資料:決標方式'),
         'budget_amount': parse_amount(g('採購資料:預算金額')),
         'award_date': roc_to_iso(g('決標資料:決標日期')),
         'total_amount': parse_amount(g('決標資料:總決標金額')),

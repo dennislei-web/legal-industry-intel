@@ -1948,6 +1948,44 @@
         </div>
       </div>
       <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#9878;&#65039; 決標方式——三種方式、三個市場</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+          <div id="gvMethodRange" style="display:flex;gap:4px;">
+            <button class="sub-tab-btn active" data-range="5y" style="padding:4px 12px;font-size:0.75rem;">近 5 年</button>
+            <button class="sub-tab-btn" data-range="all" style="padding:4px 12px;font-size:0.75rem;">全期</button>
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);" id="gvMethodDesc">-</div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:14px;">
+          <table>
+            <thead><tr><th>決標方式</th><th style="text-align:right;">件數</th><th style="text-align:right;">件數佔比</th><th style="text-align:right;">金額</th><th style="text-align:right;">金額佔比</th><th style="text-align:right;">中位單案</th><th style="text-align:right;">平均投標家數</th><th style="text-align:right;">單一投標率</th></tr></thead>
+            <tbody id="gvMethodBody"></tbody>
+          </table>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">金額級距決定比法——各級距的決標方式組成</div>
+            <div class="chart-container" style="height:280px;"><canvas id="gvMethodChart"></canvas></div>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+              <div style="font-size:0.85rem;font-weight:600;">各方式得標所 TOP 8</div>
+              <div id="gvMethodTabs" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px;" id="gvMethodFirmMeta">-</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>#</th><th>事務所</th><th style="text-align:right;">得標數</th><th style="text-align:right;">金額</th></tr></thead>
+                <tbody id="gvMethodFirmBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;">
+          ※ <strong>最低標</strong>多數其實是機關逕洽單一廠商議價（限制性招標未經公開評選），非真正比價；<strong>準用最有利標</strong>＝經公開評選的限制性招標（100 萬以上專業服務主流，評企劃與團隊後議價）；<strong>參考最有利標精神</strong>＝未達 100 萬的公開取得企劃書案（簡化評分）。「未載明」為來源公告缺此欄位。
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127963;&#65039; 哪些機關最花錢買法律服務——機關 TOP 15（按累計金額）</div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvUnitDesc">-</div>
         <div class="table-wrap">
@@ -2023,18 +2061,26 @@
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center;">
           <input id="gvSearch" type="text" placeholder="搜尋機關 / 案名關鍵字..." onkeydown="if(event.key==='Enter')gvSearchRun()" style="flex:1;min-width:200px;padding:7px 12px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.8rem;">
           <select id="gvYearSel" onchange="gvSearchRun()" style="padding:6px 10px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.78rem;"><option value="">全部年度</option></select>
+          <select id="gvMethodSel" onchange="gvSearchRun()" style="padding:6px 10px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.78rem;">
+            <option value="">全部決標方式</option>
+            <option value="最低標">最低標</option>
+            <option value="準用最有利標">準用最有利標</option>
+            <option value="參考最有利標精神">參考最有利標精神</option>
+            <option value="最有利標">最有利標</option>
+            <option value="__null">未載明</option>
+          </select>
           <button class="tab-btn" onclick="gvSearchRun()" style="padding:6px 14px;font-size:0.78rem;">查詢</button>
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="gvListMeta">-</div>
         <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
           <table>
-            <thead><tr><th>決標日</th><th>機關</th><th>案名</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
+            <thead><tr><th>決標日</th><th>機關</th><th>案名</th><th>決標方式</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
             <tbody id="gvListBody"></tbody>
           </table>
         </div>
       </div>
       <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">
-        ※ 口徑限制：(1) 以「廠商名含<strong>法律／律師</strong>」搜尋聯集抓取——會計師事務所、管顧公司承攬的法制案不在內，屬律師業視角的<strong>下限口徑</strong>；(2) 10 萬元以下小額採購依法不強制公告，故「10 萬以下」桶接近空集合；(3) <strong>定期彙送</strong>類公告（約 3 成）機關名稱已自決標明細補回，惟部分案仍缺招標／決標方式欄位，競爭度統計僅涵蓋有明細的決標公告；(4) 部分案件決標金額依規定不公開（約 300 件），計件不計額；(5) 金額為決標總價，多年期常年顧問以總價一次計入決標年。年份為西元。
+        ※ 口徑限制：(1) 以「廠商名含<strong>法律／律師</strong>」搜尋聯集抓取——會計師事務所、管顧公司承攬的法制案不在內，屬律師業視角的<strong>下限口徑</strong>；(2) 10 萬元以下小額採購依法不強制公告，故「10 萬以下」桶接近空集合；(3) <strong>定期彙送</strong>類公告（約 3 成）機關名稱已自決標明細補回，招標／決標方式已自「已公告資料」區塊回補（少數來源未載者列「未載明」），競爭度統計僅涵蓋有明細的決標公告；(4) 部分案件決標金額依規定不公開（約 300 件），計件不計額；(5) 金額為決標總價，多年期常年顧問以總價一次計入決標年。年份為西元。
       </div>
     </div>
 
@@ -15129,12 +15175,14 @@ async function loadAdrOnce() {
   }
 }
 
-// ===== 政府標案（B2G 法律服務 — gov_tenders/gov_tender_firms，mig 063/077/103）=====
+// ===== 政府標案（B2G 法律服務 — gov_tenders/gov_tender_firms，mig 063/077/103/283）=====
 let _gvLoaded = false;
 function loadGovTenderOnce() {
   if (_gvLoaded) return;
   _gvLoaded = true;
   loadGvOverview();
+  loadGvMethods();
+  wireGvMethodRange();
   loadGvUnits();
   loadGvSticky();
   loadGvFirms();
@@ -15376,18 +15424,21 @@ function gvWinnersHtml(firms) {
 async function gvSearchRun() {
   const body = document.getElementById('gvListBody');
   const meta = document.getElementById('gvListMeta');
-  body.innerHTML = '<tr><td colspan="5"><div class="loading">載入中</div></td></tr>';
+  body.innerHTML = '<tr><td colspan="6"><div class="loading">載入中</div></td></tr>';
   try {
     const kw = (document.getElementById('gvSearch').value || '').trim();
     const yr = document.getElementById('gvYearSel').value;
+    const mt = document.getElementById('gvMethodSel').value;
     let q = db.from('gov_tenders')
-      .select('unit_name, title, award_date, total_amount, gov_tender_firms(firm_name, is_winner)', { count: 'exact' })
+      .select('unit_name, title, award_date, total_amount, award_method, gov_tender_firms(firm_name, is_winner)', { count: 'exact' })
       .order('award_date', { ascending: false, nullsFirst: false }).limit(50);
     if (kw) {
       const esc = kw.replace(/[%_,()]/g, '');
       q = q.or(`title.ilike.%${esc}%,unit_name.ilike.%${esc}%`);
     }
     if (yr) q = q.eq('award_year', yr);
+    if (mt === '__null') q = q.is('award_method', null);
+    else if (mt) q = q.eq('award_method', mt);
     const { data, count, error } = await q;
     if (error) throw error;
     meta.textContent = `共 ${(count || 0).toLocaleString()} 件符合，列出最近 ${Math.min(50, data ? data.length : 0)} 件（按決標日）`;
@@ -15395,10 +15446,112 @@ async function gvSearchRun() {
       <td style="white-space:nowrap;">${r.award_date || '-'}</td>
       <td style="font-size:0.8rem;">${escHtml(r.unit_name || '（定期彙送）')}</td>
       <td style="font-size:0.8rem;max-width:320px;">${escHtml(r.title || '-')}</td>
+      <td style="font-size:0.78rem;white-space:nowrap;">${r.award_method ? escHtml(r.award_method) : '<span style="color:var(--text-muted);">未載明</span>'}</td>
       <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開'}</td>
       <td style="font-size:0.8rem;">${gvWinnersHtml(r.gov_tender_firms)}</td>
-    </tr>`).join('') || '<tr><td colspan="5" style="color:var(--text-muted);">查無資料</td></tr>';
-  } catch (e) { body.innerHTML = `<tr><td colspan="5" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-muted);">查無資料</td></tr>';
+  } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+// 決標方式（gov_tender_method_stats RPC，mig 283）
+const GV_METHOD_ORDER = ['最低標', '準用最有利標', '參考最有利標精神', '最有利標', '其他', '未載明'];
+const GV_METHOD_COLOR = { '最低標': '#e05c5c', '準用最有利標': '#4f8ef7', '參考最有利標精神': '#4caf82', '最有利標': '#c9a84c', '其他': '#9b7fd4', '未載明': '#667788' };
+let _gvMethodData = null, _gvMethodSel = '準用最有利標';
+async function loadGvMethods(range = '5y') {
+  const body = document.getElementById('gvMethodBody');
+  body.innerHTML = '<tr><td colspan="8"><div class="loading">載入中</div></td></tr>';
+  try {
+    const fromY = range === '5y' ? new Date().getFullYear() - 5 : null;
+    const { data, error } = await db.rpc('gov_tender_method_stats', { p_from_year: fromY });
+    if (error) throw error;
+    _gvMethodData = data || { methods: [], buckets: [], firms: [] };
+    const ms = [..._gvMethodData.methods].sort((a, b) => GV_METHOD_ORDER.indexOf(a.m) - GV_METHOD_ORDER.indexOf(b.m));
+    const totC = ms.reduce((a, r) => a + Number(r.cases), 0);
+    const totA = ms.reduce((a, r) => a + Number(r.total_amount || 0), 0);
+    const pct = (a, b) => b ? Math.round(a * 100 / b) + '%' : '-';
+    const get = k => ms.find(r => r.m === k);
+    const low = get('最低標'), zy = get('準用最有利標');
+    document.getElementById('gvMethodDesc').innerHTML = (low && zy)
+      ? `${fromY ? fromY + ' 年起' : '全期'} ${totC.toLocaleString()} 件：<strong>最低標佔 ${pct(low.cases, totC)} 件數、${pct(low.single_bid, low.with_bidders)} 只有 1 家</strong>（多為逕洽議價）；<strong>準用最有利標只佔 ${pct(zy.cases, totC)} 件數、卻吃下 ${pct(zy.total_amount, totA)} 金額</strong>——錢在評選案。`
+      : `${fromY ? fromY + ' 年起' : '全期'} ${totC.toLocaleString()} 件`;
+    body.innerHTML = ms.map(r => `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${GV_METHOD_COLOR[r.m] || '#888'};margin-right:6px;"></span>${escHtml(r.m)}</td>
+      <td style="text-align:right;font-weight:600;">${Number(r.cases).toLocaleString()}</td>
+      <td style="text-align:right;">${pct(r.cases, totC)}</td>
+      <td style="text-align:right;color:var(--gold);">${Number(r.total_amount) ? govAmtHtml(Number(r.total_amount)) : '-'}</td>
+      <td style="text-align:right;">${pct(Number(r.total_amount || 0), totA)}</td>
+      <td style="text-align:right;">${r.median_amount ? Math.round(Number(r.median_amount) / 1e4).toLocaleString() + ' 萬' : '-'}</td>
+      <td style="text-align:right;">${r.avg_bidders != null ? Number(r.avg_bidders).toFixed(1) : '-'}</td>
+      <td style="text-align:right;">${pct(r.single_bid, r.with_bidders)}</td>
+    </tr>`).join('') || '<tr><td colspan="8" style="color:var(--text-muted);">查無資料</td></tr>';
+    // 金額級距 × 方式 100% 堆疊
+    const bkLabels = ['50 萬以下', '50–100 萬', '100–500 萬', '500–1,000 萬', '1,000 萬以上'];
+    const present = GV_METHOD_ORDER.filter(m => _gvMethodData.buckets.some(b => b.m === m));
+    const bkTot = [1, 2, 3, 4, 5].map(k => _gvMethodData.buckets.filter(b => b.bk === k).reduce((a, b) => a + Number(b.cases), 0));
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+    if (chartInstances['gvMethod']) chartInstances['gvMethod'].destroy();
+    chartInstances['gvMethod'] = new Chart(document.getElementById('gvMethodChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: bkLabels,
+        datasets: present.map(m => ({
+          label: m, backgroundColor: GV_METHOD_COLOR[m] || '#888',
+          data: [1, 2, 3, 4, 5].map((k, i) => {
+            const b = _gvMethodData.buckets.find(x => x.bk === k && x.m === m);
+            return bkTot[i] ? +(Number(b ? b.cases : 0) * 100 / bkTot[i]).toFixed(1) : 0;
+          }),
+          _cases: [1, 2, 3, 4, 5].map(k => { const b = _gvMethodData.buckets.find(x => x.bk === k && x.m === m); return b ? Number(b.cases) : 0; }),
+        })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: muted, boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.dataset._cases[c.dataIndex].toLocaleString()} 件（${c.parsed.y}%）` } },
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: muted, font: { size: 10 } } },
+          y: { stacked: true, max: 100, ticks: { color: muted, callback: v => v + '%' } },
+        },
+      },
+    });
+    // 方式 tabs + 得標所榜
+    const tabs = document.getElementById('gvMethodTabs');
+    const withFirms = GV_METHOD_ORDER.filter(m => _gvMethodData.firms.some(f => f.m === m) && m !== '未載明' && m !== '其他');
+    if (!withFirms.includes(_gvMethodSel)) _gvMethodSel = withFirms[0];
+    tabs.innerHTML = withFirms.map(m => `<button class="sub-tab-btn${m === _gvMethodSel ? ' active' : ''}" data-m="${escHtml(m)}" style="padding:3px 10px;font-size:0.72rem;">${escHtml(m)}</button>`).join('');
+    tabs.querySelectorAll('button').forEach(b => b.onclick = () => {
+      _gvMethodSel = b.dataset.m;
+      tabs.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+      renderGvMethodFirms();
+    });
+    renderGvMethodFirms();
+  } catch (e) {
+    console.error('決標方式載入失敗', e);
+    body.innerHTML = `<tr><td colspan="8" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`;
+  }
+}
+function renderGvMethodFirms() {
+  const body = document.getElementById('gvMethodFirmBody');
+  const rows = ((_gvMethodData || {}).firms || []).filter(f => f.m === _gvMethodSel).sort((a, b) => a.rk - b.rk);
+  const m = ((_gvMethodData || {}).methods || []).find(r => r.m === _gvMethodSel);
+  const top = rows.reduce((a, r) => a + Number(r.wins), 0);
+  document.getElementById('gvMethodFirmMeta').textContent = rows.length
+    ? `共 ${Number(rows[0].firms_n).toLocaleString()} 家得過標；前 ${rows.length} 名合計 ${top.toLocaleString()} 件${m ? '（該方式共 ' + Number(m.cases).toLocaleString() + ' 件）' : ''}`
+    : '-';
+  body.innerHTML = rows.map(r => `<tr>
+    <td>${r.rk}</td>
+    <td style="font-size:0.8rem;">${r.firm_key && r.firm_key.includes('事務所') ? firmLink(r.firm_key) : escHtml(r.firm_key)}</td>
+    <td style="text-align:right;font-weight:600;">${Number(r.wins).toLocaleString()}</td>
+    <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '-'}</td>
+  </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-muted);">查無資料</td></tr>';
+}
+function wireGvMethodRange() {
+  const box = document.getElementById('gvMethodRange');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => {
+    box.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === b));
+    loadGvMethods(b.dataset.range);
+  });
 }
 
 // ===== 勞資爭議（行政調解 — 勞動部開放資料，靜態 data/labor_stats.json）=====
