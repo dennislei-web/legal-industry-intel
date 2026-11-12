@@ -1935,6 +1935,29 @@
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;" id="gvTrendDesc">-</div>
         <div class="chart-container" style="height:320px;"><canvas id="gvTrendChart"></canvas></div>
       </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129513; 服務內容——律所標到的案子在做什麼</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:10px;line-height:1.7;" id="gvSvcDesc">-</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:14px;">
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">七大組佔比——件數與金額</div>
+            <div id="gvSvcGroups" style="display:flex;flex-direction:column;gap:7px;font-size:0.8rem;"></div>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;margin-bottom:6px;">每五年的件數變化</div>
+            <div class="chart-container" style="height:260px;"><canvas id="gvSvcChart"></canvas></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>服務內容</th><th style="text-align:right;">件數</th><th style="text-align:right;">件數佔比</th><th style="text-align:right;">金額</th><th style="text-align:right;">金額佔比</th><th style="text-align:right;">單案中位數</th><th style="text-align:right;">只有一家投標</th><th id="gvSvcFirmTh">近 5 年主要得標所</th><th id="gvSvcUnitTh">近 5 年主要發案機關</th></tr></thead>
+            <tbody id="gvSvcBody"><tr><td colspan="9"><div class="loading">載入中</div></td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.7;">
+          ※ 口徑：只算<strong>得標者含律師事務所</strong>的案子（學校、研究機構、顧問公司、專利商標所得標的不計），金額＝律所得標者的決標金額。分類<strong>只看標案名稱</strong>的關鍵字規則（抽 100 件人工複核約 95 件正確），沒有讀招標文件；名稱同時含兩種服務的（如「法律諮詢及訴訟服務」）歸到名稱最突出的那一類。「只有一家投標」比例越高，越是機關直接指定。點任一列可在下方明細查詢看該類全部標案。
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px;">
         <div class="card">
           <div class="card-title">&#129355; 競爭度——每案投標家數</div>
@@ -2069,12 +2092,13 @@
             <option value="最有利標">最有利標</option>
             <option value="__null">未載明</option>
           </select>
+          <select id="gvSvcSel" onchange="gvSearchRun()" style="padding:6px 10px;background:var(--bg-input,rgba(255,255,255,0.05));border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.78rem;"><option value="">全部服務內容</option></select>
           <button class="tab-btn" onclick="gvSearchRun()" style="padding:6px 14px;font-size:0.78rem;">查詢</button>
         </div>
         <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;" id="gvListMeta">-</div>
         <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
           <table>
-            <thead><tr><th>決標日</th><th>機關</th><th>案名</th><th>決標方式</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
+            <thead><tr><th>決標日</th><th>機關</th><th>案名</th><th>服務內容</th><th>決標方式</th><th style="text-align:right;">決標金額</th><th>得標廠商</th></tr></thead>
             <tbody id="gvListBody"></tbody>
           </table>
         </div>
@@ -15181,6 +15205,7 @@ function loadGovTenderOnce() {
   if (_gvLoaded) return;
   _gvLoaded = true;
   loadGvOverview();
+  loadGvService();
   loadGvMethods();
   wireGvMethodRange();
   loadGvUnits();
@@ -15424,13 +15449,14 @@ function gvWinnersHtml(firms) {
 async function gvSearchRun() {
   const body = document.getElementById('gvListBody');
   const meta = document.getElementById('gvListMeta');
-  body.innerHTML = '<tr><td colspan="6"><div class="loading">載入中</div></td></tr>';
+  body.innerHTML = '<tr><td colspan="7"><div class="loading">載入中</div></td></tr>';
   try {
     const kw = (document.getElementById('gvSearch').value || '').trim();
     const yr = document.getElementById('gvYearSel').value;
     const mt = document.getElementById('gvMethodSel').value;
+    const sv = document.getElementById('gvSvcSel').value;
     let q = db.from('gov_tenders')
-      .select('unit_name, title, award_date, total_amount, award_method, gov_tender_firms(firm_name, is_winner)', { count: 'exact' })
+      .select('unit_name, title, award_date, total_amount, award_method, service_type, gov_tender_firms(firm_name, is_winner)', { count: 'exact' })
       .order('award_date', { ascending: false, nullsFirst: false }).limit(50);
     if (kw) {
       const esc = kw.replace(/[%_,()]/g, '');
@@ -15439,6 +15465,7 @@ async function gvSearchRun() {
     if (yr) q = q.eq('award_year', yr);
     if (mt === '__null') q = q.is('award_method', null);
     else if (mt) q = q.eq('award_method', mt);
+    if (sv) q = q.eq('service_type', sv);
     const { data, count, error } = await q;
     if (error) throw error;
     meta.textContent = `共 ${(count || 0).toLocaleString()} 件符合，列出最近 ${Math.min(50, data ? data.length : 0)} 件（按決標日）`;
@@ -15446,11 +15473,163 @@ async function gvSearchRun() {
       <td style="white-space:nowrap;">${r.award_date || '-'}</td>
       <td style="font-size:0.8rem;">${escHtml(r.unit_name || '（定期彙送）')}</td>
       <td style="font-size:0.8rem;max-width:320px;">${escHtml(r.title || '-')}</td>
+      <td style="font-size:0.78rem;white-space:nowrap;">${r.service_type ? `<span style="color:${GV_SVC_COLOR[GV_SVC_GROUP[r.service_type]] || 'inherit'};">&#9679;</span> ${escHtml(r.service_type)}` : '-'}</td>
       <td style="font-size:0.78rem;white-space:nowrap;">${r.award_method ? escHtml(r.award_method) : '<span style="color:var(--text-muted);">未載明</span>'}</td>
       <td style="text-align:right;color:var(--gold);">${r.total_amount ? govAmtHtml(Number(r.total_amount)) : '未公開'}</td>
       <td style="font-size:0.8rem;">${gvWinnersHtml(r.gov_tender_firms)}</td>
-    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-muted);">查無資料</td></tr>';
-  } catch (e) { body.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+    </tr>`).join('') || '<tr><td colspan="7" style="color:var(--text-muted);">查無資料</td></tr>';
+  } catch (e) { body.innerHTML = `<tr><td colspan="7" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`; }
+}
+
+// 服務內容分類（gov_tenders.service_type generated column＋gov_tender_service_stats RPC，mig 284）
+// 分類規則只看標案名稱，單一來源在 DB 函數 gov_tender_service_type()；這裡只管顯示順序、歸組與說明。
+const GV_SVC_ORDER = ['個案訴訟代理', '批量訴訟委外', '仲裁調解與履約爭議', '債權追償與強制執行',
+  '常年顧問與法律諮詢', '專案法律顧問', '法遵與稽核', '法制研究與修法', '教育訓練與法普宣導',
+  '民眾法律服務', '智財申請維護', '其他'];
+const GV_SVC_GROUP = {
+  '個案訴訟代理': '爭端解決', '批量訴訟委外': '爭端解決', '仲裁調解與履約爭議': '爭端解決', '債權追償與強制執行': '爭端解決',
+  '常年顧問與法律諮詢': '顧問諮詢', '專案法律顧問': '顧問諮詢', '法遵與稽核': '顧問諮詢',
+  '法制研究與修法': '法制研究', '教育訓練與法普宣導': '訓練法普', '民眾法律服務': '民眾服務',
+  '智財申請維護': '智財申請', '其他': '其他',
+};
+const GV_SVC_GROUPS = ['爭端解決', '顧問諮詢', '法制研究', '訓練法普', '民眾服務', '智財申請', '其他'];
+const GV_SVC_COLOR = { '爭端解決': '#e05c5c', '顧問諮詢': '#4f8ef7', '法制研究': '#c9a84c', '訓練法普': '#4caf82', '民眾服務': '#9b7fd4', '智財申請': '#3cb8c4', '其他': '#667788' };
+const GV_SVC_NOTE = {
+  '個案訴訟代理': '單一案件、單一審級的訴訟或訴願委任',
+  '批量訴訟委外': '年度或開口契約，把一批訴訟案包給律所',
+  '仲裁調解與履約爭議': '仲裁、工程會調解、履約與採購爭議',
+  '債權追償與強制執行': '支付命令、強制執行、欠費與補償金追繳',
+  '常年顧問與法律諮詢': '常年法律顧問、法律諮詢與一般法律服務',
+  '專案法律顧問': '促參、採購契約、投資與重大建設的專案顧問',
+  '法遵與稽核': '法令遵循查核、個資稽核',
+  '法制研究與修法': '委託研究、法規研修、草案研擬',
+  '教育訓練與法普宣導': '多為衛生單位的執法支援加人員訓練，單純宣導很少',
+  '民眾法律服務': '法律扶助、台商與受災者協助等對民眾的服務',
+  '智財申請維護': '專利商標申請、答辯與年費',
+  '其他': '翻譯、登記代辦與名稱看不出內容的案子',
+};
+async function loadGvService() {
+  const body = document.getElementById('gvSvcBody');
+  try {
+    // 明細查詢的服務內容下拉
+    const sel = document.getElementById('gvSvcSel');
+    if (sel.options.length <= 1) GV_SVC_ORDER.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+    const { data, error } = await db.rpc('gov_tender_service_stats', { p_recent_years: 5 });
+    if (error) throw error;
+    const sc = data.scope || {}, cats = data.cats || [];
+    const N = Number(sc.cases || 0), A = Number(sc.amount || 0);
+    const pc = (a, b) => b ? (a * 100 / b) : 0;
+    const p1 = v => (Math.round(v * 10) / 10) + '%';
+    const byCat = Object.fromEntries(cats.map(c => [c.cat, c]));
+    // 七大組
+    const grp = GV_SVC_GROUPS.map(g => {
+      const cs = cats.filter(c => GV_SVC_GROUP[c.cat] === g);
+      return { g, n: cs.reduce((a, c) => a + Number(c.cases), 0), amt: cs.reduce((a, c) => a + Number(c.amount || 0), 0) };
+    });
+    document.getElementById('gvSvcGroups').innerHTML = grp.map(r => `<div style="display:grid;grid-template-columns:72px 1fr 118px;align-items:center;gap:8px;">
+        <span><span style="color:${GV_SVC_COLOR[r.g]};">&#9679;</span> ${r.g}</span>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div title="件數佔比" style="height:8px;background:var(--ghost-bg);border-radius:3px;overflow:hidden;"><div style="width:${pc(r.n, N).toFixed(1)}%;height:100%;background:${GV_SVC_COLOR[r.g]};"></div></div>
+          <div title="金額佔比" style="height:8px;background:var(--ghost-bg);border-radius:3px;overflow:hidden;"><div style="width:${pc(r.amt, A).toFixed(1)}%;height:100%;background:${GV_SVC_COLOR[r.g]};opacity:0.5;"></div></div>
+        </div>
+        <span style="text-align:right;font-size:0.75rem;white-space:nowrap;">件 ${p1(pc(r.n, N))}・額 ${p1(pc(r.amt, A))}</span>
+      </div>`).join('') + '<div style="font-size:0.72rem;color:var(--text-muted);">上條＝件數佔比，下條（淡色）＝金額佔比</div>';
+    // 五年一組：2005 年以前併一組，之後每五年
+    const nowY = new Date().getFullYear();
+    const bIdx = y => y <= 2005 ? 0 : Math.floor((y - 2006) / 5) + 1;
+    const maxB = bIdx(Number(sc.max_year || nowY));
+    const bLab = i => {
+      if (i === 0) return (sc.min_year || 2000) + '–05';
+      const s = 2006 + (i - 1) * 5, e = s + 4;
+      if (e >= nowY) return s === nowY ? s + '*' : s + '–' + String(nowY).slice(2) + '*';
+      return s + '–' + String(e).slice(2);
+    };
+    const bComplete = i => i === 0 || 2006 + (i - 1) * 5 + 4 < nowY;
+    const SERIES = [
+      ['個案訴訟', ['個案訴訟代理'], '#e05c5c'],
+      ['批量訴訟委外', ['批量訴訟委外'], '#e0883c'],
+      ['仲裁、調解與追償', ['仲裁調解與履約爭議', '債權追償與強制執行'], '#b8687a'],
+      ['顧問諮詢', ['常年顧問與法律諮詢', '專案法律顧問', '法遵與稽核'], '#4f8ef7'],
+      ['法制研究', ['法制研究與修法'], '#c9a84c'],
+      ['其他各類', ['教育訓練與法普宣導', '民眾法律服務', '智財申請維護', '其他'], '#667788'],
+    ];
+    const cell = (catList, i, k) => (data.years || []).filter(r => catList.includes(r[1]) && bIdx(r[0]) === i).reduce((a, r) => a + Number(r[k] || 0), 0);
+    const muted = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#8899aa';
+    const idxs = Array.from({ length: maxB + 1 }, (_, i) => i);
+    if (chartInstances['gvSvc']) chartInstances['gvSvc'].destroy();
+    chartInstances['gvSvc'] = new Chart(document.getElementById('gvSvcChart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: idxs.map(bLab),
+        datasets: SERIES.map(([lab, cl, col]) => ({ label: lab, data: idxs.map(i => cell(cl, i, 2)), backgroundColor: col, stack: 's' })),
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { color: muted, boxWidth: 10, font: { size: 10 } } },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}：${c.parsed.y.toLocaleString()} 件` } },
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: muted, font: { size: 10 } } },
+          y: { stacked: true, ticks: { color: muted }, beginAtZero: true, title: { display: true, text: '件', color: muted } },
+        },
+      },
+    });
+    // 說明文字：佔比＋最近兩個完整五年期的變化
+    const gOf = g => grp.find(r => r.g === g) || { n: 0, amt: 0 };
+    const comp = idxs.filter(bComplete);
+    let trend = '';
+    if (comp.length >= 2) {
+      const b1 = comp[comp.length - 2], b2 = comp[comp.length - 1];
+      const seg = (name, cl) => {
+        const n1 = cell(cl, b1, 2), n2 = cell(cl, b2, 2), a1 = cell(cl, b1, 3), a2 = cell(cl, b2, 3);
+        const dn = n2 - n1, da = (a2 - a1) / 1e8;
+        return `${name} ${n1.toLocaleString()} 件→${n2.toLocaleString()} 件（${dn >= 0 ? '多' : '少'} ${Math.abs(dn).toLocaleString()} 件）、${(a1 / 1e8).toFixed(2)} 億→${(a2 / 1e8).toFixed(2)} 億（${da >= 0 ? '多' : '少'} ${Math.abs(da).toFixed(2)} 億）`;
+      };
+      trend = `<br>${bLab(b1)} 年到 ${bLab(b2)} 年：${seg('個案訴訟', ['個案訴訟代理'])}；${seg('批量訴訟委外', ['批量訴訟委外'])}；${seg('法制研究', ['法制研究與修法'])}。<strong>零散的個案委任變少，包成年度契約的批量委外與部會的法制研究計畫變多。</strong>`;
+    }
+    const lit = byCat['個案訴訟代理'] || {}, bat = byCat['批量訴訟委外'] || {};
+    document.getElementById('gvSvcDesc').innerHTML =
+      `全部 ${Number(sc.all_cases || 0).toLocaleString()} 件決標中，得標者含律師事務所的有 <strong>${N.toLocaleString()} 件、${(A / 1e8).toFixed(1)} 億元</strong>。其中<strong>爭端解決（訴訟、仲裁、追償）佔 ${p1(pc(gOf('爭端解決').n, N))} 件數、${p1(pc(gOf('爭端解決').amt, A))} 金額</strong>，顧問諮詢 ${p1(pc(gOf('顧問諮詢').n, N))}／${p1(pc(gOf('顧問諮詢').amt, A))}，法制研究 ${p1(pc(gOf('法制研究').n, N))}／${p1(pc(gOf('法制研究').amt, A))}，訓練與法普只有 ${p1(pc(gOf('訓練法普').n, N))}／${p1(pc(gOf('訓練法普').amt, A))}。` +
+      `個案訴訟 ${Math.round(pc(Number(lit.single_bid || 0), Number(lit.cases || 0)))}% 只有一家投標（機關直接指定），批量訴訟委外只有 ${Math.round(pc(Number(bat.single_bid || 0), Number(bat.cases || 0)))}%、平均 ${(Number(bat.bidders || 0) / Math.max(Number(bat.cases || 0), 1)).toFixed(1)} 家投標，是唯一真正公開競爭的類別。` + trend +
+      (bComplete(maxB) ? '' : `<br>${nowY} 年進行中、非全年數（圖上標 *）。`);
+    // 明細表
+    const rf = sc.recent_from || (nowY - 5);
+    document.getElementById('gvSvcFirmTh').textContent = rf + ' 年起主要得標所';
+    document.getElementById('gvSvcUnitTh').textContent = rf + ' 年起主要發案機關';
+    const wan = v => Math.round(Number(v) / 1e4).toLocaleString() + ' 萬';
+    body.innerHTML = GV_SVC_ORDER.filter(c => byCat[c]).map(c => {
+      const r = byCat[c], g = GV_SVC_GROUP[c];
+      const firms = (data.firms || []).filter(f => f.cat === c).map(f => {
+        const m = f.firm.match(/^.+?事務所/);
+        const disp = escHtml(f.firm.replace(/(國際)?(法律|律師)事務所$/, ''));
+        return `${m ? firmLink(m[0], '', disp) : disp}<span style="color:var(--text-muted);">（${wan(f.amt)}／${f.n} 件）</span>`;
+      }).join('、') || '-';
+      const units = (data.units || []).filter(u => u.cat === c).map(u => `${escHtml(u.unit)}<span style="color:var(--text-muted);">（${wan(u.amt)}／${u.n} 件）</span>`).join('、') || '-';
+      return `<tr style="cursor:pointer;" onclick="gvSvcPick('${c}')" title="點一下在下方明細查詢看「${c}」的標案">
+        <td style="white-space:nowrap;"><span style="color:${GV_SVC_COLOR[g]};">&#9679;</span> <strong>${c}</strong><div style="font-size:0.7rem;color:var(--text-muted);white-space:normal;min-width:150px;">${GV_SVC_NOTE[c] || ''}</div></td>
+        <td style="text-align:right;">${Number(r.cases).toLocaleString()}</td>
+        <td style="text-align:right;">${p1(pc(Number(r.cases), N))}</td>
+        <td style="text-align:right;color:var(--gold);">${govAmtHtml(Number(r.amount || 0))}</td>
+        <td style="text-align:right;">${p1(pc(Number(r.amount || 0), A))}</td>
+        <td style="text-align:right;">${r.median ? wan(r.median) : '-'}</td>
+        <td style="text-align:right;">${Math.round(pc(Number(r.single_bid), Number(r.cases)))}%</td>
+        <td style="font-size:0.75rem;min-width:200px;" onclick="event.stopPropagation()">${firms}</td>
+        <td style="font-size:0.75rem;min-width:200px;">${units}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    console.error('政府標案服務內容載入失敗', e);
+    body.innerHTML = `<tr><td colspan="9" style="color:var(--red);">載入失敗：${escHtml(e.message || String(e))}</td></tr>`;
+  }
+}
+// 點服務內容列 → 帶到明細查詢
+function gvSvcPick(cat) {
+  const sel = document.getElementById('gvSvcSel');
+  sel.value = cat;
+  gvSearchRun();
+  const card = document.getElementById('gvListBody').closest('.card');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // 決標方式（gov_tender_method_stats RPC，mig 283）
