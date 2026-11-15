@@ -97,8 +97,14 @@
   'use strict';
   var SB_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
   var SB_KEY = 'sb_publishable_NvTWZM6IGgc_Jn8iCXFvaA_QnvJsstM';
-  var SET_LABEL = { alumni: '校友試跑', full: '一次性建表', incremental: '每週增量' };
-  var SET_ORDER = ['alumni', 'full', 'incremental'];
+  var SET_LABEL = { alumni: '校友試跑', full: '一次性建表', incremental: '每週增量', rerun: '建議手動補跑' };
+  var SET_ORDER = ['alumni', 'full', 'incremental', 'rerun'];
+  /* 每週重查的清單：只有最近 6 天內查過才算「已查」，否則上週的紀錄會讓這週看起來都做完了 */
+  var WEEKLY = { incremental: 1, rerun: 1 };
+  var SET_NOTE = {
+    incremental: '每週五查一次，補進新領證的律師。由小到大查，查到 0 筆後面的段就不用查。狀態只看最近 6 天。',
+    rerun: '這些是既有律師、詳細頁查不到（404）的證號，用完整證號各查一次可以補回新的資料雜湊值。不是新律師，有空再查。狀態只看最近 6 天。'
+  };
   var state = { plan: null, progress: {}, set: null };
 
   function $(id) { return document.getElementById(id); }
@@ -195,6 +201,7 @@
   }
   function statusOf(item) {
     var p = state.progress[item.q];
+    if (p && WEEKLY[state.set] && Date.now() - new Date(p.last_at).getTime() > 6 * 864e5) p = null;
     if (!p) return { done: false, cls: 's-todo', text: '未查' };
     var got = p.last_received;
     if (got === 0) {
@@ -226,14 +233,15 @@
     var nextIdx = st.findIndex(function (s) { return !s.done; });
     $('summary').innerHTML = esc(SET_LABEL[state.set] || state.set) + '：已查 <b>' + done + '</b>／' + items.length + ' 條'
       + (warn ? '，<span class="s-warn">' + warn + ' 條要人看</span>' : '')
-      + '　<span class="muted">清單產生於 ' + fmtTime(sets[state.set].generated_at) + '</span>';
+      + '　<span class="muted">清單產生於 ' + fmtTime(sets[state.set].generated_at) + '</span>'
+      + (SET_NOTE[state.set] ? '<br>' + esc(SET_NOTE[state.set]) : '');
     $('barFill').style.width = (items.length ? (done / items.length * 100) : 0) + '%';
     if (nextIdx >= 0) {
       $('nextBox').innerHTML = '下一條：<span class="q" id="nextQ">' + esc(items[nextIdx].q) + '</span>'
         + '<button type="button" id="copyNext">複製</button><span class="muted">預期 ' + items[nextIdx].n + ' 筆</span>';
       $('copyNext').onclick = function () { copy(items[nextIdx].q, $('copyNext')); };
     } else {
-      $('nextBox').innerHTML = '<span class="s-ok">這份清單全部查完了。</span>';
+      $('nextBox').innerHTML = '<span class="s-ok">' + (items.length ? '這份清單全部查完了。' : '目前沒有需要補跑的項目。') + '</span>';
     }
 
     var hide = $('hideDone').checked;

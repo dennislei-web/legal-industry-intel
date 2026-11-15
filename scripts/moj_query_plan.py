@@ -21,7 +21,9 @@ MOJ 新站人工查詢清單產生器（2026-10-29 改版後的名冊建表／�
 輸出：
   CSV（預設 scripts/.moj_harvest_work/plan_<mode>.csv；utf-8-sig 給 Excel 開）
   --publish            另把查詢字串寫進 public/tools/moj-harvest-plan.json 的 sets.<mode>
-                       （進度頁讀；只放前綴型查詢與預期筆數，不放完整證號、不放姓名）
+                       （進度頁讀；只放前綴型查詢與預期筆數，不放姓名）
+                       --incremental 時另寫 sets.rerun＝「建議手動補跑」分頁：404 待複查者的完整證號
+                       （2026-11-15 起；只有證號、不含姓名）
 
 用法:
   python moj_query_plan.py
@@ -174,7 +176,7 @@ def write_csv(path, items):
             w.writerow({c: it.get(c, '') for c in cols})
 
 
-def publish(mode, items):
+def publish(mode, items, kinds=PUBLIC_KINDS):
     path = os.path.normpath(PLAN_JSON)
     try:
         with open(path, encoding='utf-8') as f:
@@ -185,7 +187,7 @@ def publish(mode, items):
     doc.setdefault('sets', {})[mode] = {
         'generated_at': now,
         'queries': [{'q': it['query'], 'n': it['expected_n']}
-                    for it in items if it['kind'] in PUBLIC_KINDS],
+                    for it in items if it['kind'] in kinds],
     }
     doc['generated_at'] = now
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -266,6 +268,10 @@ def main():
     if '--publish' in args:
         path, n = publish(mode, items)
         print(f'已寫入 {path}（sets.{mode}，{n} 條）')
+        if mode == 'incremental':
+            # 收成頁「建議手動補跑」分頁：詳細頁 404 待複查者的完整證號（只有證號、不含姓名；2026-11-15 雷要求上頁面）
+            path, n = publish('rerun', items, kinds={'missing'})
+            print(f'已寫入 {path}（sets.rerun，{n} 條）')
 
 
 if __name__ == '__main__':

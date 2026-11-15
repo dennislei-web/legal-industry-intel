@@ -16,16 +16,23 @@
                               .github/workflows/scrape-moj-lawyers.yml 只留手動備援。
   1. moj_harvest_ingest.py   先吃掉這週同仁收成的新雜湊（新律師核對詳細頁才插入）
   2. moj_detail_sweep.py     全量逐頁比對（≤1 req/s，約 13,600 頁 ≈ 4 小時）
+  2b. moj_harvest_ingest.py  掃描後再收一次（2026-11-15 加）：新律師只能靠人工在官網打驗證碼收成，
+                              週五上午巡檢提醒後才查的，當天下午就入庫
   3. moj_alumni_refresh.py   校友去向（zhelu_alumni）照剛刷新的名冊回寫，只讀 DB、幾秒鐘
   4. refresh RPC              refresh_firm_stats_cache／refresh_lawyer_stats／refresh_firm_map_cache／
                               refresh_ex_judicial_lawyers（新進律師若是退場法官／檢察官，轉任名單要跟上）
                               （同 .github/scripts/refresh-rpcs.sh：5xx／逾時重試 3 次、4xx 不重試；
                               scrape-moj-lawyers 原本收尾刷的 firm_stats／lawyer_stats 也包含在內）
+  5. moj_query_plan.py --incremental --ahead 3 --publish
+                              重產下週人工要查的清單 → .moj_harvest_work/plan_incremental.csv（每日巡檢週五讀）
+                              ＋ public/tools/moj-harvest-plan.json（收成頁「每週增量」「建議手動補跑」分頁），
+                              只 commit 這個檔並 push main（不在 main 就不推）
   2026-11 起取代已刪除的 moj-office-refresh／moj-licno-scan／alumni-refresh 三條 workflow。
 
 log：scripts/moj_detail_sweep_weekly.log（追加；含異動摘要的律師姓名 → 已 gitignore，不可 commit）
 最後一行固定是 `[launcher] guild_rc=… ingest_rc=… sweep_rc=… alumni_rc=… refresh_ok=N/4`，每日巡檢擷取
-（2026-11-06 以前沒有 guild_rc；2026-11-02 以前沒有 alumni_rc、是 N/3）。
+（2026-11-06 以前沒有 guild_rc；2026-11-02 以前沒有 alumni_rc、是 N/3；
+2026-11-15 起尾端多 ingest2_rc＝掃描後補收、plan_rc＝下週查詢清單、pub_rc＝清單推上收成頁）。
 
 用法：
   python moj_detail_sweep_weekly.py           # 正式跑
@@ -119,6 +126,43 @@ def call_rpc(name, env):
     return False
 
 
+PLAN_REL = 'public/tools/moj-harvest-plan.json'
+
+
+def git(*a):
+    env = {**os.environ, 'GIT_TERMINAL_PROMPT': '0'}  # 排程無人值守：要帳密就直接失敗，不要卡住
+    p = subprocess.run(['git', '-C', os.path.dirname(HERE)] + list(a), env=env, capture_output=True, text=True,
+                       encoding='utf-8', errors='replace', timeout=180, creationflags=NO_WIN)
+    return p.returncode, ((p.stdout or '') + (p.stderr or '')).strip()
+
+
+def push_plan():
+    """把收成頁查詢清單推上 GitHub Pages。只 commit 這一個檔（工作樹常有別的 session 未提交的東西）；
+    不在 main 就不推（分支上的清單推了也不會部署）。回 0＝已推或沒變、1＝沒推成。"""
+    try:
+        rc, out = git('rev-parse', '--abbrev-ref', 'HEAD')
+        if rc != 0 or out != 'main':
+            log(f'  收成頁清單未推：目前分支 {out[:60]!r} 不是 main')
+            return 1
+        rc, out = git('status', '--porcelain', '--', PLAN_REL)
+        if rc == 0 and not out:
+            log('✅ 收成頁清單沒有變動，不必推')
+            return 0
+        rc, out = git('commit', '-m', 'chore: refresh moj harvest plan (weekly launcher)', '--', PLAN_REL)
+        if rc != 0:
+            log(f'❌ 收成頁清單 commit 失敗：{out[-200:]}')
+            return 1
+        rc, out = git('push', 'origin', 'main')
+        if rc != 0:
+            log(f'❌ 收成頁清單 push 失敗（已 commit 在本機，下次 push 會一起出去）：{out[-200:]}')
+            return 1
+        log('✅ 收成頁清單已推上 main')
+        return 0
+    except (subprocess.TimeoutExpired, OSError) as e:
+        log(f'❌ 收成頁清單推送例外：{type(e).__name__}')
+        return 1
+
+
 def main():
     args = sys.argv[1:]
     limit = args[args.index('--limit') + 1] if '--limit' in args else None
@@ -130,13 +174,20 @@ def main():
     ingest_rc = run('收成 ingest', ['moj_harvest_ingest.py'], timeout=2 * 3600)
     sweep_args = ['moj_detail_sweep.py'] + (['--limit', limit] if limit else [])
     sweep_rc = run('詳細頁 sweep', sweep_args, timeout=8 * 3600)
+    # 掃描約 4 小時；這段時間內（週五上午）人工收成的新律師，當天就入庫，不必等下週五
+    ingest2_rc = run('收成 ingest（掃描後補收）', ['moj_harvest_ingest.py'], timeout=2 * 3600)
     alumni_rc = run('校友去向同步', ['moj_alumni_refresh.py'], timeout=10 * 60)
     refresh_ok = sum(call_rpc(n, env) for n in REFRESH_RPCS)
+    # 重產下週要人工查的清單：本機 CSV（每日巡檢週五讀來提醒）＋收成頁的「每週增量」「建議手動補跑」分頁
+    plan_rc = run('下週增量查詢清單', ['moj_query_plan.py', '--incremental', '--ahead', '3', '--publish'],
+                  timeout=10 * 60)
+    pub_rc = push_plan() if plan_rc == 0 else 1
 
     log(f'[launcher] guild_rc={guild_rc} ingest_rc={ingest_rc} sweep_rc={sweep_rc} alumni_rc={alumni_rc} '
-        f'refresh_ok={refresh_ok}/{len(REFRESH_RPCS)}')
-    sys.exit(0 if guild_rc == ingest_rc == sweep_rc == alumni_rc == 0 and refresh_ok == len(REFRESH_RPCS)
-             else 1)
+        f'refresh_ok={refresh_ok}/{len(REFRESH_RPCS)} ingest2_rc={ingest2_rc} plan_rc={plan_rc} pub_rc={pub_rc}')
+    # pub_rc 不計入結束碼：收成頁清單沒更新不影響資料，巡檢看 launcher 行提醒即可
+    sys.exit(0 if guild_rc == ingest_rc == sweep_rc == alumni_rc == ingest2_rc == plan_rc == 0
+             and refresh_ok == len(REFRESH_RPCS) else 1)
 
 
 if __name__ == '__main__':
