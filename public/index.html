@@ -6217,7 +6217,9 @@ function searchLawyers() {
   lawyerSearchTimer = setTimeout(() => { lawyerPage = 0; loadLawyers(); }, 300);
 }
 
+let lawyerLoadSeq = 0; // 防止較早送出的查詢較晚回來、蓋掉最新關鍵字的結果
 async function loadLawyers() {
+  const seq = ++lawyerLoadSeq;
   const search = document.getElementById('lawyerSearch').value.trim();
   const region = document.getElementById('lawyerRegionFilter').value;
   const source = document.getElementById('lawyerSourceFilter').value;
@@ -6240,10 +6242,12 @@ async function loadLawyers() {
   query = query.range(lawyerPage * PAGE_SIZE, (lawyerPage + 1) * PAGE_SIZE - 1);
 
   const { data, count, error } = await query;
+  if (seq !== lawyerLoadSeq) return; // 已有更新的查詢送出，丟棄這份過期結果
   lawyerTotal = count || 0;
 
   if (error) { console.error('lawyers_combined error:', error); return; }
   await Promise.all([ensureSoloFirms(), ensureLawyerFlags()]); // 一人所所長判定 + 獨董/標案標記對照表
+  if (seq !== lawyerLoadSeq) return;
 
   const tbody = document.getElementById('lawyerTableBody');
   if (!data || !data.length) {
