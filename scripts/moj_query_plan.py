@@ -14,7 +14,7 @@ MOJ 新站人工查詢清單產生器（2026-10-29 改版後的名冊建表／�
 模式：
   （預設）full        一次性建表全清單（約 322 條）
   --incremental        每週增量：最新年度已知最大號所在段＋往後 --ahead 段、最新年度補證／外檢整系列、
-                       詳細頁 404（page_hash_missing_at）待複查者的完整證號
+                       詳細頁 404（page_hash_missing_at）待複查者所在區段的前綴
   --alumni             只出 zhelu_alumni 校友所在的區段（試跑整條鏈用）
   --remaining          （搭配 full／alumni）只留還有「現職且尚無 page_hash」律師的查詢
 
@@ -22,8 +22,8 @@ MOJ 新站人工查詢清單產生器（2026-10-29 改版後的名冊建表／�
   CSV（預設 scripts/.moj_harvest_work/plan_<mode>.csv；utf-8-sig 給 Excel 開）
   --publish            另把查詢字串寫進 public/tools/moj-harvest-plan.json 的 sets.<mode>
                        （進度頁讀；只放前綴型查詢與預期筆數，不放姓名）
-                       --incremental 時另寫 sets.rerun＝「建議手動補跑」分頁：404 待複查者的完整證號
-                       （2026-11-15 起；只有證號、不含姓名）
+                       --incremental 時另寫 sets.rerun＝「建議手動補跑」分頁：404 待複查者所在區段的前綴
+                       （2026-11-15 起；只有查詢字串、不含姓名；2026-11-16 由完整證號改前綴）
 
 用法:
   python moj_query_plan.py
@@ -138,8 +138,33 @@ def incremental_queries(rows, ahead):
 
 
 def missing_queue(rows):
-    """詳細頁 404 待複查（雜湊失效或已移除；不等於除名）：用完整證號人工查"""
+    """詳細頁 404 待複查（雜湊失效或已移除；不等於除名）"""
     return [r for r in rows if r.get('page_hash_missing_at') and not r.get('deregistered_at')]
+
+
+def covering_query(lic_no, queries):
+    """這個證號落在一次性建表清單的哪一條前綴查詢（最長者）；格式異常對不到回 None"""
+    hit = [q for _, q in queries if lic_no.startswith(q)]
+    return max(hit, key=len) if hit else None
+
+
+def missing_items(rows, queries):
+    """404 待複查 → 改查「所在區段的前綴」（2026-11-16）。
+    完整證號在官網查不到時只回「找不到或超過 100 筆」，分不出是查法不對還是人已不在名冊，
+    而且沒有結果表可收。前綴查法是建表時逐條驗證過的：人還在就收到新雜湊；
+    區段查得到鄰號、唯獨他不在＝已不在名冊（moj_missing_resolve.py 據此標推定除名）。"""
+    by_q, out = defaultdict(list), []
+    for r in missing_queue(rows):
+        q = covering_query(r['lic_no'], queries)
+        if q:
+            by_q[q].append(r['lic_no'])
+        else:  # 格式異常：只能照原字串查
+            out.append({'kind': 'missing', 'query': r['lic_no'], 'expected_n': 1, 'active_n': 1, 'hashed_n': 1,
+                        'note': '詳細頁 404，證號格式異常，以完整證號複查', 'suggest': suggest_query(r['lic_no'])})
+    for it in annotate([('missing', q) for q in sorted(by_q)], rows):
+        it['note'] = '詳細頁 404 待複查：' + '、'.join(by_q[it['query']])
+        out.append(it)
+    return out
 
 
 def alumni_lic_nos(rows):
@@ -231,10 +256,7 @@ def main():
         abnormal = [r for r in abnormal if r['lic_no'] in lics]
     else:
         items = annotate(incremental_queries(rows, ahead), rows)
-        for r in missing_queue(rows):
-            items.append({'kind': 'missing', 'query': r['lic_no'], 'expected_n': 1, 'active_n': 1,
-                          'hashed_n': 1, 'note': f'詳細頁 404 於 {r["page_hash_missing_at"][:10]}，以完整證號複查',
-                          'suggest': ''})
+        items += missing_items(rows, queries)
         abnormal = []
 
     if '--remaining' in args and mode != 'incremental':
@@ -269,7 +291,7 @@ def main():
         path, n = publish(mode, items)
         print(f'已寫入 {path}（sets.{mode}，{n} 條）')
         if mode == 'incremental':
-            # 收成頁「建議手動補跑」分頁：詳細頁 404 待複查者的完整證號（只有證號、不含姓名；2026-11-15 雷要求上頁面）
+            # 收成頁「建議手動補跑」分頁：詳細頁 404 待複查者所在區段的前綴（不含姓名；2026-11-15 雷要求上頁面）
             path, n = publish('rerun', items, kinds={'missing'})
             print(f'已寫入 {path}（sets.rerun，{n} 條）')
 

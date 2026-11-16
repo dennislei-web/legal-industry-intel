@@ -18,6 +18,8 @@
   2. moj_detail_sweep.py     全量逐頁比對（≤1 req/s，約 13,600 頁 ≈ 4 小時）
   2b. moj_harvest_ingest.py  掃描後再收一次（2026-11-15 加）：新律師只能靠人工在官網打驗證碼收成，
                               週五上午巡檢提醒後才查的，當天下午就入庫
+  2c. moj_missing_resolve.py 404 待複查佇列收尾（2026-11-16 加）：人工重查過所在區段的前綴、本人不在結果裡、
+                              詳細頁仍 404 → 推定除名並移出佇列；失敗只記 log、不計入結束碼
   3. moj_alumni_refresh.py   校友去向（zhelu_alumni）照剛刷新的名冊回寫，只讀 DB、幾秒鐘
   4. refresh RPC              refresh_firm_stats_cache／refresh_lawyer_stats／refresh_firm_map_cache／
                               refresh_ex_judicial_lawyers（新進律師若是退場法官／檢察官，轉任名單要跟上）
@@ -176,6 +178,8 @@ def main():
     sweep_rc = run('詳細頁 sweep', sweep_args, timeout=8 * 3600)
     # 掃描約 4 小時；這段時間內（週五上午）人工收成的新律師，當天就入庫，不必等下週五
     ingest2_rc = run('收成 ingest（掃描後補收）', ['moj_harvest_ingest.py'], timeout=2 * 3600)
+    # 404 待複查佇列收尾：區段前綴重查過、本人不在結果裡、詳細頁仍 404 → 推定除名（2026-11-16）
+    resolve_rc = run('404 待複查收尾', ['moj_missing_resolve.py'], timeout=20 * 60)
     alumni_rc = run('校友去向同步', ['moj_alumni_refresh.py'], timeout=10 * 60)
     refresh_ok = sum(call_rpc(n, env) for n in REFRESH_RPCS)
     # 重產下週要人工查的清單：本機 CSV（每日巡檢週五讀來提醒）＋收成頁的「每週增量」「建議手動補跑」分頁
@@ -184,7 +188,7 @@ def main():
     pub_rc = push_plan() if plan_rc == 0 else 1
 
     log(f'[launcher] guild_rc={guild_rc} ingest_rc={ingest_rc} sweep_rc={sweep_rc} alumni_rc={alumni_rc} '
-        f'refresh_ok={refresh_ok}/{len(REFRESH_RPCS)} ingest2_rc={ingest2_rc} plan_rc={plan_rc} pub_rc={pub_rc}')
+        f'refresh_ok={refresh_ok}/{len(REFRESH_RPCS)} ingest2_rc={ingest2_rc} resolve_rc={resolve_rc} plan_rc={plan_rc} pub_rc={pub_rc}')
     # pub_rc 不計入結束碼：收成頁清單沒更新不影響資料，巡檢看 launcher 行提醒即可
     sys.exit(0 if guild_rc == ingest_rc == sweep_rc == alumni_rc == ingest2_rc == plan_rc == 0
              and refresh_ok == len(REFRESH_RPCS) else 1)

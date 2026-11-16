@@ -137,3 +137,13 @@
 - `judicial-official-stats-monthly` 第一次 08:36 觸發：`last_scraped_at` 已是本月（08:16 同仁手動跑） → `action=skip reason=本月已跑`，Last Result 0。
 - `judicial-official-stats-monthly` 第二次 08:37 觸發（先把 `last_scraped_at` 暫清為 NULL 以走完整路徑）：download → parse → 431,928 列 upsert 共 7.7 分鐘 rc=0，`PATCH last_scraped_at` HTTP 204，收尾行 `[launcher] action=run run_rc=0 patch_ok=1`，Last Result 0；`court_case_stats` 總列數 431,928 不變、`last_scraped_at`＝08:44。同日 10:30 的正常觸發會再走一次 skip。
 - 合併本 PR 前，主 checkout 停在分支 `chore/move-moj-judicial-scrapers-local`（本機排程跑的是這份工作樹的新碼）；合併後 `git checkout main && git pull` 即可。
+
+## 404 待複查佇列改查前綴＋自動收尾（2026-11-16）
+
+- 收成頁「建議手動補跑」原本列完整證號（`(84)臺檢證字第3078號`）。實測三條都回「找不到或超過 100 筆」，
+  而且 `moj_harvest_queries` 裡完整證號查詢從來沒有成功紀錄 → 分不出是查法不對還是人已不在名冊，也沒有結果表可收。
+- 改成列「所在區段的前綴」（`moj_query_plan.py` 的 `missing_items`，取一次性建表清單裡涵蓋該證號的那一條；
+  12 條在建表時全部查成功過）。人還在 → 收成列帶新雜湊、ingest 寫回；人不在 → 由新腳本收尾。
+- `scripts/moj_missing_resolve.py`（週更 launcher 步驟 2c，收尾行多 `resolve_rc`）：區段在 404 之後有成功收成、
+  收成列沒有本人、舊雜湊詳細頁仍 404（0 byte）三者同時成立 → `deregistered_at`＋`state_desc`「名冊查無（推定除名）」
+  （mig 079 慣例，trigger 記 state_change）；之後 sweep 又查得到會自動解除。`--dry-run` 只印判定。
