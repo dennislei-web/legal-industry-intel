@@ -1263,16 +1263,16 @@
       </div>
       <!-- 事務所版圖（自 產業分析＞訴訟市場 整包移入，2026-07-15；2026-11-17 併入原「領域專門所」：
            切法開關 依法院案由｜依業務領域，共用法院／年度下拉、指標磚與一張排行表，TOP 20 長條圖改成表內橫條。
-           依業務領域僅 admin（mig 285 firm_area_ranking；官網主打欄讀 firm_site_facts） -->
+           依業務領域登入即可看（mig 285／286 firm_area_ranking）；官網主打欄讀 firm_site_facts，只有 admin 拿得到值、看得到欄 -->
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127963;&#65039; 事務所版圖 — 誰最大、誰最專</div>
-        <div id="fmModeBar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div id="fmModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
           <span style="font-size:0.78rem;color:var(--text-muted);">切法</span>
           <div class="sub-tabs" style="display:flex;gap:4px;">
             <button class="sub-tab-btn active" data-fm-mode="cause" onclick="setFmMode('cause')">依法院案由</button>
-            <button class="sub-tab-btn" data-fm-mode="area" onclick="setFmMode('area')">&#128274; 依業務領域</button>
+            <button class="sub-tab-btn" data-fm-mode="area" onclick="setFmMode('area')">依業務領域</button>
           </div>
-          <span style="font-size:0.72rem;color:var(--text-muted);">法院案由＝判決書上的案類、案由，看完整的民事或刑事排名；業務領域＝把案由歸成勞動、家事、車禍等 15 類，另有佔比與官網主打對照。</span>
+          <span style="font-size:0.72rem;color:var(--text-muted);">法院案由＝判決書上的案類、案由，看完整的民事或刑事排名；業務領域＝把案由歸成勞動、家事、車禍等 15 類，另外看得到該領域佔這間所案量的比重。</span>
         </div>
         <div class="sub-tabs" id="fmAreaTabs" style="display:none;gap:4px;flex-wrap:wrap;margin-bottom:10px;"></div>
         <div class="search-bar">
@@ -1352,7 +1352,8 @@
         ※ <strong>業務領域</strong>是把判決書案由歸成 15 類（例：勞動＝僱傭＋勞動特別法；車禍交通＝損害賠償的交通事故＋刑事過失傷害、過失致死）。一般民事、醫療與無法歸類的案件不在 15 類內，「刑事」是扣掉已歸到專門領域後的其餘刑事案件，所以各領域加總不等於全部案量；要看完整的民事或刑事排名請切回「依法院案由」。
         <br>※ 件數＝該所律師在裁判書出現的該領域案件數，<strong>名目口徑</strong>（律師人次；同一判決同所多人署名各算一次，案由層沒有去重素材）。律師依姓名歸所，同名多人不計，故為<strong>下限</strong>；分所併回本所；只列名稱含「事務所」者。不選年度＝近 5 年滾動窗，選年度＝該西元年全年。喆律排名一律依件數。
         <br>※ 佔比＝該領域件數 ÷ 該所可歸類案量（套用同一法院、年度條件；不含一般民事等無法細分者）。依佔比排序時只列達件數門檻的所。
-        <br>※「官網」欄是規則從官網標題、選單、小標判定的主打領域，綜合所常一次抓到多個。裁判書只看得到訴訟：公司商務、智慧財產、金融證券、稅務的顧問、申請、交易類工作不會出現在這裡。點所名可看該所的「官網對照」。此切法僅管理員可見。
+        <br>※ 裁判書只看得到訴訟：公司商務、智慧財產、金融證券、稅務的顧問、申請、交易類工作不會出現在這裡。
+        <span id="fmFootSite" style="display:none;"><br>※「官網」欄是規則從官網標題、選單、小標判定的主打領域，綜合所常一次抓到多個。點所名可看該所的「官網對照」。這一欄與「官網對照」只有管理員看得到。</span>
       </div>
       <div class="grid-2">
         <div class="card">
@@ -4785,7 +4786,7 @@ async function showDashboard() {
     }
     realIsAdmin = profile?.role === 'admin';
     isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false
-    if (isAdmin && typeof _foLoaded !== 'undefined' && _foLoaded) initFmAreaMode();   // 事務所總覽若已先載入（當時還不知道是 admin），補顯示事務所版圖的「依業務領域」切法
+    if (isAdmin && typeof _foLoaded !== 'undefined' && _foLoaded) initFmAreaMode();   // 事務所總覽若已先載入（當時還不知道是 admin）：版圖若停在「依業務領域」，重畫補上官網欄
     document.getElementById('navBtn_zhelu').style.display = isAdmin ? '' : 'none';
     document.getElementById('navBtn_system').style.display = isAdmin ? '' : 'none';   // 系統區（資料來源／帳號管理）只給 admin
     if (isAdmin) {
@@ -5897,7 +5898,7 @@ function loadFirmOverviewOnce() {
   loadFoFlowSnapshot();
   loadFoTurnover();       // 律師離職率（年化，mig 242）
   loadFoLine();          // LINE 官方帳號 TOP 10＋趨勢（mig 241）
-  initFmAreaMode();      // 事務所版圖「依業務領域」切法（admin；mig 285，原領域專門所併入）
+  initFmAreaMode();      // 事務所版圖「依業務領域」的領域按鈕（mig 285／286，原領域專門所併入）
   initTipoCard('foTipoTabs', 'foTipoList', 'foTipoYear', true);
   loadFoIndep();
   loadFoGov();
@@ -14064,25 +14065,27 @@ function renderFmSubOptions() {
   if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
 }
 
-// 切法：cause＝依法院案由（所有登入者）、area＝依業務領域（admin；mig 285 firm_area_ranking，原「領域專門所」併入）
+// 切法：cause＝依法院案由、area＝依業務領域（mig 285／286 firm_area_ranking，原「領域專門所」併入）。
+// 兩種切法登入即可看；area 的「官網」欄只有 admin 有（RPC 對非 admin 回 NULL，前端也不畫那一欄）
 const FM_AREAS = ['家事', '刑事', '不動產', '債務執行', '勞動', '行政', '工程', '車禍交通', '智慧財產', '公司商務', '金融證券', '稅務', '性平', '消費保險', '科技個資'];
 const FM_ZHELU_NAME = '喆律法律事務所';   // firm_area_ranking 的 p_pin：不在名單內也一定回傳，指標磚要用
 let _fmMode = 'cause', _fmArea = '勞動';
 
-// 知道是不是 admin 之後呼叫（事務所總覽載入時、user_profiles 回來時各一次；可重複呼叫）
+// 事務所總覽載入時、user_profiles 回來（知道是不是 admin）時各呼叫一次；可重複呼叫
+let _fmAreaAdminDrawn = null;   // 領域表上次是以哪種身分畫的（官網欄有無）
 function initFmAreaMode() {
-  const bar = document.getElementById('fmModeBar'), tabs = document.getElementById('fmAreaTabs');
-  if (!bar || !tabs) return;
-  bar.style.display = isAdmin ? 'flex' : 'none';
-  if (isAdmin && !tabs.dataset.ready) {
+  const tabs = document.getElementById('fmAreaTabs');
+  if (!tabs) return;
+  if (!tabs.dataset.ready) {
     tabs.dataset.ready = '1';
     tabs.innerHTML = FM_AREAS.map(a =>
       `<button class="sub-tab-btn${a === _fmArea ? ' active' : ''}" data-area="${a}" onclick="setFmArea('${a}')">${a}</button>`).join('');
   }
-  if (!isAdmin && _fmMode === 'area') setFmMode('cause');
+  // 已經在領域切法、身分後來才確定：重畫一次，官網欄才會跟著出現或消失
+  if (_fmMode === 'area' && _fmAreaAdminDrawn !== null && _fmAreaAdminDrawn !== isAdmin) loadFirmMap();
 }
 function setFmMode(m) {
-  _fmMode = (m === 'area' && isAdmin) ? 'area' : 'cause';
+  _fmMode = m === 'area' ? 'area' : 'cause';
   loadFirmMap();
 }
 function setFmArea(a) {
@@ -14099,7 +14102,7 @@ function applyFmModeUi(area) {
   if (area) show('fmSubSel', false);
   show('fmAreaSort', area); show('fmAreaMin', area);
   document.getElementById('fmAreaMin').disabled = document.getElementById('fmAreaSort').value !== 'share';
-  show('fmFootCause', !area); show('fmFootArea', area);
+  show('fmFootCause', !area); show('fmFootArea', area); show('fmFootSite', isAdmin);
 }
 // 表內橫條（取代原 TOP 20 長條圖）：長度＝數值 ÷ 名單內最大值
 function fmBarCell(v, max, text, z, title) {
@@ -14116,7 +14119,7 @@ function fmSetEmpty(msg) {
 }
 
 async function loadFirmMap() {
-  const area = _fmMode === 'area' && isAdmin;
+  const area = _fmMode === 'area';
   applyFmModeUi(area);
   // 先依上游選擇重繪下拉（案類→種類→子類）再讀值，避免拿已被清掉的舊選項去查
   if (!area) { renderFmGroupOptions(); renderFmSubOptions(); }
@@ -14198,9 +14201,10 @@ async function loadFirmMap() {
   }).join('');
 }
 
-// 依業務領域（admin）：領域 × 法院 × 年度 → 件數、佔該所可歸類案量、官網主打
+// 依業務領域：領域 × 法院 × 年度 → 件數、佔該所可歸類案量；admin 另有官網主打欄
 async function loadFirmMapArea(seq, court, year) {
-  const a = _fmArea;
+  const a = _fmArea, admin = isAdmin;
+  _fmAreaAdminDrawn = admin;
   const sort = document.getElementById('fmAreaSort').value, min = +document.getElementById('fmAreaMin').value;
   const byShare = sort === 'share';
   const { data, error } = await db.rpc('firm_area_ranking',
@@ -14218,7 +14222,7 @@ async function loadFirmMapArea(seq, court, year) {
   document.getElementById('fmThead').innerHTML = `<tr><th style="${FM_TH}width:48px;">#</th><th style="${FM_TH}">事務所</th>
     <th style="${FM_TH}text-align:right;width:26%;">${escHtml(a)}件數（名目）・${period}</th>
     <th style="${FM_TH}text-align:right;width:22%;">佔該所可歸類案量</th>
-    <th style="${FM_TH}text-align:right;">有${escHtml(a)}案的律師</th><th style="${FM_TH}padding-left:12px;">官網</th></tr>`;
+    <th style="${FM_TH}text-align:right;">有${escHtml(a)}案的律師</th>${admin ? `<th style="${FM_TH}padding-left:12px;">官網</th>` : ''}</tr>`;
 
   // KPI：喆律排名一律依件數，不受排序與門檻影響
   document.getElementById('fmKpiZheluRank').textContent = zhelu ? '#' + zhelu.rank : '未上榜';
@@ -14240,7 +14244,7 @@ async function loadFirmMapArea(seq, court, year) {
     `${a}${court ? '×' + court : ''}：`
     + (list.length
       ? `列出前 ${list.length} 間（${byShare ? `依佔比、至少 ${min} 件` : '依件數'}）。`
-        + `其中 ${withSite.length} 間抽得到官網主打領域：${focus.length} 間主打${a}、${withSite.length - focus.length} 間沒主打；其餘 ${list.length - withSite.length} 間沒有官網或抽不出主打。`
+        + (admin ? `其中 ${withSite.length} 間抽得到官網主打領域：${focus.length} 間主打${a}、${withSite.length - focus.length} 間沒主打；其餘 ${list.length - withSite.length} 間沒有官網或抽不出主打。` : '')
       : `沒有達到 ${min} 件門檻的事務所。`)
     + (SITE_NONLIT.includes(a) ? '這個領域多數工作是非訟，件數只反映訴訟部分。' : '')
     + (extra ? (zhelu.ord != null ? `喆律在目前排序排第 ${zhelu.ord}，補列在最後。` : `喆律未達 ${min} 件門檻，補列在最後。`) : '');
@@ -14261,7 +14265,7 @@ async function loadFirmMapArea(seq, court, year) {
         <div style="flex:1;min-width:40px;height:8px;background:rgba(128,128,128,0.16);border-radius:4px;overflow:hidden;"><div style="width:${share.toFixed(0)}%;height:100%;background:rgba(74,144,217,0.7);"></div></div>
         <span style="min-width:48px;text-align:right;">${pct(r)}</span></div></td>
       <td style="text-align:right;">${r.lawyer_count}</td>
-      <td style="padding-left:12px;">${siteCell(r)}</td>
+      ${admin ? `<td style="padding-left:12px;">${siteCell(r)}</td>` : ''}
     </tr>`;
   }).join('');
 }
