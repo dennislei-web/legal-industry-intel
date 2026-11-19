@@ -2544,7 +2544,7 @@
         .iw-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
         .iw-table th,.iw-table td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
         .iw-table th{color:var(--text-muted);font-weight:600;font-size:0.74rem;white-space:nowrap;position:sticky;top:0;background:var(--card-bg, var(--bg));}
-        .iw-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .iw-table th.num,.iw-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
         .iw-grp td{font-weight:600;color:var(--gold);padding-top:10px;}
         .iw-meta{font-size:0.74rem;color:var(--text-muted);}
         .iw-chartbox{position:relative;height:300px;margin-top:10px;}
@@ -16900,8 +16900,10 @@ function iwSectionHtml(s) {
   if (s.note) h += `<div class="iw-note">${escHtml(s.note)}</div>`;
   if (s.bullets && s.bullets.length) h += '<ul>' + s.bullets.map(b => `<li>${escHtml(b)}</li>`).join('') + '</ul>';
   if (s.table && s.table.rows && s.table.rows.length) {
-    h += '<div class="iw-twrap"><table class="iw-table"><thead><tr>' + s.table.cols.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr></thead><tbody>' +
-      s.table.rows.map(r => '<tr>' + r.map(c => `<td class="${typeof c === 'number' ? 'num' : ''}">${typeof c === 'number' ? c.toLocaleString() : escHtml(c == null ? '—' : String(c))}</td>`).join('') + '</tr>').join('') +
+    // 數字欄：標題與整欄（含空值「—」）一律靠右，標題才會對在數字正上方
+    const numCol = s.table.cols.map((_, ci) => s.table.rows.some(r => typeof r[ci] === 'number') && s.table.rows.every(r => typeof r[ci] === 'number' || r[ci] == null));
+    h += '<div class="iw-twrap"><table class="iw-table"><thead><tr>' + s.table.cols.map((c, ci) => `<th class="${numCol[ci] ? 'num' : ''}">${escHtml(c)}</th>`).join('') + '</tr></thead><tbody>' +
+      s.table.rows.map(r => '<tr>' + r.map((c, ci) => `<td class="${typeof c === 'number' || numCol[ci] ? 'num' : ''}">${typeof c === 'number' ? c.toLocaleString() : escHtml(c == null ? '—' : String(c))}</td>`).join('') + '</tr>').join('') +
       '</tbody></table></div>';
   }
   return h + '</div>';
