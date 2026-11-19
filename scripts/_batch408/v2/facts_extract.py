@@ -184,13 +184,26 @@ def size_band(n):
     return '一人' if n <= 1 else '2–5 人' if n <= 5 else '6–20 人' if n <= 20 else '21 人以上'
 
 
+def clean_acq2(s, main=''):
+    """次案源只留 v3 八類合法值、去掉與主案源重複者（順序照原文）。
+    2026-11-19：舊 regex 在案源段沒有括號時會抓到業務段的括號，約 60 家的 acq2 變成
+    「毒品、詐欺洗錢」「精品專業」「約七成」這類字；這裡是最後一道過濾。"""
+    seen = []
+    for t in re.split(r'[、,，/／＋+]', s or ''):
+        t = t.strip().strip('-').strip()
+        if t in V3_TYPES and t != main and t not in seen:
+            seen.append(t)
+    return '、'.join(seen)
+
+
 def extract(a):
     f = {}
     # 型態：v3 速讀標頭 **【案源：主案源（＋次案源）｜業務：…｜規模：…】**；舊 v2 **【X型】** 對照成主案源
     m = re.search(r'【案源：\s*([^（(｜|】\s]+)', a)
     if m:
         f['type'] = m.group(1)
-        m2 = re.search(r'【案源：[^】]*?[（(]＋?([^）)]+)[）)]', a)
+        # 括號只在案源段裡找（到第一個「｜」為止），不要吃到業務段的括號
+        m2 = re.search(r'【案源：[^｜|】]*?[（(]＋?([^）)]+)[）)]', a)
         f['acq2'] = m2.group(1).replace('＋', '').strip() if m2 else ''
     else:
         m = re.search(r'【(B2C行銷型|傳統轉介型|機構標案型|企業非訟型|精品專業型|一人綜合型)】', a)
@@ -298,7 +311,7 @@ def main():
             lt = lj.get('type', '')
             f['type'] = lt if lt in V3_TYPES else V2_TO_V3.get(lt, '')
         acq2 = lj.get('acq2', '') if lj.get('type', '') in V3_TYPES else ''
-        f['acq2'] = (f.get('acq2') or acq2 or '').strip('-').strip()
+        f['acq2'] = clean_acq2(f.get('acq2'), f['type']) or clean_acq2(acq2, f['type'])
         f['practice_tag'] = lj.get('practice_tag', '') or V2_PRACTICE.get(f.get('v2_type') or lj.get('type', ''), '') or ('綜合訴訟' if f['type'] else '')
         if not f['type']:
             miss['type'] += 1
