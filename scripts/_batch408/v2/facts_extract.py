@@ -50,6 +50,12 @@ def getall(path):
     return out
 
 
+def rpc(fn):
+    """呼叫無參數的 RPC（回 json）。重試規則同 _get。"""
+    return _get(urllib.request.Request(URL + '/rest/v1/rpc/' + fn, data=b'{}', method='POST', headers={
+        'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json'}))
+
+
 def must(label, rows):
     """來源讀回 0 列＝讀不到（表被清空、查詢壞了），中止而不是拿空資料產 facts。"""
     if not rows:
@@ -253,6 +259,17 @@ def extract(a):
 
 def main():
     rows = must('firm_profiles', getall('/rest/v1/firm_profiles?select=firm_name,ai_analysis,practice_focus,founded_year,ex_judicial_officers&ai_analysis=not.is.null&order=firm_name'))
+    # 前司法官人數＝合併口徑（與前端 exjMergeList 同一套，2026-11-19）：官網彙整名單（firm_profiles）∪
+    # 裁判書自動比對（ex_judicial_lawyers high/medium，依事務所歸戶），一人只算一次；同名律師不自動歸所
+    # （姓名對不出是哪一位，要人工核對後寫進官網彙整名單）。舊版只數官網彙整名單，近期轉入的人會漏
+    # （喆律 5 位 vs 事務所詳情 6 位）。
+    exj_rows = must('ex_judicial_lawyers', getall(
+        '/rest/v1/ex_judicial_lawyers?select=name,kind,firm_name&confidence=in.(high,medium)&firm_name=not.is.null&order=name,kind'))
+    amb_names = set(must('ambiguous_lawyer_names', rpc('ambiguous_lawyer_names')))
+    exj_auto = {}
+    for e in exj_rows:
+        if e['name'] not in amb_names:
+            exj_auto.setdefault(firm_key_of(e['firm_name']), set()).add(e['name'])
     cache = {r['firm_name']: r for r in must('moj_firm_stats_cache', getall('/rest/v1/moj_firm_stats_cache?select=firm_name,lawyer_count,main_region,avg_cases&order=firm_name'))}
     # 去重口徑（mig 186/188）：202101 起所級名目/去重合計；年化分母用全窗月數（非各所活躍月數，
     # 否則零星活躍的小所會被高估）
@@ -343,7 +360,8 @@ def main():
                 sig.append(tag)
         pixel = 1 if d.get('has_fb_pixel') else 0
         gads = 1 if d.get('has_google_ads') else 0
-        exj = r.get('ex_judicial_officers') or []
+        exj = {x.split('｜')[0].strip() for x in (r.get('ex_judicial_officers') or [])} - {''}
+        exj |= exj_auto.get(firm_key_of(nm), set())
         out.append({
             'firm': nm,
             'lawyer_count': c.get('lawyer_count', ''),

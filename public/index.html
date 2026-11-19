@@ -3179,7 +3179,7 @@
             <th style="text-align:right;" title="5 人以上、有營收推估的事務所裡的營收排名">排名</th><th>事務所</th><th>地區</th><th style="text-align:right;">人數</th>
             <th style="text-align:right;" title="推估區間的中點；滑過數字看區間">推估營收（萬/年）</th><th style="text-align:right;">人均（萬）</th>
             <th>主案源（＋次案源）</th><th>業務屬性</th><th title="署名重複率 × 第一名律師署名占比判定">署名結構</th>
-            <th style="text-align:right;" title="在籍律師中具前法官、前檢察官資歷的人數">前司法官</th><th style="text-align:center;" title="分析速讀的「最大風險」點名接班或關鍵人">接班風險</th>
+            <th style="text-align:right;" title="具前法官、前檢察官資歷的律師人數：官網彙整名單加上裁判書姓名比對（後者為推定），一人算一次；同名律師不計。與事務所詳情的「前司法官」卡同一套算法">前司法官</th><th style="text-align:center;" title="分析速讀的「最大風險」點名接班或關鍵人">接班風險</th>
           </tr></thead>
           <tbody id="drTierList"></tbody>
         </table></div>
@@ -7798,6 +7798,26 @@ function ensureLawyerFlags() {
   return _lawyerFlagsLoading;
 }
 // 同名律師姓名（lawyers_with_stats.name_ambiguous）：所長白名單／前台標註以姓名為鍵，這些人必須事務所相符才算所長
+// 前司法官合併口徑（2026-11-19）：官網彙整名單（firm_profiles.ex_judicial_officers）∪ 裁判書自動比對
+// （ex_judicial_lawyers high/medium）。一人一筆（同一人當過法官又當過檢察官併成一筆，舊版會算成兩位）；
+// 同名律師（AMBIGUOUS_NAMES）不自動歸所——姓名對不出是哪一位，要人工核對後寫進官網彙整名單。
+// 事務所列表徽章、事務所詳情「前司法官」卡、facts_extract.py 的 ex_judicial_n 都用這一套，改規則要三處一起改。
+// curated＝「姓名｜職稱｜說明」字串陣列；autoRecsByName＝Map(姓名 → ex_judicial_lawyers 列陣列)。
+function exjMergeList(curated, autoRecsByName) {
+  const list = (curated || []).slice();
+  const seen = new Set(list.map(s => (s.split('｜')[0] || '').trim()));
+  const ymf = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+  for (const [n, recs] of autoRecsByName) {
+    if (!n || seen.has(n) || !recs || !recs.length) continue;
+    if (AMBIGUOUS_NAMES && AMBIGUOUS_NAMES.has(n)) continue;
+    const sorted = recs.slice().sort((a, b) => (a.kind === 'judge' ? 0 : 1) - (b.kind === 'judge' ? 0 : 1));
+    const role = sorted.map(r => '前' + (r.kind === 'judge' ? '法官' : '檢察官')).join('、');
+    const note = sorted.map(r => `${ymf(r.first_yyyymm)}～${ymf(r.last_yyyymm)} 主要在${r.main_org || '-'}，具名 ${Number(r.case_count_total || 0).toLocaleString()} 件`).join('；');
+    list.push(`${n}｜${role}｜${note}`);
+    seen.add(n);
+  }
+  return list;
+}
 let AMBIGUOUS_NAMES = null;
 let _ambNamesLoading = null;
 function ensureAmbiguousNames() {
@@ -8186,23 +8206,20 @@ async function loadOffices() {
   // 查詢同樣在開頭已發出（exjBadgeP）
   try {
     const exjRows = await exjBadgeP;
+    await ensureAmbiguousNames();
+    // 自動比對的 firm_name 是名冊登錄單位原文（可能帶分所字樣）→ 截到「事務所」再對
+    const exjFirmKey = s => /(法律事務所|律師事務所)/.test(s) ? s.replace(/^(.+?(?:法律|律師)事務所).*$/, '$1') : s;
     const exjByFirm = new Map();
     for (const r of exjRows) {
-      const m = exjByFirm.get(r.firm_name) || new Map();
+      const k = exjFirmKey(r.firm_name);
+      const m = exjByFirm.get(k) || new Map();
       const a = m.get(r.name) || [];
-      a.push(r); m.set(r.name, a); exjByFirm.set(r.firm_name, m);
+      a.push(r); m.set(r.name, a); exjByFirm.set(k, m);
     }
-    const ymf = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
     for (const o of allOffices) {
       const byName = exjByFirm.get(o.firm_name);
       if (!byName) continue;
-      const list = (o.ex_judicial_officers || []).slice();
-      const seen = new Set(list.map(s => (s.split('｜')[0] || '').trim()));
-      for (const [n, recs] of byName) {
-        if (seen.has(n)) continue;
-        recs.forEach(r => list.push(`${n}｜前${r.kind === 'judge' ? '法官' : '檢察官'}｜${ymf(r.first_yyyymm)}～${ymf(r.last_yyyymm)} 主要在${r.main_org || '-'}，具名 ${Number(r.case_count_total || 0).toLocaleString()} 件`));
-        seen.add(n);
-      }
+      const list = exjMergeList(o.ex_judicial_officers, byName);
       if (list.length) o.ex_judicial_officers = list;
     }
   } catch(e) { console.warn('firm ex-judicial badge merge error:', e); }
@@ -8602,18 +8619,16 @@ async function showFirmDetail(firmName) {
   // 渲染
   // 前司法官資料：官網彙整（firm_profiles）＋ 裁判書自動比對（ex_judicial_lawyers, mig 107）合併
   const currentOffice = (typeof allOffices !== 'undefined' ? allOffices : []).find(o => o.firm_name === firmName);
-  const exJudicial = (currentOffice?.ex_judicial_officers || []).slice();
+  let exJudicial = (currentOffice?.ex_judicial_officers || []).slice();
   await ensureLawyerFlags();
+  await ensureAmbiguousNames();
   if (EX_JUDICIAL_MAP) {
-    const curatedNames = new Set(exJudicial.map(s => (s.split('｜')[0] || '').trim()));
-    const ymf = s => s ? s.slice(0, 4) + '-' + s.slice(4) : '?';
+    const byName = new Map();
     for (const lw of allLawyers) {
-      if (curatedNames.has(lw.name)) continue;
-      (EX_JUDICIAL_MAP.get(lw.name) || []).forEach(r => {
-        exJudicial.push(`${lw.name}｜前${r.kind === 'judge' ? '法官' : '檢察官'}｜${ymf(r.first_yyyymm)}～${ymf(r.last_yyyymm)} 主要在${r.main_org || '-'}，具名 ${Number(r.case_count_total || 0).toLocaleString()} 件`);
-        curatedNames.add(lw.name);
-      });
+      const recs = EX_JUDICIAL_MAP.get(lw.name);
+      if (recs && !byName.has(lw.name)) byName.set(lw.name, recs);
     }
+    exJudicial = exjMergeList(exJudicial, byName);
   }
 
   bodyEl.innerHTML = `
