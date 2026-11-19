@@ -4630,6 +4630,8 @@
           <div id="createUserMsg" style="margin-top:8px;font-size:0.85rem;"></div>
         </div>
 
+        <div id="adminUsageNote" style="font-size:0.8rem;color:var(--text-muted);line-height:1.7;margin-bottom:12px;"></div>
+
         <div class="table-wrap">
           <table>
             <thead>
@@ -4638,12 +4640,15 @@
                 <th style="text-align:left;">Email</th>
                 <th style="text-align:center;">角色</th>
                 <th style="text-align:center;">狀態</th>
+                <th style="text-align:center;cursor:pointer;white-space:nowrap;" title="點一下依最後使用時間排序" onclick="setAdminSort('last')">最後使用<span id="adminSortInd_last"></span></th>
+                <th style="text-align:right;cursor:pointer;white-space:nowrap;" title="點一下依近 7 天請求數排序" onclick="setAdminSort('r7')">近 7 天請求數<span id="adminSortInd_r7"></span></th>
+                <th style="text-align:right;cursor:pointer;white-space:nowrap;" title="點一下依近 30 天請求數排序" onclick="setAdminSort('r30')">近 30 天請求數<span id="adminSortInd_r30"></span></th>
                 <th style="text-align:center;">建立時間</th>
                 <th style="text-align:center;">操作</th>
               </tr>
             </thead>
             <tbody id="adminUsersBody">
-              <tr><td colspan="6"><div class="loading"><span class="loading-spinner"></span>載入中...</div></td></tr>
+              <tr><td colspan="9"><div class="loading"><span class="loading-spinner"></span>載入中...</div></td></tr>
             </tbody>
           </table>
         </div>
@@ -4660,7 +4665,47 @@
 const SUPABASE_URL = 'https://zpbkeyhxyykbvownrngf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_NvTWZM6IGgc_Jn8iCXFvaA_QnvJsstM';
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ============================================================
+// 使用量記錄（mig 287）：帳號管理頁看「誰有在用、用多少」
+//   請求數＝這個瀏覽器向資料庫發出的查詢次數（REST／RPC／Edge Function）；分頁瀏覽＝切到哪個分頁。
+//   先在記憶體累計，有新活動才每分鐘回寫一次（一個帳號一天一列）；離開頁面時再送一次。
+//   視角預覽時仍記在真實登入的帳號上。回寫本身不走 _usageFetch，不會把自己算進去。
+// ============================================================
+const _usage = { req: 0, tabs: {}, lastTab: null, token: null };
+function _usageFetch(input, init) {
+  try {
+    const url = typeof input === 'string' ? input : ((input && input.url) || '');
+    if (url.startsWith(SUPABASE_URL + '/rest/v1/') || url.startsWith(SUPABASE_URL + '/functions/v1/')) _usage.req++;
+  } catch (e) {}
+  return fetch(input, init);
+}
+function trackTabView(tab) {
+  if (!tab || tab === _usage.lastTab) return;   // 初始化會對同一分頁連續呼叫 showTab，不重複算
+  _usage.lastTab = tab;
+  _usage.tabs[tab] = (_usage.tabs[tab] || 0) + 1;
+}
+function flushUsage() {
+  if (!_usage.token || (!_usage.req && !Object.keys(_usage.tabs).length)) return;
+  const sentReq = _usage.req, sentTabs = _usage.tabs;
+  _usage.req = 0; _usage.tabs = {};
+  const putBack = () => {   // 送失敗（斷線、token 過期）就加回去，下一輪再送
+    _usage.req += sentReq;
+    Object.keys(sentTabs).forEach(k => { _usage.tabs[k] = (_usage.tabs[k] || 0) + sentTabs[k]; });
+  };
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/log_intel_usage', {
+      method: 'POST',
+      keepalive: true,   // 關分頁時也送得出去
+      headers: { 'Authorization': 'Bearer ' + _usage.token, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_requests: sentReq, p_tabs: sentTabs }),
+    }).then(r => { if (!r.ok) putBack(); }).catch(putBack);
+  } catch (e) { putBack(); }
+}
+setInterval(flushUsage, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushUsage(); });
+window.addEventListener('pagehide', flushUsage);
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { fetch: _usageFetch } });
 
 // ============================================================
 // STATE
@@ -4830,6 +4875,7 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
+  flushUsage();   // 登出前把還沒送的使用量送掉（登出後 token 就沒了）
   await db.auth.signOut();
   currentUser = null;
   _dashShownFor = null;
@@ -4842,6 +4888,7 @@ async function handleLogout() {
 }
 
 db.auth.onAuthStateChange((event, session) => {
+  _usage.token = session?.access_token || null;   // 使用量回寫用（token 每小時更新時這裡也會跟著換）
   if (session?.user) {
     currentUser = session.user;
     showDashboard();
@@ -5013,6 +5060,7 @@ function showTab(tab) {
   if ((SECTIONS[currentSection] || []).some(t => t.tab === tab)) lastTabBySection[currentSection] = tab;
   navState.section = currentSection;
   saveNavState();
+  trackTabView(tab);
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   const content = document.getElementById('tab-' + tab);
   if (content) content.classList.add('active');
@@ -12811,25 +12859,108 @@ async function loadAdminUsers() {
   const tbody = document.getElementById('adminUsersBody');
   if (!tbody) return;
 
-  const result = await callAdminAPI('list');
+  // 帳號清單與使用量彙總（mig 287）平行抓；使用量抓不到不擋帳號清單
+  const [result, usageRes] = await Promise.all([
+    callAdminAPI('list'),
+    db.rpc('intel_usage_summary').then(r => r, e => ({ data: null, error: e })),
+  ]);
   if (result.error) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);">載入失敗：${result.error}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="color:var(--red);">載入失敗：${result.error}</td></tr>`;
     return;
   }
 
   adminUsers = result.users || [];
+  adminUsage = {};
+  adminUsageError = usageRes.error ? (usageRes.error.message || '讀取失敗') : null;
+  (usageRes.data || []).forEach(r => { adminUsage[r.user_id] = r; });
   renderAdminUsers();
+}
+
+// 使用量：user_id → intel_usage_summary 的一列
+let adminUsage = {};
+let adminUsageError = null;
+let adminSort = null;   // null＝原順序（建立時間新到舊）；'last'｜'r7'｜'r30'＝依該欄由大到小
+function setAdminSort(key) {
+  adminSort = adminSort === key ? null : key;   // 再點一次回到原順序
+  renderAdminUsers();
+}
+// 最後使用時間：今天顯示幾點幾分，之前顯示幾天前
+function fmtLastSeen(iso) {
+  if (!iso) return '<span style="color:var(--text-muted);">尚無紀錄</span>';
+  const d = new Date(iso), now = new Date();
+  const full = d.toLocaleString('zh-TW', { hour12: false });
+  const mins = Math.floor((now - d) / 60000);
+  const dayDiff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+  const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  let txt;
+  if (mins < 5) txt = '剛剛';
+  else if (dayDiff === 0) txt = '今天 ' + hm;
+  else if (dayDiff === 1) txt = '昨天 ' + hm;
+  else if (dayDiff < 30) txt = dayDiff + ' 天前';
+  else txt = d.toLocaleDateString('zh-TW');
+  const color = dayDiff <= 7 ? 'var(--text)' : 'var(--text-muted)';
+  return `<span title="${full}" style="color:${color};">${txt}</span>`;
 }
 
 function renderAdminUsers() {
   const tbody = document.getElementById('adminUsersBody');
   if (!adminUsers.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">暫無使用者</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-muted);text-align:center;">暫無使用者</td></tr>';
     return;
   }
 
-  tbody.innerHTML = adminUsers.map(u => {
+  // 說明列：哪天開始記、近 7 天幾個帳號有用
+  const noteEl = document.getElementById('adminUsageNote');
+  if (noteEl) {
+    if (adminUsageError) {
+      noteEl.innerHTML = `<span style="color:var(--red);">使用量讀取失敗：${escHtml(adminUsageError)}</span>`;
+    } else {
+      const rows = Object.values(adminUsage);
+      const from = rows.map(r => r.tracked_from).filter(Boolean).sort()[0];
+      const active7 = adminUsers.filter(u => (adminUsage[u.id]?.req_7d || 0) > 0).length;
+      const sum7 = adminUsers.reduce((s, u) => s + (adminUsage[u.id]?.req_7d || 0), 0);
+      noteEl.innerHTML =
+        (from
+          ? `近 7 天有使用的帳號：<b style="color:var(--text);">${active7}</b>／${adminUsers.length} 個，合計 <b style="color:var(--text);">${sum7.toLocaleString()}</b> 次請求。`
+          : '還沒有任何使用紀錄。')
+        + `<br>使用量自 ${from ? from.replace(/-/g, '/') : '2026/11/19'} 起記錄，這天以前的沒有資料。`
+        + '請求數＝該帳號的瀏覽器向資料庫查資料的次數（開一個分頁、換一次篩選都會產生數次到數十次）；約每分鐘更新一次。';
+    }
+  }
+  ['last', 'r7', 'r30'].forEach(k => {
+    const el = document.getElementById('adminSortInd_' + k);
+    if (el) el.textContent = adminSort === k ? ' ▼' : '';
+  });
+
+  const tabLabel = {};
+  Object.values(SECTIONS).forEach(list => list.forEach(t => { tabLabel[t.tab] = t.label; }));
+
+  let list = adminUsers;
+  if (adminSort) {
+    const val = u => {
+      const g = adminUsage[u.id];
+      if (!g) return -1;
+      if (adminSort === 'last') return g.last_seen ? new Date(g.last_seen).getTime() : -1;
+      return adminSort === 'r7' ? (g.req_7d || 0) : (g.req_30d || 0);
+    };
+    list = adminUsers.slice().sort((a, b) => val(b) - val(a));
+  }
+
+  tbody.innerHTML = list.map(u => {
     const isSelf = u.id === currentUser.id;
+    const g = adminUsage[u.id];
+    const numCell = n => n ? n.toLocaleString() : '<span style="color:var(--text-muted);">0</span>';
+    const top = g && Array.isArray(g.top_tabs_30d) && g.top_tabs_30d.length
+      ? '最常看：' + g.top_tabs_30d.map(t => escHtml(tabLabel[t.tab] || t.tab)).join('、')
+      : '';
+    const usageCells = g
+      ? `<td style="text-align:center;font-size:0.82rem;white-space:nowrap;">${fmtLastSeen(g.last_seen)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${numCell(g.req_7d)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;min-width:150px;">${numCell(g.req_30d)}
+        <div style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;">用了 ${g.days_30d} 天${top ? '<br>' + top : ''}</div></td>`
+      : `<td style="text-align:center;font-size:0.82rem;white-space:nowrap;">${fmtLastSeen(null)}</td>
+      <td style="text-align:right;color:var(--text-muted);">—</td>
+      <td style="text-align:right;color:var(--text-muted);">—</td>`;
     const roleBadge = u.role === 'admin'
       ? '<span style="color:var(--gold-light);font-weight:600;">&#128272; 管理員</span>'
       : '<span style="color:var(--text-muted);">&#128100; 使用者</span>';
@@ -12853,6 +12984,7 @@ function renderAdminUsers() {
           title="${u.is_active ? '停用這個帳號（同時封鎖登入）' : '重新啟用這個帳號'}"
           onclick="toggleUserActive('${u.id}', ${!u.is_active})">${u.is_active ? '停用' : '啟用'}</button>`}
       </td>
+      ${usageCells}
       <td style="text-align:center;font-size:0.82rem;color:var(--text-muted);">${created}</td>
       <td style="text-align:center;">
         ${isSelf ? '-' : `
