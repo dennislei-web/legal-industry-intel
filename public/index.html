@@ -3135,8 +3135,24 @@
     <!-- ==================== TAB: ALUMNI (喆律校友會) ==================== -->
     <!-- ==================== TAB: DEEPREPORT 產業深度報告（admin-only；資料源 firm_analysis_facts mig 179） ==================== -->
     <div id="tab-deepreport" class="tab-content">
+      <style>
+        #tab-deepreport .dr-seg { display:flex; height:14px; border-radius:3px; overflow:hidden; min-width:140px; background:var(--ghost-bg); }
+        #tab-deepreport .dr-seg > span { display:block; height:100%; }
+        #tab-deepreport .dr-dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:5px; vertical-align:middle; }
+        #tab-deepreport .dr-click { cursor:pointer; }
+        #tab-deepreport .dr-click:hover td { background:var(--bg-hover); }
+        #tab-deepreport .dr-sel td { background:var(--tab-active-bg); }
+        #tab-deepreport .dr-scroll { max-height:520px; overflow-y:auto; }
+        #tab-deepreport .dr-scroll thead th { position:sticky; top:0; z-index:1; background:var(--bg-card); }
+        #tab-deepreport .table-wrap th, #tab-deepreport .dr-nw { white-space:nowrap; }
+        #tab-deepreport .dr-sub { font-size:0.7rem; color:var(--text-muted); font-weight:400; line-height:1.5; }
+        #tab-deepreport .dr-legend { font-size:0.72rem; color:var(--text-muted); margin-top:8px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+        #tab-deepreport .dr-h { font-size:0.82rem; font-weight:600; margin:14px 0 6px; }
+        #tab-deepreport .dr-foot { font-size:0.72rem; color:var(--text-muted); margin-top:8px; line-height:1.7; }
+      </style>
       <div class="card" style="margin-bottom:16px;">
-        <div class="card-title">&#128202; 市場結構速覽 — 前 300 大全覆蓋（398 家）</div>
+        <div class="card-title">&#128202; 市場結構速覽</div>
+        <div class="dr-foot" style="margin-top:0;margin-bottom:6px;" id="drScopeNote"></div>
         <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px;">
           <div class="kpi-card"><div class="kpi-label">可比推估營收</div><div class="kpi-value" id="drKpiTotal">-</div><div class="kpi-sub" id="drKpiTotalSub">-</div></div>
           <div class="kpi-card"><div class="kpi-label">CR10 / CR100</div><div class="kpi-value" id="drKpiCr">-</div><div class="kpi-sub">頭部集中度</div></div>
@@ -3145,6 +3161,81 @@
           <div class="kpi-card"><div class="kpi-label">有廣告碼</div><div class="kpi-value" id="drKpiAds">-</div><div class="kpi-sub">5 人以上所（官網，含 GTM）</div></div>
         </div>
         <div style="font-size:0.8rem;line-height:1.8;margin-top:10px;" id="drRecap"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#127963; 頭部事務所分層 — 營收四層 × 主案源</div>
+        <div style="font-size:0.8rem;line-height:1.8;margin-top:4px;" id="drTierRecap"></div>
+        <div class="table-wrap" style="margin-top:8px;"><table>
+          <thead><tr>
+            <th>營收層級（推估，年）</th><th style="text-align:right;">家數</th><th style="text-align:right;">合計推估營收（億）</th>
+            <th style="text-align:right;">佔可比營收</th><th>主案源組成</th><th>前三大主案源</th>
+          </tr></thead>
+          <tbody id="drTierBody"></tbody>
+        </table></div>
+        <div class="dr-legend" id="drTierLegend"></div>
+        <div class="dr-h" id="drTierListTitle">明細</div>
+        <div class="table-wrap dr-scroll"><table>
+          <thead><tr>
+            <th style="text-align:right;" title="5 人以上、有營收推估的事務所裡的營收排名">排名</th><th>事務所</th><th>地區</th><th style="text-align:right;">人數</th>
+            <th style="text-align:right;" title="推估區間的中點；滑過數字看區間">推估營收（萬/年）</th><th style="text-align:right;">人均（萬）</th>
+            <th>主案源（＋次案源）</th><th>業務屬性</th><th title="署名重複率 × 第一名律師署名占比判定">署名結構</th>
+            <th style="text-align:right;" title="在籍律師中具前法官、前檢察官資歷的人數">前司法官</th><th style="text-align:center;" title="分析速讀的「最大風險」點名接班或關鍵人">接班風險</th>
+          </tr></thead>
+          <tbody id="drTierList"></tbody>
+        </table></div>
+        <div class="dr-foot">點上表任一層看該層明細。營收為模型推估區間的中點，不是財報；企業關係所的非訟收入看不到，實際排名會比這裡更集中在大所。</div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#129517; 主案源八類全景</div>
+        <div class="dr-foot" style="margin-top:0;">每家事務所只掛一個主案源（量體最大者），另可掛最多兩個次案源。這張表用全部已分析的事務所，不限 5 人以上，因為制度派案、同業協作、民間批量幾乎都是未滿 5 人的所。</div>
+        <div class="table-wrap" style="margin-top:8px;"><table>
+          <thead><tr>
+            <th>主案源與判準</th><th style="text-align:right;">家數</th><th style="text-align:right;">其中 5 人以上</th>
+            <th style="text-align:right;">合計推估營收（億）</th><th style="text-align:right;">人均營收中位（萬）</th>
+            <th style="text-align:right;" title="去重案量 ÷ 有出庭律師數 ÷ 資料年數">年人均案量中位（件）</th><th>規模組成</th><th>營收前三大</th>
+          </tr></thead>
+          <tbody id="drTypeBody"></tbody>
+        </table></div>
+        <div id="drTypeDetail" style="display:none;">
+          <div class="dr-h" id="drTypeListTitle"></div>
+          <div class="dr-foot" style="margin-top:0;margin-bottom:6px;" id="drTypeNote"></div>
+          <div class="table-wrap dr-scroll"><table>
+            <thead><tr>
+              <th>事務所</th><th>地區</th><th style="text-align:right;">人數</th><th style="text-align:right;">推估營收（萬/年）</th><th style="text-align:right;">人均（萬）</th>
+              <th>次案源</th><th>業務屬性</th><th>一句定位</th>
+            </tr></thead>
+            <tbody id="drTypeList"></tbody>
+          </table></div>
+        </div>
+        <div class="dr-foot">點任一列看該類全部事務所。未滿 5 人的所多半是因為案量高才被挑進來分析，不代表一般小所，所以小所居多的類別人均營收偏高。案源判讀的證據等級：2026-11-04 重跑 277 家時，推定 215 家、強烈推定 37 家、證實 21 家。</div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">&#128269; 在地口碑拆解 — 最大一類裡有什麼</div>
+        <div class="dr-foot" style="margin-top:0;">在地口碑是排除法：其他七類判準都不成立才歸這裡，所以它代表「主案源看不出來」，不是已確認靠口碑。用次案源把這一類再拆開（5 人以上所）。</div>
+        <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:8px;">
+          <div class="kpi-card"><div class="kpi-label">在地口碑（5 人以上）</div><div class="kpi-value" id="drLocN">-</div><div class="kpi-sub" id="drLocNSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">帶其他案源訊號</div><div class="kpi-value" id="drLocSig">-</div><div class="kpi-sub" id="drLocSigSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">完全沒有訊號</div><div class="kpi-value" style="color:var(--gold);" id="drLocNone">-</div><div class="kpi-sub" id="drLocNoneSub">-</div></div>
+          <div class="kpi-card"><div class="kpi-label">業務屬性為精品專業</div><div class="kpi-value" id="drLocPrem">-</div><div class="kpi-sub" id="drLocPremSub">-</div></div>
+        </div>
+        <div class="table-wrap" style="margin-top:10px;"><table>
+          <thead><tr>
+            <th>次案源訊號</th><th style="text-align:right;">家數</th><th style="text-align:right;">佔在地口碑</th><th>佔比</th>
+            <th style="text-align:right;">人均營收中位（萬）</th><th style="text-align:right;">年人均案量中位（件）</th><th>營收前三大</th>
+          </tr></thead>
+          <tbody id="drLocBody"></tbody>
+        </table></div>
+        <div id="drLocDetail" style="display:none;">
+          <div class="dr-h" id="drLocListTitle"></div>
+          <div class="table-wrap dr-scroll"><table>
+            <thead><tr>
+              <th>事務所</th><th>地區</th><th style="text-align:right;">人數</th><th style="text-align:right;">推估營收（萬/年）</th><th style="text-align:right;">人均（萬）</th>
+              <th>次案源</th><th>業務屬性</th><th>一句定位</th>
+            </tr></thead>
+            <tbody id="drLocList"></tbody>
+          </table></div>
+        </div>
+        <div class="dr-foot" id="drLocFoot"></div>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">&#127919; 線上行銷所全解剖 — 喆律的同案源對手池</div>
@@ -13768,6 +13859,196 @@ function drNicheShare(firm, niche) {
 const DR_NICHE_MIN_SHARE = 0.05, DR_NICHE_MIN_N = 10;
 const _drRev = r => (r.rev_low_wan != null && r.rev_high_wan != null) ? (r.rev_low_wan + r.rev_high_wan) / 2 : null;
 const _drMed = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+// v3 主案源八類（2026-11-03 規格，docs/firm-analysis-spec/FORMAT.md 第七節）：顏色、判準、判讀提醒
+const DR_TYPES = ['企業關係', '線上行銷', '在地口碑', '前司法官招牌', '政府批量', '民間批量', '制度派案', '同業協作'];
+const DR_TYPE_COLOR = { '企業關係': 'var(--gold)', '線上行銷': 'var(--blue)', '在地口碑': 'var(--text-muted)', '前司法官招牌': 'var(--purple)', '政府批量': 'var(--orange)', '民間批量': 'var(--red)', '制度派案': '#2aa198', '同業協作': '#c2649a' };
+const DR_TYPE_RULE = {
+  '企業關係': '常年顧問客戶名單、國際評鑑上榜、獨董席次，或企業客戶跨年回頭為主體',
+  '線上行銷': '廣告追蹤碼、Google 評論 50 則以上、內容行銷官網、業配新聞',
+  '在地口碑': '其他七類都不成立；主場法院集中、個人當事人為主、跨年回頭',
+  '前司法官招牌': '主持律師或核心律師是經採認的前法官、前檢察官',
+  '政府批量': '機關委任人佔近 12 個月 15% 以上，或有訴訟履約型政府標案',
+  '民間批量': '單一保險公司、銀行或資產管理公司佔近 12 個月 15% 以上',
+  '制度派案': '原文核對的法扶註記、消債佔委任口徑 20% 以上，或指定辯護佔刑事辯護 15% 以上',
+  '同業協作': '與所外律師共同署名佔全所 30% 以上',
+};
+const DR_TYPE_NOTE = {
+  '企業關係': '非訟收入（併購、常年顧問）從裁判書看不到，這一類的營收推估偏低。',
+  '線上行銷': '廣告追蹤碼只掃過有驗證官網的事務所，Google 商家資料也不是全量；查不到不等於沒有做行銷。',
+  '在地口碑': '排除法歸類，多數只到「推定」。下一個區塊把這一類再用次案源拆開。',
+  '前司法官招牌': '只有主持或核心律師是前司法官才列主案源；一般在籍律師具司法官資歷的，看「前司法官」人數欄。',
+  '政府批量': '批量委任單價低，行情公式對這一類的營收會高估。',
+  '民間批量': '保險代位、銀行催收這類批量委任單價低，行情公式對這一類的營收會高估。',
+  '制度派案': '消債案一位債務人會產生 3 到 4 份裁定，案量排名會被放大；法扶佔多少，多數事務所無法量化。',
+  '同業協作': '案件多與所外律師共同署名，案量不全是自己的案源。',
+};
+const DR_TIERS = [
+  { k: 't1', label: '1 億以上', min: 10000, max: Infinity },
+  { k: 't2', label: '5,000 萬到 1 億', min: 5000, max: 10000 },
+  { k: 't3', label: '2,000 萬到 5,000 萬', min: 2000, max: 5000 },
+  { k: 't4', label: '2,000 萬以下', min: -Infinity, max: 2000 },
+];
+let _drAll = [], _drTop = [], _drRv = [], _drTierSel = 't1', _drTypeSel = null, _drLocSel = null;
+// 次案源：facts.acq2 有少數列混進業務線文字（抽取時抓到別的括號），只留八類合法值、去掉與主案源重複者
+function drAcq2(r) {
+  return [...new Set(String(r.acq2 || '').split(/[、,，/／]/).map(s => s.trim()).filter(s => DR_TYPES.includes(s) && s !== r.type))];
+}
+const _drPc = r => _drRev(r) != null ? _drRev(r) / Math.max(r.lawyer_count || 1, 1) : null;
+const _drCaseYr = r => r.cases_5y ? r.cases_5y / Math.max(r.court_n || r.lawyer_count || 1, 1) / (r.dedup_months ? r.dedup_months / 12 : 5) : null;
+const _drMedTxt = a => a.length ? Math.round(_drMed(a)).toLocaleString() : '-';
+const _drPct = (a, b) => b ? Math.round(100 * a / b) + '%' : '-';
+function drDot(t) { return `<span class="dr-dot" style="background:${DR_TYPE_COLOR[t] || 'var(--border)'};"></span>`; }
+function drSegBar(rows) {
+  const n = rows.length;
+  if (!n) return '';
+  return '<div class="dr-seg">' + DR_TYPES.map(t => {
+    const c = rows.filter(r => r.type === t).length;
+    return c ? `<span style="width:${(100 * c / n).toFixed(1)}%;background:${DR_TYPE_COLOR[t]};" title="${t} ${c} 家（${Math.round(100 * c / n)}%）"></span>` : '';
+  }).join('') + '</div>';
+}
+function drTypeCounts(rows) {
+  return DR_TYPES.map(t => [t, rows.filter(r => r.type === t).length]).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1]);
+}
+function drTop3(rows) {
+  return rows.filter(r => _drRev(r) != null).sort((a, b) => _drRev(b) - _drRev(a)).slice(0, 3).map(r => firmLink(r.firm)).join('、') || '-';
+}
+function drRevCell(r) {
+  const v = _drRev(r);
+  return v == null ? '-' : `<span title="推估區間 ${r.rev_low_wan.toLocaleString()} 萬到 ${r.rev_high_wan.toLocaleString()} 萬">${Math.round(v).toLocaleString()}</span>`;
+}
+function drSourceCell(r) {
+  const a2 = drAcq2(r);
+  return `${drDot(r.type)}${escHtml(r.type || '-')}${a2.length ? `<span style="color:var(--text-muted);font-size:0.76rem;">　＋${escHtml(a2.join('、'))}</span>` : ''}`;
+}
+// 類別明細共用列（主案源八類全景、在地口碑拆解）
+function drFirmRowsHtml(list) {
+  return list.slice().sort((a, b) => (_drRev(b) ?? -1) - (_drRev(a) ?? -1)).map(r => {
+    const z = isZheluFirm(r.firm), pc = _drPc(r), a2 = drAcq2(r);
+    return `<tr${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
+      <td>${firmLink(r.firm, z ? 'font-weight:700;' : '')}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${escHtml(r.region || '-')}</td>
+      <td style="text-align:right;">${r.lawyer_count ?? '-'}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${drRevCell(r)}</td>
+      <td style="text-align:right;">${pc != null ? Math.round(pc).toLocaleString() : '-'}</td>
+      <td style="font-size:0.76rem;">${a2.length ? escHtml(a2.join('、')) : '<span style="color:var(--text-muted);">無</span>'}</td>
+      <td style="font-size:0.76rem;">${escHtml(r.practice_tag || '-')}</td>
+      <td style="font-size:0.76rem;color:var(--text-muted);">${escHtml(r.tagline || '')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);">沒有符合的事務所</td></tr>';
+}
+
+// --- 頭部事務所分層：營收四層 × 主案源（5 人以上、有營收推估）---
+function drTierRows(k) {
+  const t = DR_TIERS.find(x => x.k === k);
+  return t ? _drRv.filter(r => _drRev(r) >= t.min && _drRev(r) < t.max) : [];
+}
+function selectDrTier(k) { _drTierSel = k; renderDrTiers(); }
+function renderDrTiers() {
+  const tot = _drRv.reduce((s, r) => s + _drRev(r), 0);
+  document.getElementById('drTierBody').innerHTML = DR_TIERS.map(t => {
+    const rows = drTierRows(t.k), sum = rows.reduce((s, r) => s + _drRev(r), 0);
+    return `<tr class="dr-click${_drTierSel === t.k ? ' dr-sel' : ''}" onclick="selectDrTier('${t.k}')">
+      <td class="dr-nw" style="font-weight:600;">${t.label}</td>
+      <td style="text-align:right;">${rows.length}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${(sum / 10000).toFixed(1)}</td>
+      <td style="text-align:right;">${_drPct(sum, tot)}</td>
+      <td>${drSegBar(rows)}</td>
+      <td style="font-size:0.76rem;">${drTypeCounts(rows).slice(0, 3).map(([n, c]) => `${escHtml(n)} ${c}`).join('、') || '-'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('drTierLegend').innerHTML = DR_TYPES.map(t => `<span>${drDot(t)}${escHtml(t)}</span>`).join('');
+  const sel = DR_TIERS.find(x => x.k === _drTierSel), list = drTierRows(_drTierSel);
+  document.getElementById('drTierListTitle').textContent = `${sel.label}明細（${list.length} 家，依推估營收排序）`;
+  document.getElementById('drTierList').innerHTML = list.map(r => {
+    const z = isZheluFirm(r.firm), pc = _drPc(r);
+    return `<tr${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
+      <td style="text-align:right;color:var(--text-muted);">${_drRv.indexOf(r) + 1}</td>
+      <td>${firmLink(r.firm, z ? 'font-weight:700;' : '')}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${escHtml(r.region || '-')}</td>
+      <td style="text-align:right;">${r.lawyer_count ?? '-'}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${drRevCell(r)}</td>
+      <td style="text-align:right;">${pc != null ? Math.round(pc).toLocaleString() : '-'}</td>
+      <td style="white-space:nowrap;">${drSourceCell(r)}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${escHtml(r.practice_tag || '-')}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${escHtml(r.concentration || '-')}</td>
+      <td style="text-align:right;">${r.ex_judicial_n ? r.ex_judicial_n + ' 位' : '-'}</td>
+      <td style="text-align:center;">${r.succession_risk === 1 ? '<span style="color:var(--red);">亮燈</span>' : '-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="11" style="color:var(--text-muted);">這一層沒有事務所</td></tr>';
+}
+
+// --- 主案源八類全景（全樣本）---
+function selectDrType(t) { _drTypeSel = (_drTypeSel === t) ? null : t; renderDrTypes(); }
+function renderDrTypes() {
+  const SIZES = ['一人', '2–5 人', '6–20 人', '21 人以上'];
+  const groups = DR_TYPES.map(t => {
+    const rows = _drAll.filter(r => r.type === t);
+    return { t, rows, sum: rows.reduce((s, r) => s + (_drRev(r) || 0), 0) };
+  }).filter(g => g.rows.length).sort((a, b) => b.sum - a.sum);
+  document.getElementById('drTypeBody').innerHTML = groups.map(({ t, rows, sum }) => {
+    const sizes = SIZES.map(s => [s, rows.filter(r => r.size_band === s).length]).filter(([, c]) => c > 0);
+    return `<tr class="dr-click${_drTypeSel === t ? ' dr-sel' : ''}" onclick="selectDrType('${t}')">
+      <td style="min-width:220px;"><div style="font-weight:600;">${drDot(t)}${escHtml(t)}</div><div class="dr-sub">${escHtml(DR_TYPE_RULE[t] || '')}</div></td>
+      <td style="text-align:right;">${rows.length}</td>
+      <td style="text-align:right;">${rows.filter(r => (r.lawyer_count || 0) >= 5).length}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);">${(sum / 10000).toFixed(1)}</td>
+      <td style="text-align:right;">${_drMedTxt(rows.map(_drPc).filter(v => v != null))}</td>
+      <td style="text-align:right;">${_drMedTxt(rows.map(_drCaseYr).filter(v => v != null))}</td>
+      <td style="font-size:0.74rem;white-space:nowrap;">${sizes.map(([s, c]) => `${s} ${c}`).join('<br>')}</td>
+      <td style="font-size:0.76rem;min-width:220px;">${drTop3(rows)}</td>
+    </tr>`;
+  }).join('');
+  const det = document.getElementById('drTypeDetail');
+  if (!_drTypeSel) { det.style.display = 'none'; return; }
+  const list = _drAll.filter(r => r.type === _drTypeSel);
+  det.style.display = '';
+  document.getElementById('drTypeListTitle').textContent = `${_drTypeSel}（${list.length} 家，依推估營收排序）`;
+  document.getElementById('drTypeNote').textContent = '判讀提醒：' + (DR_TYPE_NOTE[_drTypeSel] || '');
+  document.getElementById('drTypeList').innerHTML = drFirmRowsHtml(list);
+}
+
+// --- 在地口碑拆解：用次案源把殘餘桶拆開（5 人以上）---
+const DR_LOC_NONE = '沒有次案源訊號';
+function drLocRows(k) {
+  const loc = _drTop.filter(r => r.type === '在地口碑');
+  return k === DR_LOC_NONE ? loc.filter(r => !drAcq2(r).length) : loc.filter(r => drAcq2(r).includes(k));
+}
+function selectDrLoc(k) { _drLocSel = (_drLocSel === k) ? null : k; renderDrLocal(); }
+function renderDrLocal() {
+  const loc = _drTop.filter(r => r.type === '在地口碑');
+  const none = drLocRows(DR_LOC_NONE), sig = loc.length - none.length;
+  const prem = loc.filter(r => r.practice_tag === '精品專業');
+  document.getElementById('drLocN').textContent = loc.length + ' 家';
+  document.getElementById('drLocNSub').textContent = `佔 5 人以上所 ${_drPct(loc.length, _drTop.length)}`;
+  document.getElementById('drLocSig').textContent = sig + ' 家';
+  document.getElementById('drLocSigSub').textContent = `佔在地口碑 ${_drPct(sig, loc.length)}`;
+  document.getElementById('drLocNone').textContent = none.length + ' 家';
+  document.getElementById('drLocNoneSub').textContent = `佔 5 人以上所 ${_drPct(none.length, _drTop.length)}`;
+  document.getElementById('drLocPrem').textContent = prem.length + ' 家';
+  document.getElementById('drLocPremSub').textContent = `其餘 ${loc.length - prem.length} 家為綜合訴訟`;
+  const keys = DR_TYPES.filter(t => t !== '在地口碑').map(t => [t, drLocRows(t)]).filter(([, rows]) => rows.length).sort((a, b) => b[1].length - a[1].length);
+  keys.push([DR_LOC_NONE, none]);
+  document.getElementById('drLocBody').innerHTML = keys.map(([k, rows]) => {
+    const color = DR_TYPE_COLOR[k] || 'var(--border-light)';
+    return `<tr class="dr-click${_drLocSel === k ? ' dr-sel' : ''}" onclick="selectDrLoc('${k}')">
+      <td class="dr-nw" style="font-weight:600;">${k === DR_LOC_NONE ? '' : drDot(k)}${escHtml(k)}</td>
+      <td style="text-align:right;">${rows.length}</td>
+      <td style="text-align:right;">${_drPct(rows.length, loc.length)}</td>
+      <td><div class="dr-seg"><span style="width:${loc.length ? (100 * rows.length / loc.length).toFixed(1) : 0}%;background:${color};"></span></div></td>
+      <td style="text-align:right;">${_drMedTxt(rows.map(_drPc).filter(v => v != null))}</td>
+      <td style="text-align:right;">${_drMedTxt(rows.map(_drCaseYr).filter(v => v != null))}</td>
+      <td style="font-size:0.76rem;min-width:240px;">${drTop3(rows)}</td>
+    </tr>`;
+  }).join('');
+  const exjNoTag = loc.filter(r => (r.ex_judicial_n || 0) > 0 && !drAcq2(r).includes('前司法官招牌')).length;
+  document.getElementById('drLocFoot').innerHTML = `一家事務所可以同時帶兩個次案源，所以各列家數加總會超過 ${loc.length} 家，佔比加總也會超過 100%；只有最後一列「${DR_LOC_NONE}」與其他列互斥。另有 ${exjNoTag} 家在籍律師具司法官資歷，但沒有被列為案源。點任一列看名單。`;
+  const det = document.getElementById('drLocDetail');
+  if (!_drLocSel) { det.style.display = 'none'; return; }
+  const list = drLocRows(_drLocSel);
+  det.style.display = '';
+  document.getElementById('drLocListTitle').textContent = `在地口碑 × ${_drLocSel}（${list.length} 家，依推估營收排序）`;
+  document.getElementById('drLocList').innerHTML = drFirmRowsHtml(list);
+}
 async function loadDeepReportOnce() {
   if (_drLoaded) return;
   _drLoaded = true;
@@ -13784,8 +14065,12 @@ async function loadDeepReportOnce() {
     const top = data.filter(r => (r.lawyer_count || 0) >= 5);
     const rv = top.filter(r => _drRev(r) != null).sort((a, b) => _drRev(b) - _drRev(a));
     const tot = rv.reduce((s, r) => s + _drRev(r), 0);
+    _drAll = data; _drTop = top; _drRv = rv;
 
     // --- 市場結構速覽 ---
+    document.getElementById('drScopeNote').textContent =
+      `已分析 ${data.length} 家事務所，其中 5 人以上 ${top.length} 家是本頁的可比口徑（營收、集中度、佔比都以這 ${top.length} 家計算）；` +
+      `未滿 5 人的 ${data.length - top.length} 家多半是因為案量高才被挑進來分析，只在「主案源八類全景」出現。`;
     document.getElementById('drKpiTotal').textContent = (tot / 10000).toFixed(0) + ' 億';
     document.getElementById('drKpiTotalSub').textContent = `可比 ${rv.length} 家/年`;
     const cr = k => Math.round(100 * rv.slice(0, k).reduce((s, r) => s + _drRev(r), 0) / tot);
@@ -13805,7 +14090,19 @@ async function loadDeepReportOnce() {
       `掛名制度約 ${concPct('掛名制度')}%（協作型大所 ${concPct('協作型大所')}%、真集中 ${concPct('真集中')}%、分散 ${concPct('分散/非掛名')}%——署名重複率×top1 集中度判定）；前司法官滲透 ${exj.length} 家共 ${exj.reduce((s, r) => s + r.ex_judicial_n, 0)} 位。` +
       `官網掛廣告追蹤碼（FB/Google Ads/LINE/Yahoo/TikTok）的 ${adsTop} 家，佔 5 人以上所 ${Math.round(100 * adsTop / top.length)}%——有追蹤碼不等於正在投放，是「曾建置投放基礎」的上限口徑。`;
 
-    // --- B2C 全解剖 ---
+    // --- 頭部分層／主案源八類全景／在地口碑拆解 ---
+    const rich = drTierRows('t1'), richSum = rich.reduce((s, r) => s + _drRev(r), 0), richTypes = drTypeCounts(rich);
+    document.getElementById('drTierRecap').innerHTML = rich.length
+      ? `推估營收 1 億以上的 ${rich.length} 家合計約 ${(richSum / 10000).toFixed(1)} 億，佔可比營收 ${_drPct(richSum, tot)}。` +
+        `這 ${rich.length} 家的主案源：${richTypes.map(([n, c]) => `${escHtml(n)} ${c} 家`).join('、')}；` +
+        `業務屬性為企業非訟的 ${rich.filter(r => r.practice_tag === '企業非訟').length} 家。`
+      : '';
+    _drTierSel = 't1'; _drTypeSel = null; _drLocSel = null;
+    renderDrTiers();
+    renderDrTypes();
+    renderDrLocal();
+
+    // --- 線上行銷所全解剖 ---
     const b2c = top.filter(r => r.type === '線上行銷');
     _drB2c = b2c.map(r => ({
       ...r,
@@ -13905,12 +14202,18 @@ async function loadDeepReportOnce() {
     // --- 戰略意涵（數字動態帶入） ---
     const adsList = _drB2c.filter(r => r.ads > 0).sort((a, b) => (b.lawyer_count || 0) - (a.lawyer_count || 0));
     const caseMed = _drMed(_drB2c.filter(r => r.percase != null).map(r => r.percase));
+    const caseMedAll = _drMed(top.map(_drCaseYr).filter(v => v != null));
+    const richOnline = rich.filter(r => r.type === '線上行銷'), richCorp = rich.filter(r => r.type === '企業關係');
+    const loc = top.filter(r => r.type === '在地口碑'), locNone = drLocRows(DR_LOC_NONE);
+    const nicheTop = bl.slice(0, 3), nicheAbove = nicheTop.filter(([, v]) => _drMed(v.pc) > pcMed).length;
     document.getElementById('drInsights').innerHTML = [
-      `<strong>1. 真正的同構對手只有 ${adsList.length} 家。</strong>B2C 行銷型 ${b2c.length} 家裡，官網掛廣告追蹤碼的 ${adsList.length} 家：${adsList.map(r => firmLink(r.firm)).join('、')}——其餘官網無任何追蹤碼，多為內容/口碑導流。`,
-      `<strong>2. 量產不等於賺錢。</strong>B2C 型年人均案量中位 ${caseMed.toFixed(0)} 件（全體約 25 件）但人均營收中位 ${Math.round(pcMed)} 萬反而低於傳統轉介（${Math.round(refMed)} 萬）——多數同型態所靠債務/車禍等低單價案型堆量。維持家事/刑辯高單價案型組合，比衝案量更關鍵。`,
-      `<strong>3. 追蹤碼 ≠ 正在投放，站外品牌站仍看不到。</strong>廣告碼欄偵測官網首頁＋聯絡/服務內頁的追蹤碼（含 GTM 容器內的碼），代表「曾建置投放追蹤」，不保證目前仍在花錢；另外各所的站外品牌站（如喆律的法律010）不在掃描範圍。要確認是否正在投放，需對照 Meta 廣告檔案庫／Google 廣告透明度中心。`,
-      `<strong>4. 精品利基是人效天花板。</strong>不動產、金融、刑辯利基的人均營收中位 ${bl.length ? bl.slice(0, 3).map(([k, v]) => `${k} ${Math.round(_drMed(v.pc))} 萬`).join('、') : '-'}，全數高於 B2C 中位——高單價利基所是挖角與合署的優先目標池。`,
-    ].map(s => `<div style="margin-bottom:8px;">${s}</div>`).join('');
+      `<strong>頭部是企業關係所的地盤。</strong>推估營收 1 億以上的 ${rich.length} 家裡，主案源是企業關係的 ${richCorp.length} 家，靠線上行銷擠進來的有 ${richOnline.length} 家${richOnline.length ? `（${richOnline.map(r => firmLink(r.firm)).join('、')}），排名最前的是第 ${rv.indexOf(richOnline[0]) + 1} 名` : ''}。這 ${rich.length} 家佔可比營收 ${_drPct(richSum, tot)}，企業關係所的非訟收入又看不到，實際集中度只會更高。`,
+      `<strong>「在地口碑佔 ${_drPct(loc.length, top.length)}」不能當成結論。</strong>這一類是排除法歸出來的。${loc.length} 家裡有 ${loc.length - locNone.length} 家帶著其他案源訊號（企業客戶、前司法官、線上行銷、同業協作等），真正看不出任何案源訊號的是 ${locNone.length} 家，佔 5 人以上所 ${_drPct(locNone.length, top.length)}。`,
+      `<strong>真正同構的對手是 ${adsList.length} 家。</strong>主案源為線上行銷的 ${b2c.length} 家裡，官網掛廣告追蹤碼的有 ${adsList.length} 家：${adsList.map(r => firmLink(r.firm)).join('、')}。其餘官網沒有任何追蹤碼，多半靠內容或評論導流。`,
+      `<strong>量產不等於賺錢。</strong>線上行銷所的年人均案量中位是 ${caseMed.toFixed(0)} 件（5 人以上所整體 ${caseMedAll.toFixed(0)} 件），人均營收中位 ${Math.round(pcMed)} 萬，${pcMed < refMed ? '反而低於' : '高於'}在地口碑所的 ${Math.round(refMed)} 萬。多數同類事務所靠債務、車禍這類低單價案件堆量；維持家事、刑事辯護等高單價案件的組合，比衝案量重要。`,
+      `<strong>有追蹤碼不等於正在投放，站外品牌站也看不到。</strong>廣告碼欄偵測的是官網首頁與聯絡、服務內頁的追蹤碼（含 GTM 容器內的碼），只代表曾經建置投放追蹤，不保證現在還在花錢；各所的站外品牌站（例如喆律的法律010）不在掃描範圍。要確認是否正在投放，需對照 Meta 廣告檔案庫與 Google 廣告透明度中心。`,
+      `<strong>精品利基的人均營收較高。</strong>人均營收中位最高的三個利基是 ${nicheTop.length ? nicheTop.map(([k, v]) => `${k} ${Math.round(_drMed(v.pc))} 萬`).join('、') : '-'}，其中 ${nicheAbove} 個高於線上行銷所的中位 ${Math.round(pcMed)} 萬。高單價利基所是挖角與合署的優先目標池。`,
+    ].map((s, i) => `<div style="margin-bottom:8px;">${i + 1}. ${s}</div>`).join('');
   } catch (e) { _drLoaded = false; console.error('產業深度報告載入失敗', e); }
 }
 
