@@ -4,6 +4,9 @@
 -- 一個帳號一天一列，量很小（17 個帳號 × 365 天）。
 --   log_intel_usage(p_requests, p_tabs)  登入者寫自己的（只收有 user_profiles 的帳號；儀表板帳號呼叫會被靜默略過）
 --   intel_usage_summary()                admin 讀每個帳號的彙總（帳號管理頁用）
+-- 歷史回補（2026-11-19 一次性，不在本檔）：2026-08-21～11-19 上線前的請求數由 Supabase edge_logs 逐日回推寫入
+--   （來源網域 dennislei-web.github.io、排除 OPTIONS、只算 /rest/v1 與 /functions/v1、依登入帳號分組；紀錄只留約三個月）。
+--   回補的列 tab_views＝0、tabs 為空，「最常看」自 2026-11-19 起才有。
 BEGIN;
 SET LOCAL lock_timeout = '5s';
 
