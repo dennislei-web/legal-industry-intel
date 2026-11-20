@@ -3207,6 +3207,25 @@
             <tbody id="drTypeList"></tbody>
           </table></div>
         </div>
+        <!-- 全台同業協作集團（firm_collab_groups，mig 290；點「同業協作」才顯示） -->
+        <div id="drCollab" style="display:none;">
+          <div class="dr-h" id="drCollabTitle">全台協作集團</div>
+          <div style="font-size:0.8rem;line-height:1.8;" id="drCollabRecap"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;" id="drCollabTabs"></div>
+          <div class="table-wrap dr-scroll"><table>
+            <thead><tr>
+              <th>集團（招牌與律師）</th><th>型態</th><th>地區</th>
+              <th style="text-align:right;">律師</th><th style="text-align:right;">招牌</th>
+              <th style="text-align:right;" title="成員五年裁判書件數，同一份裁判書集團內多人同列只算 1 件">5 年案量（件）</th>
+              <th style="text-align:right;" title="滑過數字看前 12 個月">近 12 個月（件）</th>
+              <th style="text-align:right;" title="集團內 2 人以上出現在同一份裁判書的件數，括號是佔 5 年案量的比例">集團內同列（件）</th>
+              <th>合作起點</th><th>近況</th>
+            </tr></thead>
+            <tbody id="drCollabBody"></tbody>
+          </table></div>
+          <div id="drCollabDetail" style="display:none;"></div>
+          <div class="dr-foot" id="drCollabFoot"></div>
+        </div>
         <div class="dr-foot">點任一列看該類全部事務所。未滿 5 人的所多半是因為案量高才被挑進來分析，不代表一般小所，所以小所居多的類別人均營收偏高。案源判讀的證據等級：2026-11-04 重跑 277 家時，推定 215 家、強烈推定 37 家、證實 21 家。</div>
       </div>
       <div class="card" style="margin-bottom:16px;">
@@ -14147,12 +14166,144 @@ function renderDrTypes() {
     </tr>`;
   }).join('');
   const det = document.getElementById('drTypeDetail');
+  const collabOn = _drTypeSel === '同業協作';
+  document.getElementById('drCollab').style.display = collabOn ? '' : 'none';
+  if (collabOn) { loadDrCollabOnce(); renderDrCollab(); }
   if (!_drTypeSel) { det.style.display = 'none'; return; }
   const list = _drAll.filter(r => r.type === _drTypeSel);
   det.style.display = '';
   document.getElementById('drTypeListTitle').textContent = `${_drTypeSel}（${list.length} 家，依推估營收排序）`;
   document.getElementById('drTypeNote').textContent = '判讀提醒：' + (DR_TYPE_NOTE[_drTypeSel] || '');
   document.getElementById('drTypeList').innerHTML = drFirmRowsHtml(list);
+}
+
+// --- 全台同業協作集團（firm_collab_groups，mig 290；定義見該 migration 檔頭）---
+let _drCollab = null, _drCollabLoading = false, _drCollabErr = false, _drCollabSel = null, _drCollabTier = 'all';
+const DR_COLLAB_KIND = { '同址': '同一辦公室，分掛招牌', '同電話': '不同地址，同一支電話', '部分同址': '部分成員同址', '異址': '不同地址的固定搭檔' };
+const _drShortFirm = s => String(s || '').replace(/(法律|律師)事務所.*$/, '') || String(s || '');
+const _drYm = ym => ym ? `${ym.slice(0, 4)} 年 ${+ym.slice(4)} 月` : '-';
+const _drN = v => (v ?? 0).toLocaleString();
+async function loadDrCollabOnce() {
+  if (_drCollab || _drCollabLoading) return;
+  _drCollabLoading = true; _drCollabErr = false;
+  try {
+    const { data, error } = await db.from('firm_collab_groups').select('*').order('dedup', { ascending: false });
+    if (error) { console.log('firm_collab_groups error:', error); _drCollabErr = true; }
+    else _drCollab = data || [];
+  } catch (e) { console.log('firm_collab_groups fail:', e); _drCollabErr = true; }
+  _drCollabLoading = false;
+  renderDrCollab();
+}
+function selectDrCollab(i) {
+  const g = (_drCollab || [])[i];
+  _drCollabSel = (g && _drCollabSel !== g.gid) ? g.gid : null;
+  renderDrCollab();
+}
+function setDrCollabTier(t) { _drCollabTier = t; _drCollabSel = null; renderDrCollab(); }
+// 近況：近 12 個月集團內同列件數對比前 12 個月
+function drCollabTrend(g) {
+  const a = g.co12 || 0, b = g.co_p12 || 0;
+  const [label, color] = a < 0.5 * b ? ['降溫', 'var(--red)'] : a > 1.5 * b ? ['升溫', 'var(--green, #4caf82)'] : ['持平', 'var(--text-muted)'];
+  return `<span style="color:${color};" title="集團內同列：近 12 個月 ${a} 件，前 12 個月 ${b} 件">${label}</span>`;
+}
+function drCollabName(g) { return (g.firms || []).map(f => _drShortFirm(f.firm)).join('＋'); }
+function renderDrCollab() {
+  if (_drTypeSel !== '同業協作') return;
+  const $ = id => document.getElementById(id);
+  if (!_drCollab) {
+    $('drCollabTitle').textContent = '全台協作集團';
+    $('drCollabRecap').textContent = _drCollabErr ? '集團資料讀取失敗，請重新整理頁面再試。' : '載入中…';
+    $('drCollabTabs').innerHTML = ''; $('drCollabBody').innerHTML = ''; $('drCollabDetail').style.display = 'none'; $('drCollabFoot').textContent = '';
+    return;
+  }
+  const all = _drCollab, est = all.filter(g => g.tier === '確立'), pend = all.filter(g => g.tier !== '確立');
+  const sum = (a, k) => a.reduce((s, g) => s + (g[k] || 0), 0);
+  const same = a => a.filter(g => g.kind === '同址' || g.kind === '同電話').length;
+  const ws = all[0]?.window_start, we = all[0]?.window_end;
+  $('drCollabTitle').textContent = `全台協作集團（${all.length} 組，依 5 年案量排序）`;
+  $('drCollabRecap').innerHTML =
+    `全台符合條件的協作集團共 <strong>${all.length} 組</strong>，涉及 ${sum(all, 'lawyer_n')} 位律師、${sum(all, 'firm_n')} 塊招牌。` +
+    `其中合作三年以上的 <strong>${est.length} 組</strong>：名冊登記同一門牌或同一支電話的 ${same(est)} 組，不同地址的固定搭檔 ${est.length - same(est)} 組。` +
+    `另外 ${pend.length} 組是近三年才出現的配對，可能是新合作，也可能是律師離所後的尾案，列為待確認。` +
+    `上面表格的 ${_drAll.filter(r => r.type === '同業協作').length} 家是「已做過深度分析、且主案源判為同業協作」的事務所，這裡是全名冊掃出來的結果，範圍不同。`;
+  const tabs = [['all', `全部 ${all.length}`], ['est', `合作三年以上 ${est.length}`], ['pend', `待確認 ${pend.length}`]];
+  $('drCollabTabs').innerHTML = tabs.map(([k, t]) => `<button class="sub-tab-btn${_drCollabTier === k ? ' active' : ''}" onclick="setDrCollabTier('${k}')">${t}</button>`).join('');
+  const list = _drCollabTier === 'est' ? est : _drCollabTier === 'pend' ? pend : all;
+  $('drCollabBody').innerHTML = list.map(g => {
+    const i = all.indexOf(g), z = (g.firms || []).some(f => isZheluFirm(f.firm));
+    const start = g.first_ym && g.first_ym <= ws ? `${_drYm(ws)}以前` : _drYm(g.first_ym);
+    return `<tr class="dr-click${_drCollabSel === g.gid ? ' dr-sel' : ''}" onclick="selectDrCollab(${i})"${z ? ' style="background:rgba(76,175,130,0.10);"' : ''}>
+      <td style="min-width:240px;"><div style="font-weight:600;">${escHtml(drCollabName(g))}</div><div class="dr-sub">${escHtml((g.members || []).map(m => m.name).join('、'))}</div></td>
+      <td style="font-size:0.76rem;">${escHtml(DR_COLLAB_KIND[g.kind] || g.kind)}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${escHtml((g.cities || []).filter(Boolean).join('、') || '-')}</td>
+      <td style="text-align:right;">${g.lawyer_n}</td>
+      <td style="text-align:right;">${g.firm_n}</td>
+      <td style="text-align:right;font-weight:600;color:var(--gold);"><span title="成員各自件數加總 ${_drN(g.nominal)} 件，去重後 ${_drN(g.dedup)} 件">${_drN(g.dedup)}</span></td>
+      <td style="text-align:right;"><span title="前 12 個月 ${_drN(g.dedup_p12)} 件">${_drN(g.dedup12)}</span></td>
+      <td style="text-align:right;white-space:nowrap;">${_drN(g.co)}<span style="color:var(--text-muted);font-size:0.76rem;">（${_drPct(g.co, g.dedup)}）</span></td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${start}</td>
+      <td style="font-size:0.76rem;white-space:nowrap;">${g.tier === '確立' ? '' : '<span style="color:var(--orange);">待確認</span>　'}${drCollabTrend(g)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="color:var(--text-muted);">沒有符合的集團</td></tr>';
+  $('drCollabFoot').innerHTML =
+    `集團定義：一對律師在 ${_drYm(ws)}到 ${_drYm(we)}共同署名 50 件以上、跨 3 個年度、近 12 個月仍有 10 件以上，佔其中一方案量 30% 以上且佔另一方 10% 以上，而且兩人登記在不同事務所；彼此相連的配對合成一個集團。` +
+    `已排除：分所與所名異寫、名冊異動紀錄顯示剛轉所的（對象是前東家）、同名律師、登記在公司或所名不明的。` +
+    `名冊異動紀錄只從 2026 年 7 月起，更早離所的看不出來，所以近三年才出現的配對一律標「待確認」。地址、電話、名冊人數取自法務部律師名冊現況。點任一列看該集團的人數組成、成員與配對明細。`;
+  renderDrCollabDetail();
+}
+function renderDrCollabDetail() {
+  const box = document.getElementById('drCollabDetail');
+  const g = (_drCollab || []).find(x => x.gid === _drCollabSel);
+  if (!g) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const mem = g.members || [], firms = g.firms || [], pairs = g.pairs || [];
+  const ws = g.window_start, we = g.window_end;
+  const yrs = Object.keys(g.by_year || {}).sort();
+  const yLabel = y => y === ws.slice(0, 4) && ws.slice(4) !== '01' ? `${y}（${+ws.slice(4)}–12 月）` : y === we.slice(0, 4) && we.slice(4) !== '12' ? `${y}（1–${+we.slice(4)} 月）` : y;
+  const th = 'style="text-align:right;"';
+  box.style.display = '';
+  box.innerHTML = `
+    <div class="dr-h">${escHtml(drCollabName(g))}：${g.lawyer_n} 位律師、${g.firm_n} 塊招牌，${escHtml(DR_COLLAB_KIND[g.kind] || g.kind)}</div>
+    <div style="font-size:0.8rem;line-height:1.8;">5 年案量 ${_drN(g.dedup)} 件（成員各自件數加總 ${_drN(g.nominal)} 件，扣掉同一份裁判書重複計算的 ${_drN(g.nominal - g.dedup)} 件）；其中集團內 2 人以上同列的 ${_drN(g.co)} 件，佔 ${_drPct(g.co, g.dedup)}。近 12 個月 ${_drN(g.dedup12)} 件，前 12 個月 ${_drN(g.dedup_p12)} 件。${g.tier === '確立' ? '' : '<span style="color:var(--orange);">這組的配對都是近三年才出現，可能是律師離所後的尾案，尚待確認。</span>'}</div>
+    <div class="dr-h">人數組成</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>事務所（招牌）</th><th>所在地</th><th ${th} title="法務部律師名冊上目前登記在這家事務所的律師人數">名冊登記律師數</th><th ${th}>參與集團的律師數</th><th>參與集團的律師</th></tr></thead>
+      <tbody>${firms.map(f => `<tr>
+        <td>${firmLink(f.firm)}</td><td style="font-size:0.76rem;">${escHtml(f.city || '-')}</td>
+        <td ${th}>${f.roster || '-'}</td><td ${th}>${f.members}</td>
+        <td style="font-size:0.76rem;">${mem.filter(m => m.firm === f.firm).map(m => lawyerLink(m.name)).join('、')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="dr-h">成員</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>律師</th><th>登記事務所</th><th>名冊地址</th><th ${th}>5 年案量（件）</th><th ${th}>近 12 個月（件）</th><th ${th} title="這位律師與集團其他成員出現在同一份裁判書的件數，括號是佔本人 5 年案量的比例">與集團成員同列（件）</th></tr></thead>
+      <tbody>${mem.map(m => `<tr>
+        <td>${lawyerLink(m.name, 'font-weight:600;')}</td><td style="font-size:0.76rem;">${escHtml(m.office || '-')}</td>
+        <td style="font-size:0.76rem;color:var(--text-muted);">${escHtml(m.addr || '-')}</td>
+        <td ${th}>${_drN(m.cases)}</td><td ${th}>${_drN(m.cases12)}</td>
+        <td style="text-align:right;white-space:nowrap;">${_drN(m.co)}<span style="color:var(--text-muted);font-size:0.76rem;">（${_drPct(m.co, m.cases)}）</span></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="dr-h">配對</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>配對</th><th ${th} title="同一份裁判書、同一方共同署名的件數">5 年共同署名（件）</th><th ${th}>佔前者案量</th><th ${th}>佔後者案量</th><th ${th}>近 12 個月（件）</th><th ${th}>前 12 個月（件）</th><th>第一次同列</th><th>名冊登記</th></tr></thead>
+      <tbody>${pairs.map(p => `<tr>
+        <td style="white-space:nowrap;">${escHtml(p.a)} × ${escHtml(p.b)}</td>
+        <td style="text-align:right;font-weight:600;">${_drN(p.c)}</td><td ${th}>${p.pa ?? '-'}%</td><td ${th}>${p.pb ?? '-'}%</td>
+        <td ${th}>${_drN(p.c12)}</td><td ${th}>${_drN(p.p12)}</td>
+        <td style="font-size:0.76rem;white-space:nowrap;">${p.first && p.first <= ws ? _drYm(ws) + '以前' : _drYm(p.first)}</td>
+        <td style="font-size:0.76rem;">${p.loc === '同址' ? '同一門牌' : p.loc === '同電話' ? '同一支電話' : '不同地址'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="dr-h">逐年</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>年度</th>${yrs.map(y => `<th ${th}>${yLabel(y)}</th>`).join('')}</tr></thead>
+      <tbody>
+        <tr><td>集團案量（件，已去重）</td>${yrs.map(y => `<td ${th}>${_drN(g.by_year[y].dedup)}</td>`).join('')}</tr>
+        <tr><td>集團內同列（件）</td>${yrs.map(y => `<td ${th}>${_drN(g.by_year[y].co)}</td>`).join('')}</tr>
+        <tr><td>同列佔案量</td>${yrs.map(y => `<td ${th}>${_drPct(g.by_year[y].co, g.by_year[y].dedup)}</td>`).join('')}</tr>
+      </tbody>
+    </table></div>
+    <div class="dr-foot" style="margin-top:6px;">配對的「共同署名」只算同一方一起掛名；集團的「同列」是同一份裁判書裡出現 2 位以上成員，包含各自代理不同當事人的情形，所以會比配對件數略多。</div>`;
 }
 
 // --- 在地口碑拆解：用次案源把殘餘桶拆開（5 人以上）---
