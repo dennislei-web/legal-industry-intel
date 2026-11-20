@@ -29,11 +29,15 @@
        晚到的月份，下一次執行就會補上；寫入是 upsert＋防呆＋驗證（見 upload_facts.py）。
        寫完再核對去重 cache 有沒有跟上月表（沒跟上＝雲端月更的 refresh 鏈沒跑完，facts 只能停在舊窗）。
        步驟 1–8 中途丟例外（步驟之間的 rest_count 等）只會中止 1–8，這一步照跑。
+   10. rpc refresh_firm_collab_groups  全台同業協作集團（firm_collab_groups，mig 290；2026-11-20 加入）。
+       「產業深度報告」點同業協作時直讀。純 DB 內重算（共同列名表＋律師名冊＋名冊異動紀錄），
+       資料窗＝共同列名表最末月往前 60 個月；整表刪掉重寫在同一個交易裡，失敗會整個退回。
+       約 40 秒，用 service key 走 REST 呼叫（函數自帶 300 秒上限）。不相依步驟 9，9 失敗也照跑。
 
 用法：
   python judgment_derivs_monthly.py            # 自動判定目標月
   python judgment_derivs_monthly.py 202607     # 指定目標月
-  python judgment_derivs_monthly.py facts      # 只跑步驟 9（月表晚到、不想等下個月時補 facts 用）
+  python judgment_derivs_monthly.py facts      # 只跑步驟 9–10（月表晚到、不想等下個月時補 facts 用）
 log：scripts/judgment_derivs_monthly.log（追加）
 """
 import datetime as dt
@@ -89,6 +93,16 @@ def rest_count(table):
                                                'Prefer': 'count=exact'})
     with urllib.request.urlopen(req, timeout=60) as r:
         return int(r.headers['Content-Range'].split('/')[1])
+
+
+def rest_rpc(fn, timeout=330):
+    url = ENV_LII['SUPABASE_URL'].rstrip('/') + '/rest/v1/rpc/' + fn
+    key = ENV_LII['SUPABASE_SERVICE_KEY']
+    req = urllib.request.Request(url, data=b'{}', method='POST',
+                                 headers={'apikey': key, 'Authorization': f'Bearer {key}',
+                                          'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
 
 
 def shift(ym, n):
@@ -188,6 +202,28 @@ def refresh_facts(step, fails):
         log(f'  facts 資料窗至 {dedup_to}（月表最新 {latest}）')
 
 
+def refresh_collab(fails):
+    """步驟 10：重建全台同業協作集團（firm_collab_groups）。函數回傳寫入的組數。
+    組數掉三成以上多半是上游表（共同列名、名冊）出事，不是集團真的散了——資料已寫入，記成失敗讓人來看。"""
+    desc = '協作集團重建'
+    log(f'▶ {desc}：rpc refresh_firm_collab_groups')
+    t0 = dt.datetime.now()
+    try:
+        before = rest_count('firm_collab_groups')
+        n = rest_rpc('refresh_firm_collab_groups')
+        win = rest_get('firm_collab_groups?select=window_end&limit=1')
+    except Exception as e:
+        log(f'❌ {desc}失敗：{type(e).__name__}: {str(e)[:200]}')
+        fails.append(desc)
+        return
+    secs = (dt.datetime.now() - t0).seconds
+    if not isinstance(n, int) or n == 0 or n < before * 0.7:
+        log(f'❌ {desc}：{before} → {n} 組，縮水超過三成（已寫入），請人工檢查上游表')
+        fails.append(desc + '筆數縮水')
+        return
+    log(f'✅ {desc}：{before} → {n} 組，資料窗至 {win[0]["window_end"] if win else "-"}（{secs} 秒）')
+
+
 def main():
     log('=' * 60)
     only_facts = sys.argv[1:] == ['facts']
@@ -200,7 +236,7 @@ def main():
         return ok
 
     if only_facts:
-        log('只跑步驟 9（事務所 facts）')
+        log('只跑步驟 9–10（事務所 facts、協作集團）')
     else:
         if len(sys.argv) > 1:
             target = sys.argv[1]
@@ -213,11 +249,12 @@ def main():
             log(f'❌ 步驟 1–8 中途例外，後面的步驟沒跑：{type(e).__name__}: {str(e)[:200]}')
             fails.append('步驟 1–8 中途例外')
     refresh_facts(step, fails)
+    refresh_collab(fails)
 
     if fails:
         log(f'❌ 完成但有失敗：{"、".join(fails)}')
         sys.exit(1)
-    log('✅ 步驟 9 完成' if only_facts else '✅ 裁判書衍生管線全部完成')
+    log('✅ 步驟 9–10 完成' if only_facts else '✅ 裁判書衍生管線全部完成')
 
 
 if __name__ == '__main__':

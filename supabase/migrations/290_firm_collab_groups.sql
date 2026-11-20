@@ -60,7 +60,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $fn$
 DECLARE v_n int;
 BEGIN
-  DELETE FROM firm_collab_groups;
+  DELETE FROM firm_collab_groups WHERE true;  -- PostgREST 連線掛 safeupdate，不帶 WHERE 會被擋
   INSERT INTO firm_collab_groups (gid, kind, tier, cities, lawyer_n, firm_n, nominal, dedup, co,
     dedup12, dedup_p12, co12, co_p12, first_ym, by_year, members, firms, pairs, window_start, window_end, refreshed_at)
 with recursive prm as (
