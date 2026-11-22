@@ -645,6 +645,12 @@
   產出日：週報週六起（週六～週五，period_key＝週五）、月報次月 20 日、季報季後次月 20 日、年報次年 1/20。離職率只在期間結束 31 天內記錄（`firm_turnover_stats()` 是 7/27 起累積值）。
   **log 公開**：腳本只印期別與段數，不印人名所名。排程 `.github/workflows/industry-watch-report.yml` 每日 UTC 02:00 跑 auto。
 - 前端 `tab-watch`（`loadWatchOnce`／`_iw`／`iwRender*`）：頻率切換＋閱讀／比較（任兩期指標逐項 A−B）／趨勢（單一指標 Chart.js）。測試殼可用 `window.__iwOverride` 餵列。
+- **指標明細名單（mig 291，2026-11-22）**：`details` jsonb＝`{指標 key: [物件…], _meta}`，產報告當下由 `industry_watch_details(p_start, p_end)`（service_role 限定，口徑逐項對齊
+  `industry_watch_metrics`）取得並**凍結**——`firm_open_close()` 是即時函式，事後回查新設／熄燈家數會飄。有明細的指標：新設、熄燈、跨所移動、進入／離開事務所、整團轉所、
+  喆律轉入／轉出、新進律師、名冊轉非正常、懲戒紀錄異動、10–29 人所、30 人以上所。前端比較頁點指標並排展開 A／B 兩期名單、趨勢頁點期間展開該期名單
+  （`IW_DET` 欄位定義／`iwDetBlock`／`iwEnsureDet`；列表查詢**不載** `details`，點開才 `select('id,details').in('id', …)`，測試殼列上自帶 `details` 就直接用）。
+  加新指標要有明細＝函式加一個 key＋`IW_DET` 加欄位定義。舊報告用 `details [--cadence] [--force]` 回補（只寫 `details` 欄）；2026-11-22 回補 21 份，
+  只有 8 月初三份的「新設」各差 1 家（前端會註明是事後回補）。
 - 週報在法務部掃描沒跑的週（電腦關機）數字會偏少；2026-10-23～10-31 改版停擺與首輪補登已寫進報告口徑段。
 - **AI 解讀（mig 274，2026-11-10）**：`interpretation` jsonb（headline／insights[{title,body}]／zhelu／actions／watch／data_cautions）＋`interp_model`＋`interpreted_at`。
   產一期時若有 `ANTHROPIC_API_KEY`（環境變數 → scripts/.env → `ANTHROPIC_KEY_FILE` 指的 .env）就呼叫 Claude（effort high、structured outputs、串流、`fallbacks: "default"`，新模型不收 fallbacks 就退回不帶）。

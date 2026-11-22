@@ -2555,13 +2555,25 @@
         .iw-ai-item{font-size:0.83rem;line-height:1.75;margin:6px 0;}
         .iw-ai-item b{display:block;}
         .iw-ai ul{margin:2px 0;padding-left:20px;font-size:0.83rem;line-height:1.75;}
+        /* 指標明細（點指標展開名單，mig 291） */
+        .iw-caret{display:inline-block;width:1.2em;color:var(--blue);}
+        .iw-click{cursor:pointer;}
+        .iw-click:hover>td{background:var(--ghost-bg);}
+        .iw-click>td:first-child{color:var(--blue);}
+        .iw-det>td{padding:10px 8px 14px;background:var(--ghost-bg);}
+        .iw-det2{display:flex;flex-wrap:wrap;gap:14px;}
+        .iw-det2>div{flex:1 1 360px;min-width:0;}
+        .iw-det-h{font-size:0.8rem;font-weight:600;margin-bottom:4px;}
+        .iw-det .iw-twrap{max-height:380px;border:1px solid var(--border);border-radius:8px;background:var(--card-bg, var(--bg));}
+        .iw-det .iw-table td{white-space:nowrap;}
+        .iw-det .iw-table td.wrap{white-space:normal;min-width:150px;}
       </style>
       <div class="card" style="margin-top:16px;border:1px solid var(--gold);">
         <div class="card-title">&#128274; 產業觀察 <span style="font-size:0.7rem;color:var(--gold);border:1px solid var(--gold);border-radius:6px;padding:1px 6px;margin-left:6px;">admin</span></div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px;line-height:1.7;">
           每週、每月、每季、每年自動產出一份台灣法律產業觀察報告並留存。<strong>週報</strong>看轉所、團隊出走、新設熄燈、喆律進出（週六產出，接在週五法務部掃描之後）；
           <strong>月報</strong>另加事務所規模結構、裁判書案量排名、委任率、離職率（次月 20 日產出）；<strong>季報、年報</strong>是同樣指標的長期間版本，另附待人工檢查清單（季後次月 20 日、次年 1 月 20 日產出）。
-          「比較」可任選兩期逐項對照，「趨勢」看單一指標歷期變化。報告內文由數字規則自動產生，比較基準是同頻率的前一期。
+          「比較」可任選兩期逐項對照，「趨勢」看單一指標歷期變化；<strong>藍色的指標可以點開</strong>，看是哪幾家事務所、哪些律師。報告內文由數字規則自動產生，比較基準是同頻率的前一期。
         </div>
         <div class="iw-bar">
           <div class="iw-seg" id="iwCadSeg"></div>
@@ -17434,7 +17446,8 @@ window.salToggleDetails = function(el) {
 // ==================== 產業觀察（定期報告留存＋比較；admin，mig 273） ====================
 // 資料：industry_watch_reports（scripts/industry_watch_report.py 每日 auto 補產）；RLS＝is_intel_admin()
 const IW_CAD = [['weekly', '每週'], ['monthly', '每月'], ['quarterly', '每季'], ['yearly', '每年']];
-let _iw = { loaded: false, rows: [], cad: 'weekly', mode: 'read', sel: null, a: null, b: null, metric: null, chart: null };
+let _iw = { loaded: false, rows: [], cad: 'weekly', mode: 'read', sel: null, a: null, b: null, metric: null, chart: null,
+  open: new Set(), tOpen: null, det: {} };   // open＝比較頁展開的指標、tOpen＝趨勢頁展開的那一期、det＝各期明細名單快取
 try { const s = JSON.parse(localStorage.getItem('iwState') || '{}'); if (s.cad) _iw.cad = s.cad; if (s.mode) _iw.mode = s.mode; } catch (e) {}
 function iwSave() { try { localStorage.setItem('iwState', JSON.stringify({ cad: _iw.cad, mode: _iw.mode })); } catch (e) {} }
 
@@ -17459,7 +17472,7 @@ function iwRenderCad() {
   document.getElementById('iwCadSeg').innerHTML = IW_CAD.map(([k, l]) =>
     `<button class="${k === _iw.cad ? 'on' : ''}" onclick="iwSetCad('${k}')">${l}（${iwList(k).length}）</button>`).join('');
 }
-function iwSetCad(c) { _iw.cad = c; _iw.sel = _iw.a = _iw.b = null; iwSave(); iwRenderCad(); iwRender(); }
+function iwSetCad(c) { _iw.cad = c; _iw.sel = _iw.a = _iw.b = null; _iw.open.clear(); _iw.tOpen = null; iwSave(); iwRenderCad(); iwRender(); }
 function iwSetMode(m) {
   _iw.mode = m; iwSave();
   document.querySelectorAll('#iwModeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
@@ -17554,6 +17567,95 @@ function iwMetricKeys(rows) {
   return keys;
 }
 
+// ---- 指標明細名單（mig 291）----
+// industry_watch_reports.details＝{指標 key: [物件…], _meta}，產報告當下凍結；列表不載這一欄，點指標時才單獨讀。
+// 每個指標一組欄位定義：[欄名（字串或 meta=>字串）, 物件=>HTML, 是否數字欄, 是否允許換行（其餘欄不換行、太寬就橫向捲動）]
+const IW_KIND = { new: '全新', spinoff: '拆分', merger: '合併新設', shutdown: '收掉', merge: '併入他所', unlisted: '轉未登錄' };
+const iwTxt = v => escHtml(v == null || v === '' ? '—' : String(v));
+const iwOffice = f => !f ? '—' : (/事務所/.test(f) ? firmLink(f) : escHtml(f));   // 非事務所（企業法務室等）不連到事務所頁
+const iwNames = a => (a || []).map(n => lawyerLink(n)).join('、') || '—';
+const iwCnt = v => typeof v === 'number' ? v.toLocaleString() : '—';
+const IW_MOVE = (fromLabel, toLabel, toEmpty) => [
+  ['日期', x => iwTxt(x.d)], ['律師', x => lawyerLink(x.name) || '—'],
+  [fromLabel, x => x.type === 'new_lawyer' ? '（新進律師）' : iwOffice(x.from)],
+  [toLabel, x => x.to ? iwOffice(x.to) : toEmpty],
+];
+const IW_BAND = [
+  ['事務所', x => iwOffice(x.firm)],
+  [m => `律師數（${m.snap_end || '期末'}）`, x => iwCnt(x.n), 1],
+  [m => `期初（${m.snap_begin || '—'}）`, x => iwCnt(x.prev_n), 1],
+  ['增減', x => typeof x.prev_n === 'number' ? (x.n - x.prev_n > 0 ? '+' : '') + (x.n - x.prev_n) : '期初不在快照', 1],
+];
+const IW_DET = {
+  closed: [['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['離開人數', x => iwCnt(x.n), 1],
+    ['併入去向', x => iwOffice(x.dest)], ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['最後異動日', x => iwTxt(x.d)]],
+  opened: [['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['現有人數', x => iwCnt(x.n), 1],
+    ['來源事務所', x => x.split_from ? iwOffice(x.split_from) : ((x.from_firms || []).map(iwOffice).join('、') || '—')],
+    ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['首見日', x => iwTxt(x.d)]],
+  firm_to_firm: IW_MOVE('原事務所', '新事務所', '—'),
+  entering: IW_MOVE('原登錄單位', '新事務所', '—'),
+  leaving: IW_MOVE('原事務所', '新登錄單位', '未登錄'),
+  team_moves: [['原事務所', x => iwOffice(x.from)], ['新事務所', x => iwOffice(x.to)], ['人數', x => iwCnt(x.n), 1], ['律師', x => iwNames(x.names), 0, 1]],
+  zhelu_in: IW_MOVE('原單位', '新單位', '—'),
+  zhelu_out: IW_MOVE('原單位', '新單位', '未登錄'),
+  new_lawyers: [['日期', x => iwTxt(x.d)], ['律師', x => lawyerLink(x.name) || '—'], ['登錄單位', x => iwOffice(x.office)]],
+  state_removed: [['日期', x => iwTxt(x.d)], ['律師', x => lawyerLink(x.name) || '—'], ['登錄單位', x => iwOffice(x.office)],
+    ['狀態', x => `${iwTxt(x.old_state)} → ${iwTxt(x.new_state)}`]],
+  discipline: [['日期', x => iwTxt(x.d)], ['律師', x => lawyerLink(x.name) || '—'], ['登錄單位', x => iwOffice(x.office)],
+    ['異動內容', x => x.after ? (x.before ? `變更為：${escHtml(x.after)}（原：${escHtml(x.before)}）` : `新增：${escHtml(x.after)}`)
+      : `紀錄移除${x.before ? `（原：${escHtml(x.before)}）` : ''}`, 0, 1]],
+  firms_30plus: IW_BAND,
+  firms_10_29: IW_BAND,
+};
+// 這個指標在這幾期裡有沒有名單可看（有定義、而且至少一期數字大於 0）
+function iwCanDrill(k, reports) {
+  return !!IW_DET[k] && reports.some(r => { const v = ((r.metrics || {})[k] || {}).value; return typeof v === 'number' && v > 0; });
+}
+async function iwEnsureDet(ids) {
+  const need = [...new Set(ids.map(String))].filter(id => _iw.det[id] === undefined);
+  if (!need.length) return;
+  need.forEach(id => { _iw.det[id] = 'loading'; });
+  const remote = [];
+  need.forEach(id => {          // 測試殼餵的列若自帶 details 就直接用
+    const r = _iw.rows.find(x => String(x.id) === id);
+    if (r && r.details !== undefined) _iw.det[id] = r.details || null; else remote.push(id);
+  });
+  if (remote.length) {
+    const { data, error } = await db.from('industry_watch_reports').select('id,details').in('id', remote);
+    remote.forEach(id => {
+      const r = (data || []).find(x => String(x.id) === id);
+      _iw.det[id] = error ? { _error: error.message || '讀取失敗' } : ((r && r.details) || null);
+    });
+  }
+  await null;      // 一律等呼叫端這一輪畫完再重畫（否則呼叫端稍後寫入的「載入中」會蓋掉名單）
+  iwRender();
+}
+function iwRetryDet(id) { delete _iw.det[String(id)]; iwRender(); }
+function iwToggleMetric(k) { if (_iw.open.has(k)) _iw.open.delete(k); else _iw.open.add(k); iwRender(); }
+function iwToggleTrend(id) { _iw.tOpen = String(_iw.tOpen) === String(id) ? null : id; iwRender(); }
+// 一期×一個指標的名單區塊
+function iwDetBlock(k, r, tag) {
+  const m = (r.metrics || {})[k];
+  const unit = (m && m.unit) || '筆';
+  const wrap = inner => `<div><div class="iw-det-h">${tag ? tag + '：' : ''}${escHtml(r.title)}</div>${inner}</div>`;
+  if (!m) return wrap('<div class="iw-note">這一期沒有這項指標。</div>');
+  const det = _iw.det[String(r.id)];
+  if (det === undefined || det === 'loading') return wrap('<div class="iw-note">名單載入中…</div>');
+  if (det && det._error) return wrap(`<div class="iw-note">名單讀取失敗：${escHtml(det._error)}　<a href="#" onclick="iwRetryDet('${r.id}');return false;" style="color:var(--blue);">重試</a></div>`);
+  const list = det && det[k];
+  if (!Array.isArray(list)) return wrap('<div class="iw-note">這一期沒有留存名單。</div>');
+  if (!list.length) return wrap(`<div class="iw-note">本期 0${escHtml(unit)}，沒有名單。</div>`);
+  const meta = det._meta || {};
+  const cols = IW_DET[k];
+  const gap = typeof m.value === 'number' && m.value !== list.length
+    ? `<div class="iw-note">報告產出當時記錄 ${m.value.toLocaleString()}${escHtml(unit)}，這份名單是事後回補的，共 ${list.length.toLocaleString()}${escHtml(unit)}（名冊後來又有變動，所以對不上）。</div>` : '';
+  return wrap(`${gap}<div class="iw-twrap"><table class="iw-table"><thead><tr>${
+    cols.map(c => `<th class="${c[2] ? 'num' : ''}">${escHtml(typeof c[0] === 'function' ? c[0](meta) : c[0])}</th>`).join('')
+  }</tr></thead><tbody>${
+    list.map(x => '<tr>' + cols.map(c => `<td class="${c[2] ? 'num' : c[3] ? 'wrap' : ''}">${c[1](x)}</td>`).join('') + '</tr>').join('')
+  }</tbody></table></div><div class="iw-note">共 ${list.length.toLocaleString()}${escHtml(unit)}。點律師或事務所可看詳細資料。</div>`);
+}
+
 function iwRenderCompare(body, list) {
   if (!list.find(x => String(x.id) === String(_iw.a))) _iw.a = list[0].id;
   if (!list.find(x => String(x.id) === String(_iw.b))) _iw.b = (list[1] || list[0]).id;
@@ -17561,13 +17663,18 @@ function iwRenderCompare(body, list) {
   const keys = iwMetricKeys([A, B]);
   const groups = {};
   keys.forEach(k => { const m = (A.metrics || {})[k] || (B.metrics || {})[k]; (groups[m.group || '其他'] = groups[m.group || '其他'] || []).push(k); });
-  let rows = '';
+  let rows = '', anyOpen = false;
   Object.entries(groups).forEach(([g, ks]) => {
     rows += `<tr class="iw-grp"><td colspan="4">${escHtml(g)}</td></tr>`;
     ks.forEach(k => {
       const ma = (A.metrics || {})[k] || {}, mb = (B.metrics || {})[k] || {};
       const unit = ma.unit || mb.unit || '';
-      rows += `<tr><td>${escHtml(ma.label || mb.label || k)}</td><td class="num">${iwFmt(ma.value, unit)}</td><td class="num">${iwFmt(mb.value, unit)}</td><td class="num">${iwDelta(ma.value, mb.value, unit) || '—'}</td></tr>`;
+      const can = iwCanDrill(k, [A, B]), isOpen = can && _iw.open.has(k);
+      rows += `<tr ${can ? `class="iw-click" onclick="iwToggleMetric('${k}')" title="點一下看名單"` : ''}><td><span class="iw-caret">${can ? (isOpen ? '▾' : '▸') : ''}</span>${escHtml(ma.label || mb.label || k)}</td><td class="num">${iwFmt(ma.value, unit)}</td><td class="num">${iwFmt(mb.value, unit)}</td><td class="num">${iwDelta(ma.value, mb.value, unit) || '—'}</td></tr>`;
+      if (isOpen) {
+        anyOpen = true;
+        rows += `<tr class="iw-det"><td colspan="4"><div class="iw-det2">${iwDetBlock(k, A, 'A')}${String(A.id) !== String(B.id) ? iwDetBlock(k, B, 'B') : ''}</div></td></tr>`;
+      }
     });
   });
   const hl = r => `<div style="flex:1 1 300px;min-width:0;"><div style="font-weight:600;font-size:0.84rem;">${escHtml(r.title)}</div>${r.interpretation && r.interpretation.headline ? `<div style="font-size:0.82rem;margin:4px 0;color:var(--gold);">AI：${escHtml(r.interpretation.headline)}</div>` : ''}<ul style="margin:4px 0;padding-left:20px;font-size:0.8rem;line-height:1.7;">${(r.highlights || []).map(h => `<li>${escHtml(h)}</li>`).join('')}</ul></div>`;
@@ -17578,8 +17685,9 @@ function iwRenderCompare(body, list) {
     </div>
     <div class="iw-twrap" style="max-height:none;"><table class="iw-table">
       <thead><tr><th>指標</th><th class="num">A</th><th class="num">B</th><th class="num">A − B</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="iw-note">「—」＝該期沒有這項（週報不含月快照與裁判書；離職率只在期間剛結束時記錄）。裁判書月份＝期間往前推 2 個月。</div>
+    <div class="iw-note">藍色、前面有 ▸ 的指標可以點開，並排列出 A、B 兩期是哪幾家事務所、哪些律師；名單是產報告當下留存的。「—」＝該期沒有這項（週報不含月快照與裁判書；離職率只在期間剛結束時記錄）。裁判書月份＝期間往前推 2 個月。</div>
     <div class="iw-hl" style="display:flex;flex-wrap:wrap;gap:16px;">${hl(A)}${hl(B)}</div>`;
+  if (anyOpen) iwEnsureDet([A.id, B.id]);   // 要放在畫面寫入之後：名單已在快取時它會立刻重畫
 }
 
 function iwRenderTrend(body, list) {
@@ -17588,14 +17696,23 @@ function iwRenderTrend(body, list) {
   if (!keys.includes(_iw.metric)) _iw.metric = keys.includes('firm_to_firm') ? 'firm_to_firm' : keys[0];
   const lab = k => { const r = asc.find(x => (x.metrics || {})[k]); return r ? r.metrics[k].label : k; };
   const unit = (asc.find(x => (x.metrics || {})[_iw.metric]) || { metrics: { [_iw.metric]: {} } }).metrics[_iw.metric].unit || '';
-  const pts = asc.map(r => ({ x: r.period_key, y: typeof ((r.metrics || {})[_iw.metric] || {}).value === 'number' ? r.metrics[_iw.metric].value : null }));
+  const pts = asc.map(r => ({ r, x: r.period_key, y: typeof ((r.metrics || {})[_iw.metric] || {}).value === 'number' ? r.metrics[_iw.metric].value : null }));
+  const drill = !!IW_DET[_iw.metric];
+  const tOpen = drill ? pts.find(p => String(p.r.id) === String(_iw.tOpen) && p.y > 0) : null;
+  const trow = (p, i) => {
+    const can = drill && p.y > 0, isOpen = tOpen === p;
+    return `<tr ${can ? `class="iw-click" onclick="iwToggleTrend('${p.r.id}')" title="點一下看名單"` : ''}><td><span class="iw-caret">${can ? (isOpen ? '▾' : '▸') : ''}</span>${escHtml(p.x)}</td><td class="num">${iwFmt(p.y, unit)}</td><td class="num">${i ? (iwDelta(p.y, pts[i - 1].y, unit) || '—') : '—'}</td></tr>`
+      + (isOpen ? `<tr class="iw-det"><td colspan="3"><div class="iw-det2">${iwDetBlock(_iw.metric, p.r, '')}</div></td></tr>` : '');
+  };
   body.innerHTML = `
     <div class="iw-bar"><span class="iw-meta">指標</span>
       <select class="iw-sel" onchange="_iw.metric=this.value;iwRender()">${keys.map(k => `<option value="${k}" ${k === _iw.metric ? 'selected' : ''}>${escHtml(lab(k))}</option>`).join('')}</select></div>
     <div class="iw-chartbox"><canvas id="iwChart"></canvas></div>
     <div class="iw-twrap" style="margin-top:10px;"><table class="iw-table"><thead><tr><th>期間</th><th class="num">${escHtml(lab(_iw.metric))}</th><th class="num">較前期</th></tr></thead><tbody>
-      ${pts.map((p, i) => `<tr><td>${escHtml(p.x)}</td><td class="num">${iwFmt(p.y, unit)}</td><td class="num">${i ? (iwDelta(p.y, pts[i - 1].y, unit) || '—') : '—'}</td></tr>`).reverse().join('')}
-    </tbody></table></div>`;
+      ${pts.map(trow).reverse().join('')}
+    </tbody></table></div>
+    ${drill ? '<div class="iw-note">藍色、前面有 ▸ 的期間可以點開，看那一期是哪幾家事務所、哪些律師。</div>' : ''}`;
+  if (tOpen) iwEnsureDet([tOpen.r.id]);
   const css = getComputedStyle(document.documentElement);
   const blue = css.getPropertyValue('--blue').trim() || '#4f8ef7';
   const muted = css.getPropertyValue('--text-muted').trim() || '#888';

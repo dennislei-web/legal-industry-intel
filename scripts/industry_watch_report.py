@@ -10,6 +10,7 @@
   python scripts/industry_watch_report.py yearly  [--period 2026]       [--force]
   python scripts/industry_watch_report.py backfill            # 一次補齊 2026-07-27 起所有已完成期間
   python scripts/industry_watch_report.py interpret [--cadence monthly] [--force]   # 幫已存在的報告補（重寫）AI 解讀
+  python scripts/industry_watch_report.py details [--cadence weekly] [--force]      # 幫已存在的報告補指標明細名單（只寫 details 欄）
   （有 ANTHROPIC_API_KEY 時，每產一期會順手呼叫 Claude 寫「AI 解讀」；--no-ai 關掉）
 
 期間與產出日：
@@ -566,6 +567,38 @@ def prev_report(cadence, start):
     return rows[0] if rows else None
 
 
+def fetch_details(start, end, metric_keys):
+    """指標明細名單（mig 291）：{指標 key: [物件…]}，只留本期有的指標＋ _meta。
+    產報告當下取一次就凍結在 details 欄，前端點指標時才讀；這裡不印內容（log 公開）。"""
+    det = http('POST', '/rest/v1/rpc/industry_watch_details', {'p_start': start.isoformat(), 'p_end': end.isoformat()}) or {}
+    return {k: v for k, v in det.items() if k in metric_keys or k.startswith('_')}
+
+
+def details_mismatch(metrics, details):
+    """明細筆數和指標數字對不上的指標數（事後回補舊報告時，新設／熄燈可能因名冊後來變動而不同）"""
+    return sum(1 for k, v in details.items()
+               if isinstance(v, list) and isinstance((metrics.get(k) or {}).get('value'), int) and len(v) != metrics[k]['value'])
+
+
+def backfill_details(cadence, force):
+    """幫已存在的報告補明細名單（只寫 details 欄，不動內文與解讀）"""
+    rows = http('GET', f'/rest/v1/industry_watch_reports?select=period_key,period_start,period_end,metrics,has:details-%3E_meta'
+                       f'&cadence=eq.{cadence}&order=period_end.asc') or []
+    n = 0
+    for r in rows:
+        if r.get('has') and not force:
+            continue
+        start, end = dt.date.fromisoformat(r['period_start']), dt.date.fromisoformat(r['period_end'])
+        det = fetch_details(start, end, set(r.get('metrics') or {}))
+        http('PATCH', f'/rest/v1/industry_watch_reports?cadence=eq.{cadence}&period_key=eq.{r["period_key"]}', {'details': det},
+             {'Prefer': 'return=minimal'})
+        bad = details_mismatch(r.get('metrics') or {}, det)
+        print(f'  ✅ {cadence} {r["period_key"]}：明細 {sum(1 for v in det.values() if isinstance(v, list))} 項'
+              + (f'（{bad} 項筆數與當時數字不同）' if bad else ''))
+        n += 1
+    return n
+
+
 def generate(cadence, start, end, today, use_ai=True):
     key = key_of(cadence, start, end)
     raw = http('POST', '/rest/v1/rpc/industry_watch_metrics', {'p_start': start.isoformat(), 'p_end': end.isoformat()})
@@ -574,6 +607,10 @@ def generate(cadence, start, end, today, use_ai=True):
     row = {'cadence': cadence, 'period_key': key, 'period_start': start.isoformat(), 'period_end': end.isoformat(),
            'title': rep['title'], 'summary': rep['summary'], 'highlights': rep['highlights'], 'sections': rep['sections'],
            'metrics': rep['metrics'], 'raw': raw, 'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(), 'generator': GENERATOR}
+    try:
+        row['details'] = fetch_details(start, end, set(rep['metrics']))
+    except Exception as ex:  # noqa: BLE001  明細取不到不擋報告；之後用 details 模式補
+        print(f'  ⚠️ 明細名單取得失敗（報告照常寫入）：{ex}')
     http('POST', '/rest/v1/industry_watch_reports?on_conflict=cadence,period_key', row,
          {'Prefer': 'resolution=merge-duplicates,return=minimal'})
     print(f'  ✅ {cadence} {key}：{len(rep["sections"])} 段、{len(rep["metrics"])} 項指標')
@@ -608,7 +645,7 @@ def interpret_existing(cadence, force, recent=None):
 def main():
     global URL, KEY
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['auto', 'backfill', 'interpret', 'weekly', 'monthly', 'quarterly', 'yearly'])
+    ap.add_argument('mode', choices=['auto', 'backfill', 'interpret', 'details', 'weekly', 'monthly', 'quarterly', 'yearly'])
     ap.add_argument('--period')
     ap.add_argument('--force', action='store_true', help='不檢查產出日、已存在也重產（interpret 模式＝已有解讀也重寫）')
     ap.add_argument('--no-ai', action='store_true', help='只產規則報告，不呼叫 Claude 解讀')
@@ -622,6 +659,11 @@ def main():
         print('（沒有 ANTHROPIC_API_KEY，本次只產規則報告、不寫 AI 解讀）')
         use_ai = False
     fails = 0
+
+    if a.mode == 'details':
+        for cad in ([a.cadence] if a.cadence else ['weekly', 'monthly', 'quarterly', 'yearly']):
+            print(f'{CADENCE_LABEL[cad]}：補明細 {backfill_details(cad, a.force)} 份')
+        return
 
     if a.mode == 'interpret':
         if not use_ai:
