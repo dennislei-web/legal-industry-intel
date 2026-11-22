@@ -17586,8 +17586,18 @@ const IW_BAND = [
   [m => `期初（${m.snap_begin || '—'}）`, x => iwCnt(x.prev_n), 1],
   ['增減', x => typeof x.prev_n === 'number' ? (x.n - x.prev_n > 0 ? '+' : '') + (x.n - x.prev_n) : '期初不在快照', 1],
 ];
+// 懲戒紀錄整筆消失時，是不是「公開期滿」：律師法第 136 條只公開五年內的警告／申誡／研習，除名與停止執行職務永久公開。
+// 條件＝原紀錄沒有除名或停職，而且每個案號的年度都距異動日五年以上（決議不會早於案號年度，未滿五年就消失的不是期滿）。
+// 不符合的維持寫「紀錄移除」，可能是再審議撤銷或官網更正。
+function iwDiscExpired(x) {
+  const before = String(x.before || '');
+  if (!before || /除名|停止執行職務/.test(before)) return false;
+  const yrs = [...before.matchAll(/(\d{2,3})年度/g)].map(m => +m[1]);
+  const roc = parseInt(String(x.d || '').slice(0, 4), 10) - 1911;
+  return yrs.length > 0 && roc > 0 && yrs.every(y => roc - y >= 5);
+}
 const IW_DET = {
-  closed: [['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['離開人數', x => iwCnt(x.n), 1],
+  closed:[['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['離開人數', x => iwCnt(x.n), 1],
     ['併入去向', x => iwOffice(x.dest)], ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['最後異動日', x => iwTxt(x.d)]],
   opened: [['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['現有人數', x => iwCnt(x.n), 1],
     ['來源事務所', x => x.split_from ? iwOffice(x.split_from) : ((x.from_firms || []).map(iwOffice).join('、') || '—')],
@@ -17603,6 +17613,7 @@ const IW_DET = {
     ['狀態', x => `${iwTxt(x.old_state)} → ${iwTxt(x.new_state)}`]],
   discipline: [['日期', x => iwTxt(x.d)], ['律師', x => lawyerLink(x.name) || '—'], ['登錄單位', x => iwOffice(x.office)],
     ['異動內容', x => x.after ? (x.before ? `變更為：${escHtml(x.after)}（原：${escHtml(x.before)}）` : `新增：${escHtml(x.after)}`)
+      : iwDiscExpired(x) ? `<span title="律師法第 136 條：警告、申誡、研習只公開五年，期滿自法務部查詢系統下架，不是懲戒被撤銷">公開期滿下架（滿五年；原：${escHtml(x.before)}）</span>`
       : `紀錄移除${x.before ? `（原：${escHtml(x.before)}）` : ''}`, 0, 1]],
   firms_30plus: IW_BAND,
   firms_10_29: IW_BAND,
