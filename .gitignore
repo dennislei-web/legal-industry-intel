@@ -47,6 +47,9 @@ scripts/achievement_monthly.log
 
 # 司法院官方案件統計月更 launcher 本機 log
 scripts/judicial_official_stats_monthly.log
+# 2026-11-22 搬本機的兩支月更 launcher log（closed-case-stats-monthly／judgment-stats-monthly 排程）
+scripts/closed_case_stats_monthly.log
+scripts/judgment_stats_monthly.log
 
 # 產業觀察 AI 解讀本機 launcher log（含人名異動，不進公開 repo）
 scripts/industry_watch_local.log
