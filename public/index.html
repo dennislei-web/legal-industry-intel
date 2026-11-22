@@ -3136,6 +3136,7 @@
           事務所名以「截到第一個法律/律師事務所」正規化合併分所；同名事務所改名（如「兆民」↔「兆民國際」）會被視為兩所、可能出現在矩陣中。
           總表「狀態」欄的改名判定（migration 146）：以「流失律師的最大單一去向 ≥ 6 成且該所仍有在職律師」認定整所遷移，
           去向所本身是新設所記為<strong>改名</strong>、既有所記為<strong>併入</strong>；改名/併入/轉未登錄屬招牌或登錄異動，非真實開關。
+          去向雖是既有所，但新舊所名幾乎相同（去掉法律／律師／國際／聯合等通用字後相同，或等長只差一字，多半是名冊錯字更正）也記為<strong>改名</strong>，不算併入（migration 292）。
           分批搬遷（如博欽 5 人分 18 天轉入亞司特博欽）仍會被歸為同一組，故不設日期窗。<br>
           企業法務、公職等非事務所去向歸入「進入/離開執業」與總表「其他進出」，不計入跨所矩陣。<br>
           ※ 法務部名冊未登錄／不公開事務所者（空白或標示「律師未顯示」）視為<strong>未登錄</strong>，不是一間事務所，
@@ -14890,12 +14891,14 @@ let _ovRows = [], _ovFilter = 'all', _ovQuery = '', _ovSortK = 'net', _ovSortDir
 const OV_STATUS = {
   closed_shutdown: { label: '熄燈',    color: 'var(--red)',        desc: '名冊查無／停職／未執業／去向分散' },
   closed_unlisted: { label: '轉未登錄', color: 'var(--text-muted)', desc: '律師仍執業，名冊不再揭示所名' },
+  closed_breakup:  { label: '拆夥重組', color: 'var(--purple)',     desc: '過半律師（至少 2 位）轉往同一家新設的所，其餘各自離開；未達整批轉移的六成門檻' },
   closed_merge:    { label: '併入',    color: 'var(--blue)',       desc: '整批律師轉往既有事務所' },
-  closed_rename:   { label: '改名',    color: 'var(--orange)',     desc: '整批律師轉往同時新設的所' },
+  closed_rename:   { label: '改名',    color: 'var(--orange)',     desc: '整批律師轉往同時新設的所，或名冊所名更正（新舊所名幾乎相同）' },
   opened_new:      { label: '新設',    color: 'var(--green)',      desc: '追蹤起始後首次出現，無歸零所整批轉入、也非分家' },
   opened_rename:   { label: '改名而來', color: 'var(--orange)',     desc: '單一歸零所整批轉入' },
   opened_merger:   { label: '整併而來', color: 'var(--blue)',       desc: '多個歸零所整批轉入' },
   opened_spinoff:  { label: '分家而來', color: 'var(--purple)',     desc: '過半律師來自同一個仍在營運的所（原所留人）' },
+  opened_regroup:  { label: '重組而來', color: 'var(--purple)',     desc: '過半律師來自同一個已經歸零的所（原所拆夥，未整批轉入）' },
 };
 const OV_FILTERS = [
   { k: 'all',    label: '全部',          test: () => true },
@@ -14904,7 +14907,7 @@ const OV_FILTERS = [
   { k: 'opened', label: '真新設',        test: r => r.status === 'opened_new' },
   { k: 'closed', label: '真熄燈',        test: r => r.status === 'closed_shutdown' },
   { k: 'spin',   label: '分家',          test: r => r.status === 'opened_spinoff' },
-  { k: 'sign',   label: '招牌/登錄異動', test: r => ['closed_rename', 'closed_merge', 'closed_unlisted', 'opened_rename', 'opened_merger', 'opened_spinoff'].includes(r.status) },
+  { k: 'sign',   label: '招牌/登錄異動', test: r => ['closed_rename', 'closed_merge', 'closed_breakup', 'closed_unlisted', 'opened_rename', 'opened_merger', 'opened_spinoff', 'opened_regroup'].includes(r.status) },
 ];
 // 幅度＝淨變動 ÷ 追蹤起始推估規模（現有 − 淨）；無基期的新設所回 Infinity
 function ovPct(r) {
@@ -17570,7 +17573,7 @@ function iwMetricKeys(rows) {
 // ---- 指標明細名單（mig 291）----
 // industry_watch_reports.details＝{指標 key: [物件…], _meta}，產報告當下凍結；列表不載這一欄，點指標時才單獨讀。
 // 每個指標一組欄位定義：[欄名（字串或 meta=>字串）, 物件=>HTML, 是否數字欄, 是否允許換行（其餘欄不換行、太寬就橫向捲動）]
-const IW_KIND = { new: '全新', spinoff: '拆分', merger: '合併新設', shutdown: '收掉', merge: '併入他所', unlisted: '轉未登錄' };
+const IW_KIND = { new: '全新', spinoff: '拆分', regroup: '重組新設', merger: '合併新設', shutdown: '收掉', merge: '併入他所', breakup: '拆夥重組', unlisted: '轉未登錄' };
 const iwTxt = v => escHtml(v == null || v === '' ? '—' : String(v));
 const iwOffice = f => !f ? '—' : (/事務所/.test(f) ? firmLink(f) : escHtml(f));   // 非事務所（企業法務室等）不連到事務所頁
 const iwNames = a => (a || []).map(n => lawyerLink(n)).join('、') || '—';
@@ -17598,7 +17601,7 @@ function iwDiscExpired(x) {
 }
 const IW_DET = {
   closed:[['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['離開人數', x => iwCnt(x.n), 1],
-    ['併入去向', x => iwOffice(x.dest)], ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['最後異動日', x => iwTxt(x.d)]],
+    ['去向事務所', x => iwOffice(x.dest)], ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['最後異動日', x => iwTxt(x.d)]],
   opened: [['事務所', x => iwOffice(x.firm)], ['型態', x => iwTxt(IW_KIND[x.kind] || x.kind)], ['現有人數', x => iwCnt(x.n), 1],
     ['來源事務所', x => x.split_from ? iwOffice(x.split_from) : ((x.from_firms || []).map(iwOffice).join('、') || '—')],
     ['律師（最多列 6 位）', x => iwNames(x.names), 0, 1], ['首見日', x => iwTxt(x.d)]],
