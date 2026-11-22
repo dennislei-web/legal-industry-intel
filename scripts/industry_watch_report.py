@@ -378,7 +378,9 @@ def build_report(cadence, start, end, r, prev, turnover, moj_flag=None):
     if big_o:
         sec['bullets'].append('2 人以上新設：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{src_word(x) + short(x['split_from']) if x.get('split_from') else ''}）" for x in big_o))
     if big_c:
-        sec['bullets'].append('2 人以上熄燈：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{'→' + short(x['dest']) if x.get('dest') else ''}）" for x in big_c))
+        # 拆夥重組（breakup）的 n 是離開總人數、只有過半去了 dest；寫成「7 人→某所」會被讀成整批併入（2026-11-23 AI 解讀因此寫錯）
+        dest_word = lambda x: ('，過半→' if x.get('kind') == 'breakup' else '→') + short(x['dest']) if x.get('dest') else ''
+        sec['bullets'].append('2 人以上熄燈：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{dest_word(x)}）" for x in big_c))
     foreign = [x for x in r['opened']['top'] if '外國法事務' in (x.get('firm') or '')]
     if foreign:
         sec['bullets'].append(f'其中外國法事務律師事務所 {len(foreign)} 家（前 15 大新設中）')
