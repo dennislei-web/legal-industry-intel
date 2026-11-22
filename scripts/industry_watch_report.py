@@ -271,8 +271,39 @@ def build_metrics(r, cadence, turnover):
     return M
 
 
-def build_report(cadence, start, end, r, prev, turnover):
+MOJ_STALE_TEXT = {
+    'no_update': '⚠️ 本週法務部官網的事務所與公會資料疑似沒有更新：名冊掃描有跑完，但全名冊沒有任何事務所異動（正常每週至少 20 筆）、'
+                 '全國公會人數也和上週相同。本期跨所移動、進入／離開事務所、新設事務所是低估，不代表真的沒有；通常下一週會一次補上。',
+    'no_scan': '⚠️ 本週沒有法務部名冊掃描紀錄（週五本機排程沒跑，多半是電腦關機）。本期跨所移動、進入／離開事務所、新設事務所、執業狀態異動是低估，'
+               '下次掃描會一次補上。',
+    'catch_up': '⚠️ 上一期法務部名冊沒有更新（或掃描沒跑），本期的跨所移動、進入／離開事務所、新設事務所含上一期累積，約為兩週的量，不能直接和平常單週比較。',
+}
+
+
+def moj_week_flag(start, end, r):
+    """週報用：這一週法務部名冊有沒有真的更新。回 None（正常）／'no_scan'（週五掃描沒跑）／'no_update'（掃描有跑但官網內容沒動）。
+    判定：整週沒有任何事務所異動時才往下看——期間內沒有公會人數紀錄（公會人數與名冊掃描同一支週五排程）＝掃描沒跑；
+    有紀錄而且全國公會人數與期初相同＝官網當週批次沒帶進變更（2026-11-14～11-20 首見，細節見 CLAUDE.md）。"""
+    if r['flow'].get('firm_change_all'):
+        return None
+    t0 = f'{start.isoformat()}T00:00:00%2B08:00'
+    t1 = f'{(end + dt.timedelta(days=1)).isoformat()}T00:00:00%2B08:00'
+    rows = http('GET', f'/rest/v1/industry_stats?select=created_at&stat_type=eq.lawyer_count'
+                       f'&created_at=gte.{t0}&created_at=lt.{t1}&limit=1') or []
+    if not rows:
+        return 'no_scan'
+    lc = r['lawyer_count']
+    return 'no_update' if lc.get('end') is not None and lc.get('end') == lc.get('begin') else None
+
+
+def build_report(cadence, start, end, r, prev, turnover, moj_flag=None):
     M = build_metrics(r, cadence, turnover)
+    # 名冊沒更新的加註（只有週報判定）：本期沒更新／上一期沒更新所以本期含累積
+    warn = []
+    if moj_flag in ('no_update', 'no_scan'):
+        warn.append(MOJ_STALE_TEXT[moj_flag])
+    elif cadence == 'weekly' and ((prev or {}).get('flags') or {}).get('moj_stale'):
+        warn.append(MOJ_STALE_TEXT['catch_up'])
     P = (prev or {}).get('metrics') or {}
     pl = PREV_LABEL[cadence]
 
@@ -387,7 +418,7 @@ def build_report(cadence, start, end, r, prev, turnover):
         if cadence == 'yearly':
             todo += ['考選部律師高考放榜人數（供給預測）', '法扶年報、內政部調解通報、公證年報、TIPO 年報等年更頁面', '產業評析（docs/industry_review_2026.md）整份改寫']
         S.append({'heading': '本期待人工檢查', 'bullets': todo})
-    caveats = [f"律師異動自 {DATA_START.isoformat()} 起才可靠，期間早於此日的部分不計。"]
+    caveats = warn + [f"律師異動自 {DATA_START.isoformat()} 起才可靠，期間早於此日的部分不計。"]
     if start <= dt.date(2026, 10, 31) and end >= dt.date(2026, 10, 23):
         caveats.append('⚠️ 2026-10-23～10-29 法務部官網改版、異動偵測停擺；10-30／10-31 新架構首輪掃描一次補登（10-31 單日新進 175 位、新設所大增），'
                        '本期新進律師與新設事務所數字含累積補登，不代表當期真實增量。')
@@ -404,7 +435,7 @@ def build_report(cadence, start, end, r, prev, turnover):
              'yearly': f'產業觀察年報 {start.year} 年'}[cadence]
     if start < DATA_START:
         title += '（異動自 7/27 起）'
-    return {'title': title, 'summary': hl[0] + hl[1] if len(hl) > 1 else (hl[0] if hl else ''), 'highlights': hl,
+    return {'title': title, 'summary': hl[0] + hl[1] if len(hl) > 1 else (hl[0] if hl else ''), 'highlights': warn + hl,
             'sections': S, 'metrics': M}
 
 
@@ -456,6 +487,7 @@ INTERP_SYSTEM = """你是喆律法律事務所主持律師的產業策略分析�
 
 資料口徑（一定要遵守）：
 - 律師異動自 2026-07-27 起才可靠。2026-10-23～10-29 法務部官網改版、異動偵測停擺；10-30／10-31 新架構首輪掃描一次補登（10-31 單日新進 175 位、新設所大增）。涵蓋這段的期間，新進律師與新設事務所數字含累積補登，不能解讀成真實增量。
+- 重點或資料口徑裡若有以 ⚠️ 開頭、說明「法務部名冊本週沒有更新／掃描沒跑」或「本期含上一期累積」的句子，那一期的跨所移動、進入／離開事務所、新設事務所就是低估或兩週合計，不可以解讀成市場真實變化，也不要拿來和前後期算增減；要在 data_cautions 寫明。
 - 週報數字小，單週 ±幾筆的變化多半是雜訊；百分比變化在基數很小時（例如上週 4 筆）沒有意義，不要拿來下結論。
 - 裁判書案量只算公開裁判書（下限）、按現任名冊回溯；月份是期間往前推 2 個月。
 - 公會人數是週更序列，跨會重複計入，看趨勢不看絕對數。
@@ -562,7 +594,7 @@ def existing_keys(cadence):
 
 
 def prev_report(cadence, start):
-    rows = http('GET', f'/rest/v1/industry_watch_reports?select=title,metrics,period_end&cadence=eq.{cadence}'
+    rows = http('GET', f'/rest/v1/industry_watch_reports?select=title,metrics,period_end,flags:raw-%3E_flags&cadence=eq.{cadence}'
                        f'&period_end=lt.{start.isoformat()}&order=period_end.desc&limit=1') or []
     return rows[0] if rows else None
 
@@ -603,7 +635,11 @@ def generate(cadence, start, end, today, use_ai=True):
     key = key_of(cadence, start, end)
     raw = http('POST', '/rest/v1/rpc/industry_watch_metrics', {'p_start': start.isoformat(), 'p_end': end.isoformat()})
     turnover = turnover_now() if cadence != 'weekly' and (today - end).days <= 31 else None
-    rep = build_report(cadence, start, end, raw, prev_report(cadence, start), turnover)
+    moj_flag = moj_week_flag(start, end, raw) if cadence == 'weekly' else None
+    rep = build_report(cadence, start, end, raw, prev_report(cadence, start), turnover, moj_flag)
+    if moj_flag:
+        raw = dict(raw, _flags={'moj_stale': moj_flag})     # 下一期產報告時讀這個旗標，加註「本期含上一期累積」
+        print(f'  ⚠️ 名冊本週沒有更新（{moj_flag}），已加註')
     row = {'cadence': cadence, 'period_key': key, 'period_start': start.isoformat(), 'period_end': end.isoformat(),
            'title': rep['title'], 'summary': rep['summary'], 'highlights': rep['highlights'], 'sections': rep['sections'],
            'metrics': rep['metrics'], 'raw': raw, 'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(), 'generator': GENERATOR}

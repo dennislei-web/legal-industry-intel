@@ -652,6 +652,11 @@
   加新指標要有明細＝函式加一個 key＋`IW_DET` 加欄位定義。舊報告用 `details [--cadence] [--force]` 回補（只寫 `details` 欄）；2026-11-22 回補 21 份，
   只有 8 月初三份的「新設」各差 1 家（前端會註明是事後回補）。
 - 週報在法務部掃描沒跑的週（電腦關機）數字會偏少；2026-10-23～10-31 改版停擺與首輪補登已寫進報告口徑段。
+- **名冊沒更新自動加註（2026-11-23）**：`moj_week_flag()` 只在週報、而且整週 `firm_change_all` 為 0 時判定——期間內沒有 `industry_stats` lawyer_count 紀錄＝週五掃描沒跑（`no_scan`）；
+  有紀錄且全國公會人數與期初相同＝官網當週批次沒帶進變更（`no_update`）。加註句（`MOJ_STALE_TEXT`）放在 highlights 最前面與資料口徑段第一條，旗標存 `raw._flags.moj_stale`；
+  下一期讀到上一期有旗標就加註「本期含上一期累積」。AI 解讀的系統提示也寫了遇到 ⚠️ 加註不可解讀成真實變化。
+  起因：2026-11-14～11-20 掃描 13,559 頁全讀到、連線失敗 0，但轉所 0、公會合計與前週同為 13,626、首頁截止日照常跳到 115/11/19（8 月以來每週至少 20 筆，從沒 0 過）；
+  推測法務部那次週四批次沒帶進公會送的變更（無法證實）。同一週「轉非正常 12、熄燈 6」是 11-16 新增的 404 待複查自動收尾一次清掉 11-06 起累積的佇列。
 - **AI 解讀（mig 274，2026-11-10）**：`interpretation` jsonb（headline／insights[{title,body}]／zhelu／actions／watch／data_cautions）＋`interp_model`＋`interpreted_at`。
   產一期時若有 `ANTHROPIC_API_KEY`（環境變數 → scripts/.env → `ANTHROPIC_KEY_FILE` 指的 .env）就呼叫 Claude（effort high、structured outputs、串流、`fallbacks: "default"`，新模型不收 fallbacks 就退回不帶）。
   **模型（2026-11-10 使用者指定）**：週報固定 `claude-opus-5-5`；月報／季報／年報用**執行當下最新的 Fable**（`interp_model_for()` 以 Models API 取 created_at 最新的 `claude-fable-*`，查不到用 `claude-fable-5-2`）。
