@@ -63,7 +63,13 @@
   **所名更正（mig 292，2026-11-23）**：歸零所的最大去向雖是既有所，但新舊所名幾乎相同（`flow_same_name()`：去掉通用字後相同，或等長只差一字；
   個人所加入別人的所除外）→ kind='rename'、`name_fix=true`，不算併入也不算熄燈；錯字所名若是追蹤期間才出現，新設側同樣標 rename。
   只比對「同一批律師真的從 A 轉到 B」的配對——人名所彼此只差一字的有上百組，不可做全名冊所名相似比對。
-  套用當天手動修正 6 份舊報告的熄燈數與明細（`raw._fixes` 有紀錄；AI 解讀只在 data_cautions 加註、未重寫）。前端對 RPC error 容錯顯示「尚未啟用」
+  套用當天手動修正 6 份舊報告的熄燈數與明細（`raw._fixes` 有紀錄；AI 解讀只在 data_cautions 加註、未重寫）。
+  **拆夥重組／重組新設（mig 293，2026-11-23，以 292 為底，套用順序 292 → 293；重套 292 後必須接著重套 293）**：
+  熄燈側 kind='breakup'＝最大去向未達 6 成，但該去向是追蹤期內新設所、仍有在職律師、收了 >= 2 人且 >= 50% 離開者（帶 dest_firm／dest_moved）；
+  去向是既有所的 50%～60% 仍是 shutdown。新設側 kind='regroup'＝最大單一來源搬來 >= 2 人且佔新所 >= 50%、來源所已歸零、且不在 from_firms
+  （沿用 split_from／split_moved，split_src_left=0；來源所仍留人才是 spinoff）。起因：235 的分家判定在來源所事後歸零時失效，主體來源被 1 人歸零所搶走。
+  下游多出 closed_breakup／opened_regroup 兩個 status（前端 OV_STATUS、IW_KIND、報告腳本 kind_o／kind_c 已加）；離職率（mig 242）不把 breakup 當內部轉換。
+  套用當天改列 5 份舊報告的型態標籤（家數不變；`raw._fixes` 的 breakup_relabel／regroup_relabel）。前端對 RPC error 容錯顯示「尚未啟用」
 - **除名偵測（mig 079）**：舊 API「確定查無」兩段確認——首輪記 `dereg_candidate_at`、下輪仍查無才標 `deregistered_at` +
   state_desc=「名冊查無（推定除名）」（trigger 自動入異動追蹤）。已除名者不計入 `moj_firm_statistics()` 人數與
   `moj_solo_firm_lawyers`；firm modal 清單沉底標「已除名」。**新站沒有「確定查無」訊號**：詳細頁查得到會清除候選／解除除名（自癒），

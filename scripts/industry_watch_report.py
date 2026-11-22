@@ -366,8 +366,9 @@ def build_report(cadence, start, end, r, prev, turnover, moj_flag=None):
                   'table': {'cols': ['律師', '原事務所', '新事務所'], 'rows': [[m['name'], short(m['from']), short(m['to'])] for m in r['moves_list']]}})
     # 事務所新設／熄燈
     ob, cb = r['opened']['by_kind'] or {}, r['closed']['by_kind'] or {}
-    kind_o = {'new': '全新', 'spinoff': '拆分', 'merger': '合併新設', 'rename': '改名'}
-    kind_c = {'shutdown': '收掉', 'merge': '併入他所', 'unlisted': '轉未登錄', 'rename': '改名'}
+    kind_o = {'new': '全新', 'spinoff': '拆分', 'regroup': '重組新設', 'merger': '合併新設', 'rename': '改名'}
+    kind_c = {'shutdown': '收掉', 'merge': '併入他所', 'breakup': '拆夥重組', 'unlisted': '轉未登錄', 'rename': '改名'}
+    src_word = lambda x: '，主體來自' if x.get('kind') == 'regroup' else '，拆自'   # regroup＝來源所已歸零（mig 293）
     sec = {'heading': '事務所新設與熄燈', 'bullets': [
         '新設：' + ('、'.join(f'{kind_o.get(k, k)} {v}' for k, v in ob.items()) or '無'),
         '熄燈：' + ('、'.join(f'{kind_c.get(k, k)} {v}' for k, v in cb.items()) or '無'),
@@ -375,7 +376,7 @@ def build_report(cadence, start, end, r, prev, turnover, moj_flag=None):
     big_o = [x for x in r['opened']['top'] if (x.get('n') or 0) >= 2]
     big_c = [x for x in r['closed']['top'] if (x.get('n') or 0) >= 2]
     if big_o:
-        sec['bullets'].append('2 人以上新設：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{'，拆自' + short(x['split_from']) if x.get('split_from') else ''}）" for x in big_o))
+        sec['bullets'].append('2 人以上新設：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{src_word(x) + short(x['split_from']) if x.get('split_from') else ''}）" for x in big_o))
     if big_c:
         sec['bullets'].append('2 人以上熄燈：' + '、'.join(f"{short(x['firm'])}（{x['n']} 人{'→' + short(x['dest']) if x.get('dest') else ''}）" for x in big_c))
     foreign = [x for x in r['opened']['top'] if '外國法事務' in (x.get('firm') or '')]
