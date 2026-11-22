@@ -13,7 +13,8 @@ MOJ 新站人工查詢清單產生器（2026-10-29 改版後的名冊建表／�
 
 模式：
   （預設）full        一次性建表全清單（約 322 條）
-  --incremental        每週增量：最新年度已知最大號所在段＋往後 --ahead 段、最新年度補證／外檢整系列、
+  --incremental        每週增量：最新年度已知最大號所在段，往前 --back 段（預設 2，回頭查晚到的人）、
+                       往後 --ahead 段；最新年度補證／外檢整系列；跨年前後舊年度續查（見 incremental_queries）；
                        詳細頁 404（page_hash_missing_at）待複查者所在區段的前綴
   --alumni             只出 zhelu_alumni 校友所在的區段（試跑整條鏈用）
   --remaining          （搭配 full／alumni）只留還有「現職且尚無 page_hash」律師的查詢
@@ -113,10 +114,24 @@ def annotate(queries, rows):
     return out
 
 
-def incremental_queries(rows, ahead):
-    """最新年度：臺檢證取最大號所在百號段＋往後 ahead 段；補證／外檢整系列。
-    民國年已跨過 DB 最新年度時（例如 1 月），新年度用同一組段落再出一份（臺檢證編號跨年連續）。"""
-    latest = defaultdict(lambda: (0, 0))  # kind → (year, max num)
+PREV_YEAR_SERIES_MONTHS = 3   # 跨年後前幾個月，補證／外檢續查上一年度整系列
+
+
+def incremental_queries(rows, ahead, back=2, today=None):
+    """臺檢證：最大號所在百號段，往前 back 段（回頭查晚到的人）、往後 ahead 段；補證／外檢整系列。
+
+    回頭查（2026-11-22 加）：官網上同一段的人不是一次到齊——11/15 重查 195 段多出 3 位、
+    108 年 154 段多出 1 位。原本只查最大號那段以後，舊段晚到的人永遠收不到。
+
+    跨年度（臺檢證編號跨年連續，同一個百號段可能前半是舊年度、後半是新年度）：
+      - 民國年已跨過名冊最新年度（1 月還沒有新年度的人）→ 最大號那段起，新年度也各出一條
+      - 名冊已有新年度的人之後，舊年度不能直接丟：回頭查的段若落在舊年度的號碼範圍
+        （≤ 新年度第一段），照樣用舊年度前綴出一條（12 月發證、1 月才上官網的人）
+      - 補證／外檢：最新年度＋當年度；跨年後前 PREV_YEAR_SERIES_MONTHS 個月續查上一年度
+    """
+    today = today or datetime.now()
+    latest = defaultdict(lambda: (0, 0))   # kind → (year, max num)
+    lo, hi = {}, {}                        # 臺檢證：year → 最小／最大百號段
     for r in rows:
         t = lic_triple(r['lic_no'])
         if not t or t[0] is None:
@@ -124,16 +139,32 @@ def incremental_queries(rows, ahead):
         y, k, n = t
         if k in ('臺檢證', '臺檢補證', '外檢證') and (y, n) > latest[k]:
             latest[k] = (y, n)
-    roc_now = datetime.now().year - 1911
-    out = []
+        if k == '臺檢證':
+            b = n // 100
+            lo[y] = min(lo.get(y, b), b)
+            hi[y] = max(hi.get(y, b), b)
+    roc_now = today.year - 1911
     y, m = latest['臺檢證']
-    years = [y] + ([roc_now] if roc_now > y else [])
-    for yy in years:
-        for b in range(m // 100, m // 100 + ahead + 1):
+    mb = m // 100
+    out = []
+    for b in range(max(mb - back, 0), mb + ahead + 1):
+        years = set()
+        if b >= lo.get(y, mb):
+            years.add(y)                              # 最新年度自己的段
+        if (y - 1) in hi and b <= lo.get(y, mb) and b >= lo[y - 1]:
+            years.add(y - 1)                          # 回頭查的段還在上一年度的號碼範圍
+        if roc_now > y and b >= mb:
+            years.add(roc_now)                        # 新年度還沒有人入庫：從最大號那段起預查
+        for yy in sorted(years):
             out.append(('block', f'{yy}臺檢證字第{b}'))
-        for k in ('臺檢補證', '外檢證'):
-            if latest[k][0]:
-                out.append(('series', f'{yy}{k}字第'))
+    for k in ('臺檢補證', '外檢證'):
+        if not latest[k][0]:
+            continue
+        years = {latest[k][0], roc_now}
+        if today.month <= PREV_YEAR_SERIES_MONTHS:
+            years.add(roc_now - 1)
+        for yy in sorted(years):
+            out.append(('series', f'{yy}{k}字第'))
     return out
 
 
@@ -239,6 +270,7 @@ def main():
     args = sys.argv[1:]
     mode = 'incremental' if '--incremental' in args else 'alumni' if '--alumni' in args else 'full'
     ahead = int(args[args.index('--ahead') + 1]) if '--ahead' in args else 2
+    back = int(args[args.index('--back') + 1]) if '--back' in args else 2
     out_path = args[args.index('--out') + 1] if '--out' in args else os.path.join(WORK_DIR, f'plan_{mode}.csv')
 
     rows = load_lawyers()
@@ -255,7 +287,7 @@ def main():
         items = annotate(picked, rows)
         abnormal = [r for r in abnormal if r['lic_no'] in lics]
     else:
-        items = annotate(incremental_queries(rows, ahead), rows)
+        items = annotate(incremental_queries(rows, ahead, back), rows)
         items += missing_items(rows, queries)
         abnormal = []
 
