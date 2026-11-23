@@ -68,7 +68,7 @@
   熄燈側 kind='breakup'＝最大去向未達 6 成，但該去向是追蹤期內新設所、仍有在職律師、收了 >= 2 人且 >= 50% 離開者（帶 dest_firm／dest_moved）；
   去向是既有所的 50%～60% 仍是 shutdown。新設側 kind='regroup'＝最大單一來源搬來 >= 2 人且佔新所 >= 50%、來源所已歸零、且不在 from_firms
   （沿用 split_from／split_moved，split_src_left=0；來源所仍留人才是 spinoff）。起因：235 的分家判定在來源所事後歸零時失效，主體來源被 1 人歸零所搶走。
-  下游多出 closed_breakup／opened_regroup 兩個 status（前端 OV_STATUS、IW_KIND、報告腳本 kind_o／kind_c 已加）；離職率（mig 242）不把 breakup 當內部轉換。
+  下游多出 closed_breakup／opened_regroup 兩個 status（前端 OV_STATUS、IW_KIND、報告腳本 kind_o／kind_c 已加）；離職率 `firm_turnover_stats()` 自 mig 294 起把 breakup 比照 rename／merge 當內部轉換，整所離開者不計（含沒跟去新所的少數人）；已凍結的報告數字不回改（月報 2026-10 的 13.8% 是舊口徑）。
   套用當天改列 5 份舊報告的型態標籤（家數不變；`raw._fixes` 的 breakup_relabel／regroup_relabel）。前端對 RPC error 容錯顯示「尚未啟用」
 - **除名偵測（mig 079）**：舊 API「確定查無」兩段確認——首輪記 `dereg_candidate_at`、下輪仍查無才標 `deregistered_at` +
   state_desc=「名冊查無（推定除名）」（trigger 自動入異動追蹤）。已除名者不計入 `moj_firm_statistics()` 人數與

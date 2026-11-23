@@ -1177,7 +1177,7 @@
           <div style="font-size:0.78rem;font-weight:600;margin:14px 0 4px;">20 人以上事務所（年化離職率高→低，只計 7/27 起）</div>
           <div id="foTurnFirms"><div class="loading">載入中</div></div>
           <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;line-height:1.6;">
-            口徑＝觀察期內離開該所的律師（去他所／轉未登錄／退出執業，每人每所計一次；離開後回原所不計；整所改名或併入他所視同內部轉換不計）÷ 觀察期月快照平均人數，再乘 365／觀察天數年化。
+            口徑＝觀察期內離開該所的律師（去他所／轉未登錄／退出執業，每人每所計一次；離開後回原所不計；整所改名、併入他所或拆夥重組視同內部轉換不計）÷ 觀察期月快照平均人數，再乘 365／觀察天數年化。
             名冊人數含老闆與合夥人、且律師離職後常延遲或未變更登錄，故為<b>下限估計</b>；1 人所的「離開」＝收掉自己的所，不併入合計。單所人數少，一兩位異動即大幅擺動，請看分組合計。
           </div>
         </div>
@@ -6096,7 +6096,7 @@ async function loadFoFlowSnapshot() {
   } catch (e) { inBox.innerHTML = rankFailMsg(e); outBox.innerHTML = ''; }
 }
 
-// 律師離職率（年化）：firm_turnover_stats RPC（mig 242）；分組合計＋20 人以上各所
+// 律師離職率（年化）：firm_turnover_stats RPC（mig 242；mig 294 起拆夥重組也算內部轉換）；分組合計＋20 人以上各所
 async function loadFoTurnover() {
   const noteEl = document.getElementById('foTurnNote'), bandBox = document.getElementById('foTurnBands'),
         firmBox = document.getElementById('foTurnFirms');
