@@ -4650,8 +4650,9 @@
             </div>
             <div class="form-group" style="margin-bottom:0;">
               <label>角色</label>
-              <select id="newUserRole">
+              <select id="newUserRole" title="檢視者：看得到管理員才有的頁面，但看不到 010 合作律師與帳號管理，也不能改資料">
                 <option value="user">一般使用者</option>
+                <option value="viewer">檢視者（管理員頁面唯讀，不含 010）</option>
                 <option value="admin">管理員</option>
               </select>
             </div>
@@ -4746,6 +4747,10 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { globa
 let currentUser = null;
 let isAdmin = false;        // 套用視角後的生效值：所有「admin 才看得到」的分頁／按鈕都看這個
 let realIsAdmin = false;    // 真實角色（user_profiles.role === 'admin'）
+let realRole = 'user';      // 真實角色：admin｜viewer｜user
+// 檢視者 viewer（mig 295）：看得到 adminOnly 的分頁與區塊（isAdmin 為 true），但不是管理員——
+// 寫入按鈕、帳號管理、010 合作律師看 canManage（只有 admin 為 true）。資料庫另有 RLS 把關，這裡只管畫面。
+let canManage = false;      // 套用視角後的生效值
 
 // ============================================================
 // 視角預覽（仿喆律儀表板 shared/view-as.js）
@@ -4760,11 +4765,16 @@ function getViewAs() {
 function setViewAs(v) {
   try { if (v) localStorage.setItem(VIEWAS_KEY, JSON.stringify(v)); else localStorage.removeItem(VIEWAS_KEY); } catch (e) {}
 }
-// 視角套用後的生效 isAdmin：非 admin 永遠是自己；admin 依所選視角決定
-function effectiveIsAdmin() {
-  if (!realIsAdmin) return false;
+// 視角套用後的生效角色：非 admin 永遠是自己；admin 依所選視角決定
+function effectiveRole() {
+  if (!realIsAdmin) return realRole;
   const v = getViewAs();
-  return !v || v.role === 'admin';
+  return v ? (v.role || 'user') : 'admin';
+}
+// 生效 isAdmin＝看得到 adminOnly 內容（admin 與 viewer）；能不能改資料／管帳號另看 canManage
+function effectiveIsAdmin() {
+  const r = effectiveRole();
+  return r === 'admin' || r === 'viewer';
 }
 let viewAsUsers = [];
 async function installViewAsSelector() {
@@ -4774,16 +4784,19 @@ async function installViewAsSelector() {
   const { data } = await db.from('user_profiles').select('id,email,display_name,role,is_active').order('display_name');
   viewAsUsers = (data || []).filter(u => u.id !== currentUser.id && u.is_active !== false);
   const admins = viewAsUsers.filter(u => u.role === 'admin');
-  const users = viewAsUsers.filter(u => u.role !== 'admin');
+  const viewers = viewAsUsers.filter(u => u.role === 'viewer');
+  const users = viewAsUsers.filter(u => u.role !== 'admin' && u.role !== 'viewer');
   const opt = (u, icon) => `<option value="as:${u.id}">${icon} ${escHtml(u.display_name || u.email)}</option>`;
   let html = '<optgroup label="角色視角">'
     + '<option value="real">&#128273; 真實視角（管理員）</option>'
+    + '<option value="viewer">&#128065; 檢視者</option>'
     + '<option value="user">&#128100; 一般使用者</option></optgroup>';
   if (admins.length) html += '<optgroup label="管理員帳號">' + admins.map(u => opt(u, '&#128272;')).join('') + '</optgroup>';
+  if (viewers.length) html += '<optgroup label="檢視者帳號">' + viewers.map(u => opt(u, '&#128065;')).join('') + '</optgroup>';
   if (users.length) html += '<optgroup label="一般使用者帳號">' + users.map(u => opt(u, '&#128100;')).join('') + '</optgroup>';
   sel.innerHTML = html;
   const cur = getViewAs();
-  sel.value = !cur ? 'real' : (cur.mode === 'as' ? 'as:' + cur.id : 'user');
+  sel.value = !cur ? 'real' : (cur.mode === 'as' ? 'as:' + cur.id : (cur.role === 'viewer' ? 'viewer' : 'user'));
   if (sel.selectedIndex < 0) { sel.value = 'real'; setViewAs(null); }   // 帳號已刪或停用 → 退回真實視角
   sel.classList.toggle('previewing', sel.value !== 'real');
   sel.style.display = '';
@@ -4792,6 +4805,7 @@ async function installViewAsSelector() {
 function onViewAsChange(val) {
   if (val === 'real') setViewAs(null);
   else if (val === 'user') setViewAs({ mode: 'role', role: 'user', label: '一般使用者' });
+  else if (val === 'viewer') setViewAs({ mode: 'role', role: 'viewer', label: '檢視者' });
   else {
     const u = viewAsUsers.find(x => 'as:' + x.id === val);
     setViewAs(u ? { mode: 'as', id: u.id, role: u.role, label: u.display_name || u.email } : null);
@@ -4955,8 +4969,10 @@ async function showDashboard() {
       handleLogout();
       return;
     }
-    realIsAdmin = profile?.role === 'admin';
-    isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false
+    realRole = profile?.role || 'user';
+    realIsAdmin = realRole === 'admin';
+    isAdmin = effectiveIsAdmin();   // admin 若選了「一般使用者」視角，這裡會是 false；檢視者（viewer）為 true
+    canManage = effectiveRole() === 'admin';   // 寫入按鈕、帳號管理、010 合作律師只給真正的管理員
     if (isAdmin && typeof _foLoaded !== 'undefined' && _foLoaded) initFmAreaMode();   // 事務所總覽若已先載入（當時還不知道是 admin）：版圖若停在「依業務領域」，重畫補上官網欄
     document.getElementById('navBtn_zhelu').style.display = isAdmin ? '' : 'none';
     document.getElementById('navBtn_system').style.display = isAdmin ? '' : 'none';   // 系統區（資料來源／帳號管理）只給 admin
@@ -5039,7 +5055,7 @@ const SECTIONS = {
   zhelu: [
     { tab: 'watch', label: '產業觀察', adminOnly: true },
     { tab: 'alumni', label: '喆律校友會', adminOnly: true },
-    { tab: 'law010', label: '010 合作律師', adminOnly: true },
+    { tab: 'law010', label: '010 合作律師', adminOnly: true, managerOnly: true },   // 檢視者看不到（view 內也只認 admin，mig 075）
     { tab: 'deepreport', label: '產業深度報告', adminOnly: true },
     { tab: 'nlwatch', label: '併購觀察名單', adminOnly: true },
     { tab: 'fieldnotes', label: '合夥人訪談筆記', adminOnly: true },
@@ -5047,9 +5063,11 @@ const SECTIONS = {
   ],
   system: [
     { tab: 'sources', label: '資料來源', adminOnly: true },
-    { tab: 'admin', label: '帳號管理', adminOnly: true },
+    { tab: 'admin', label: '帳號管理', adminOnly: true, managerOnly: true },
   ],
 };
+// 分頁可見性：adminOnly＝管理員與檢視者；managerOnly＝只有管理員（010 合作律師、帳號管理）
+function tabVisible(t) { return (!t.adminOnly || isAdmin) && (!t.managerOnly || canManage); }
 // 導覽狀態記憶：閒置分頁被瀏覽器休眠回收後重載，回復上次停留的頁面（不再跳回預設「律師」）
 let navState = {};
 try { navState = JSON.parse(localStorage.getItem('navState') || '{}') || {}; } catch (e) { navState = {}; }
@@ -5067,7 +5085,7 @@ function showSection(sec) {
   if (navBtn) navBtn.classList.add('active');
 
   const bar = document.getElementById('subTabsBar');
-  const tabs = (SECTIONS[sec] || []).filter(t => !t.adminOnly || isAdmin);
+  const tabs = (SECTIONS[sec] || []).filter(tabVisible);
   if (tabs.length) {
     bar.style.display = '';
     // group 屬性變化時插入分組標籤（目前用於 產業分析：訴訟與需求端 / 鄰接市場與人力）
@@ -5090,7 +5108,9 @@ function showSection(sec) {
 }
 
 function showTab(tab) {
-  if ((SECTIONS[currentSection] || []).some(t => t.tab === tab)) lastTabBySection[currentSection] = tab;
+  const tabDef = (SECTIONS[currentSection] || []).find(t => t.tab === tab);
+  if (tabDef && !tabVisible(tabDef)) return;   // 這個角色看不到的分頁（例：檢視者點到 010 合作律師）不切過去
+  if (tabDef) lastTabBySection[currentSection] = tab;
   navState.section = currentSection;
   saveNavState();
   trackTabView(tab);
@@ -5129,13 +5149,13 @@ function showTab(tab) {
   if (tab === 'changes') { initChgTab(); loadChanges(); loadFirmFlow(); }
   if (tab === 'corpmap') initCorpTab();  // 企業版圖：clients/inhouse 由 switchCorpTab 各自 lazy load
   if (tab === 'alumni' && isAdmin) loadAlumni();
-  if (tab === 'law010' && isAdmin) loadLaw010();
+  if (tab === 'law010' && canManage) loadLaw010();
   if (tab === 'judges') loadJudges();
   if (tab === 'courts') loadCourts();
   if (tab === 'judge-changes') { loadJudgeChanges(); loadJudgeDiscipline(); }
   if (tab === 'prosecutors') { loadProsecutorOverviewOnce(); loadProsecutors(); }
   if (tab === 'sources') loadSources();
-  if (tab === 'admin' && isAdmin) loadAdminUsers();
+  if (tab === 'admin' && canManage) loadAdminUsers();
   if (tab === 'jstat-causes') { loadCausesOnce(); loadRepCurveOnce(); }
   else if (tab.startsWith('jstat-')) loadJstatTab(tab);
 }
@@ -8836,7 +8856,7 @@ async function showFirmDetail(firmName) {
             const fromOverride = !!(LEADER_OVERRIDES && LEADER_OVERRIDES.get(l.name));
             const jsName = escHtml(l.name).replace(/'/g, "\\'");
             const jsFirm = escHtml(firmName).replace(/'/g, "\\'");
-            const adminBtn = !isAdmin ? '' : (fromOverride
+            const adminBtn = !canManage ? '' : (fromOverride
               ? ` <a href="#" class="leader-mark-btn" onclick="unmarkFirmLeader('${jsName}','${jsFirm}');return false;" title="移除前台所長標註" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">✕</a>`
               : (!isLeader ? ` <a href="#" class="leader-mark-btn" onclick="markFirmLeader('${jsName}','${jsFirm}');return false;" title="標註為所長／負責人" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;margin-left:4px;">＋👑</a>` : ''));
             return `<tr${isLeader ? ' style="background:rgba(201,168,76,0.08);"' : ''}>
@@ -11784,7 +11804,7 @@ function renderPageSources(sources) {
   const freqLabel = f => ({ daily: '每日', weekly: '每週', monthly: '每月', yearly: '每年', manual: '手動' }[f] || f || '-');
   const rows = [];
   for (const [sec, tabs] of Object.entries(SECTIONS)) {
-    const visTabs = tabs.filter(t => !t.adminOnly || isAdmin);
+    const visTabs = tabs.filter(tabVisible);
     if (!SECTION_LABELS[sec] || !visTabs.length) continue;
     rows.push(`<tr><td colspan="2" style="background:var(--bg-row);font-weight:600;color:var(--gold-light);font-size:0.78rem;">${SECTION_LABELS[sec]}</td></tr>`);
     for (const t of visTabs) {
@@ -12122,7 +12142,7 @@ async function deleteAlumnus(id, name) {
 async function loadAlumni() {
   if (_alumniRows) return;
   const addBtn = document.getElementById('alumniAddBtn');
-  if (addBtn) addBtn.style.display = isAdmin ? '' : 'none';
+  if (addBtn) addBtn.style.display = canManage ? '' : 'none';
   const { data, error } = await db.from('zhelu_alumni').select('*');
   if (error || !data) {
     document.getElementById('alumniTableBody').innerHTML =
@@ -12257,10 +12277,10 @@ function renderAlumniTable() {
     const lsn = d.lawsnote_url ? ` <a href="${escHtml(d.lawsnote_url)}" target="_blank" title="Lawsnote 個人頁" style="color:var(--blue);text-decoration:none;">&#8599;</a>` : '';
     const exp = (d.lawsnote_expertise || []).slice(0, 3).map(e =>
       `<span style="display:inline-block;background:var(--ghost-bg);border:1px solid var(--border);color:var(--text-muted);border-radius:10px;padding:1px 7px;font-size:0.7rem;margin:2px 2px 0 0;">${escHtml(e)}</span>`).join('');
-    const exclBtn = !isAdmin ? '' : (d.moj_exclude
+    const exclBtn = !canManage ? '' : (d.moj_exclude
       ? ` <a href="#" class="leader-mark-btn" onclick="toggleAlumnusMojExclude(${d.id});return false;" title="已標「MOJ 同名非本人」，點擊取消排除" style="font-size:0.72rem;text-decoration:none;">⛔</a>`
       : ` <a href="#" class="leader-mark-btn" onclick="toggleAlumnusMojExclude(${d.id});return false;" title="標示 MOJ 名冊同名非本人（清除比對到的去向並排除每週自動同步）" style="font-size:0.72rem;text-decoration:none;opacity:0.45;">⛔</a>`);
-    const delBtn = (isAdmin && d.is_manual)
+    const delBtn = (canManage && d.is_manual)
       ? ` <a href="#" class="leader-mark-btn" onclick="deleteAlumnus(${d.id},'${escHtml(d.name).replace(/'/g, "\\'")}');return false;" title="刪除這筆手動新增的校友" style="font-size:0.72rem;color:var(--red);text-decoration:none;">✕</a>`
       : '';
     return `<tr>
@@ -12271,7 +12291,7 @@ function renderAlumniTable() {
       <td>${firm}${lsn}${exp ? '<div>' + exp + '</div>' : ''}</td>
       <td>${escHtml(d.current_region || '—')}</td>
       <td>${d.lawsnote_cases != null ? d.lawsnote_cases : '—'}</td>
-      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${escHtml(d.note || '')}${isAdmin ? ` <a href="#" class="leader-mark-btn" onclick="editAlumnusNote(${d.id});return false;" title="編輯備註" style="font-size:0.72rem;text-decoration:none;">✏️</a>` : ''}</td>
+      <td style="font-size:0.74rem;color:var(--text-muted);max-width:220px;">${escHtml(d.note || '')}${canManage ? ` <a href="#" class="leader-mark-btn" onclick="editAlumnusNote(${d.id});return false;" title="編輯備註" style="font-size:0.72rem;text-decoration:none;">✏️</a>` : ''}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="loading">無符合條件的校友</td></tr>';
   document.getElementById('alumniCount').textContent = `顯示 ${rows.length} / ${_alumniRows.length} 位`;
@@ -12997,6 +13017,8 @@ function renderAdminUsers() {
       <td style="text-align:right;color:var(--text-muted);">—</td>`;
     const roleBadge = u.role === 'admin'
       ? '<span style="color:var(--gold-light);font-weight:600;">&#128272; 管理員</span>'
+      : u.role === 'viewer'
+      ? '<span style="color:var(--text);">&#128065; 檢視者</span>'
       : '<span style="color:var(--text-muted);">&#128100; 使用者</span>';
     const statusBadge = u.is_active
       ? '<span style="color:var(--green);">啟用</span>'
@@ -13010,6 +13032,7 @@ function renderAdminUsers() {
         ${isSelf ? roleBadge : `<select style="background:var(--bg-row);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:0.82rem;cursor:pointer;"
           onchange="changeUserRole('${u.id}', this.value, this)">
           <option value="user" ${u.role === 'user' ? 'selected' : ''}>&#128100; 使用者</option>
+          <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''} title="看得到管理員才有的頁面，但看不到 010 合作律師與帳號管理，也不能改資料">&#128065; 檢視者</option>
           <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>&#128272; 管理員</option>
         </select>`}
       </td>
@@ -13065,7 +13088,7 @@ async function createUser() {
 }
 
 async function changeUserRole(userId, newRole, selectEl) {
-  const label = newRole === 'admin' ? '管理員' : '使用者';
+  const label = newRole === 'admin' ? '管理員' : newRole === 'viewer' ? '檢視者（管理員頁面唯讀，不含 010 合作律師與帳號管理）' : '使用者';
   const user = adminUsers.find(u => u.id === userId);
   if (!confirm(`確定將「${user?.display_name || user?.email}」設為「${label}」？`)) {
     selectEl.value = user?.role || 'user';

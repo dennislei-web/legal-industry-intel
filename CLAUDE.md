@@ -36,7 +36,11 @@
 - **檢察官姓名雜訊（migration 066，2026-07）**：舊版抽取 regex 允許 `\s` 跨換行，「…檢察署檢察官\n被　告　○○」會把被告名抓成檢察官，359 月累積 ~1 萬個假名（「累計具名人數」曾膨脹到 17,752）。已刪歷史假名列＋`prosecutor_active_summary().names_total` 改「跨 ≥12 個資料月」門檻（=2,646）；`judgment_stats.py` 的 `RE_PROS_*` 改僅容許水平空白＋擴充 `RE_PROS_BAD`（**停用字與 066 清洗 pattern 同步，改一邊要同步另一邊**）。殘餘零星假名（像真人名的誤抓被告）仍在 month_stats，靠門檻擋在 KPI 外
 - `moj_lawyer_changes` — 律師異動紀錄（事務所變更/新進/執業狀態/懲戒記錄），由 `moj_lawyers` 上的 trigger `moj_lawyers_log_change` 自動寫入（migration 024；懲戒 `discipline_change` 是 mig 254 加的，舊／新內容原樣存 old/new_discipline，判定比「案號集合」——舊 HTML 換新站純文字不記。統計函數讀這張表一律要篩 change_type），前端「異動追蹤」tab 讀取；律師 modal 另有「登錄單位異動歷程」卡（`renderLawyerFirmHistoryCard`，按證號列 firm_change/state_change 時間軸，new_lawyer 事件因補掃入庫噪音不列）
 - `lawyer_members` — 律師公會會員（按地區公會）
-- `user_profiles` — 使用者角色 (admin/user)
+- `user_profiles` — 使用者角色 (admin/viewer/user)。**viewer＝檢視者（mig 295，2026-11-23）**：看得到 adminOnly 的分頁與區塊，
+  但看不到「010 合作律師」「帳號管理」、不能寫入。DB：讀取 policy 用 `is_intel_viewer()`（admin＋viewer），寫入／帳號／010 仍用
+  `is_intel_admin()` 或 `role='admin'`；前端：`isAdmin`＝看得到（admin＋viewer）、`canManage`＝真正的管理員（寫入按鈕、`managerOnly` 分頁）。
+  **新增 admin-only 的表**：給檢視者看就用 `is_intel_viewer()`，不給就用 `is_intel_admin()`；新的寫入按鈕一律看 `canManage`。
+  不要為了「多看幾頁」把人設成 admin——admin 能重設共用 auth 池裡任何人的密碼，也是霸凌戰情室的管理員
 
 - `firm_headcount_snapshots` — 事務所規模月快照（migration 195，2026-09-13）：snapshot_month('YYYY-MM'＝該月月底) × firm_key（口徑同 `moj_firm_statistics()`：現職、排除名/「律師未顯示」、分所歸戶；含公司法人，`is_firm`=名稱含「事務所」）。`take_firm_size_snapshot(p_month, p_asof, p_note)` 冪等整月覆寫，`firm-size-snapshot-monthly.yml` 每月 1 日台北 00:30 拍上月；`firm_headcount_as_of(p_asof)` 用 moj_lawyer_changes 倒推歷史（只能回到追蹤起點 2026-07-03，2026-06~08 為倒推回填、note 有標）；前端「事務所總覽＞事務所規模分布」卡下方 `loadFirmSizeTrend()` 讀 `firm_size_trend()`。
 - `field_note_dimensions` / `firm_field_notes` / `firm_field_facts` / `field_note_overviews` / `interview_market_bands` — 合夥人訪談筆記（migration 196–208，**全部 admin-only**）：雷拜訪各所律師的口述（面談＝拜訪，`channel` 只允許 拜訪／面試筆記彙整）＋北所面試筆記彙整→依 `docs/field-notes/README.md` 拆成維度×對象所×數值×信心的原子觀察。`db_crosscheck` 只放本站佐證（`crosscheck_kind` evidence／pointer），跨訪談互證放 `corroboration`，面試筆記查核狀態放 `verification_status`（mig 202）；受訪者姓名只在 `firm_field_notes.interviewee`，顯示欄位不放人名（mig 204 遮名 lint）。前端：喆律戰情＞合夥人訪談筆記三層（總覽面向磚→面向頁概述／關鍵數字／市場帶／各所陳述→行內展開），事務所 modal「田野筆記」tab（本所自述／他人談本所）；概述存 `field_note_overviews`（Claude 撰寫、雷核定、只走 migration，`field_note_overview_status` view 查落後）。寫入走新 migration，不做前端表單；內容不得進 `ai_analysis` 公開文。**本 repo 公開：含拜訪或面試筆記內容的 migration 只存本機（`.git/info/exclude`），不得 commit。**
