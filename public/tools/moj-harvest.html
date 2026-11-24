@@ -178,7 +178,7 @@
       $('bmLink').href = 'javascript:' + encodeURIComponent(code);
       $('bmLink').onclick = function (e) { e.preventDefault(); alert('請把這個按鈕「拖」到書籤列，再到法務部查詢結果頁按書籤。'); };
       $('copyCode').onclick = function () { copy(code, $('copyCode')); };
-      if (!/github\.io$/.test(location.hostname)) $('bmNote').textContent = '（測試版：資料會送回 ' + location.host + '）';
+      if (!/(github\.io|^intel\.zhelu\.tw)$/.test(location.hostname))$('bmNote').textContent = '（測試版：資料會送回 ' + location.host + '）';
     }).catch(function () { $('bmNote').textContent = '讀不到 moj-harvest.js，書籤無法產生'; });
   }
 
