@@ -13,7 +13,7 @@
  */
 (function () {
   var PAGE = '__HARVEST_PAGE__';
-  if (!/^https?:/.test(PAGE)) PAGE = 'https://dennislei-web.github.io/legal-industry-intel/tools/moj-harvest.html';
+  if (!/^https?:/.test(PAGE)) PAGE = 'https://intel.zhelu.tw/tools/moj-harvest.html';
 
   if (location.hostname !== 'lawyerbc.moj.gov.tw') {
     alert('請在法務部律師查詢系統（lawyerbc.moj.gov.tw）的查詢結果頁使用。');
